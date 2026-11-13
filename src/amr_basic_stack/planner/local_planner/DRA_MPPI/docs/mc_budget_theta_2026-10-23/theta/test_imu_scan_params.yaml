@@ -1,0 +1,23 @@
+rviz_theta_star_node:
+  ros__parameters:
+    base_frame: base_footprint
+    endpoint_snap_radius: 0.5
+    goal_topic: /theta_timing/goal
+    initial_pose_grace_period: 2.0
+    initial_pose_topic: /theta_timing/initial
+    map: test_imu_scan
+    map_frame: map
+    maps_dir: /home/smoc/2026amr_ws/src/amr_basic_stack/planner/global_planner/maps
+    path_topic: /theta_timing/global_path
+    path_validation_frequency: 1.0
+    require_initial_pose: true
+    robot_size: 0.4
+    tf_timeout: 0.2
+    transform_max_age: 0.5
+    traversable_map_timeout: 2.0
+    traversable_map_topic: /theta_timing/traversable
+    traversable_unknown_is_obstacle: false
+    use_traversable_map: true
+    waypoint_interval: 0.1
+    waypoint_marker_size: 0.06
+    waypoint_marker_topic: /theta_timing/waypoints

@@ -1,0 +1,14 @@
+{
+  "source_sha256": {
+    "planner/local_planner/DRA_MPPI/tools/gap_value_prototype.py": "09c29c51c3ffad5829e4c853b063beaec573fb676b623edda414bc617596139c",
+    "planner/local_planner/DRA_MPPI/tools/experiment_gap_value_optimization.py": "cc31b98dfedca0e796ab475bd7b56b04a64ef197f802060418b4646da01c9eb4",
+    "planner/local_planner/DRA_MPPI/tools/render_gap_value_experiment.py": "af738c57f2f177e1a3fbb4f28dc88e357586b96905b0a8d2dd783a6465da5751"
+  },
+  "png_count": 19,
+  "quality_comparison": {
+    "lower": 6,
+    "higher": 4,
+    "within_0.001": 6
+  },
+  "cpu": "Intel(R) Core(TM) 5 210H"
+}

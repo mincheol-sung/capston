@@ -1,0 +1,38 @@
+motion_predictor_node:
+  ros__parameters:
+    tracked_modes_topic: /tracked_object_modes
+    predictions_topic: /predictions
+    prediction_dt: 0.20
+    # DRA uses 2.0 s; the extra 0.5 s covers its prediction_timeout latency.
+    prediction_horizon: 2.5
+
+    # false keeps the current posterior weights along each persistent mode.
+    # true runs measurement-free IMM interaction and mean-sojourn TPM at every
+    # future step. Enable after the sojourn/process parameters are calibrated.
+    propagate_mode_probabilities: false
+
+    # Must match object_tracker's motion-model parameters.
+    sigma_a: 1.0
+    sigma_a_ct: 0.7
+    sigma_omega_cv: 0.15
+    sigma_omega_ct: 0.5
+    sigma_omega0: 1.0
+    cv_omega_decay_time: 0.25
+    minimum_mode_probability: 0.0001
+    sigma_position_static: 0.04
+    static_velocity_decay_time: 0.10
+
+prediction_markers_node:
+  ros__parameters:
+    # DRA-MPPI의 class whitelist를 통과해 실제 위험 계산에 쓰이는 객체만 표시.
+    predictions_topic: /dra_mppi/predictions_used
+    prediction_markers_topic: /prediction_markers
+
+    # sqrt(chi2_2,0.95): 타원 안에 예측 위치 확률질량의 95%가 들어간다.
+    visualization.covariance_scale: 2.4477
+    visualization.ellipse_segments: 24
+    # 경로/점은 0.2s마다, 무거운 타원은 5칸(1.0s)마다 그리고 끝점은 항상 표시.
+    visualization.covariance_stride: 5
+    visualization.marker_lifetime: 0.5
+    visualization.line_width: 0.025
+    visualization.point_diameter: 0.06

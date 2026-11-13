@@ -1,0 +1,23 @@
+{
+  "scope": "Installed package, ROS_DOMAIN_ID=201, initialization only; no spin, no control commands.",
+  "rows": [
+    {
+      "strategy": "standard",
+      "initialized": true,
+      "nominal_min": 100,
+      "optimization_timeout": 0.05
+    },
+    {
+      "strategy": "guide_conditioned",
+      "initialized": true,
+      "nominal_min": 100,
+      "optimization_timeout": 0.05
+    },
+    {
+      "strategy": "gap",
+      "initialized": true,
+      "nominal_min": 100,
+      "optimization_timeout": 0.05
+    }
+  ]
+}

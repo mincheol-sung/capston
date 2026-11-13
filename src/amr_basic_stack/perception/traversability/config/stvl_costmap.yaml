@@ -1,0 +1,124 @@
+# spatio_temporal_voxel_layer 2.5.5 — 설계문서 §3.3 의 STVL 후보 구성.
+#
+# STVL 은 독립 노드가 아니라 nav2_costmap_2d 의 Layer 플러그인이다. 그래서
+# nav2 네비게이션 스택 전체가 아니라 nav2_costmap_2d 의 **독립 실행 파일**
+# 하나만 띄우고 그 안에 STVL 을 얹는다. 경로 계획기는 관여하지 않는다.
+# 문서 §3.3 의 "자체 프레임워크용 입출력 어댑터와 의존성 분리 범위" 가 이것이다.
+#
+# 입력은 octomap_server 와 똑같이 /traversability/cloud_filtered 다.
+#
+# ★ 6절 원칙과의 충돌 — 반드시 읽을 것
+#   문서 6절은 "시간 경과만으로 빈 공간 확정 금지" 를 규칙으로 정했는데,
+#   STVL 의 기본 동작인 시간 감쇠는 정확히 시간 경과로 voxel 을 제거한다.
+#   그래서 track_unknown_space 를 true 로 두어 관측된 적 없는 셀이
+#   NO_INFORMATION(255) 로 남게 한다. 그러나 **감쇠로 사라진 voxel 은
+#   FREE_SPACE(0) 가 되지 NO_INFORMATION 이 되지 않는다** — costmap_2d 자료구조
+#   자체가 "만료됨" 상태를 갖고 있지 않기 때문이다.
+#   따라서 이 출력을 그대로 통과 가능으로 믿으면 안 된다. §3.3 의 측정지표
+#   "미관측의 빈 공간 오판"(0 이어야 함, 미달 시 탈락) 을 이 구성으로 측정하고,
+#   STVL 을 채택하려면 만료 voxel 을 미확인으로 강등하는 어댑터가 추가로 필요하다.
+costmap:
+  ros__parameters:
+    # 3D 누적 좌표계. octomap_server 의 frame_id 와 같아야 비교가 성립한다(§3.2).
+    global_frame: odom
+    robot_base_frame: base_footprint
+
+    update_frequency: 5.0
+    publish_frequency: 2.0
+    transform_tolerance: 0.3
+
+    # 로컬 윈도우. 로봇을 따라다닌다.
+    rolling_window: true
+    width: 12
+    height: 12
+    # 2D 출력 해상도. traversability_node 와 같은 0.05 m/cell (§3.3 공통 조건).
+    resolution: 0.05
+    origin_x: 0.0
+    origin_y: 0.0
+
+    # 로봇 형상. URDF base_link 충돌박스 0.28584 x 0.18841 m 의 외접원 0.171 m.
+    # Theta* 의 robot_size 0.30 m(폭) 과 같은 뜻이 되도록 반지름 0.15 로 둔다.
+    robot_radius: 0.15
+    footprint_padding: 0.0
+
+    always_send_full_costmap: true
+    track_unknown_space: true
+
+    # 팽창 레이어는 넣지 않는다. 팽창은 Planning 이 자기 footprint 로 한다
+    # (§7.1 "로봇 크기에 따른 영역 확장을 어느 단계에서 적용했는지 명시").
+    plugins: ["stvl_layer"]
+
+    stvl_layer:
+      plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
+      enabled: true
+
+      # ── 시간 감쇠 ─────────────────────────────────────────────────────
+      # voxel_decay: 관측이 끊긴 voxel 이 사라지기까지의 초. 위 경고 참조.
+      # 15 s 는 문서 §6 의 "관측 유효 시간" 미확정 상태에서의 출발점이며,
+      # traversability_node 의 memory_seconds 5 s 보다 길게 잡아 3D 쪽이
+      # 먼저 지워지지 않게 했다.
+      voxel_decay: 15.0
+      # 0 = linear, 1 = exponential, -1 = persistent(감쇠 없음)
+      # 비교 실험에서 -1 로 두면 OctoMap 의 "증거 없으면 해제 안 함" 성질과
+      # 같은 조건이 되어 §3.3 의 사각지대 유지율을 분리 측정할 수 있다.
+      decay_model: 0
+
+      voxel_size: 0.05
+      track_unknown_space: true
+      unknown_threshold: 15
+      mark_threshold: 0
+      update_footprint_enabled: true
+      combination_method: 1
+      origin_z: 0.0
+      # RViz 에서 3D voxel 을 보려면 반드시 true.
+      # ★ 실측 토픽 이름(2026-09-09):
+      #     3D voxel   /voxel_grid        (sensor_msgs/PointCloud2)
+      #     2D costmap /costmap           (nav_msgs/OccupancyGrid)
+      #     레이어 단독 /stvl_layer
+      #   nav2_costmap_2d 독립 노드는 이름이 costmap 이고 네임스페이스가 / 라서
+      #   /costmap/voxel_grid 가 아니라 /voxel_grid 로 나온다.
+      publish_voxel_map: true
+      transform_tolerance: 0.3
+      mapping_mode: false
+      map_save_duration: 60.0
+
+      observation_sources: rgbd_mark rgbd_clear
+
+      # 표시(marking): 점군이 있는 voxel 을 점유로 세운다.
+      rgbd_mark:
+        data_type: PointCloud2
+        topic: /traversability/cloud_filtered
+        marking: true
+        clearing: false
+        obstacle_range: 6.0
+        # 밴드보다 넓게 받아 상부 구조도 3D 에 남긴다. 2D 평탄화는
+        # min/max_obstacle_height 가 아니라 소비자 쪽에서 정한다.
+        min_obstacle_height: -0.30
+        max_obstacle_height: 2.00
+        expected_update_rate: 0.0
+        observation_persistence: 0.0
+        inf_is_valid: false
+        # 전처리 노드가 이미 0.03 m voxel 로 줄였다. 두 번 하지 않는다.
+        voxel_filter: false
+        clear_after_reading: true
+
+      # 해제(clearing): 센서 FOV 를 통과한 광선 위의 voxel 을 지운다.
+      # FOV 는 D455 depth 실측값 — 87도 x 58도.
+      rgbd_clear:
+        data_type: PointCloud2
+        topic: /traversability/cloud_filtered
+        marking: false
+        clearing: true
+        max_z: 2.00
+        min_z: -0.30
+        vertical_fov_angle: 1.0123    # 58 deg
+        horizontal_fov_angle: 1.5184  # 87 deg
+        decay_acceleration: 5.0
+        # 0 = depth camera 모델
+        model_type: 0
+
+costmap_lifecycle_manager:
+  ros__parameters:
+    autostart: true
+    node_names: ["costmap"]
+    bond_timeout: 0.0

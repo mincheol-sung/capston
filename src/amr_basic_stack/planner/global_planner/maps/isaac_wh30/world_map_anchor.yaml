@@ -1,0 +1,14 @@
+x: -3.99923
+y: -1.68061
+yaw_deg: -85.9199
+note: T_world_map = T_world_base * inv(T_map_base). world = Isaac ground truth, map
+  = cartographer. sim_nav.py anchor 가 저장.
+samples: 60
+gt_mean:
+- -4.29987
+- -1.69851
+- 0.08816
+loc_mean:
+- -0.00354
+- -0.30115
+- 1.58774

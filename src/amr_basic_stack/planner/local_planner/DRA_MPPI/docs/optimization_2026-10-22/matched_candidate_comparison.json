@@ -1,0 +1,26 @@
+{
+  "isotropic_100": {
+    "identical": true,
+    "hashes": [
+      "45d9a1085332e465fbd40f11d8a6e8b78339d32db5407f717f9c0fe15e8946d8"
+    ]
+  },
+  "isotropic_500": {
+    "identical": true,
+    "hashes": [
+      "b044334d59d2d86d49b99cf2a9ec1d6a3104a37d4fb9016215459babd47ac4c6"
+    ]
+  },
+  "anisotropic_100": {
+    "identical": true,
+    "hashes": [
+      "45d9a1085332e465fbd40f11d8a6e8b78339d32db5407f717f9c0fe15e8946d8"
+    ]
+  },
+  "anisotropic_500": {
+    "identical": true,
+    "hashes": [
+      "b044334d59d2d86d49b99cf2a9ec1d6a3104a37d4fb9016215459babd47ac4c6"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+# wheel_mpc_node (구조 B) 배선 — 토픽과 로깅만.  구조 A 의 mpc.yaml 과 같은 규약이다.
+# ===================================================================
+# ★ 숫자(모델·제약·튜닝·타임아웃)는 이 파일에 없다. config/plant_wheel.yaml 이 유일한 출처이고
+#   노드가 그 값을 파라미터 기본값으로 쓴다.
+#
+#   설계값을 바꾸려면 → config/plant_wheel.yaml
+#   실행마다 바꾸려면 → launch 인자 또는 --ros-args -p
+# ===================================================================
+wheel_mpc_node:
+  ros__parameters:
+    # 배선
+    reference_topic: /dra_mppi/reference_trajectory   # PlanarReferenceArray (dt 0.2 s × 20)
+
+    # ★ 플래너(dra_mppi.yaml:6 odometry_topic)와 반드시 같은 원천이어야 한다.
+    #   2026-09-09 실측: /odom 과 /odometry/filtered 는 같은 odom frame 인데도 416 s 동안
+    #   위치 62~222 cm, 누적 yaw 1127° 벌어졌다. 원천이 다르면 X_e 가 그 차이를 그대로 먹는다.
+    #   (wheel_tracking.py 의 노드 기본값 /odom 은 자기시험 전용이다.)
+    #   단독 시험으로 되돌릴 때만 launch 인자 odom_topic:=/odom 을 준다.
+    odom_topic: /odometry/filtered
+    wheel_topic: /measured_wheel_speeds               # 드라이버 encoder (roboclaw_mecanum_node)
+
+    # 단독 실행 기본값. autonomy.launch.py 에서는 /wheel_mpc/cmd_raw 로 덮어쓰고
+    # keyboard_command_gate(command_type=wheels)가 실제 /wheel_cmd 를 단독 소유한다.
+    wheel_cmd_topic: /wheel_cmd
+
+    # 디버그·로깅
+    publish_debug: true      # /wheel_mpc/reference_horizon (Path), /wheel_mpc/status
+    log_prefix: ""           # 비면 CSV 없음. 예: wheel_track → wheel_track_YYYYmmdd_HHMMSS.csv (cwd)

@@ -1,0 +1,45 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Name: TF
+    - Class: rviz_default_plugins/RobotModel
+      Alpha: 1
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Enabled: true
+      Name: RobotModel
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Class: rviz_default_plugins/LaserScan
+      Enabled: true
+      Name: Front Laser
+      Topic:
+        Value: /scan_front
+    - Class: rviz_default_plugins/LaserScan
+      Enabled: true
+      Name: Rear Laser
+      Topic:
+        Value: /scan_rear
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: Depth Points
+      Topic:
+        Value: /camera/depth/color/points
+  Enabled: true
+  Global Options:
+    Fixed Frame: base_link
+  Name: root

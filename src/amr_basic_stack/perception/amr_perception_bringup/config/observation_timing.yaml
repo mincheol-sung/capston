@@ -1,0 +1,44 @@
+# Bounds are initial engineering limits, NOT measured motion calibration.
+lidar_cluster_node:
+  ros__parameters:
+    scan_topics: [/scan_front, /scan_rear]
+    # Bundled RPLIDAR sorts, replicates and reverses nodes; its host grab start
+    # is not a verified beam epoch. Do not switch to ros/reversed without audit.
+    timing_modes: [unknown, unknown]
+    unknown_timing_policy: snapshot  # or drop for strict deskew-only operation
+    target_frame: base_link
+    fixed_frame: odom
+    sector_min_deg: [-90.0, 90.0]
+    sector_max_deg: [90.0, -90.0]
+    tf_knot_interval: 0.01
+    max_scan_duration: 0.5
+    tf_wait_timeout: 0.25
+    pending_capacity: 16
+    max_observation_age: 0.75
+camera_lidar_fusion_node:
+  ros__parameters:
+    reference_frame: base_link
+    fixed_frame: odom
+    sync_slop: 0.067  # retained association epoch tolerance
+    sync_queue: 32
+    partner_wait: 0.10  # one nominal LiDAR period; camera loss cannot stall it
+    tf_wait_timeout: 0.25
+    max_observation_age: 0.75
+    max_association_time_delta: 0.167  # 100ms sweep + 67ms epoch separation
+    object_velocity_sigma: 1.0  # m/s, zero-mean unknown object velocity
+    unknown_timing_sigma: 0.15  # m, explicit snapshot timing error floor
+    uncalibrated_lidar_sigma: 0.05  # m, rear has no C2 precision calibration
+    calibrated_sensor_id: /scan_front
+rgbd_detection_node:
+  ros__parameters:
+    # RealSense 4.58.4 publishes a common frameset stamp, not independent
+    # exposure epochs. Equal image stamps alone do not verify capture timing.
+    timing_mode: unknown
+    unknown_timing_policy: snapshot  # drop if verified exposures are required
+    tf_wait_timeout: 0.25
+    pending_capacity: 8
+    max_observation_age: 0.75
+    rgbd_max_delta: 0.025  # coarse rejection; unequal stamps are also rejected
+object_tracker_node:
+  ros__parameters:
+    max_observation_age: 0.75

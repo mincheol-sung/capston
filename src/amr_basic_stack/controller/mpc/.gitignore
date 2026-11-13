@@ -1,0 +1,3 @@
+# 실행 로그 (mpc_circle_node / mpc_tracking_node CSV)
+*.csv
+__pycache__/

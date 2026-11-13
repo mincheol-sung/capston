@@ -1,0 +1,82 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 3000,
+  "normal_optimizer_cycles": 0,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 197,
+  "callback_over_200ms_ratio": 0.06566666666666666,
+  "timeout_count": 2992,
+  "scheduled_response_ms": {
+    "count": 3000,
+    "mean": 226.1323440503329,
+    "p50": 207.2294045938179,
+    "p95": 339.4119129865429,
+    "p99": 372.92970006586984,
+    "max": 382.58126471191645
+  },
+  "backend": "split",
+  "workers": 2,
+  "frozen_nominal": false,
+  "statuses": {
+    "timeout": 2992,
+    "stale_odom": 8
+  },
+  "fallback_ratio": 1.0,
+  "deadline_miss_ratio": 0.72,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 3000,
+    "mean": 195.45357908230895,
+    "p50": 195.78594306949526,
+    "p95": 200.54744535591453,
+    "p99": 204.92489990312598,
+    "max": 238.5400258935988
+  },
+  "normal_optimizer_ms": null,
+  "start_delay_ms": {
+    "count": 3000,
+    "mean": 30.73136640805751,
+    "p50": 10.618736036121845,
+    "p95": 144.65981797548005,
+    "p99": 176.76096223061904,
+    "max": 186.60014471970499
+  },
+  "deadline_lateness_ms": {
+    "count": 3000,
+    "mean": 27.265612300718193,
+    "p50": 7.283268682658662,
+    "p95": 139.46551586268455,
+    "p99": 172.98321480862796,
+    "max": 182.63287185691297
+  },
+  "publish_interval_ms": {
+    "count": 3000,
+    "mean": 199.9693888782834,
+    "p50": 199.95242555160075,
+    "p95": 205.20616114372388,
+    "p99": 209.88944986136622,
+    "max": 349.0358330309391
+  },
+  "receive_interval_ms": {
+    "count": 3000,
+    "mean": 199.96949056171192,
+    "p50": 199.95640183333308,
+    "p95": 205.24164659436792,
+    "p99": 209.84196419594804,
+    "max": 349.7611260972917
+  },
+  "receive_count_in_window": 3000,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 3050,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 50,
+  "obstacles": 5,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

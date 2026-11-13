@@ -1,0 +1,13 @@
+# Plan without dispatching. Revalidate the resolved (possibly snapped) endpoint.
+geometry_msgs/PoseStamped[] candidates
+geometry_msgs/Point target_center
+geometry_msgs/Vector3 target_extent
+float32 min_standoff
+float32 max_standoff
+float32 max_snap_distance
+bool require_fresh_map
+---
+bool success
+geometry_msgs/PoseStamped goal
+nav_msgs/Path path
+string message

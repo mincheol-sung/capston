@@ -1,0 +1,298 @@
+Panels:
+- Class: rviz_common/Displays
+  Help Height: 78
+  Name: Displays
+  Property Tree Widget:
+    Expanded: null
+    Splitter Ratio: 0.5
+  Tree Height: 700
+- Class: rviz_common/Views
+  Expanded:
+  - /Current View1
+  Name: Views
+  Splitter Ratio: 0.5
+Visualization Manager:
+  Class: ''
+  Name: root
+  Displays:
+  - Alpha: 0.5
+    Cell Size: 1
+    Class: rviz_default_plugins/Grid
+    Color: 160; 160; 164
+    Enabled: true
+    Line Style:
+      Line Width: 0.03
+      Value: Lines
+    Name: Grid
+    Normal Cell Count: 0
+    Offset:
+      X: 0
+      Y: 0
+      Z: 0
+    Plane: XY
+    Plane Cell Count: 20
+    Reference Frame: <Fixed Frame>
+    Value: true
+  - Class: rviz_default_plugins/TF
+    Enabled: true
+    Frame Timeout: 15
+    Frames:
+      All Enabled: false
+      base_footprint:
+        Value: true
+      base_link:
+        Value: true
+      camera_link:
+        Value: true
+      camera_depth_optical_frame:
+        Value: true
+      laser_front:
+        Value: true
+      odom:
+        Value: true
+    Marker Scale: 0.4
+    Name: TF
+    Show Arrows: false
+    Show Axes: true
+    Show Names: true
+    Tree: {}
+    Update Interval: 0
+    Value: true
+  - Alpha: 0.9
+    Class: rviz_default_plugins/RobotModel
+    Description Topic:
+      Depth: 5
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /robot_description
+    Enabled: true
+    Name: RobotModel
+    Visual Enabled: true
+    Collision Enabled: false
+    Value: true
+  - Alpha: 0.5
+    Class: rviz_default_plugins/Map
+    Color Scheme: map
+    Draw Behind: true
+    Enabled: true
+    Name: Base Map /map (비교용)
+    Topic:
+      Depth: 1
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /map
+    Update Topic:
+      Value: /map_updates
+    Use Timestamp: false
+    Value: true
+  - Alpha: 1.0
+    Class: rviz_default_plugins/Map
+    Color Scheme: map
+    Draw Behind: true
+    Enabled: true
+    Name: Traversable Map
+    Topic:
+      Depth: 1
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /traversable_map_grid
+    Update Topic:
+      Value: /traversable_map_grid_updates
+    Use Timestamp: false
+    Value: true
+  - Class: rviz_default_plugins/MarkerArray
+    Enabled: true
+    Name: Octomap Voxels (z 색)
+    Namespaces: {}
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /occupied_cells_vis_array
+    Value: true
+  - Alpha: 1
+    Autocompute Intensity Bounds: false
+    Class: rviz_default_plugins/PointCloud2
+    Color: 255; 120; 0
+    Color Transformer: FlatColor
+    Decay Time: 0
+    Enabled: false
+    Name: STVL Voxels
+    Position Transformer: XYZ
+    Selectable: true
+    Size (Pixels): 3
+    Size (m): 0.05
+    Style: Boxes
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /voxel_grid
+    Use Fixed Frame: true
+    Value: false
+  - Alpha: 1
+    Autocompute Intensity Bounds: true
+    Autocompute Value Bounds:
+      Max Value: 1.0
+      Min Value: -0.3
+      Value: false
+    Axis: Z
+    Class: rviz_default_plugins/PointCloud2
+    Color: 200; 200; 200
+    Color Transformer: AxisColor
+    Decay Time: 0
+    Enabled: false
+    Name: Cloud filtered (전체 높이)
+    Position Transformer: XYZ
+    Selectable: true
+    Size (Pixels): 2
+    Size (m): 0.01
+    Style: Points
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /traversability/cloud_filtered
+    Use Fixed Frame: true
+    Value: false
+  - Alpha: 1
+    Autocompute Intensity Bounds: true
+    Autocompute Value Bounds:
+      Max Value: 0.31
+      Min Value: 0.033
+      Value: false
+    Axis: Z
+    Class: rviz_default_plugins/PointCloud2
+    Color: 0; 255; 0
+    Color Transformer: AxisColor
+    Decay Time: 0
+    Enabled: true
+    Name: Cloud z-band [0.033, 0.31]
+    Position Transformer: XYZ
+    Selectable: true
+    Size (Pixels): 3
+    Size (m): 0.02
+    Style: Flat Squares
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /traversability/cloud_band
+    Use Fixed Frame: true
+    Value: true
+  - Class: rviz_default_plugins/LaserScan
+    Color: 255; 255; 0
+    Color Transformer: FlatColor
+    Enabled: true
+    Name: LaserScan
+    Position Transformer: XYZ
+    Size (Pixels): 3
+    Size (m): 0.02
+    Style: Points
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: /scan
+    Use Fixed Frame: true
+    Value: true
+  - Alpha: 0.6
+    Class: rviz_default_plugins/Map
+    Color Scheme: costmap
+    Draw Behind: false
+    Enabled: false
+    Name: Octomap Projected (2D)
+    Topic:
+      Depth: 1
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /projected_map
+    Use Timestamp: false
+    Value: false
+  - Alpha: 0.6
+    Class: rviz_default_plugins/Map
+    Color Scheme: costmap
+    Draw Behind: false
+    Enabled: false
+    Name: STVL Costmap
+    Topic:
+      Depth: 1
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /costmap
+    Use Timestamp: false
+    Value: false
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 20
+  Tools:
+  - Class: rviz_default_plugins/Interact
+    Hide Inactive Objects: true
+  - Class: rviz_default_plugins/MoveCamera
+  - Class: rviz_default_plugins/FocusCamera
+  - Class: rviz_default_plugins/Measure
+    Line color: 128; 128; 0
+  - Class: rviz_default_plugins/SetInitialPose
+    Covariance x: 0.25
+    Covariance y: 0.25
+    Covariance yaw: 0.06853891909122467
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /initialpose
+  - Class: rviz_default_plugins/SetGoal
+    Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /goal_pose
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 6
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.06
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 1.0
+        Y: 0
+        Z: 0.15
+      Focal Shape Fixed Size: true
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.01
+      Pitch: 0.25
+      Target Frame: base_footprint
+      Value: Orbit (rviz)
+      Yaw: 3.0
+    Saved: null
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 900
+  Hide Left Dock: false
+  Hide Right Dock: false
+  Width: 1500
+  X: 60
+  Y: 40

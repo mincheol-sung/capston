@@ -1,0 +1,128 @@
+{
+  "config": {
+    "dt": 0.2,
+    "horizon_steps": 10,
+    "num_rollouts": 321,
+    "temperature": 2.0,
+    "adaptive_temperature": true,
+    "temperature_eta_lower": 5.0,
+    "temperature_eta_upper": 10.0,
+    "temperature_decrease_factor": 0.9,
+    "temperature_increase_factor": 1.2,
+    "noise_std": [
+      0.15,
+      0.12,
+      0.45
+    ],
+    "spline_knots": 4,
+    "halton_scramble": true,
+    "control_min": [
+      -0.375,
+      -0.5625,
+      -3.0
+    ],
+    "control_max": [
+      0.78,
+      0.5625,
+      3.0
+    ],
+    "acceleration_limit": [
+      2.25,
+      2.25,
+      6.75
+    ],
+    "yaw_lever": 0.19835,
+    "speed_limit_l1": 0.78,
+    "desired_speed": 0.75,
+    "tracking_path_weight": 64.0,
+    "tracking_goal_weight": 24.0,
+    "heading_weight": 3.0,
+    "heading_lookahead": 0.2,
+    "speed_weight": 1.78,
+    "progress_weight": 8.0,
+    "projection_window": 0.5,
+    "goal_activation_distance": 0.5,
+    "input_delta_weight": [
+      0.5,
+      0.5,
+      0.055
+    ],
+    "seed": 7,
+    "strategy": "guide_conditioned",
+    "guide_num_rollouts": 500,
+    "guide_angles_deg": [
+      0.0,
+      45.0,
+      90.0,
+      -45.0,
+      -90.0
+    ],
+    "guide_noise_std": [
+      0.15,
+      0.12,
+      0.45
+    ],
+    "guide_anchor_blend": 0.25,
+    "guide_switch_penalty": 0.25,
+    "guide_hysteresis": 0.1,
+    "guide_evaluation": "split",
+    "guide_timeout": 0.18,
+    "static_cost_enabled": true,
+    "static_cost_soft_weight": 8.0,
+    "static_cost_decay": 0.1,
+    "static_cost_robot_radius": 0.2,
+    "dynamic_risk": {
+      "mode": "monte_carlo",
+      "soft_weight": 18.0,
+      "robot_radius": 0.2,
+      "obstacle_radius": 0.25,
+      "minimum_sigma": 0.08,
+      "mc_samples": 2048,
+      "adaptive_halton_mc": true,
+      "mc_sample_density": 992.0,
+      "mc_samples_min": 4096,
+      "mc_samples_max": 32768,
+      "guide_parallel_workers": 2,
+      "guide_mc_sample_density": 992.0,
+      "guide_mc_samples_min": 1024,
+      "guide_mc_samples_max": 8192,
+      "final_mc_sample_density": 992.0,
+      "final_mc_samples_min": 2048,
+      "final_mc_samples_max": 32768,
+      "mc_reject_underresolved": true,
+      "hard_threshold": 0.05,
+      "hard_penalty": 100000.0,
+      "seed": 17
+    }
+  },
+  "python": "3.12.3",
+  "numpy": "1.26.4",
+  "scipy": "1.11.4",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.39",
+  "args": {
+    "output": "planner/local_planner/DRA_MPPI/docs/risk_integrator_comparison_2026-11-04",
+    "suite": "timing",
+    "iterations": 30
+  },
+  "source_sha256": {
+    "dra_mppi/mecanum_model.py": "d5f4956b1091da947dfb9c69db1eabe3ea89cb82d1fc12be96ed2d32330527b2",
+    "dra_mppi/control_sampling.py": "a3639dcfd913317161e145487c1442ad0da1207861debcadba38693d1d9deed0",
+    "dra_mppi/mppi_controller.py": "b49a288576b60508f801e93e62317859880a53b034c7124b1420dfe6002449ce",
+    "dra_mppi/common_cost.py": "6f9e8b5a5a09f9c6f6ed9a273336990eea5c2f4f1646b8a13c314299670a398c",
+    "dra_mppi/gaussian_disk.py": "8a9a9249f01a52258e41473f496e6863620615c1fb9cfb47c4ca382d020e350b",
+    "dra_mppi/cycle_timing.py": "a6ce143abea345cf7acdf2cce98dc5d46a84018c935769e2daef5fd1ab6d2632",
+    "dra_mppi/grid_costmap.py": "a9ce969643f4d65124b46813febe4ca3948ad946f2b00b9729aeb3d789ed00f7",
+    "dra_mppi/dra_mppi_node.py": "8cccd8eafa9add10f691bd6bf7ded5aec1485a187e3efd5875ed6f2405d8c9d7",
+    "dra_mppi/guide_conditioned.py": "8b16a3234ea34078f79caf3059c3f84e166030f58582e403e12a91917a5d8593",
+    "dra_mppi/__init__.py": "1e19bc73547d4d52405563876be7076ce7792da8855806ce9dedb7cdc9817b4c",
+    "dra_mppi/geometry.py": "ebb537f3199815b233aad3b5e5e5554df27fb27ad281300ac16e0305c4add4b2",
+    "dra_mppi/dynamic_risk.py": "741dc9fa3b4b055b999e9828402b9f6e8b09c7389230c39ba2e14be1e170f664",
+    "dra_mppi/path_handler.py": "0a6f767cb9cf3d31fe98f040be1b0dc046f4919e7c32202894e7cbb2492dba37",
+    "tools/compare_risk_integrators.py": "5372d3b10ead04113cc41b63d755ecc8cb7dbb12807cc48fa5c34a30e4b8fd9a",
+    "config/dra_mppi.yaml": "51ba1f1c1a6b4008a87c1f4a9869ea61ff8c71160715b836f7747f212887d30b",
+    "tools/validate_mc_accuracy.py": "324a596ca678921d0d90b30d86c0130e223cb998f4edf934c7ec9cd20d64400b",
+    "tools/validate_current_mc.py": "5ab26e8b6bfbaa5eb34403a85dd5a4f6b8a20146b9af964a89b2f83407d7e0f1",
+    "tools/benchmark_guide_conditioned.py": "988e1d0ebf80361eaa63c65a7d08d8c72a803e523f80561f311b4b0ea7f77bb5"
+  },
+  "scope": "Offline synthetic assessment; no ROS timing, actuator execution, or model calibration; YAML unchanged."
+}

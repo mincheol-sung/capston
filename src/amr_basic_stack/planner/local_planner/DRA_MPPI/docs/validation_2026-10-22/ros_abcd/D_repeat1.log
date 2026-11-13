@@ -1,0 +1,174 @@
+[WARN] [1792658434.740622606] [rcl]: ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled. Use ROS_AUTOMATIC_DISCOVERY_RANGE and ROS_STATIC_PEERS instead.
+[WARN] [1792658434.740655805] [rcl]: 'localhost_only' is enabled, 'automatic_discovery_range' and 'static_peers' will be ignored.
+[INFO] [1792658434.790947944] [dra_mppi_node]: wheel-speed limit: |vx|+|vy|+0.19835|yaw_rate| <= 0.780 m/s (0.040 m x 30.0 rad/s x 0.65 budget)
+[INFO] [1792658434.804664676] [dra_mppi_node]: DRA-MPPI ready: strategy=guide_conditioned, path=/guide_validation/global_path, odom=/guide_validation/odometry/filtered, predictions=/guide_validation/predictions, prediction_classes=['person'], reference_trajectory=/guide_validation/dra_mppi/reference_trajectory (odom frame)
+[INFO] [1792658435.605983858] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658436.065546632] [dra_mppi_node]: Odometry is stale; publishing a hold reference.
+[INFO] [1792658436.105309128] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658436.594834607] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658437.246372387] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 241.8 ms
+[INFO] [1792658437.247195155] [dra_mppi_node]: MPPI[guide_+45] cycle=241.8 ms (optimizer=238.4 ms, budget=200.0 ms), cost=2.83, C_static=0.00, ESS=4.8, selected_cp=0.013, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 732.6+65.5 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658437.247870259] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658437.250512990] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658437.875519658] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658438.363901155] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658438.844861216] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658439.619524520] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658439.865140323] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 235.4 ms
+[INFO] [1792658439.865895234] [dra_mppi_node]: MPPI[guide_+45] cycle=235.4 ms (optimizer=232.3 ms, budget=200.0 ms), cost=2.84, C_static=0.00, ESS=4.8, selected_cp=0.013, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 745.0+61.0 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658439.866527374] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658440.344763254] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658440.829174935] [dra_mppi_node]: Odometry is stale; publishing a hold reference.
+[INFO] [1792658440.831913838] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658441.475701394] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658441.960635204] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658442.214918790] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658442.640960311] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 236.4 ms
+[INFO] [1792658442.641615047] [dra_mppi_node]: MPPI[guide_+45] cycle=236.4 ms (optimizer=233.2 ms, budget=200.0 ms), cost=2.83, C_static=0.00, ESS=4.8, selected_cp=0.013, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 747.0+61.0 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658442.642221424] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658442.874493993] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658443.353299247] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658443.848109776] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658444.333667875] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658444.854181386] [dra_mppi_node]: Odometry is stale; publishing a hold reference.
+[INFO] [1792658444.856347574] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658445.242410826] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 236.9 ms
+[INFO] [1792658445.243110466] [dra_mppi_node]: MPPI[guide_+45] cycle=236.9 ms (optimizer=233.7 ms, budget=200.0 ms), cost=2.83, C_static=0.00, ESS=4.8, selected_cp=0.013, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 714.8+63.3 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658445.243726519] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658445.247698887] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658445.876808636] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658446.366303926] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658446.619184330] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658447.531725885] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658447.776187348] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 234.0 ms
+[INFO] [1792658447.776895307] [dra_mppi_node]: MPPI[guide_+45] cycle=234.0 ms (optimizer=230.9 ms, budget=200.0 ms), cost=2.85, C_static=0.00, ESS=4.8, selected_cp=0.014, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 726.3+61.5 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658447.777541962] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658448.015955890] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658448.502243657] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658448.989671940] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658449.488723693] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658449.989177548] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 239.2 ms
+[INFO] [1792658449.989896615] [dra_mppi_node]: MPPI[guide_+45] cycle=239.2 ms (optimizer=236.0 ms, budget=200.0 ms), cost=2.85, C_static=0.00, ESS=4.8, selected_cp=0.014, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 754.9+62.9 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658449.990519071] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658449.992133307] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658450.495657546] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658450.983841167] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658451.479776336] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658451.489736111] [dra_mppi_node]: Odometry is stale; publishing a hold reference.
+[INFO] [1792658451.595042437] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658452.236196751] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 231.8 ms
+[INFO] [1792658452.236873684] [dra_mppi_node]: MPPI[guide_+45] cycle=231.8 ms (optimizer=228.6 ms, budget=200.0 ms), cost=2.83, C_static=0.00, ESS=4.8, selected_cp=0.013, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 675.2+61.4 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658452.237535037] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658452.477271631] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658452.731770124] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658453.528018897] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658454.004825072] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658454.482378342] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 232.4 ms
+[INFO] [1792658454.483038144] [dra_mppi_node]: MPPI[guide_+45] cycle=232.4 ms (optimizer=229.2 ms, budget=200.0 ms), cost=2.85, C_static=0.00, ESS=4.8, selected_cp=0.014, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 704.8+61.8 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658454.483662299] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658454.485121421] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658454.974293246] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658455.505907097] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658455.986395849] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658456.479706187] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658456.986093698] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658456.986712650] [dra_mppi_node]: Odometry is stale; publishing a hold reference.
+[INFO] [1792658457.276763626] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658457.655152035] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658458.042676079] [dra_mppi_node]: DRA-MPPI cycle missed its 200.0 ms deadline: 237.9 ms
+[INFO] [1792658458.043340399] [dra_mppi_node]: MPPI[guide_+45] cycle=237.9 ms (optimizer=234.7 ms, budget=200.0 ms), cost=2.83, C_static=0.00, ESS=4.8, selected_cp=0.013, u=[0.29, 0.35, -0.05], mc=per_guide_adaptive_halton 750.7+62.3 ms final N_total=340915 A_sum=4.73..12.67 m^2 N=20480..51907 cp_clip=0 empty_circle=0
+[INFO] [1792658458.043948090] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[20, 20, 20, 20, 20] rejected=('', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792658458.105615201] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792658458.846945780] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792658459.245351291] [dra_mppi_node]: Odometry is stale; publishing a hold reference.
+[INFO] [1792658459.246960496] [dra_mppi_node]: Received global path with 2 poses in odom
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 44,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 84,
+  "callback_over_200ms_ratio": 0.84,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 305.39991095429286,
+    "p50": 320.65559655893594,
+    "p95": 472.2957063699141,
+    "p99": 491.5412420290523,
+    "max": 500.7313275709748
+  },
+  "backend": "split",
+  "workers": 5,
+  "frozen_nominal": true,
+  "statuses": {
+    "normal": 44,
+    "stale_odom": 16,
+    "expired_input": 40
+  },
+  "fallback_ratio": 0.56,
+  "deadline_miss_ratio": 0.88,
+  "skipped_periods": 14,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 200.9806029801257,
+    "p50": 236.61843733862042,
+    "p95": 250.4119900870137,
+    "p99": 266.7053985153325,
+    "max": 270.53227415308356
+  },
+  "normal_optimizer_ms": {
+    "count": 44,
+    "mean": 233.78674891798502,
+    "p50": 233.64822193980217,
+    "p95": 238.30375594552606,
+    "p99": 238.67572398623452,
+    "max": 238.79951797425747
+  },
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 105.50855949055403,
+    "p50": 94.67821661382914,
+    "p95": 239.77160814683884,
+    "p99": 250.2013901760802,
+    "max": 254.36583487316966
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 122.33165399730206,
+    "p50": 122.42433773353694,
+    "p95": 274.49688190827146,
+    "p99": 293.72328444616875,
+    "max": 300.73640956543386
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 230.2793936105445,
+    "p50": 244.93435805197805,
+    "p95": 397.0721098477952,
+    "p99": 423.15092695411295,
+    "max": 425.2693250309676
+  },
+  "receive_interval_ms": {
+    "count": 100,
+    "mean": 230.2825875300914,
+    "p50": 244.95642457623035,
+    "p95": 397.1101161208935,
+    "p99": 423.47733669914305,
+    "max": 425.35709985531867
+  },
+  "receive_count_in_window": 100,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 10,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

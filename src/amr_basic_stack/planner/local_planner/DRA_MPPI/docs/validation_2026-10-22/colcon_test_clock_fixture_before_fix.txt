@@ -1,0 +1,49 @@
+Starting >>> dra_mppi
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+cachedir: /home/smoc/2026amr_ws/build/dra_mppi/.pytest_cache
+rootdir: /home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI
+plugins: ament-lint-0.17.5, launch-testing-ros-0.26.13, launch-testing-3.4.12, ament-flake8-0.17.5, ament-xmllint-0.17.5, ament-copyright-0.17.5, ament-pep257-0.17.5, colcon-core-0.21.3, typeguard-4.1.5, cov-4.1.0
+collected 177 items
+
+test/test_common_cost.py ..............                                  [  7%]
+test/test_configuration.py ...                                           [  9%]
+test/test_control_sampling.py ..                                         [ 10%]
+test/test_dynamic_risk.py ..................                             [ 20%]
+test/test_grid_costmap.py ..                                             [ 22%]
+test/test_guide_conditioned.py ...........................               [ 37%]
+test/test_guide_node.py ..........................                       [ 51%]
+test/test_input_freshness.py ............FF                              [ 59%]
+test/test_mecanum_model.py ..                                            [ 61%]
+test/test_mppi_controller.py ...................                         [ 71%]
+test/test_path_handler.py .......                                        [ 75%]
+test/test_prediction_filter.py ............................              [ 91%]
+test/test_requested_objective.py ............                            [ 98%]
+test/test_semantic_chain.py ...                                          [100%]
+
+=================================== FAILURES ===================================
+______ test_prediction_source_time_and_horizon_fail_closed[10.2-2-future] ______
+test/test_input_freshness.py:108: in test_prediction_source_time_and_horizon_fail_closed
+    DraMppiNode._aligned_predictions(n)
+dra_mppi/dra_mppi_node.py:1324: in _aligned_predictions
+    self.get_clock().now()
+/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/time.py:102: in __sub__
+    raise TypeError("Can't subtract times with different clock types")
+E   TypeError: Can't subtract times with different clock types
+______ test_prediction_source_time_and_horizon_fail_closed[9.9-5-horizon] ______
+test/test_input_freshness.py:108: in test_prediction_source_time_and_horizon_fail_closed
+    DraMppiNode._aligned_predictions(n)
+dra_mppi/dra_mppi_node.py:1324: in _aligned_predictions
+    self.get_clock().now()
+/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/time.py:102: in __sub__
+    raise TypeError("Can't subtract times with different clock types")
+E   TypeError: Can't subtract times with different clock types
+----- generated xml file: /home/smoc/2026amr_ws/build/dra_mppi/pytest.xml ------
+=========================== short test summary info ============================
+FAILED test/test_input_freshness.py::test_prediction_source_time_and_horizon_fail_closed[10.2-2-future]
+FAILED test/test_input_freshness.py::test_prediction_source_time_and_horizon_fail_closed[9.9-5-horizon]
+======================== 2 failed, 175 passed in 2.29s =========================
+Finished <<< dra_mppi [2.73s]	[ with test failures ]
+
+Summary: 1 package finished [2.85s]
+  1 package had test failures: dra_mppi

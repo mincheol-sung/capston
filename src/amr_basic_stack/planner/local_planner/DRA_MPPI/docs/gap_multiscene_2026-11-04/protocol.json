@@ -1,0 +1,52 @@
+{
+  "methods": [
+    "fixed5_warm",
+    "nominal",
+    "radial_R",
+    "radial_noR",
+    "radial_adaptive_noR",
+    "connected_noR",
+    "valley_noR",
+    "valley_cost",
+    "valley_cost_gate"
+  ],
+  "bags": [
+    "mpc_chain_20260923_135325",
+    "mpc_chain_20260923_113151",
+    "mpc_chain_20260923_135606"
+  ],
+  "seeds": [
+    7,
+    23
+  ],
+  "design_bag": "mpc_chain_20260923_135325",
+  "holdout_bags": [
+    "mpc_chain_20260923_113151",
+    "mpc_chain_20260923_135606"
+  ],
+  "sampling": "Every approximately 2 seconds from +5 s; no outcome-based frame selection.",
+  "comparison": "Paired snapshots and control-noise seeds. K=500, T=10, dt=.2, existing cost and MC settings unchanged.",
+  "ordering": "Selected seeds sorted by stable pool ID before solving; score-rank permutations alone cannot change noise assignment.",
+  "radial": "Previous 0.5/1.0/1.5 m intervals; center angle; 12 deg cross-level merging.",
+  "connected": "One interval per connected d_free>=0.5 m angular run, minimum 6 deg; midpoint direction.",
+  "valley": "Split each connected run at substantial depth valleys: Gaussian sigma=2 angle bins, peak prominence=0.25 m, separation=20 deg. Deepest peak direction, unsmoothed clearance.",
+  "adaptive_target": "min(available depth-0.10m, max(0.25m, 0.90*2s constrained projected reach)); never move target beyond available depth.",
+  "noR": "Remove 0.15*R from prior score without renormalization; retain V>=0.25. Also report whether membership changes before/after threshold.",
+  "cost": "Rank collision-free, nonduplicate, reachable seeds by existing common_costs+static cost. No custom value-score threshold; up to three.",
+  "gate": "Same cost rank; when nominal healthy require seed cost improvement > max(0.5, 5% abs(nominal cost)). Escape allows all eligible seeds if nominal static-invalid, nominal arc progress<0.15m, or nominal intersects a 2-sigma person envelope. This envelope is a trigger, not collision probability.",
+  "fixed5": "Context baseline: initialize every fixed guide nominal with the same recorded reference, then existing 0.25 anchor blend. Not reconstruction of historical independent guide states.",
+  "unimplemented": "No closed-loop simulation, persistent gap IDs, MPC execution, goal-rate measurement, or real-time ROS/full-stack deadline validation.",
+  "outcomes": [
+    "safe/moving selection count",
+    "paired final objective on mutually safe moving trials",
+    "arc progress",
+    "finite rollout fraction",
+    "number of raw/selected candidates",
+    "rearward seed fraction",
+    "single-snapshot wall time including input prep, proposals, setup, solver, teardown"
+  ],
+  "timeout_s": 10.0,
+  "max_gap_guides": 3,
+  "allocation": "nominal 500-100*gap_count; each gap 100",
+  "frozen_source": "Source snapshot retained in result directory; thresholds fixed before any multiscene results."
+}

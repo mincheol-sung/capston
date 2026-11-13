@@ -1,0 +1,79 @@
+# 상태 추정기 설정 — state_estimator_node (구조도 v3). 근거·결정은 amr/notes_amr/torque_mpc_todo.md "상태 추정".
+# ===================================================================
+#   /tracked_pose (SLAM, 약 10 Hz 스캔 매칭 결과) + /imu/base_link (200 Hz)  →  /state_estimator/odom (100 Hz)
+#   위치·속도: 스캔 매칭이 들어오면 위치 잔차로 보정, 그 사이는 IMU 가속도 적분 (2026-11-06 결정)
+#   방향: 자이로 적분 + SLAM yaw 로 보정하는 상보 필터, 자이로 바이어스 추정
+#   게인은 아래 잡음 값으로 계산한 정상상태 칼만 게인(고정)이다. 기동 시 로그에 찍힌다.
+#
+# 숫자의 출처: bags/mpc_chain_20260923_135325 앞 30 s (2026-11-11 분석, RoboClaw 구동 시절 데이터).
+#   AK40 으로 바꾼 뒤 진동 수준이 달라질 수 있다 → 실차에서 다시 잰다.
+# ===================================================================
+estimator:
+  publish_period: 0.01          # [s] 출력 주기 = MPC Ts. IMU stamp 가 이만큼 지날 때마다 낸다
+
+  # ── SLAM 포즈를 어떻게 고르나
+  #   stamped          : stamp 가 새로 바뀐 포즈는 모두 그 stamp 시각의 측정값으로 쓴다.
+  #                      Cartographer 외삽을 끈 설정(use_pose_extrapolator = false → 스캔 시각 stamp, 약 0.13 s 늦게 도착)과 시뮬용.
+  #   after_scan_match : /scan_matched_points2 가 온 직후의 /tracked_pose 하나만 쓴다.
+  #                      지금 실차 설정(외삽 켬, 100 Hz, stamp = 발행 시각)용. 이 표본에는 Cartographer 가 스캔 시각에서
+  #                      지금까지 일정 속도로 외삽한 몫이 들어 있다.
+  pose_source: stamped
+  history_s: 0.6                # [s] 늦게 도착한 포즈를 그 시각의 추정값과 비교하려고 보관하는 길이
+  max_pose_age: 0.4             # [s] 이보다 오래된 stamp 의 포즈는 버린다
+
+  # ── 기동 시 정지 상태에서 바이어스 평균 (무장 전이라 로봇은 서 있다)
+  init_s: 1.0                   # [s]
+  init_max_accel_std: 0.10      # [m/s²] 이보다 흔들리면 정지가 아니라고 보고 다시 모은다
+  init_max_gyro_std: 0.02       # [rad/s]
+
+  # ── IMU 와 포즈 기준점의 위치 (base_footprint 기준 [m])
+  #    Cartographer 의 /tracked_pose 는 로봇 중심이 아니라 tracking_frame(camera_gyro_frame = IMU 위치)의 포즈다
+  #    (2026-11-11 bag 분석). 추정기는 그 점의 위치·속도를 추정한 뒤 로봇 중심으로 옮겨서 내보낸다.
+  #    값의 출처: bag(2026-09-23) /tf_static 의 base_link → camera_link (0.1140, +0.0475) → camera_gyro_frame (−0.0160, −0.0302).
+  #    같은 bag 의 제자리 회전 구간에서 추정 속도와 휠 오돔의 차로 확인했다:
+  #        (0, 0) 50 mm/s  →  (0.098, −0.030) 28 mm/s  →  (0.098, +0.017) 16 mm/s
+  #    ★ 지금 리포의 URDF 는 camera_link y = 0 이라 (0.098, −0.030) 이 된다. bag 때와 장착이 달라졌는지 미확인
+  #      → 실차에서 제자리 회전으로 다시 확인 (To do)
+  imu_offset_x: 0.098
+  imu_offset_y: 0.017
+  # pose_offset_x / pose_offset_y: 포즈 기준점이 IMU 와 다를 때만 적는다 (없으면 IMU 위치와 같다고 본다)
+
+  # ── 잡음 모델 → 정상상태 칼만 게인
+  accel_noise_density: 0.07     # [m/s²/√Hz] 주행 중 실측 σ 0.95 m/s² @ 200 Hz (진동 포함). 정지 시는 0.0012
+  accel_bias_walk: 0.02         # [m/s²/√s]  가속도계 바이어스가 변하는 속도 (기울기·온도). 정지 실측 바이어스 (−0.15, +0.13) m/s²
+  pose_noise_xy: 0.003          # [m]   스캔 매칭 위치 잡음. 정지 실측 0.7 mm, 주행 중은 더 크다고 보고 3 mm
+  gyro_noise_density: 0.0064    # [rad/s/√Hz] 주행 중 실측 σ 0.09 rad/s @ 200 Hz. 정지 시 0.003 rad/s
+  gyro_bias_walk: 0.0005        # [rad/s/√s]
+  pose_noise_yaw_deg: 0.2       # [deg] 스캔 매칭 yaw 잡음. 정지 실측 0.05°
+  # 게인을 직접 주고 싶으면 아래를 채운다 (비우면 위 잡음에서 계산)
+  #   gains_xy: [K_p, K_v, K_b]     p += K_p·e,  v += K_v·e,  b += K_b·e      (e = 위치 잔차 [m])
+  #   gains_yaw: [K_psi, K_bg]
+  gains_xy: []
+  gains_yaw: []
+
+  # ── SLAM 포즈 튐 (전역 최적화·재측위). 잔차가 이보다 크면 보정에 쓰지 않고 세어 둔다 → fault_monitor (5단계)
+  jump_xy: 0.15                 # [m]
+  jump_yaw_deg: 15.0
+  jump_reset_count: 5           # 연속으로 이만큼 튀면 SLAM 쪽이 맞다고 보고 그 포즈로 다시 초기화
+
+  # ── SLAM 포즈 끊김 (R3 리뷰 2026-11-13). 마지막 보정 뒤 이만큼 IMU 적분만 하면 출력을 멈춘다 → MPC 는 state_timeout
+  #    (0.3 s) 뒤 DAMPING, fault_monitor 는 무장 해제. 평소 보정 간격은 약 0.1 s (스캔 10 Hz). 0 이면 검사 안 함.
+  #    바이어스 잔차 0.01 m/s² 만으로도 0.5 s 에 1 mm, 2 s 에 2 cm — 진동 잡음까지 더하면 더 빨리 흐른다.
+  max_dead_reckoning: 0.5       # [s]
+
+  # ── 출력
+  omega_lpf_hz: 40.0            # [Hz] 출력 각속도(자이로 − 바이어스) 저역통과. 0 이면 끔
+
+# ── 측위(Cartographer) 입력 선택 — 2026-11-11 결정: 휠 오돔은 구조만 두고 기본 끔
+#    Cartographer 는 외삽을 끈 설정으로 스캔 매칭 결과만 낸다 (perception/amr_perception_bringup/config/).
+#    use_wheel_odom: true 면 wheel_odometry_node 가 /wheel_states 로 /wheel_odom 을 만들고,
+#    Cartographer 는 그것을 로컬 스캔 매칭의 초기 짐작에 쓴다 (슬립 측정·제어에는 안 씀).
+#    언제 켜나: 기준물을 둔 8자 트랙에서도 휠 오돔 없이 측위가 미끄러질 때. 켜기 전에 lua 의 주의를 읽을 것.
+#    한 번만 바꿀 때: launch 인자 wheel_odom:=true
+#    ※ 시뮬에는 Cartographer 가 없어서(가짜 SLAM) 이 스위치는 wheel_odometry_node 를 띄우는 것까지만 한다.
+#      Cartographer 연결은 7단계(plant:=real).
+slam:
+  use_wheel_odom: false
+  lua_without_wheel_odom: localization_torque_2d.lua
+  lua_with_wheel_odom: localization_torque_odom_2d.lua
+  wheel_odom_topic: /wheel_odom

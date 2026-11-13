@@ -1,0 +1,88 @@
+{
+  "schedule": [
+    [
+      0,
+      "D",
+      "split",
+      5
+    ],
+    [
+      1,
+      "D",
+      "split",
+      5
+    ],
+    [
+      1,
+      "C",
+      "split",
+      2
+    ],
+    [
+      2,
+      "A",
+      "batch",
+      1
+    ],
+    [
+      2,
+      "D",
+      "split",
+      5
+    ],
+    [
+      0,
+      "B",
+      "split",
+      1
+    ],
+    [
+      0,
+      "A",
+      "batch",
+      1
+    ],
+    [
+      0,
+      "C",
+      "split",
+      2
+    ],
+    [
+      1,
+      "A",
+      "batch",
+      1
+    ],
+    [
+      2,
+      "B",
+      "split",
+      1
+    ],
+    [
+      1,
+      "B",
+      "split",
+      1
+    ],
+    [
+      2,
+      "C",
+      "split",
+      2
+    ]
+  ],
+  "cycles": 100,
+  "warmup": 10,
+  "obstacles": 10,
+  "K": 100,
+  "N": 10,
+  "dt": 0.2,
+  "scope": "planner + DDS fixture, no perception/MPC/robot; frozen nominal",
+  "timeout_override": 10.0,
+  "density": 4096.0,
+  "execution": "sequential fresh processes",
+  "seed": 7,
+  "shuffle_seed": 20261022
+}

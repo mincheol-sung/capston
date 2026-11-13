@@ -1,0 +1,2 @@
+Intel Core 5 210H; x86_64; 12 logical CPUs; OPENBLAS_NUM_THREADS=1; OMP_NUM_THREADS=1
+No CPU isolation; ROS/perception pipeline not included.

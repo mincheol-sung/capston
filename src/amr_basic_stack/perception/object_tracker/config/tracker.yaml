@@ -1,0 +1,111 @@
+# object_tracker_node 파라미터.
+#
+#   ros2 launch amr_perception_bringup perception_stack.launch.py
+#   ros2 run object_tracker object_tracker_node --ros-args \
+#       --params-file $(ros2 pkg prefix object_tracker)/share/object_tracker/config/tracker.yaml
+#
+# 기본값의 단일 출처는 object_tracker/core/config.py 다. 여기 값은 그것과
+# 같으며, 실차에서 바꿀 때만 손댄다. 근거 등급 [실측]/[유도]/[TODO] 는
+# core/config.py 주석 참고.
+
+object_tracker_node:
+  ros__parameters:
+    # ── 배선 ──────────────────────────────────────────────────────────
+    # One synchronized frame containing camera-only, fused, and unmatched
+    # LiDAR geometry. LiDAR-only tracks keep the unknown class and can never
+    # confirm or renew a person label.
+    detections_topic: /detections_tracking
+    tracks_topic: /tracks
+    tracked_modes_topic: /tracked_object_modes
+    track_frame: odom                     # map 은 AMCL 점프가 속도로 새어든다
+    # Monotonic queue wait budget; TF lookup itself never blocks callbacks.
+    tf_timeout: 0.25
+    tf_queue_size: 32
+    publish_markers: true
+    publish_tentative: false
+
+    # ── 정적 지도 벽 필터 ─────────────────────────────────────────────
+    # /map의 벽 근처에서 STATIC으로 확정된 트랙만 세 출력(/tracks,
+    # /tracked_object_modes, marker)에서 제외한다. UNKNOWN/DYNAMIC은 벽
+    # 가까이에서도 통과시켜 벽을 따라 걷는 사람을 지우지 않는다.
+    # Camera/FUSED semantic objects (including stationary people) remain
+    # obstacles near walls. Enable legacy suppression only after validation.
+    grid_filter_enabled: false
+    grid_filter_map_topic: /map
+    # nav2 map_server occupied_thresh 0.65 및 traversability와 같은 경계.
+    grid_filter_occupied_threshold: 65
+    # 억제 진입/이탈 거리 [m]. exit을 더 크게 둬 map<-odom 흔들림에 의한
+    # on/off 반복을 막는다. 0.05m 지도에서 0.15m는 약 3셀이다.
+    grid_filter_enter_distance: 0.15
+    grid_filter_exit_distance: 0.20
+    # STATIC이면서 진입 거리 안인 조건이 연속으로 성립해야 하는 프레임 수.
+    # 트랙 자체의 static_confirm_time 확인 뒤 추가로 적용된다.
+    grid_filter_confirm_frames: 3
+
+    # NIS 진단 로그 주기 [s]. 0 이면 끈다. sigma_a 를 실측할 때만 켠다.
+    # 로그의 추정값은 한 번에 안 맞는다 — 반복이 필요하고, 그 반복은
+    # tools/nis_fit.py 가 대신 돌려 준다. 이 파라미터는 실주행 중 필터가
+    # 일관적인지(평균 1.907, 기각률 1%) 보는 용도다.
+    nis_report_period: 0.0
+
+    # ── 운동 모델 ─────────────────────────────────────────────────────
+    # [TODO] 실측으로 대체할 값. tools/nis_fit.py --bag <경로> 가 역산한다
+    #        (게이트 절단 때문에 NIS 목표는 2.0 이 아니라 1.907 — core/nis.py).
+    #        속도 불확실성과 mode likelihood를 함께 바꾸므로 새 3-mode
+    #        판정에서는 확률 임계값/STATIC 잡음과 함께 검증해야 한다.
+    # 단위는 m/s^1.5 다 (m/s^2 아님 — Q_vv = sigma_a^2 dt). 조작적으로는
+    # "1초 coast 했을 때 속도 추정이 벌어지는 폭 [m/s]" 이다.
+    sigma_a: 1.0        # [m/s^1.5] CWNA 가속도 세기
+    sigma_a_ct: 0.7     # [m/s^1.5] CT mode Cartesian acceleration noise
+    sigma_omega_cv: 0.15 # [rad/s^1.5] CV omega random-walk strength
+    sigma_omega_ct: 0.5  # [rad/s^1.5] CT omega random-walk strength
+    sigma_omega0: 1.0    # [rad/s] 새 track의 turn-rate 표준편차
+    cv_omega_decay_time: 0.25 # [s] CV mode의 omega -> 0 시정수
+    mean_sojourn_cv: 3.0 # [s] mean CV dwell time; Pi(dt)=expm(G dt)
+    mean_sojourn_ct: 1.0 # [s] mean CT dwell time
+    # Provisional: recent bags show ~0.133s median input, ~0.20s p99.
+    # See docs/THREE_MODE_IMM.md for measured evidence vs engineering priors.
+    mean_sojourn_static: 3.0
+    static_to_cv: 0.9
+    cv_to_static: 0.5
+    ct_to_static: 0.2
+    sigma_position_static: 0.04  # [m/sqrt(s)] centroid random walk
+    static_velocity_decay_time: 0.10
+    initial_probability_cv: 0.4
+    initial_probability_static: 0.4  # CT gets remaining 0.2
+    minimum_mode_probability: 0.0001
+    sigma_v0: 1.5       # [m/s]   새 트랙의 속도 불확실성
+    max_dt: 0.5         # [s]     predict 한 번의 상한
+
+    # ── association ───────────────────────────────────────────────────
+    gate_chi2: 9.21034  # chi^2_{2,0.99}. camera_lidar_fusion 게이트와 같은 값
+    fallback_sigma: 0.1 # [m] position_covariance 가 비었을 때만
+    # Provisional semantic policy: require repeated camera evidence and retain
+    # person through short occlusion, but not indefinitely on LiDAR updates.
+    # Expiry removes the class, NOT the geometric obstacle track.
+    person_confirm_hits: 3
+    person_confirmation_window: 1.0
+    # 짧은 카메라 누락만 잇고, LiDAR-only 트랙에 예전 person 라벨이 오래
+    # 남지 않게 한다.
+    person_label_timeout: 1.0
+    class_conflict_confidence: 0.6
+    # 최근 LOST person만 보수적으로 재연결한다. 통계 게이트, 절대 거리,
+    # 1등/2등 후보 차이를 모두 통과해야 기존 ID를 이어 쓴다.
+    person_reid_max_age: 0.50
+    person_reid_gate_chi2: 16.0
+    person_reid_max_distance: 0.60
+    person_reid_ambiguity_ratio: 0.70
+    default_obstacle_radius: 0.25 # [m] metric footprint가 생기기 전 fallback
+
+    # ── 생명주기 ──────────────────────────────────────────────────────
+    n_confirm: 3        # TENTATIVE -> CONFIRMED 누적 검출 수
+    max_coast: 1.0      # [s] 마지막 검출 이후 삭제까지
+
+    # IMM posterior probabilities; confirmation advances only on observations.
+    static_enter_probability: 0.85
+    static_exit_probability: 0.65
+    dynamic_enter_probability: 0.80
+    dynamic_exit_probability: 0.60
+    static_confirm_time: 0.50
+    dynamic_confirm_time: 0.30
+    motion_evidence_max_gap: 0.25

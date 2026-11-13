@@ -1,0 +1,36 @@
+frames:
+  base_frame: base_link
+  front_lidar_frame: laser_front
+  rear_lidar_frame: laser_rear
+  camera_frame: camera_link
+
+front_lidar:
+  enabled: true
+  model: rplidar_s2
+  serial_port: /dev/ttyUSB0
+  serial_baudrate: 1000000
+  frame_id: laser_front
+  scan_topic: /scan_front
+  scan_mode: DenseBoost
+  angle_compensate: true
+  inverted: false
+
+rear_lidar:
+  enabled: true
+  model: rplidar_s2
+  serial_port: /dev/ttyUSB1
+  serial_baudrate: 1000000
+  frame_id: laser_rear
+  scan_topic: /scan_rear
+  scan_mode: DenseBoost
+  angle_compensate: true
+  inverted: false
+
+depth_camera:
+  enabled: true
+  package: realsense2_camera
+  launch_file: rs_launch.py
+  camera_name: camera
+  frame_id: camera_link
+  depth_profile: 1280x720x30
+  pointcloud_enable: true

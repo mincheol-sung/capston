@@ -1,0 +1,90 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 16,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 50,
+  "callback_over_200ms_ratio": 0.5,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 136.49321183096617,
+    "p50": 138.28593655489385,
+    "p95": 239.00375574594364,
+    "p99": 241.2816428113729,
+    "max": 244.07971068285406
+  },
+  "backend": "split",
+  "workers": 2,
+  "frozen_nominal": true,
+  "statuses": {
+    "stale_odom": 50,
+    "expired_input": 34,
+    "normal": 16
+  },
+  "fallback_ratio": 0.84,
+  "deadline_miss_ratio": 0.5,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 118.32242710981518,
+    "p50": 117.06220312044024,
+    "p95": 238.8184099807404,
+    "p99": 241.1577444872819,
+    "max": 243.787539890036
+  },
+  "normal_optimizer_ms": {
+    "count": 16,
+    "mean": 231.0223753156606,
+    "p50": 231.05215840041637,
+    "p95": 231.7086366820149,
+    "p99": 231.79790660506114,
+    "max": 231.8202240858227
+  },
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 18.619030583649874,
+    "p50": 17.215918749570847,
+    "p95": 39.57150246715173,
+    "p99": 41.68081165757032,
+    "max": 44.54341880045831
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 18.217712636105713,
+    "p50": 16.86930258292704,
+    "p95": 39.00911160744725,
+    "p99": 41.28633131971583,
+    "max": 44.084260659292326
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 200.00457968795672,
+    "p50": 199.13428649306297,
+    "p95": 402.60532438987866,
+    "p99": 404.9063057289459,
+    "max": 406.4682829193771
+  },
+  "receive_interval_ms": {
+    "count": 100,
+    "mean": 199.99914255924523,
+    "p50": 199.12920950446278,
+    "p95": 402.826662408188,
+    "p99": 405.053952250164,
+    "max": 406.7393629811704
+  },
+  "receive_count_in_window": 100,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 10,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

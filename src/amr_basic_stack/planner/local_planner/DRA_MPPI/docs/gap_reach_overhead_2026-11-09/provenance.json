@@ -1,0 +1,29 @@
+{
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+  "numpy": "1.26.4",
+  "scipy": "1.11.4",
+  "threads": {
+    "OPENBLAS_NUM_THREADS": 1,
+    "OMP_NUM_THREADS": 1
+  },
+  "input_sha256": {
+    "b1_019": "ce7ac18fd964bf12fbcc14b486f659b1f36d9a3c19cad6a3ab77f2e4a071d672",
+    "b1_030": "588b8c38fb9a1867c9387d765eebbeffdb27b4e7f4ad1668546a3e0aa5eeec95",
+    "b1_037": "a9acd1216ea288aab9cb15062aaa546bcf336aa531dba39dd9bb55df09fe1edb",
+    "b1_066": "7b3c177e0590a925848f6ecfeb9a4e1b7bb919ed8a91c9ccdfc60a8972cecd12",
+    "b1_088": "ca559775f88b9f532db6caa42ab8093b3aa2a23fe90f39d881cf59e17b8348e0",
+    "b0_001": "e389e956d1f98695c4cb4ebecd88c8ea875fece8f2f7345cee3fa80765df7177",
+    "b0_024": "c79b49a251bfdb91c2bbda858b2a42efbfd7c76ead430d98a5b18ba6f8340062",
+    "b0_027": "39c60f7113b93618435508564ae35ebc9704c5aa0d90de10eae89c5cd9c2e311",
+    "b0_039": "d435f4c77261af460fa2165edc04ba1779ea3053ffa6cc66db01a66c76cad237",
+    "b0_052": "dce1e928eccad7fec5e5efaaea4c89f686b5b0969c7eb0c7929cd3db7547a85e",
+    "b2_051": "edda818344a1794e905dec3cc41d3f51ad96eb5a4bec4b793b6915244eec0c8a",
+    "b2_060": "4b82ad4ad8e35fe01c47f20769b7c9571822623c3674819dff484630729dd0d3",
+    "b2_079": "8becc21496840005c8b7f836abcc965e980755ff0a62cebd1ced3d53716a5937",
+    "b2_100": "a77c80687900f9c93e047414a436a7f8e5de5987c781ccd9c4e45cf67794e241",
+    "b2_114": "97d448bde711e51c703d59b97f5d2e80f975a6e356ba60af0736ba9b3d997246",
+    "b2_123": "54fd72a4bfd49dee8a89fa7061134a3b25159cf4e1c396103c310d942162861e"
+  },
+  "runtime_sources_unchanged": true
+}

@@ -1,0 +1,25 @@
+{
+  "version": "disparity_midpoint_value_v1",
+  "status": "Initial development policy, evaluated on 10 snapshots; no production integration or MPPI validation",
+  "seed_per_gap": 1,
+  "midpoint": "ids[len(ids)//2] on circular ordered bins",
+  "full_circle": "No unique midpoint; use bearing to path point approximately 1m along remaining path",
+  "minimum_forward_displacement_m": 0.25,
+  "maximum_target_error_m": 0.35,
+  "nominal_duplicate_rms_lt_m": 0.22,
+  "nominal_duplicate_tail_lt_m": 0.3,
+  "disable_nominal_dedup_if_nominal_static_collision": true,
+  "selected_duplicate_rms_lt_m": 0.25,
+  "maximum_extra_guides": 3,
+  "cost": "Frozen existing common_costs + static soft cost",
+  "require_improvement_over_nominal": false,
+  "additional_dynamic_mc": false,
+  "dynamic_safety": "Original MPPI rollout and common final MC; not run in this experiment",
+  "rollout_budget": {
+    "total": 500,
+    "per_guide": 100,
+    "nominal": "500-100*g"
+  },
+  "source_partition_sha256": "6fb1cf6a0a0f96aabb7c61446ef86f5ed2e1ec8f6025db81cbb57bd4231c946a",
+  "script_sha256": "162b4b0d2cb690df642a14e87944dcc57c98a96775ba01bc1c86a74a5aaf82a8"
+}

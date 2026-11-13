@@ -1,0 +1,143 @@
+충돌 비용 제외 공통 목적함수 seed · 실제 10장면
+다중 초기값 SLSQP로 기존 common_costs만 최소화. 속도/가속도/휠 제한 및 기존 비선형 rollout 유지.
+정적 soft/hard 항과 동적 위험 항은 seed 최적화에서 모두 제외하고 사후 평가에서만 사용.
+수치적으로 수렴한 feasible 최저 관측해이며 전역 최적해 보장은 없다.
+선정된 진단 장면 10개: 정적 충돌 7개, 나머지 3개는 nominal과 중복.
+로컬 최적화 48/48회 수렴.
+공통 비용 수치와 장애물 포함 최종 MPPI 비용은 서로 다른 목적함수이므로 혼동하지 않는다.
+1차 gated 추가 seed 방식은 10개 모두 충돌/중복 gate에서 제외돼 원래 결과를 재사용했다. 이것만으로 sampling 중심의 유용성을 평가할 수 없다.
+정적 통과 3개를 nominal 초기값으로 사용한 실제 MPPI 6회는 모두 비용이 줄었다.
+초기값 교체: 동일500 rollout 예산, 기존 gap 가이드 및 최종 충돌/MC 검사 유지.
+2차 직접 추가: 충돌/중복으로 seed 중심을 기각하지 않고 실제10장면x2seed=20회 MPPI 실행. 기존 rollout 및 최종 안전 검사는 유지.
+직접 추가 결과: 비용 비교 가능한9장면 중7개 개선,2개 유사,0개 악화. 나머지1개는 두 방식 모두 안전 후보 없음. 유사 기준은 장면별 두 seed 평균 차이 ±0.1.
+공통 seed 그룹이 14/20 trial에서 최종 선택됐다. seed 중심이 정적 충돌했던4장면에서도 주변 sampling 후 안전 기준 통과 결과가 선택됐다.
+권고 개발 구조: nominal + 공통 비용 최적화 seed 1개 + gap 최대2개. 총500 rollout, 공통 seed100개. gap 다양성 필터와 별개인 목표추종 최적화 역할.
+기존 gap이3개인 경우 비용 우선순위가 낮은 gap을 대체하며 nominal 배정도 변경된다. 따라서 목적함수 개선만 고립한 실험은 아니다.
+이10개는 결과 확인 전 선정한 진단 장면이며 기존 데이터 재사용이다. 전체127장면/새bag/폐루프 일반화 증거는 아니다.
+다중 초기값 전체 시간 ms: {'min': 152.35589910298586, 'median': 277.1686704363674, 'max': 383.0253123305738}
+path guide 하나에서 시작한 최적화 시간 ms: {'min': 21.10470598563552, 'median': 54.25721011124551, 'max': 72.56466615945101}
+다중 초기값 계산을 매 주기 추가하는 것은 5Hz 예산에 맞지 않는다. 단일 초기값/제한 반복 실시간 구현은 별도 검증 필요.
+도구: tools/experiment_common_objective_seed.py, tools/evaluate_common_seed_raw.py, tools/render_common_objective_seed.py
+실행: ROS Jazzy와 workspace setup을 source한 뒤 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 /usr/bin/python3 tools/experiment_common_objective_seed.py
+직접 추가 후속 실행: 같은 ROS/스레드 환경에서 /usr/bin/python3 tools/evaluate_common_seed_raw.py
+그림만 재생성: /usr/bin/python3 tools/render_common_objective_seed.py
+
+[
+  {
+    "scene": "b1_004",
+    "before_mean_cost": 1.2454926469792693,
+    "after_mean_cost": 0.745792144673159
+  },
+  {
+    "scene": "b1_037",
+    "before_mean_cost": 0.5776796436179896,
+    "after_mean_cost": 0.2472799616238553
+  },
+  {
+    "scene": "b2_133",
+    "before_mean_cost": 3.282973067214895,
+    "after_mean_cost": 2.3248710097720435
+  }
+]
+
+{
+  "comparison": [
+    {
+      "scene": "b0_001",
+      "comparable": true,
+      "before": 0.9822910469834887,
+      "after": 0.7575834904347573,
+      "delta": -0.22470755654873142,
+      "selected_count": 2,
+      "static_invalid_seed": true
+    },
+    {
+      "scene": "b0_029",
+      "comparable": true,
+      "before": 21.34699211715934,
+      "after": 21.34699211715934,
+      "delta": 0.0,
+      "selected_count": 0,
+      "static_invalid_seed": true
+    },
+    {
+      "scene": "b0_033",
+      "comparable": false,
+      "before": null,
+      "after": null,
+      "delta": null,
+      "selected_count": 0,
+      "static_invalid_seed": true
+    },
+    {
+      "scene": "b0_034",
+      "comparable": true,
+      "before": 18.187783138460958,
+      "after": 18.16263613028671,
+      "delta": -0.02514700817424753,
+      "selected_count": 0,
+      "static_invalid_seed": true
+    },
+    {
+      "scene": "b1_004",
+      "comparable": true,
+      "before": 1.2454926469792693,
+      "after": 0.6901516974933062,
+      "delta": -0.5553409494859631,
+      "selected_count": 2,
+      "static_invalid_seed": false
+    },
+    {
+      "scene": "b1_037",
+      "comparable": true,
+      "before": 0.5776796436179896,
+      "after": 0.24042417086679152,
+      "delta": -0.3372554727511981,
+      "selected_count": 2,
+      "static_invalid_seed": false
+    },
+    {
+      "scene": "b1_088",
+      "comparable": true,
+      "before": 4.1481777146244205,
+      "after": 1.93140116916218,
+      "delta": -2.2167765454622406,
+      "selected_count": 2,
+      "static_invalid_seed": true
+    },
+    {
+      "scene": "b2_083",
+      "comparable": true,
+      "before": 5.716718388818073,
+      "after": 5.334697258796336,
+      "delta": -0.3820211300217373,
+      "selected_count": 2,
+      "static_invalid_seed": true
+    },
+    {
+      "scene": "b2_084",
+      "comparable": true,
+      "before": 8.423009732908223,
+      "after": 3.1119082532500997,
+      "delta": -5.311101479658124,
+      "selected_count": 2,
+      "static_invalid_seed": true
+    },
+    {
+      "scene": "b2_133",
+      "comparable": true,
+      "before": 3.282973067214895,
+      "after": 2.255754876334117,
+      "delta": -1.0272181908807783,
+      "selected_count": 2,
+      "static_invalid_seed": false
+    }
+  ],
+  "better": 7,
+  "similar": 2,
+  "worse": 0,
+  "noncomparable": 1,
+  "common_group_selected_trials": 14,
+  "moving_trials": 18,
+  "static_invalid_centres_with_selected_safe_result": 4
+}

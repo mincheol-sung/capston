@@ -1,0 +1,59 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 30,
+  "normal_optimizer_cycles": 30,
+  "statuses": {
+    "normal": 30
+  },
+  "fallback_ratio": 0.0,
+  "deadline_miss_ratio": 0.0,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "p50": 34.462363459169865,
+    "p95": 35.94798679696396,
+    "p99": 36.4997293218039,
+    "max": 36.724291974678636
+  },
+  "normal_optimizer_ms": {
+    "p50": 31.856002984568477,
+    "p95": 32.17197513440624,
+    "p99": 33.59593816567212,
+    "max": 34.16446200571954
+  },
+  "start_delay_ms": {
+    "p50": 0.28509972617030144,
+    "p95": 0.3033723100088537,
+    "p99": 0.32851605676114565,
+    "max": 0.33855182118713856
+  },
+  "deadline_lateness_ms": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "publish_interval_ms": {
+    "p50": 200.07515791803598,
+    "p95": 200.59490433195606,
+    "p99": 201.8322856258601,
+    "max": 202.2981340996921
+  },
+  "receive_interval_ms": {
+    "p50": 200.02337894402444,
+    "p95": 200.60374406166375,
+    "p99": 201.82545440038666,
+    "max": 202.28356099687517
+  },
+  "receive_count_in_window": 30,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 40,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 5,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true
+}

@@ -1,0 +1,120 @@
+-- ============================================================================
+-- mapping_hq_2d.lua — 실차 매핑 프로파일. mode:=mapping 의 기본값이다.
+--
+-- 쓰는 법 (lua_basename 을 줄 필요 없다 — 이게 기본이다):
+--   ros2 launch amr_perception_bringup cartographer.launch.py \
+--        mode:=mapping map:=<이름>
+--
+-- mapping_2d.lua 는 이제 매핑 프로파일이 아니라 localization_2d / slam_2d /
+-- mapping_imu_scan_2d / mapping_sim_2d 가 함께 include 하는 공통 베이스다.
+-- 그래서 지우지 않는다. 매핑에는 이 파일을 쓴다.
+--
+-- ═══ 이 파일이 지금 값이 된 경위 (2026-09-15 ~ 16) ═══════════════════════
+--
+-- ── 1 차: 측위 bag 으로 한 ablation (2026-09-15) ─ 결론이 절반은 틀렸다 ──
+--   bag mpc_chain_20260915_154912(190 s)를 재매핑해 한 번에 한 파라미터씩
+--   비교했다. 그런데 이 bag 은 **측위 모드로 MPC 주행 중** 담은 것이라
+--   매핑용 스윕이 아니었고, 절대 품질이 양쪽 다 나빴다(흐릿/점유 4 대).
+--
+--     설정                          점유  흐릿/점유  벽두께p90  고립  constraint
+--     mapping_2d.lua (기준)         3191    4.288     200 mm     38    18349
+--     + min_num_points 500          3054    3.897     141 mm     42    22143  채택
+--     + ceres max_num_iterations 50 2972    4.936     141 mm     53    23056  기각
+--     + optimize_every_n_nodes 50   3097    4.475     200 mm     48    18340  무변화
+--     + sampling_ratio 0.5          3209    4.926     200 mm     57    32811  기각
+--     + max_num_final_iterations 500 3191   4.288     200 mm     38    18349  무효과
+--     위 다섯 개 전부               2987    5.903     141 mm     49    30085  최악
+--
+--   이 중 "벽두께 141 mm" 는 아래 2 차에서 **재현되지 않았다**(200 mm 동일).
+--   기각·무효과 판정은 유효하다고 본다 — 방향이 뚜렷했다.
+--
+-- ── 2 차: 매핑 bag 으로 한 same-data A/B (2026-09-16) ─ 이게 채택 근거다 ──
+--   bag map_hq_20260916_001124(319 s, 실제 매핑 주행)을 lua 만 바꿔 두 번
+--   cartographer_offline_node 로 재매핑했다. 주행·회전·경로가 완전히 동일해
+--   교란 변수가 0 이다.
+--
+--     설정            흐릿/점유  조각  고립<10  constraint  평균score  처리시간
+--     mapping_2d        2.197    142    113      40014      0.756     108.8 s
+--     mapping_hq_2d     1.986    125     96      57064      0.764     195.9 s
+--                      -9.6 %  -12 %   -15 %    +42.6 %    +1.0 %     1.80 배
+--
+--   constraint 가 42.6 % 늘면서 **평균 score 도 같이 올랐다.** 1 차의
+--   sampling_ratio 0.5 는 constraint 를 79 % 늘렸지만 min_score 0.62 바로
+--   위의 약한 것이 섞여 지도를 흐리게 했다 — 이번은 양과 질이 같이 올랐다.
+--   벽두께는 200 mm 로 동일했다.
+--   비용: CPU 394 % -> 762 %, 메모리 330 MB -> 658 MB.
+--
+-- ── 3 차: lua 가 아니라 주행이 문제였다 (2026-09-16) ─────────────────────
+--   같은 hq lua 로 두 번 매핑한 실차 결과:
+--
+--                        회전상한  커버속도   스캔1장중 회전p90  흐릿/점유
+--     09-16 00:11 런     1.000     22.7 m²/분      5.39°         4.021
+--     09-16 00:50 런     0.600      6.6 m²/분      3.40°         1.263
+--
+--   첫 런이 과회전한 것은 joy_teleop_node 의 버그였다 — 버튼 경로에
+--   scale_* 이 안 곱해져서 max_angular_vel 이 그대로 나갔고, joy_teleop.yaml
+--   의 axis_angular_z 가 -1(축 비활성)이라 회전이 100 % 버튼으로 들어왔다.
+--   /cmd_vel 회전 명령 875 개가 전부 정확히 1.000 rad/s 였다. 2026-09-16 수정.
+--
+--   교훈: **lua 보다 주행이 압도적으로 크다.** lua 차이는 10 % 수준인데
+--   주행 차이는 3 배였다. 천천히, 회전을 아껴서 돌 것.
+--
+-- ── 4 차: 오프라인 재매핑은 만능이 아니다 (2026-09-16) ───────────────────
+--   같은 bag 을 실시간 결과와 cartographer_offline_node 결과로 비교:
+--
+--                      실시간   오프라인
+--     과회전 런(00:11)  4.021    1.986   오프라인이 2.0 배 좋음
+--     정상 런(00:50)    1.263    1.419   실시간이 11 % 좋음
+--
+--   즉 오프라인 재매핑은 **망가진 런을 복구하는 수단**이지 좋은 런을 더
+--   좋게 만드는 수단이 아니다. 정상 런이면 실시간 맵을 그대로 쓴다.
+--   도구는 stack_master/scripts/offline_map.sh 에 있다.
+--
+-- ── 남은 현상 (원인 미규명) ─────────────────────────────────────────────
+--   매핑 중 cartographer_node 가 주기적으로 1~2.4 s 씩 통째로 멈춘다.
+--   /tracked_pose p50 5.00 ms 인데 최대 공백 2447 ms, >1 s 공백이 96 회
+--   (756 s 런 기준 총 69.6 s = 9.2 %). pose graph 최적화가 노드 mutex 를
+--   잡는 구간으로 보인다. 발생률은 0.12~0.13 /s 로 주행 방식과 무관하고,
+--   과회전 런과 정상 런에서 동일한데 맵 품질은 3 배 차이가 났다 —
+--   **따라서 맵 품질의 원인은 아니다.** 실시간성이 필요한 slam 모드에서는
+--   문제가 될 수 있으니 거기서는 이 프로파일을 쓰지 말 것.
+--
+-- 측정 지표 정의:
+--   흐릿/점유 = (점유도 자유도 미지(128)도 아닌 중간확률 셀) / 점유 셀
+--               같은 벽을 여러 pose 로 그리면 늘어난다. 낮을수록 선명.
+--   벽두께p90 = 점유 셀의 distance transform x 2
+--   nav2 규약(negate=0): p=(255-px)/255, 점유 px<=89, 자유 px>=205
+-- ============================================================================
+
+include "mapping_2d.lua"
+
+-- ── 정합에 쓰는 점 수 ────────────────────────────────────────────────────
+-- adaptive voxel filter 는 min_num_points 를 채울 때까지 voxel 을 줄인다.
+-- RPLIDAR S2 는 스캔당 3240 점(각도 0.1108°)인데 기본값은 200 점만 보장한다.
+-- ceres residual 수가 그만큼 늘어 정합이 정밀해진다.
+TRAJECTORY_BUILDER_2D.adaptive_voxel_filter.min_num_points = 500
+
+-- 루프 클로저 정합(fast correlative -> ceres)에 쓰는 점. 기본 100.
+-- constraint 하나하나의 품질이 올라가면 전역 기하가 단단해진다.
+TRAJECTORY_BUILDER_2D.loop_closure_adaptive_voxel_filter.min_num_points = 200
+
+-- 점이 2.5 배로 늘어 constraint 계산이 무거워진다. 매핑 때는 perception 스택을
+-- 안 띄우므로 이 NUC(8 코어 12 스레드)에서 8 까지 준다.
+-- 실시간 처리가 밀리면(= /submap_list 갱신이 늘어지면) 6 으로 낮출 것.
+MAP_BUILDER.num_background_threads = 8
+
+-- ── 손대지 않은 것과 그 이유 ─────────────────────────────────────────────
+-- * ceres_scan_matcher.ceres_solver_options.max_num_iterations 20 유지.
+--   50 으로 올리면 벽은 얇아지지만 흐릿함이 4.288 -> 4.936 으로 늘었다.
+-- * POSE_GRAPH.optimize_every_n_nodes 100 유지. 50 은 효과가 없었다.
+-- * POSE_GRAPH.constraint_builder.sampling_ratio 0.3 유지. 0.5 는 악화.
+-- * POSE_GRAPH.max_num_final_iterations 기본 200 유지. 500 은 무효과.
+-- * submaps.grid_options_2d.resolution 0.05 유지. 0.03 은 파급이 크다 —
+--   측위도 같은 해상도로 돌아야 하고 /map PGM 해상도가 바뀌면
+--   traversability.yaml 의 셀 기준 파라미터와 planner 가 전부 영향을 받는다.
+-- * constraint_builder.min_score 0.62 유지. 낮추면 약한 constraint 가 섞인다
+--   (위 sampling_ratio 실험이 그 방향의 결과를 보여준다).
+-- * fast_correlative_scan_matcher.linear_search_window 4 유지.
+--   넓은 공간에서 먼 루프 클로저가 필요하면 기본값 7 로 올릴 수 있다.
+
+return options

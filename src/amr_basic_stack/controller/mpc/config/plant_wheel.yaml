@@ -1,0 +1,129 @@
+# amr_mpc 바퀴 단위(구조 B) 설계 파라미터 — wheel_model.py / wheel_mpc.py / wheel_tracking_node.py 의 단일 출처
+# ===================================================================
+# 구조 B: MPC 출력이 몸체속도 명령이 아니라 바퀴 각속도 setpoint ω_cmd (4) 다.
+#   Upper controller (이 MPC) 가 kinematics T 를 소유하고, Lower (RoboClaw wheel PI + 모터) 는
+#   바퀴별 FOPDT 로 흑상자. 기존 몸체 단위 구조(plant.yaml, mpc.py)는 그대로 두고 병행한다.
+#
+# 교수님 정의(입력 = 토크/전류/각속도)에서 각속도 단계. 토크 단계로 갈 때는 model 절만 바뀐다.
+# ===================================================================
+
+# ── 모델: 바퀴별 명령 → 응답 (FOPDT). 2026-09-03 로그 wp2_log_20260903_160518, θ = 40 ms 고정,
+#    fit_fopdt 와 같은 계단 에지 창(3축 54구간 합산)에서 바퀴별 ARX 최소자승 (2026-09-04).
+#    바퀴 간 τ 편차 9 %. 축별 모델(plant.yaml 98/106/89) 과 같은 자릿수.
+model:
+  tau:   {FL: 0.101, FR: 0.098, RL: 0.102, RR: 0.093}    # [s]
+  k_dc:  {FL: 1.010, FR: 1.010, RL: 1.011, RR: 1.010}    # [-]
+  theta: 0.040                                           # [s]  Python: tuning.Ts 와 같아야 d = 1.  C++: Ts 의 정수배
+
+# ── 모델 (100 Hz, C++ 노드 amr_mpc_cpp 전용): 바퀴별 1차 근사, dead time 없음. 측정은 /encoder_wheel_speeds.
+# 2026-10-22 교수님 피드백: "데드타임 40 ms 는 쓰기 어렵다, 1차 근사로, 남은 오차는 MPC 가 상쇄, 10 ms 기준".
+# 위 model(θ 40 / τ ≈ 100 ms)은 cmd 18 속도 기준이고, 그 속도는 RoboClaw 펌웨어 필터 때문에 실제보다 θ+τ 로
+# 91~94 ms 늦다 (바퀴 띄우고 실측, base.yaml 주석·analysis/roboclaw_100hz). 실제 바퀴는 θ ≈ 11 ms 라 1 스텝 수준이다.
+# 1차 근사 τ₁ = θ + τ (평균 체류시간 T_ar 보존 = e^{-θs} ≈ 1/(θs+1) 로 지연을 시정수에 흡수, SIMC 모델 축소와 같은 계열).
+# 바닥 값은 직렬 LTI 의 T_ar 가산성으로 추정했다:  바닥 실제 T_ar = 바닥 cmd 18 T_ar (wp2_log_20260903_160518, 1차 맞춤)
+#   − 측정필터 T_ar (띄운 실측, 하중 무관).  FL 136.6−93.1, FR 132.8−90.5, RL 136.3−94.4, RR 128.5−90.9 ms.
+#   이득도 같은 식: 바닥 cmd 18 K / 필터 이득 (cmd 18 은 카운트 기준보다 1.1~1.8 % 작다).
+# ★ 간접 추정이다. 바닥 계단 sysid (wp2_step_logger --ramp 0 --rate 100, 드라이버 encoder 모드)로 확인할 것.
+#   띄운 상태 실측은 τ₁ 26~28 ms — 바닥이 차체 관성만큼 느린 방향이 맞다.
+model_100hz:
+  tau:   {FL: 0.043, FR: 0.042, RL: 0.042, RR: 0.038}    # [s]  τ₁ = θ + τ
+  k_dc:  {FL: 1.024, FR: 1.030, RL: 1.023, RR: 1.029}    # [-]
+  theta: 0.0                                             # [s]  1차 근사 — dead time 상태 없음
+
+# ── 기하: 드라이버 twist_to_wheels 와 같은 식.  ω_i = (v_x ± v_y ± k ω)/r,  k = (wheel_base + width)/2
+geometry:
+  wheel_radius_m: 0.04
+  wheel_base_m:   0.1897
+  robot_width_m:  0.207
+
+# ── 제약: 바퀴별 (정확한 하드웨어 한계 — 몸체 단위의 L1 마름모는 이것의 대리였다)
+limits:
+  max_wheel_rad_per_sec: 30.0     # base.yaml 과 같게. |ω_i| ≤ 이 값, 4 바퀴 × ± → 8행 × Nc
+  max_wheel_accel: 112.5          # [rad/s²] → |Δω_i| ≤ 이 값 × Ts = 4.5 rad/s per step.
+                                  #   몸체 단위 plant.yaml max_cmd_accel 4.5 m/s² ÷ r 0.04 와 같은 크기
+  load_budget: 0.65               # 기준 바퀴속도 max|T⁻¹ u_r| 가 이 비율 × max 를 넘으면 경고
+
+# ── 튜닝
+tuning:
+  Ts: 0.04
+  Np: 20
+  Nc: 5
+  q_pos: 6.0
+  q_yaw: 0.5
+  # 속도 관측기 gain K (core/observer.py). 구조 A 와 같은 이유·같은 식이고, 여기서는
+  # 바퀴 각속도 4 축에 건다: ω̂ = a′ ω̂ + b′ ω_cmd(k−1−d) + K(ω_meas − ω̂).
+  #   1.0 = 측정 그대로, 0 = 순수 개루프 예측. 근거는 core/observer.py 머리주석.
+  #   구조 B 도 wheel/mpc.py 의 x_m 에서 ω_e = ω_r − ω_meas 를 1차 차분하므로 같은 문제를
+  #   그대로 갖는다. 피드백 원천만 다르다 (/measured_wheel_speeds, 실측 SNR 6.0~9.9).
+  k_obs: 0.15
+  r_dw: 0.0016      # Δω [rad/s] 가중 (바퀴 각가속도 벌점). 2026-09-04 sweep (θ_r=0, 0.5 m/s, FGM 상한 100, 스트레스 케이스 오차 40 cm+34°):
+                    #   r_dw    κ(E)  FGM100 잔여위반   τ_cl 위치 / 헤딩
+                    #   0.0016  158   1.4e-2 rad/s      293 / 310 ms   ← 채택. r_du·r² (병진 등가). 잔여 위반의 영향은 아래 검증 참조
+                    #   0.003    85   2.0e-2            388 / 419
+                    #   0.01     26   0                 671 / 779      ← FGM 은 깨끗이 수렴하지만 루프가 2.3배 느려져 기각
+  # null-space 벌점 q_null — nᵀω 에 거는 가중, n = [1,1,−1,−1]/2 (wheel/mpc.py 머리주석).
+  #   T_FWD 의 null 방향 바퀴속도는 몸체를 못 움직여 비용의 어느 항에도 안 보이고, incremental form 의
+  #   입력 적분기 ω_cmd = ω_prev − Δω 때문에 box·rate 제약이 한 번 심어 놓으면 영원히 남는다.
+  #   2026-09-10 실차 (bags/mpc_chain_20260910_161323) hold 구간 29 곳: |nᵀω_cmd| 중앙값 0.2~19 rad/s 가
+  #   상수로 유지, encoder 도 같은 값 — 몸체 정지 상태에서 바퀴만 돌며 롤러가 미끄러졌고, 그동안
+  #   IMU 자이로 1σ 153 mrad/s (null 0.2 rad/s 구간은 11) 로 몸체가 요 방향으로 떨렸다.
+  #   무제약 null 모드 폐루프 극 1 − δ₀/c 와 시상수 (Np 20, Nc 5, r_dw 0.0016), 폐루프 시뮬 (직진 0.5 m/s
+  #   → hold, 초기오차 46 cm+34°, 바퀴 잡음 0.05 rad/s) 의 hold 잔여 null 성분:
+  #     q_null   τ_null    hold nᵀω     첫 스텝 δ₀/c
+  #     0        ∞         −5.99 rad/s  0          ← 이전 동작. 바퀴 3.0 rad/s 로 헛돈다
+  #     0.0001   0.141 s    0.000       0.18       ← 채택
+  #     0.0005   0.072 s    0.000       0.43
+  #     0.004    0.028 s    0.000       0.77
+  #   ★ 값을 키우면 안 되는 이유: 세 축이 동시에 걸린 포화에서는 null 성분이 바퀴 최대속도를 실제로
+  #   낮춘다 (바퀴 [−5,7,−3,5] 에 c=−2 → [−6,6,−2,6], 최대 7→6). 벌점은 QP 의 그 재분배 여지를 뺏는다.
+  #   3축 기준(vx,vy,ω) + 초기오차 35 cm+23°, 시드 3 개 평균, 오차 RMS(1 s 이후):
+  #     q_null     부하 64 % (예산 안)   부하 87 % (예산 초과)
+  #     0           0.56 cm              1.34 cm
+  #     0.0001      0.56                 1.51        ← 채택. 예산 안에서는 차이 0
+  #     0.0005      0.55                 2.12
+  #     0.002        -                   2.74
+  #   예산(load_budget 0.65) 안에서는 어느 값이든 같고, 초과 구간에서만 벌점이 추종을 깎는다.
+  #   0 을 주면 이전 동작과 같다.
+  q_null: 0.0001
+  qp_max_iter: 100
+  solver: active    # primal active-set (Nocedal–Wright 16.3, warm start). 이 QP (box 40 + rate 40 행, 변수 20, 활성 ≤ 16) 의 정석.
+                    #   2026-09-04 무작위 40 스트레스 케이스, 정확해(SLSQP ftol 1e-14) 대비:
+                    #     active-set  차이 1.4e-5  위반 0       시간 p50 0.67 / max 1.94 ms
+                    #     hildreth    차이 6.8e-3  위반 5e-4    p50 2.17 / max 9.44 ms     (100회 상한)
+                    #     fgm         정체 — 상한 800 에도 폐루프 궤적 8.6 mm 차이
+                    #   폐루프(초기오차 35 cm+29°, 0.6 m/s): 정확해 대비 궤적 차이 0.00 mm, 반복 ≤ 16, warm start 로 정상 주행 0~1회
+
+# ── 튜닝 (100 Hz, C++ 노드 amr_mpc_cpp 전용 — Python 노드는 위 tuning 절만 읽는다)
+# 2026-10-22 교수님 지시로 100 Hz. 아래는 위 25 Hz 값을 **시간 적분 기준**으로 환산한 trial and error 시작점이다.
+#   지평 시간 유지  Np·Ts = 0.8 s,  Nc·Ts = 0.2 s
+#   Σ q·e² 는 스텝 수가 4 배라 q × 1/4,  Σ r·Δω² 는 Δω 가 1/4·스텝 4 배라 r × 4,  q_null 도 q 처럼 × 1/4
+#   k_obs 는 스텝당 보정이라 같은 시간 상수가 되게 1 − (1 − 0.15)^(1/4) = 0.040
+# model.theta 0.040 / Ts 0.01 → d = 4 단 지연 (C++ 판은 d 를 임의 정수로 받는다).
+# 실행마다 바꾸려면 --ros-args -p Nc:=10 -p theta:=0.0 처럼 ROS 파라미터로 덮어쓴다 (노드 머리주석).
+tuning_100hz:
+  Ts: 0.01
+  Np: 80
+  Nc: 20
+  q_pos: 1.5
+  q_yaw: 0.125
+  k_obs: 0.040
+  r_dw: 0.0064
+  q_null: 0.000025
+  daqp_iter_limit: 1000   # 2026-10-22 폐루프 QP 1600 개에서 반복 최대 47
+
+safety:
+  odom_timeout: 0.3
+  ref_timeout:  0.5
+  wheel_timeout: 0.3   # measured_wheel_speeds 끊김 판정 [s]
+
+# ── hold: 도착 후 정지 latch (core/reference.py HoldLatch, Nav2 stateful goal checker 규칙) ─────
+# 플래너가 정지 기준열(속도 0, 포즈 한 점)을 내고 오차가 enter 안이면 명령 0 + MPC 리셋.
+# exit 를 넘으면(밀림) 다시 추종. 2026-09-10 bags/mpc_chain_20260910_172254 근거:
+#   포즈 잡음 1σ 1 mm / 0.3° → enter 는 그 10 배 (떨림 없음). exit 는 dra_mppi goal_tolerance 0.15 m 보다 작게.
+#   능동 추종을 두면 몸체명령 ~10 mm/s, 바퀴 0.5~0.9 rad/s 가 stiction(≈0.25 rad/s) 근처에서 stick-slip 한다.
+hold:
+  enter_xy: 0.01        # [m]   이 안이면 idle 진입
+  enter_yaw_deg: 2.0    # [deg]
+  exit_xy: 0.03         # [m]   idle 중 이걸 넘으면 추종 재개
+  exit_yaw_deg: 5.0     # [deg]
+  stopped_wheel: 1.0    # [rad/s] 측정 바퀴속도 max 가 이 아래여야 idle 진입 (≈ 몸체 4 cm/s). stiction 0.25 의 4 배

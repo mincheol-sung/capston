@@ -1,0 +1,14 @@
+{
+  "purpose": "After observing rearward option loss, compare full seed pools and audit empty gaps; exploratory reuse, no independent validation.",
+  "methods": [
+    "all_options_cost",
+    "all_options_hard_fallback"
+  ],
+  "baseline": "valley_direction_cost: one cheapest feasible seed per gap",
+  "selection": "All peak/midpoint/path-aligned options compete globally; static collision, reach <=0.35m, nominal RMS<0.22m AND tail<0.30m gates unchanged; cost-ranked greedy trajectory RMS >=0.25m; max3.",
+  "fallback": "Only if strict raw gap count is zero: repeat the same gap definition using body-radius clearance without the additional 0.05m proposal buffer. Grid/sweep conservatism, unknown blocked, full trajectory collision and MC remain unchanged. Minimum depth0.5m and width6 bins unchanged.",
+  "fixed": "Frozen planner/config; same 127 valid snapshots, noise seeds7/23; total500; 100 per extra seed; nominal remainder; 10s offline timeout.",
+  "gap_count": "A geometric gap may now provide more than one MPPI guide; selected_guides is distinct from geometric gaps.",
+  "time": "Reused input preparation and proposal timings plus fresh solver setup/compute/teardown; no ROS/full-stack claim.",
+  "source_sha256": "134e84b838e046f7c47c2fa1cc7cdf639576a30360de4ba603d900a3602c16fb"
+}

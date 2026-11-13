@@ -1,0 +1,44 @@
+{
+  "scope": "Re-score saved prior b2_060 actual MPPI samples and representatives using existing common+static costs without dynamic costs; fixed unequal group sample budgets from the historical replay, not a controlled allocation comparison. Representative controls were originally produced with dynamic evaluation. Index order nominal,G1,G2,G3,stop.",
+  "representative_costs": [
+    14.098735228631643,
+    1.9827055279197625,
+    5.226078691004084,
+    31.396680353243536,
+    19.125718758350846
+  ],
+  "groups": [
+    {
+      "group": "nominal",
+      "count": 200,
+      "static_valid": 175,
+      "minimum": 10.360737935894448,
+      "p10": 15.486683037661113,
+      "median": 19.91065576249777
+    },
+    {
+      "group": "G1",
+      "count": 167,
+      "static_valid": 161,
+      "minimum": 1.0098881940911575,
+      "p10": 2.157488658848858,
+      "median": 6.980352588823057
+    },
+    {
+      "group": "G2",
+      "count": 89,
+      "static_valid": 57,
+      "minimum": 4.069887384574379,
+      "p10": 4.673865534126159,
+      "median": 7.623301905288994
+    },
+    {
+      "group": "G3",
+      "count": 44,
+      "static_valid": 43,
+      "minimum": 29.927076632917213,
+      "p10": 37.383406097942995,
+      "median": 42.229484577091306
+    }
+  ]
+}

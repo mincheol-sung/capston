@@ -1,0 +1,131 @@
+2026-11-06: gap 계산 시간 단축
+
+결론
+500개 rollout, 예측구간, 두 목표점의 비용 최적화, 안전 검사, 비용 가중치,
+MC 샘플 설정, 배분 규칙을 유지하면서 기본 예산의 평균 계산 시간을
+112.575ms에서 96.884ms로 15.691ms(13.94%) 줄였다.
+제어 주기의 5Hz 설정은 바꾸지 않았다.
+
+변경한 부분
+
+1. dra_mppi/gap_inputs.py, fuse_scans
+기존에는 연속한 LiDAR beam마다 원점 2개와 ray 끝점 2개의 배열을 생성하고
+grid 좌표로 변환했다. 유효한 beam 쌍 선별, 깊이 계산, 네 꼭짓점 구성,
+pixel 좌표 변환을 NumPy로 일괄 계산하도록 바꿨다.
+OpenCV fillConvexPoly는 각 polygon에 그대로 호출하여 기존 겹침/경계 픽셀
+처리를 유지했다. 여러 polygon을 fillPoly 한 번으로 처리하는 방식은 서로
+겹친 영역의 의미가 달라질 수 있어 사용하지 않았다.
+
+2. dra_mppi/gap_optimization.py, rollout_jacobian
+매 시간 단계의 미분행렬 항을 작은 Python 반복 대신 배열 인덱싱으로 넣는다.
+시간 단계 인덱스/이전 단계 mask만 읽기 전용으로 재사용한다.
+상태·입력·최적화 결과를 cache하여 생략하는 변경은 아니다.
+이 부분의 미세 측정 개선은 작았고, 전체 단축의 주효과는 LiDAR 배열 일괄 계산이다.
+
+유지한 동작
+
+- 바퀴 제한만으로 D_g 계산, wheel 목표점 비용 최적화.
+- 실제 목표거리 min(D_g,d_g), 짧아진 목표점에 같은 비용으로 재최적화.
+- 실제 비용으로 후보 선택/가변 배분, nominal/gap 최소 수량, 총 500개.
+- 기존 500개 및 최종 대표의 비용·정적/동적 위험 평가.
+- horizon=10, dt=0.2초, 제어기 5Hz 설정.
+- seed 준비/최적화 50ms, MPPI 예약 100ms, 전체 deadline 180ms.
+- 최적화 미완료 시 재검증한 이전 seed/규칙 seed 사용 및 출처 구분.
+
+측정 방법
+
+수정 직전 package를 baseline_package/dra_mppi에 보관하고 다른 Python namespace로
+불러와 수정 후 controller와 같은 프로세스에서 차례대로 실행했다.
+각 trial마다 전/후 실행 순서를 번갈아 바꿨다. 동시에 두 planner를 실행하지 않았다.
+기존 원본 bag 추출 데이터 16장면, 각 8회, 모드별 전/후 각각 128회.
+전체 512회 MPPI 실행이며 매회 500개를 평가했다.
+nominal/현재 속도/지도/LiDAR/동적 예측/샘플 설정은 동일하다.
+각 controller의 cache/worker를 유지하고 기록된 nominal을 매회 복원했다.
+OPENBLAS_NUM_THREADS=1, OMP_NUM_THREADS=1.
+
+A. 같은 계산량 비교 (equal_work)
+오직 실험에서만 seed budget=2초, cycle timeout=5초로 늘려 deadline에 따른
+중단 위치 차이를 없앴다. 각 방법의 동일한 최적화와 평가를 끝까지 수행했다.
+
+                    개선 전       개선 후
+평균                144.554ms     123.157ms
+p95                 197.331ms     176.388ms
+최대                204.480ms     182.467ms
+최적화 완료 후보    360개          360개
+정상 반환           128/128        128/128
+
+평균 21.397ms(14.80%) 단축.
+128쌍 모두 다음 값이 array_equal / exact equality로 일치했다.
+- 500개의 sampled_controls
+- 500개의 rollout_costs
+- 그룹 대표의 mode_final_costs
+- 최종 control_sequence와 selected_mode
+- 후보별 wheel 거리/비용, 실제 목표거리/비용, seed 출처
+
+B. 기본 운영 예산 비교 (production)
+운영 YAML의 50ms/180ms를 그대로 사용했다.
+
+                    개선 전       개선 후
+평균                112.575ms      96.884ms
+p95                 157.773ms     145.313ms
+최대                169.504ms     157.850ms
+정상 반환           128/128        128/128
+200ms 초과          0              0
+최적화 완료 후보    168개          208개
+선택된 최적화 seed  125개          161개
+
+평균 15.691ms(13.94%) 단축. 최적화 완료 후보는 23.81% 증가했다.
+geometry 평균은 37.193ms에서 15.348ms로 줄었고,
+seed 준비/최적화 평균은 37.146ms에서 43.243ms로 늘었다.
+이는 기존 '전체 180ms에서 MPPI 100ms 예약' 규칙 때문에 geometry가 빨라진 만큼
+seed 최적화에 사용할 수 있는 시간이 늘어나 더 많은 풀이를 마쳤기 때문이다.
+
+따라서 기본 예산 비교에서 모든 주기의 결과가 같아야 하는 것은 아니다.
+128쌍 중 76쌍의 최종 비용은 정확히 같았고, 나머지는 시간 안에 완료한 후보/배분이
+달라질 수 있었다. 여기서 주행 성능 개선을 주장하지 않는다.
+최종 선택 경로는 양쪽 128회 모두 기존 정적 충돌 및 동적 hard 기준을 통과했다.
+
+미세 측정
+
+단계                  평균 개선 전       평균 개선 후
+LiDAR fusion           28.319ms            5.979ms
+Jacobian 1회            0.029180ms          0.028603ms
+
+fusion은 16장면 각 2회 준비 실행 후 4회 측정, 실행 순서를 번갈아 비교했다.
+16장면 모두 occupancy와 clearance 배열이 정확히 같았다.
+Jacobian은 horizon 1/3/10/17, 총 40개 입력에서 상태·미분행렬의 정확한 일치를
+확인했다. 별도로 실제 rollout에 대한 수치미분 테스트도 수행했다.
+
+검증 및 빌드
+
+- 전체 pytest: 269 passed.
+- 겹치는 polygon, 거리 급변, 아주 가까운/먼 return, invalid beam,
+  연속 유효 beam 쌍이 없는 경우, 로봇 좌표 변환의 scalar raster 비교 테스트 추가.
+- 모든 paired 실행에서 500개 예산과 기존 선택 안전 조건 확인.
+- common_cost.py, mppi_controller.py, guide_conditioned.py, dynamic_risk.py,
+  gaussian_disk.py는 baseline과 byte 단위로 동일함을 assert했다.
+- colcon build --packages-select dra_mppi --symlink-install: 성공.
+- 운영 주기나 파라미터는 변경하지 않았고 실행 중인 노드 재시작은 하지 않았다.
+
+해석 범위
+
+이 결과는 정지 bag snapshot을 반복 재생한 planner kernel 측정이다.
+미세 측정 후 같은 프로세스에서 비교했으므로 최초 모듈 import 시간은 포함하지 않는다.
+ROS callback/TF/deskew/발행, 다른 노드 CPU 부하, 폐루프 주행은 포함하지 않는다.
+평균이 100ms보다 낮아졌어도 p95는 145.3ms, 최대는 157.9ms다.
+따라서 10Hz 실행을 보장하거나 제어기 설정을 10Hz로 바꿀 근거는 아니다.
+5Hz의 계산 여유를 늘리는 변경으로 적용했다.
+
+남는 큰 계산량은 seed SLSQP 및 동적 예측을 포함한 MPPI 평가다.
+이번 작업은 샘플 수/정밀도/최적화 의미를 바꾸지 않고 확인 가능한 중복 연산을
+줄였다. 추가적인 근사나 MC 샘플 축소는 별도의 품질 검증이 필요한 변경이다.
+
+파일
+benchmark.json: 전/후 512회 결과, 설정, 동일성 검증, evaluator hash
+microbench.json: LiDAR/Jacobian 단계 측정
+latency_comparison.png: 기본 운영 예산의 시간 비교
+baseline_package/: 재현 가능한 수정 전 소스
+baseline_dra_mppi.yaml: 수정 전 YAML (이번 작업에서 설정 변경 없음)
+
+재현
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 /usr/bin/python3 planner/local_planner/DRA_MPPI/tools/benchmark_gap_latency.py --output /tmp/gap_latency_replay

@@ -1,0 +1,107 @@
+{
+  "summaries": [
+    {
+      "map": "smoc_lab",
+      "requested_distance": 3.0,
+      "phase": "initial_goal",
+      "attempts": 3,
+      "successes": 3,
+      "callback_mean_ms": 18.89224397018552,
+      "callback_max_ms": 19.20907781459391,
+      "search_mean_ms": 18.051404894019168
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 3.0,
+      "phase": "blocked_path_replan",
+      "attempts": 3,
+      "successes": 3,
+      "callback_mean_ms": 39.95116373213629,
+      "callback_max_ms": 40.351474890485406,
+      "search_mean_ms": 38.80606428720057
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 8.0,
+      "phase": "initial_goal",
+      "attempts": 3,
+      "successes": 3,
+      "callback_mean_ms": 628.4518516622484,
+      "callback_max_ms": 636.374264024198,
+      "search_mean_ms": 626.9969003430257
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 8.0,
+      "phase": "blocked_path_replan",
+      "attempts": 3,
+      "successes": 3,
+      "callback_mean_ms": 758.7180213692287,
+      "callback_max_ms": 760.0968510378152,
+      "search_mean_ms": 756.6500750059882
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 3.0,
+      "phase": "initial_goal",
+      "attempts": 3,
+      "successes": 3,
+      "callback_mean_ms": 18.654208242272336,
+      "callback_max_ms": 18.91025179065764,
+      "search_mean_ms": 17.904043042411406
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 3.0,
+      "phase": "blocked_path_replan",
+      "attempts": 3,
+      "successes": 3,
+      "callback_mean_ms": 39.729992005353175,
+      "callback_max_ms": 39.96460395865142,
+      "search_mean_ms": 38.62106737991174
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 8.0,
+      "phase": "initial_goal",
+      "attempts": 3,
+      "successes": 3,
+      "callback_mean_ms": 699.0531843621284,
+      "callback_max_ms": 699.4042389560491,
+      "search_mean_ms": 697.6126799515138
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 8.0,
+      "phase": "blocked_path_replan",
+      "attempts": 3,
+      "successes": 3,
+      "callback_mean_ms": 766.8178447832664,
+      "callback_max_ms": 771.7766971327364,
+      "search_mean_ms": 764.832580772539
+    }
+  ],
+  "maps": [
+    {
+      "map": "smoc_lab",
+      "shape": [
+        347,
+        326
+      ],
+      "resolution": 0.05,
+      "load_and_inflation_ms": 12.048563919961452,
+      "map_sha256": "772054c30d44aaed93f2bf6b7e1e76b5b441ee4691e1d4ca9a8752161bceec0e"
+    },
+    {
+      "map": "test_imu_scan",
+      "shape": [
+        286,
+        224
+      ],
+      "resolution": 0.05,
+      "load_and_inflation_ms": 2.871791832149029,
+      "map_sha256": "0c8f96346115097ebf4ee507df41fd63703c919d14f33ca5b6237f1db3092ebd"
+    }
+  ],
+  "limitation": "Saved-map synthetic endpoints and injected obstacle; direct actual ROS node callbacks with fixed pose/costmap fixtures, publication included. Not live operational pose/goal, no DDS scheduling/TF wait. 3 repeats only; no p99 claim. Validation timer 1Hz can add up to 1s detection delay."
+}

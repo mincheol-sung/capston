@@ -1,0 +1,211 @@
+{
+  "bag": "/home/smoc/2026amr_ws/bags/mpc_chain_20260923_113151",
+  "duration_s": 287.987832013,
+  "selected_message_counts": {
+    "/odometry/filtered": 14165,
+    "/global_path": 65,
+    "/detections_fused": 2832,
+    "/camera/color/camera_info": 4247,
+    "/tf_static": 1,
+    "/lidar_clusters": 2833,
+    "/detections": 4220,
+    "/tracked_object_modes": 2824
+  },
+  "frame_counts": {
+    "/odometry/filtered": {
+      "odom": 14165
+    },
+    "/global_path": {
+      "map": 65
+    },
+    "/detections_fused": {
+      "base_link": 2832
+    },
+    "/camera/color/camera_info": {
+      "camera_color_optical_frame": 4247
+    },
+    "/lidar_clusters": {
+      "base_link": 2833
+    },
+    "/detections": {
+      "base_link": 4220
+    },
+    "/tracked_object_modes": {
+      "odom": 2824
+    }
+  },
+  "detections": {
+    "/detections": {
+      "objects": 4720,
+      "sources": {
+        "0": 4720
+      },
+      "classes": {
+        "umbrella": 9,
+        "airplane": 114,
+        "tv": 924,
+        "chair": 1204,
+        "person": 1277,
+        "refrigerator": 429,
+        "skateboard": 53,
+        "traffic light": 7,
+        "oven": 6,
+        "toilet": 39,
+        "suitcase": 344,
+        "bottle": 66,
+        "backpack": 106,
+        "bench": 53,
+        "sports ball": 62,
+        "potted plant": 1,
+        "microwave": 7,
+        "sink": 2,
+        "laptop": 6,
+        "handbag": 3,
+        "parking meter": 8
+      },
+      "nonempty_messages": 2399,
+      "unique_header_stamps": 4220
+    },
+    "/lidar_clusters": {
+      "objects": 81607,
+      "sources": {
+        "1": 81607
+      },
+      "classes": {
+        "lidar_cluster": 81607
+      },
+      "nonempty_messages": 2833,
+      "unique_header_stamps": 2832
+    },
+    "/detections_fused": {
+      "objects": 3169,
+      "sources": {
+        "0": 3060,
+        "2": 109
+      },
+      "classes": {
+        "umbrella": 7,
+        "airplane": 77,
+        "tv": 630,
+        "chair": 806,
+        "person": 847,
+        "skateboard": 33,
+        "traffic light": 6,
+        "refrigerator": 286,
+        "oven": 5,
+        "toilet": 26,
+        "suitcase": 233,
+        "bottle": 47,
+        "backpack": 73,
+        "bench": 34,
+        "sports ball": 40,
+        "potted plant": 1,
+        "microwave": 5,
+        "sink": 1,
+        "laptop": 4,
+        "handbag": 3,
+        "parking meter": 5
+      },
+      "nonempty_messages": 1608,
+      "unique_header_stamps": 2832
+    }
+  },
+  "image_topics": [],
+  "observation_target_topics": [],
+  "embedded_detection_schema_has_provenance": false,
+  "tracks": {
+    "counts": {
+      "object_samples": 4472
+    },
+    "sources": {
+      "0": 4309,
+      "2": 163
+    },
+    "classes": {
+      "chair": 1354,
+      "person": 952,
+      "tv": 946,
+      "airplane": 123,
+      "refrigerator": 395,
+      "suitcase": 305,
+      "backpack": 103,
+      "bench": 61,
+      "skateboard": 51,
+      "sports ball": 37,
+      "microwave": 10,
+      "traffic light": 9,
+      "bottle": 47,
+      "handbag": 16,
+      "umbrella": 9,
+      "toilet": 44,
+      "parking meter": 10
+    },
+    "lifecycle": {
+      "1": 2079,
+      "2": 2393
+    },
+    "unique_ids": 157,
+    "never_semantic_ids": 0,
+    "last_source_lidar_ids": 0,
+    "preliminary_lidar_information_need_ids": 0,
+    "preliminary_lidar_information_need_frames": 0,
+    "never_semantic_to_semantic_events": [],
+    "stale_to_fresh_tracker_events": [
+      {
+        "track_id": 730,
+        "time_s": 187.92146039009094,
+        "previous_age": 1.0018947124481201,
+        "class_name": "person",
+        "last_source": 0
+      }
+    ]
+  },
+  "camera": {
+    "width": 640,
+    "height": 480,
+    "fx": 386.63519287109375,
+    "cx": 319.15692138671875,
+    "frame": "camera_color_optical_frame",
+    "horizontal_fov_deg": 79.22579933793044,
+    "note": "Pinhole estimate from recorded CameraInfo, not effective detection FOV"
+  },
+  "camera_static_transforms": [
+    {
+      "parent": "camera_link",
+      "child": "camera_color_frame",
+      "xyz": [
+        0.0,
+        -0.059,
+        0.0
+      ],
+      "xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "parent": "base_link",
+      "child": "camera_link",
+      "xyz": [
+        0.11398,
+        0.0475,
+        0.092772
+      ],
+      "xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "limitations": [
+    "Track IDs are recorded associations, not ground-truth identity.",
+    "semantic_age reset is not proof of a distinct camera exposure; legacy fusion can reuse detections.",
+    "Preliminary information-need gate excludes path relevance, turn feasibility, and occlusion.",
+    "No counterfactual heading or new camera views can be tested from fixed recorded observations.",
+    "No track-ID epoch reset inferred; events only compare adjacent samples within 0.5 s."
+  ]
+}

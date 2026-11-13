@@ -1,0 +1,134 @@
+[
+  {
+    "scene": "b2_060",
+    "trial": 0,
+    "candidate": {
+      "id": "gap_01",
+      "region_id": 1,
+      "angle_deg": -7.0,
+      "direction_kind": "midpoint",
+      "depth_m": 2.0,
+      "cost": 3.0548012537629843,
+      "reason": "selected",
+      "seed_source": "optimized",
+      "allocation_cost_source": "optimized_actual",
+      "optimization_status": "converged",
+      "feasible": true,
+      "wheel_distance_m": 1.498575495638222,
+      "wheel_value_cost": 3.0548012537629865,
+      "wheel_value_components": {
+        "progress": 2.277585216809884,
+        "straight": 0.0015729301986564775,
+        "heading": 0.7515285864360792,
+        "delta": 0.024114520318366868
+      },
+      "actual_target_distance_m": 1.498575495638222,
+      "actual_value_cost": 3.0548012537629843,
+      "actual_value_components": {
+        "progress": 2.277585216809882,
+        "straight": 0.0015729301986564723,
+        "heading": 0.7515285864360792,
+        "delta": 0.024114520318366854
+      },
+      "lidar_limited": false,
+      "actual_value_reused_from_wheel": true,
+      "wheel_trajectory_within_lidar_depth": true,
+      "value_difference": -2.220446049250313e-15,
+      "optimization_stage": "complete",
+      "wheel_reach_status": "converged",
+      "wheel_value_status": "converged",
+      "actual_value_status": "reused_wheel_solution",
+      "cost_components": {
+        "progress": 2.277585216809882,
+        "straight": 0.0015729301986564723,
+        "heading": 0.7515285864360792,
+        "delta": 0.024114520318366854
+      },
+      "target_distance_m": 1.498575495638222,
+      "target_error_m": 0.010000048811878963,
+      "projected_displacement_m": 1.4885754468263428,
+      "nominal_rms_m": 0.9084556041339373,
+      "nominal_tail_m": 1.3325756206228485,
+      "static_collision": false,
+      "wheel_reach_iterations": 10,
+      "wheel_reach_ms": 3.752924967557192,
+      "wheel_value_iterations": 8,
+      "wheel_value_ms": 3.5424940288066864,
+      "reach_distance_m": 1.498575495638222,
+      "samples": 172
+    },
+    "counts": [
+      138,
+      172,
+      142,
+      48
+    ]
+  },
+  {
+    "scene": "b2_060",
+    "trial": 0,
+    "candidate": {
+      "id": "gap_02",
+      "region_id": 2,
+      "angle_deg": 28.0,
+      "direction_kind": "midpoint",
+      "depth_m": 0.68,
+      "cost": 5.316539788709416,
+      "reason": "selected",
+      "seed_source": "optimized",
+      "allocation_cost_source": "optimized_actual",
+      "optimization_status": "converged",
+      "feasible": true,
+      "wheel_distance_m": 1.4337652344407654,
+      "wheel_value_cost": 1.2916201646395682,
+      "wheel_value_components": {
+        "progress": 1.0113853169832994,
+        "straight": 0.00015406439381068288,
+        "heading": 0.24674882150297292,
+        "delta": 0.03333196175948533
+      },
+      "actual_target_distance_m": 0.68,
+      "actual_value_cost": 5.316539788709416,
+      "actual_value_components": {
+        "progress": 5.267424645679317,
+        "straight": 0.00023338448081657706,
+        "heading": 0.027062155120951885,
+        "delta": 0.021819603428330225
+      },
+      "lidar_limited": true,
+      "actual_value_reused_from_wheel": false,
+      "wheel_trajectory_within_lidar_depth": false,
+      "value_difference": 4.024919624069847,
+      "optimization_stage": "complete",
+      "wheel_reach_status": "converged",
+      "wheel_value_status": "converged",
+      "actual_value_status": "converged",
+      "cost_components": {
+        "progress": 5.267424645679317,
+        "straight": 0.00023338448081657706,
+        "heading": 0.027062155120951885,
+        "delta": 0.021819603428330225
+      },
+      "target_distance_m": 0.68,
+      "target_error_m": 1.0764484475386698e-08,
+      "projected_displacement_m": 0.679999992103353,
+      "nominal_rms_m": 0.37508438849003556,
+      "nominal_tail_m": 0.5856572793794127,
+      "static_collision": false,
+      "wheel_reach_iterations": 17,
+      "wheel_reach_ms": 5.853522103279829,
+      "wheel_value_iterations": 9,
+      "wheel_value_ms": 3.817439079284668,
+      "actual_value_iterations": 24,
+      "actual_value_ms": 7.23780132830143,
+      "reach_distance_m": 0.68,
+      "samples": 142
+    },
+    "counts": [
+      138,
+      172,
+      142,
+      48
+    ]
+  }
+]

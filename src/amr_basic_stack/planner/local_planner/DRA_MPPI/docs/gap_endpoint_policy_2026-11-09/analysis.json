@@ -1,0 +1,250 @@
+{
+  "paired": {
+    "uncensored": {
+      "pairs": 128,
+      "free_better": 57,
+      "free_worse": 45,
+      "ties": 26,
+      "free_cost_change_percent": 1.0018510653246437,
+      "free_time_change_percent": -16.294107980136662
+    },
+    "production": {
+      "pairs": 128,
+      "free_better": 55,
+      "free_worse": 44,
+      "ties": 29,
+      "free_cost_change_percent": -1.1870210684372329,
+      "free_time_change_percent": -16.948944444079594
+    }
+  },
+  "scenes": {
+    "uncensored": {
+      "b1_019": {
+        "fixed_cost": 2.3033602375240356,
+        "free_cost": 2.300499635802333,
+        "free_change_percent": -0.12419254596396367,
+        "fixed_time_ms": 100.09288612491218,
+        "free_time_ms": 97.34571063017938
+      },
+      "b1_030": {
+        "fixed_cost": 1.388484963081266,
+        "free_cost": 1.388484963081266,
+        "free_change_percent": 0.0,
+        "fixed_time_ms": 130.36067774373805,
+        "free_time_ms": 126.94848012324655
+      },
+      "b1_037": {
+        "fixed_cost": 0.5903713487376494,
+        "free_cost": 0.5892840515697246,
+        "free_change_percent": -0.18417173703461076,
+        "fixed_time_ms": 123.62039338040631,
+        "free_time_ms": 89.26523473928683
+      },
+      "b1_066": {
+        "fixed_cost": 2.4905250029093,
+        "free_cost": 2.5011232496241806,
+        "free_change_percent": 0.4255426748376534,
+        "fixed_time_ms": 83.30791588377906,
+        "free_time_ms": 66.0455341276247
+      },
+      "b1_088": {
+        "fixed_cost": 2.504892085735024,
+        "free_cost": 2.597664022909333,
+        "free_change_percent": 3.7036300965870517,
+        "fixed_time_ms": 169.43171725142747,
+        "free_time_ms": 157.3122598711052
+      },
+      "b0_001": {
+        "fixed_cost": 0.9605146850796203,
+        "free_cost": 0.9692991277094801,
+        "free_change_percent": 0.9145557862170195,
+        "fixed_time_ms": 165.56140674947528,
+        "free_time_ms": 134.94009013083996
+      },
+      "b0_024": {
+        "fixed_cost": 2.0982788869898146,
+        "free_cost": 2.0980489617544618,
+        "free_change_percent": -0.01095780150000003,
+        "fixed_time_ms": 97.52640787337441,
+        "free_time_ms": 79.8611123682349
+      },
+      "b0_027": {
+        "fixed_cost": 2.06265761873349,
+        "free_cost": 2.0609409812168,
+        "free_change_percent": -0.08322454977982563,
+        "fixed_time_ms": 169.74357450089883,
+        "free_time_ms": 146.97239063389134
+      },
+      "b0_039": {
+        "fixed_cost": 19.250645346655894,
+        "free_cost": 19.2458059089079,
+        "free_change_percent": -0.025139093577630778,
+        "fixed_time_ms": 56.436213133565616,
+        "free_time_ms": 50.22623976401519
+      },
+      "b0_052": {
+        "fixed_cost": 18.605842517396333,
+        "free_cost": 18.605842517396333,
+        "free_change_percent": 0.0,
+        "fixed_time_ms": 55.8433639962459,
+        "free_time_ms": 49.08686011185637
+      },
+      "b2_051": {
+        "fixed_cost": 1.4389396414722633,
+        "free_cost": 1.4514461874141793,
+        "free_change_percent": 0.8691501423311765,
+        "fixed_time_ms": 120.26691800565459,
+        "free_time_ms": 76.86200062016724
+      },
+      "b2_060": {
+        "fixed_cost": 1.9672557035394687,
+        "free_cost": 2.7143895170756283,
+        "free_change_percent": 37.97847998061072,
+        "fixed_time_ms": 156.41897362365853,
+        "free_time_ms": 152.8461924972362
+      },
+      "b2_079": {
+        "fixed_cost": 10.513869829119237,
+        "free_cost": 10.513869829119237,
+        "free_change_percent": 0.0,
+        "fixed_time_ms": 50.75250787922414,
+        "free_time_ms": 40.56305736594368
+      },
+      "b2_100": {
+        "fixed_cost": 4.517064020701957,
+        "free_cost": 4.42806249958902,
+        "free_change_percent": -1.970340041784624,
+        "fixed_time_ms": 169.22001860802993,
+        "free_time_ms": 108.50364349607844
+      },
+      "b2_114": {
+        "fixed_cost": 5.675145786577179,
+        "free_cost": 5.6712768957250645,
+        "free_change_percent": -0.06817253684063829,
+        "fixed_time_ms": 171.13718300242908,
+        "free_time_ms": 141.99219138390617
+      },
+      "b2_123": {
+        "fixed_cost": 1.0575489364478097,
+        "free_cost": 1.0650454225815362,
+        "free_change_percent": 0.708854774976797,
+        "fixed_time_ms": 62.52111175126629,
+        "free_time_ms": 56.77584674413083
+      }
+    },
+    "production": {
+      "b1_019": {
+        "fixed_cost": 2.019438708124491,
+        "free_cost": 2.0052593741949005,
+        "free_change_percent": -0.7021423266051596,
+        "fixed_time_ms": 94.48977599095087,
+        "free_time_ms": 89.88378274807474
+      },
+      "b1_030": {
+        "fixed_cost": 1.2834695585921523,
+        "free_cost": 1.2834695585921523,
+        "free_change_percent": 0.0,
+        "fixed_time_ms": 128.8414778682636,
+        "free_time_ms": 118.6965855085873
+      },
+      "b1_037": {
+        "fixed_cost": 0.48749443495914446,
+        "free_cost": 0.4858662716143104,
+        "free_change_percent": -0.33398603718840514,
+        "fixed_time_ms": 112.0857885107398,
+        "free_time_ms": 75.7526517554652
+      },
+      "b1_066": {
+        "fixed_cost": 2.4076057476196295,
+        "free_cost": 2.3845724978566034,
+        "free_change_percent": -0.9566869403679901,
+        "fixed_time_ms": 75.47168424207484,
+        "free_time_ms": 56.49970800004667
+      },
+      "b1_088": {
+        "fixed_cost": 3.371075525933606,
+        "free_cost": 2.5618464220885886,
+        "free_change_percent": -24.00507190122667,
+        "fixed_time_ms": 155.0127297450672,
+        "free_time_ms": 137.73806212702766
+      },
+      "b0_001": {
+        "fixed_cost": 0.9203222784714631,
+        "free_cost": 0.9351934519634559,
+        "free_change_percent": 1.615865859152299,
+        "fixed_time_ms": 162.449530493177,
+        "free_time_ms": 126.37522987643024
+      },
+      "b0_024": {
+        "fixed_cost": 2.072934732927988,
+        "free_cost": 2.072669375375258,
+        "free_change_percent": -0.012801056806810429,
+        "fixed_time_ms": 96.71350862481631,
+        "free_time_ms": 74.53317099862034
+      },
+      "b0_027": {
+        "fixed_cost": 1.9603342081342543,
+        "free_cost": 1.9774236785130648,
+        "free_change_percent": 0.8717631058979158,
+        "fixed_time_ms": 163.1416417658329,
+        "free_time_ms": 146.9865144972573
+      },
+      "b0_039": {
+        "fixed_cost": 19.110148839989677,
+        "free_cost": 19.058347365038614,
+        "free_change_percent": -0.2710678780411313,
+        "fixed_time_ms": 53.577365244564135,
+        "free_time_ms": 46.95881288353121
+      },
+      "b0_052": {
+        "fixed_cost": 18.125010002875857,
+        "free_cost": 18.125010002875857,
+        "free_change_percent": 0.0,
+        "fixed_time_ms": 52.23216336889891,
+        "free_time_ms": 45.232613490952644
+      },
+      "b2_051": {
+        "fixed_cost": 1.2663234335522673,
+        "free_cost": 1.2664450496848874,
+        "free_change_percent": 0.00960387602391144,
+        "fixed_time_ms": 113.95657900720835,
+        "free_time_ms": 69.13681012520101
+      },
+      "b2_060": {
+        "fixed_cost": 1.952521598813597,
+        "free_cost": 2.6932189623647256,
+        "free_change_percent": 37.93542483735881,
+        "fixed_time_ms": 151.5384987287689,
+        "free_time_ms": 143.31777823826997
+      },
+      "b2_079": {
+        "fixed_cost": 11.8764484049649,
+        "free_cost": 11.8764484049649,
+        "free_change_percent": 0.0,
+        "fixed_time_ms": 44.5963541205856,
+        "free_time_ms": 35.78852474311134
+      },
+      "b2_100": {
+        "fixed_cost": 5.53168185326067,
+        "free_cost": 4.723190104951021,
+        "free_change_percent": -14.615658849452462,
+        "fixed_time_ms": 136.3026355029433,
+        "free_time_ms": 110.20015887334011
+      },
+      "b2_114": {
+        "fixed_cost": 5.350883084227425,
+        "free_cost": 5.350276463762398,
+        "free_change_percent": -0.011336828995844872,
+        "fixed_time_ms": 159.69791849784087,
+        "free_time_ms": 136.49727774463827
+      },
+      "b2_123": {
+        "fixed_cost": 0.9754487374788429,
+        "free_cost": 0.9775863374282433,
+        "free_change_percent": 0.21914016260098368,
+        "fixed_time_ms": 63.97130000550533,
+        "free_time_ms": 51.48850863042753
+      }
+    }
+  }
+}

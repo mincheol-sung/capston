@@ -1,0 +1,57 @@
+혼합 충돌확률 평가 적용 — 2026-11-04
+
+적용 설정
+- dynamic_risk.mode: monte_carlo
+- dynamic_risk.final_mode: gaussian_disk
+- dynamic_risk.max_obstacles: 20
+- 기존 8배 MC 예산, K500, horizon10, worker2, CP 임계값 0.05 유지.
+- guide의 최종 대표와 Stop, standard의 최종 weighted representative와 Stop,
+  종단 위치/yaw 정렬을 직접 적분으로 검사한다.
+- 최종 MC 표본 수는 0으로 보고하고 적분 연산량을 별도로 기록한다.
+- final_mode: inherit은 기존 1차 적분 방식을 따른다. mode: off는 전체 동적 위험 평가를 끈다.
+- max_obstacles는 기존 class/freshness 필터 이후 예측 객체 수다(mode 수가 아님).
+  21개 이상이면 객체를 자르지 않고 prediction_budget_hold로 기존 hold 명령을 발행한다.
+  입력이 다시 상한 이하가 되면 다음 주기에서 재계획한다. 0은 상한 비활성화다.
+- 이 hold는 정지 시에도 접근하는 장애물에 대한 충돌 방지 보장이 아니다.
+- 기존 실행 노드는 자동 재시작하지 않았다. 다음 시작에 설치된 새 YAML이 적용된다.
+
+검증
+- DRA_MPPI 전체 pytest: 204 passed (3.21 s).
+- 테스트에 두 전략의 MC/직접 적분 분리, 최종 CP 일치, terminal 직접 적분,
+  20개 허용/21개 거부, 일반·terminal 경로의 초과 입력 hold를 포함했다.
+- colcon build --packages-select dra_mppi --symlink-install 성공.
+- 설치된 YAML의 final_mode 및 max_obstacles 값을 확인했다.
+
+ROS 20명 시험: ros20/
+- ROS Jazzy, 별도 localhost domain177, publish_cmd_vel=false.
+- 합성 사람 20명 × 2 modes, 이방 covariance [[0.05,0.025],[0.025,0.025]].
+- static ON, 기본 timeout 180 ms, warm-up10 + 측정100주기.
+- 정상100/100, timeout0, callback 200 ms 초과0.
+- 전체 callback: 평균107.35 ms / p95 112.20 ms / p99 116.95 ms / 최대121.08 ms.
+- optimizer: 평균102.88 ms / p99 109.61 ms.
+- 발행 간격: 평균199.99 ms / p99 210.45 ms.
+- 측정100주기 모두 primary MC 표본 >0, final integration mode=gaussian_disk 확인.
+- 최종 직접 적분에는 MC 표본을 사용하지 않으며 quadrature 연산량을 기록했다.
+
+ROS 21명 시험: ros21_ready/
+- 같은 조건, warm-up10 + 측정10주기.
+- 10/10주기 prediction_budget_hold, optimizer 진입 없음.
+- 초기 ros21/ 실행은 warm-up3으로 입력 도착 전 missing_input 1회와
+  prediction_budget_hold 9회였다. 초기화 구간을 충분히 제외하고 위 시험을 반복했다.
+
+범위 및 제한
+- 로봇 구동 출력은 껐으며 합성 입력의 odometry는 고정 상태다.
+- 실제 perception 추론, 하위 MPC, actuator 및 폐루프 물리 주행은 포함하지 않는다.
+- 짧은 ROS 시험에서 deadline을 만족했다고 장기/full-stack 5 Hz를 보장하지 않는다.
+- 강한 이방 분포와 밀집 인원의 시간 한계는 이전 비교 보고서를 따른다.
+- 직접 적분 오차 추정은 수학적으로 인증된 상한이 아니며 예측 분포 보정과 별개다.
+- 1차 MC 오차가 후보 가중평균과 탐색에 주는 영향은 혼합 방식에서도 남는다.
+
+원자료
+- ros20/summary.json, cycles.jsonl, actual_parameters.yaml, source_sha256.json
+- ros21_ready/summary.json, cycles.jsonl, actual_parameters.yaml, source_sha256.json
+- 이전 수치 비교: ../risk_integrator_comparison_2026-11-04/RESULTS.txt
+
+재현 (저장소 루트, ROS와 workspace setup을 source한 뒤)
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 planner/local_planner/DRA_MPPI/tools/validate_ros_pilot.py --output /tmp/hybrid_ros20 --cycles 100 --warmup 10 --obstacles 20 --covariance anisotropic --domain 177
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 planner/local_planner/DRA_MPPI/tools/validate_ros_pilot.py --output /tmp/hybrid_ros21 --cycles 10 --warmup 10 --obstacles 21 --covariance anisotropic --domain 177

@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Theta* 직결 제어 흐름</title>
+<style>
+:root{
+  --ground:#EFF2F1; --surface:#FFFFFF; --well:#E3E9E7; --line:#CFD9D5;
+  --ink:#16201D; --ink-2:#55635E; --ink-3:#87938D;
+  --accent:#0B6E5F; --accent-soft:#D6E8E3;
+  --gate:#9E5A15; --gate-soft:#F4E4CE; --gate-line:#D9AF7C;
+  --blue:#2B5C8A; --blue-soft:#D9E6F2;
+  --shadow:0 1px 2px rgba(22,32,29,.05), 0 8px 24px -16px rgba(22,32,29,.28);
+  --sans:"IBM Plex Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono:"IBM Plex Mono", "IBM Plex Sans KR", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F1513; --surface:#18211E; --well:#212B28; --line:#2E3A36;
+    --ink:#E3EAE7; --ink-2:#9BA9A3; --ink-3:#6A7873;
+    --accent:#57C3AC; --accent-soft:#12302A;
+    --gate:#DA9C52; --gate-soft:#2E220F; --gate-line:#6B4E27;
+    --blue:#7FB3E0; --blue-soft:#14273A;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0F1513; --surface:#18211E; --well:#212B28; --line:#2E3A36;
+  --ink:#E3EAE7; --ink-2:#9BA9A3; --ink-3:#6A7873;
+  --accent:#57C3AC; --accent-soft:#12302A;
+  --gate:#DA9C52; --gate-soft:#2E220F; --gate-line:#6B4E27;
+  --blue:#7FB3E0; --blue-soft:#14273A;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:56px 24px 100px}
+.kicker{font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+h1{margin:0 0 12px;font-size:clamp(28px,4.6vw,40px);font-weight:700;letter-spacing:-.022em;line-height:1.16;text-wrap:balance}
+.standfirst{margin:0;max-width:64ch;color:var(--ink-2);font-size:16.5px}
+section{margin-top:52px}
+h2{margin:0 0 6px;font-size:13px;font-weight:600;font-family:var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--accent)}
+h2 .n{color:var(--ink-3);margin-right:10px}
+p{margin:0 0 12px;max-width:66ch}
+p.lead{color:var(--ink-2);margin-bottom:16px}
+pre{margin:10px 0 16px;padding:15px 17px;background:var(--surface);border:1px solid var(--line);border-radius:4px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.62}
+code{font-family:var(--mono);font-size:.885em;background:var(--well);padding:1px 5px;border-radius:3px}
+figure{margin:18px 0 22px;background:var(--surface);border:1px solid var(--line);border-radius:4px;box-shadow:var(--shadow);overflow:hidden}
+.canvas{overflow-x:auto;padding:22px 20px 8px}
+figure svg{display:block;max-width:100%;height:auto;color:var(--ink)}
+figcaption{padding:12px 20px 14px;border-top:1px solid var(--line);background:var(--well);font-size:13.5px;color:var(--ink-2)}
+figcaption b{color:var(--ink);font-weight:600}
+.blk{fill:var(--surface)} .stk{stroke:currentColor;stroke-opacity:.55;fill:none}
+.wire{stroke:currentColor;stroke-opacity:.75;fill:none;stroke-width:1.5}
+.fb1{stroke:var(--gate);fill:none;stroke-width:1.8}
+.fb2{stroke:var(--blue);fill:none;stroke-width:1.8}
+.fb3{stroke:var(--accent);fill:none;stroke-width:1.8}
+.lbl{fill:currentColor;font-family:var(--sans);font-size:15px;font-weight:600}
+.sub{fill:currentColor;fill-opacity:.62;font-family:var(--mono);font-size:11.5px}
+.sig{fill:currentColor;fill-opacity:.85;font-family:var(--mono);font-size:13px;font-weight:500}
+.sigd{fill:currentColor;fill-opacity:.5;font-family:var(--mono);font-size:10px}
+.t1{fill:var(--gate);font-family:var(--mono);font-size:12.5px;font-weight:600}
+.t2{fill:var(--blue);font-family:var(--mono);font-size:12.5px;font-weight:600}
+.t3{fill:var(--accent);font-family:var(--mono);font-size:12.5px;font-weight:600}
+.encl{stroke:currentColor;stroke-opacity:.28;stroke-dasharray:5 4;fill:none}
+.gat{fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.5}
+.gatt{fill:var(--gate);font-family:var(--mono);font-size:11px;font-weight:600}
+.pm{fill:currentColor;fill-opacity:.7;font-family:var(--mono);font-size:12px;font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:6px 0 14px}
+.scroll{overflow-x:auto}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
+th{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
+td.sym{font-family:var(--mono)}
+td.num{font-family:var(--mono);text-align:right}
+tbody tr:last-child td{border-bottom:0}
+table.zebra tbody tr:nth-child(even){background:var(--well)}
+tr.grp td{background:var(--accent-soft);font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600;padding:5px 10px}
+.note{padding:14px 17px;border-radius:3px;background:var(--gate-soft);border:1px solid var(--gate-line);border-left:3px solid var(--gate);font-size:14.5px;margin:16px 0}
+.note.ok{background:var(--accent-soft);border-color:var(--accent);border-left-color:var(--accent)}
+.sw{display:inline-block;width:22px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:700px){.wrap{padding:38px 16px 70px}}
+.wrap{max-width:1100px;margin:0 auto;padding:32px 20px 60px}
+.wrap{max-width:1100px;margin:0 auto;padding:32px 20px 60px}
+.step{fill:var(--accent);font-family:var(--mono);font-size:11px;font-weight:600}
+.eq{fill:currentColor;fill-opacity:.8;font-family:var(--mono);font-size:11px}
+</style></head><body><div class="wrap">
+<h2><span class="n">02′</span>글로벌 경로(x, y)만 받을 때의 제어 흐름</h2>
+<p class="lead">02 그림의 <b>궤적 생성기</b> 블록 하나를 펼친 것. ⊕ 이후(MPC → 플랜트 → 오도메트리)는 02 그림과 완전히 같다.</p>
+<figure><div class="canvas">
+<svg viewBox="0 0 1180 560" xmlns="http://www.w3.org/2000/svg" width="1180">
+<defs>
+ <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" fill-opacity=".75"/></marker>
+ <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2B5C8A"/></marker>
+</defs>
+
+<!-- ===== 줄 0: 오프라인 ===== -->
+<rect x="20" y="20" width="560" height="110" rx="4" class="encl"/>
+<text x="32" y="40" class="sub">오프라인 — 한 번만. 시간·θ·속도 없음</text>
+
+<rect x="40" y="55" width="150" height="56" rx="3" class="blk stk"/>
+<text x="115" y="79" text-anchor="middle" class="lbl">Theta*</text>
+<text x="115" y="97" text-anchor="middle" class="sub">planner.py · 격자 any-angle</text>
+
+<path d="M190 83 H 320" class="wire" marker-end="url(#ar)"/>
+<text x="255" y="74" text-anchor="middle" class="sig">waypoints.csv</text>
+<text x="255" y="98" text-anchor="middle" class="sigd">(x, y) · 0.1 m 간격 · map</text>
+
+<rect x="320" y="55" width="220" height="56" rx="3" class="blk stk"/>
+<text x="430" y="79" text-anchor="middle" class="lbl">global_path_publisher</text>
+<text x="430" y="97" text-anchor="middle" class="sub">nav_msgs/Path · latched</text>
+
+<!-- /global_path 내려감 -->
+<path d="M430 111 V 175" class="wire" marker-end="url(#ar)"/>
+<text x="440" y="140" class="sig">/global_path</text>
+<text x="440" y="156" class="sigd">frame_id = map · orientation.w = 1 (θ 없음)</text>
+
+<!-- ===== 줄 1: mpc_node 궤적 생성기 ===== -->
+<rect x="20" y="175" width="1140" height="230" rx="4" class="encl"/>
+<text x="32" y="195" class="sub">mpc_node.py · 20 Hz — 궤적 생성기 (reference(t) 교체분).  02 그림의 한 블록</text>
+
+<!-- ① TF -->
+<rect x="40" y="215" width="150" height="90" rx="3" class="blk stk"/>
+<text x="50" y="233" class="step">① 프레임 변환</text>
+<text x="115" y="256" text-anchor="middle" class="lbl">T_odom←map</text>
+<text x="115" y="275" text-anchor="middle" class="eq">p_j ← R·p_j + t</text>
+<text x="115" y="293" text-anchor="middle" class="sub">TF 조회, 경로 수신 시 1회</text>
+
+<path d="M190 260 H 220" class="wire" marker-end="url(#ar)"/>
+
+<!-- ② 호장 -->
+<rect x="220" y="215" width="170" height="90" rx="3" class="blk stk"/>
+<text x="230" y="233" class="step">② 호장 파라미터화</text>
+<text x="305" y="256" text-anchor="middle" class="lbl">s_j, d_j</text>
+<text x="305" y="275" text-anchor="middle" class="eq">s_j = Σ|p_j − p_{j−1}|</text>
+<text x="305" y="293" text-anchor="middle" class="eq">d_j = (p_{j+1} − p_j)/|·|</text>
+
+<path d="M390 260 H 420" class="wire" marker-end="url(#ar)"/>
+
+<!-- ③ 시간 법칙 -->
+<rect x="420" y="215" width="160" height="90" rx="3" class="blk stk"/>
+<text x="430" y="233" class="step">③ 시간 법칙</text>
+<text x="500" y="256" text-anchor="middle" class="lbl">s(t) = v·t</text>
+<text x="500" y="275" text-anchor="middle" class="eq">v = 0.15,  s ≤ s_end</text>
+<text x="500" y="293" text-anchor="middle" class="sub">끝에서 정지 (u_r → 0)</text>
+
+<path d="M580 260 H 610" class="wire" marker-end="url(#ar)"/>
+
+<!-- ④ 보간 -->
+<rect x="610" y="215" width="170" height="90" rx="3" class="blk stk"/>
+<text x="620" y="233" class="step">④ 지평 보간</text>
+<text x="695" y="256" text-anchor="middle" class="lbl">(x_r, y_r)(t + iT_s)</text>
+<text x="695" y="275" text-anchor="middle" class="eq">i = 0 … N_p  (16 = 0.8 s)</text>
+<text x="695" y="293" text-anchor="middle" class="eq">[ẋ_r, ẏ_r] = v · d_j(s)</text>
+
+<path d="M780 260 H 810" class="wire" marker-end="url(#ar)"/>
+
+<!-- ⑥ u_r 역산 -->
+<rect x="810" y="215" width="190" height="90" rx="3" class="blk stk"/>
+<text x="820" y="233" class="step">⑥ u_r 역산 (정합)</text>
+<text x="905" y="256" text-anchor="middle" class="lbl">Ẋ_r = f(X_r, u_r)</text>
+<text x="905" y="275" text-anchor="middle" class="eq">[vx_r, vy_r] = R(θ_r)ᵀ[ẋ_r, ẏ_r]</text>
+<text x="905" y="293" text-anchor="middle" class="eq">ω_r = θ̇_r = 0</text>
+
+<!-- ⑤ 헤딩 정책 (아래에서 ⑥으로 들어옴) -->
+<rect x="810" y="330" width="190" height="60" rx="3" class="blk stk"/>
+<text x="820" y="348" class="step">⑤ 헤딩 정책 A</text>
+<text x="905" y="370" text-anchor="middle" class="lbl">θ_r ≡ θ_0</text>
+<text x="905" y="385" text-anchor="middle" class="sub">기동 시 yaw 고정. 여기서 θ 가 생긴다</text>
+<path d="M905 330 V 305" class="wire" marker-end="url(#ar)"/>
+
+<!-- 출력 -->
+<path d="M1000 260 H 1060" class="wire" marker-end="url(#ar)"/>
+<text x="1070" y="248" class="sig">X_r(k+i)</text>
+<text x="1070" y="266" class="sig">u_r(k+i)</text>
+<text x="1070" y="284" class="sigd">i = 0..N_p</text>
+
+<!-- ===== 줄 2: 이하 02 그림 ===== -->
+<path d="M1100 292 V 470 H 200" class="wire" marker-end="url(#ar)"/>
+<text x="700" y="462" text-anchor="middle" class="sigd">X_r, u_r 지평 → 02 그림 ⊕ / 피드포워드 / MPC 로.  이 아래는 동일</text>
+
+<circle cx="180" cy="470" r="14" class="blk stk"/>
+<text x="180" y="474" text-anchor="middle" class="pm">⊕</text>
+<text x="175" y="450" text-anchor="end" class="sig">X_e = X_odom − X_r</text>
+<path d="M166 470 H 110" class="wire" marker-end="url(#ar)"/>
+<rect x="30" y="448" width="80" height="44" rx="3" class="blk stk"/>
+<text x="70" y="467" text-anchor="middle" class="lbl">MPC</text>
+<text x="70" y="483" text-anchor="middle" class="sub">02 그림</text>
+
+<!-- odom 되먹임: ⊕ 와 θ_0 -->
+<path d="M180 540 V 484" class="fb2" marker-end="url(#ar2)"/>
+<text x="192" y="536" class="t2">/odom  X_odom, v_odom  (odom 프레임)</text>
+<path d="M180 540 H 905 V 390" class="fb2" marker-end="url(#ar2)"/>
+<text x="915" y="420" class="t2">θ_0 = yaw(X_odom) at t=0</text>
+
+<!-- 주석: 프레임 -->
+<rect x="620" y="330" width="170" height="60" rx="3" class="gat"/>
+<text x="705" y="352" text-anchor="middle" class="gatt">프레임 주의</text>
+<text x="705" y="368" text-anchor="middle" class="eq">경로 map · 피드백 odom</text>
+<text x="705" y="383" text-anchor="middle" class="eq">①에서 맞추지 않으면 X_e 가 틀림</text>
+</svg>
+</div>
+<figcaption><b>θ 는 ⑤에서 처음 생긴다.</b> Theta* → ①②③④ 까지는 전부 (x, y) 와 시간뿐이고, ⑤가 θ_r 을 상수로 박아 넣으면 ⑥이 그에 맞춰 몸체속도를 회전시켜 u_r 을 만든다. 이 여섯 단계가 지금 <code>mpc_node.reference(t)</code> 가 원궤적으로 대신하고 있는 자리다. ⊕ 이후는 손대지 않는다.</figcaption>
+</figure>
+
+<h2 style="margin-top:36px">단계별 정리</h2>
+<div class="scroll"><table class="zebra">
+<thead><tr><th>단계</th><th>입력 → 출력</th><th>식</th><th>지금 코드</th><th>바뀌는 것</th></tr></thead>
+<tbody>
+<tr><td>Theta*</td><td>지도 → (x,y) 점열</td><td class="sym">waypoints.csv</td><td class="sym">planner/global_planner</td><td>없음</td></tr>
+<tr><td>publisher</td><td>csv → /global_path</td><td class="sym">Path, frame=map</td><td class="sym">global_path_publisher_node.py</td><td>없음</td></tr>
+<tr><td>① 변환</td><td>map 점열 → odom 점열</td><td class="sym">p ← T_odom←map · p</td><td>DRA-MPPI 에만 있음 (<code>_path_in_planning_frame</code>)</td><td><b>추가</b> — TF 조회 1회</td></tr>
+<tr><td>② 호장</td><td>점열 → s_j, d_j</td><td class="sym">s_j = Σ|Δp|, d_j = Δp/|Δp|</td><td>없음</td><td><b>추가</b></td></tr>
+<tr><td>③ 시간 법칙</td><td>t → s</td><td class="sym">s = min(v·t, s_end)</td><td><code>reference(t)</code> 의 <code>th = ω·t</code> 가 같은 역할</td><td>교체</td></tr>
+<tr><td>④ 보간</td><td>s → (x_r, y_r), (ẋ_r, ẏ_r)</td><td class="sym">조각별 선형, N_p 개</td><td><code>on_tick</code> 의 <code>ref</code> 리스트</td><td>교체</td></tr>
+<tr><td>⑤ 헤딩</td><td>— → θ_r</td><td class="sym">θ_r = θ_0</td><td><code>reference(t)</code> 의 <code>a0 + th</code></td><td>교체 (상수로)</td></tr>
+<tr><td>⑥ 역산</td><td>(Ẋ_r, θ_r) → u_r</td><td class="sym">R(θ_r)ᵀ[ẋ_r, ẏ_r], 0</td><td><code>[speed, 0, ω]</code> 하드코딩</td><td>교체</td></tr>
+<tr><td>⊕ 이후</td><td>X_r, u_r → /cmd_vel</td><td class="sym">02 그림</td><td class="sym">mpc.py, model.py</td><td><b>없음</b></td></tr>
+</tbody></table></div>
+</div></body></html>

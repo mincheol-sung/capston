@@ -1,0 +1,654 @@
+--- before/dra_mppi/dra_mppi_node.py
++++ after/dra_mppi/dra_mppi_node.py
+@@ -953,6 +953,14 @@
+                     'selected': None if result is None else result.selected_mode,
+                     'max_step_cp': None if result is None else result.max_collision_probability,
+                     'static_enabled': self.controller.config.static_cost_enabled,
++                    'risk_integration_mode': self.controller.config.dynamic_risk.mode,
++                    'primary_analytic_evaluations': None if result is None else self.controller.risk_diagnostics.analytic_evaluations,
++                    'primary_quadrature_evaluations': None if result is None else self.controller.risk_diagnostics.quadrature_evaluations,
++                    'primary_integration_error_estimate': None if result is None else self.controller.risk_diagnostics.error_estimate_max,
++                    'final_analytic_evaluations': None if result is None or result.final_risk_diagnostics is None else result.final_risk_diagnostics.analytic_evaluations,
++                    'primary_unresolved_integrals': None if result is None else self.controller.risk_diagnostics.unresolved_integrals,
++                    'final_quadrature_evaluations': None if result is None or result.final_risk_diagnostics is None else result.final_risk_diagnostics.quadrature_evaluations,
++                    'final_unresolved_integrals': None if result is None or result.final_risk_diagnostics is None else result.final_risk_diagnostics.unresolved_integrals,
+                     'actual_primary_mc_samples': None if result is None else self.controller.risk_diagnostics.total_samples,
+                     'candidate_sample_comparisons': None if result is None else self.controller.risk_diagnostics.candidate_sample_comparisons,
+                     'underresolved_steps': None if result is None else self.controller.risk_diagnostics.underresolved_steps,
+--- before/dra_mppi/dynamic_risk.py
++++ after/dra_mppi/dynamic_risk.py
+@@ -119,8 +119,8 @@
+             value = getattr(self, item.name)
+             if isinstance(value, (int, float)) and not np.isfinite(value):
+                 raise ValueError(f'{item.name} must be finite')
+-        if self.mode not in ('off', 'monte_carlo'):
+-            raise ValueError('dynamic risk mode must be off or monte_carlo')
++        if self.mode not in ('off', 'monte_carlo', 'gaussian_disk'):
++            raise ValueError('dynamic risk mode must be off, monte_carlo or gaussian_disk')
+         if self.soft_weight < 0.0 or self.hard_penalty < 0.0:
+             raise ValueError('risk cost weights must be non-negative')
+         if self.robot_radius < 0.0 or self.obstacle_radius < 0.0:
+@@ -188,6 +188,10 @@
+     candidate_sample_comparisons: int = 0
+     underresolved_steps: int = 0
+     peak_pairwise_bytes: int = 0
++    analytic_evaluations: int = 0
++    quadrature_evaluations: int = 0
++    unresolved_integrals: int = 0
++    error_estimate_max: float = 0.0
+ 
+ 
+ class MonteCarloJointCollisionProbability:
+@@ -547,10 +551,10 @@
+             cost=np.zeros(rollout_count, dtype=np.float64),
+             collision_probability=np.zeros((rollout_count, horizon), dtype=np.float64),
+         )
+-    if config.mode != 'monte_carlo':
++    if config.mode not in ('monte_carlo', 'gaussian_disk'):
+         raise ValueError(f'unsupported dynamic risk mode: {config.mode}')
+ 
+-    calculator = estimator or MonteCarloJointCollisionProbability(
++    calculator = estimator or make_probability_estimator(config,
+         num_samples=config.mc_samples,
+         minimum_sigma=config.minimum_sigma,
+         seed=config.seed,
+@@ -578,3 +582,11 @@
+         cost=soft_cost + hard_cost,
+         collision_probability=probability,
+     )
++
++
++def make_probability_estimator(config, **kwargs):
++    """Use the same probability model with either shared MC or disk integration."""
++    if config.mode == 'gaussian_disk':
++        from .gaussian_disk import GaussianDiskCollisionProbability
++        return GaussianDiskCollisionProbability(**kwargs)
++    return MonteCarloJointCollisionProbability(**kwargs)
+--- before/dra_mppi/gaussian_disk.py
++++ after/dra_mppi/gaussian_disk.py
+@@ -0,0 +1,138 @@
++"""Gaussian mass in a collision disk, without a candidate-spanning MC domain.
++
++Isotropic normals use the noncentral chi-square CDF. General normals use
++conditional-normal one-dimensional Gauss-Legendre quadrature, refined until
++successive orders agree. Refinement is an error estimate, not a certified bound;
++unresolved integrals fail closed. Covariance flooring, mixture weights, obstacle
++independence and collision radii match the shared MC implementation.
++"""
++from functools import lru_cache
++import time
++
++import numpy as np
++from scipy.special import ndtr, roots_legendre
++from scipy.stats import ncx2
++
++from .dynamic_risk import MonteCarloDiagnostics, MonteCarloJointCollisionProbability
++
++
++@lru_cache(maxsize=8)
++def _disk_nodes(order):
++    nodes, weights = roots_legendre(order)
++    theta = nodes * (np.pi / 2.)
++    result = (np.sin(theta), np.cos(theta), weights * (np.pi / 2.))
++    for a in result:
++        a.setflags(write=False)
++    return result
++
++
++class GaussianDiskCollisionProbability(MonteCarloJointCollisionProbability):
++    """Deterministic circle integration with adaptive anisotropic quadrature."""
++
++    @property
++    def sampling_mode(self):
++        return 'gaussian_disk'
++
++    def _sample_count(self, region_area):
++        return 0  # No Monte Carlo samples; integration work has separate counters.
++
++    @staticmethod
++    def _integrate(mu, precision, radius, order):
++        sine, cosine, weights = _disk_nodes(order)
++        x = radius[:, None] * sine
++        height = radius[:, None] * cosine
++        a, b, c = precision[:, 0, 0], precision[:, 0, 1], precision[:, 1, 1]
++        sigma_x = np.sqrt(c / (a*c-b*b))
++        sigma_y = 1. / np.sqrt(c)
++        z = (x-mu[:, :1]) / sigma_x[:, None]
++        conditional_mean = mu[:, 1:2] - (b/c)[:, None]*(x-mu[:, :1])
++        mass_y = (ndtr((height-conditional_mean)/sigma_y[:, None])
++                  - ndtr((-height-conditional_mean)/sigma_y[:, None]))
++        pdf_x = np.exp(-.5*z*z)/(np.sqrt(2.*np.pi)*sigma_x[:, None])
++        return np.sum(pdf_x*mass_y*height*weights, axis=1)
++
++    def evaluate(self, positions, predictions, collision_radius,
++                 cache_samples=False, reuse_last_samples=False):
++        points = np.asarray(positions, dtype=np.float64)
++        if points.ndim != 3 or points.shape[-1] != 2 or not np.all(np.isfinite(points)):
++            raise ValueError('positions must be finite with shape (K,T,2)')
++        k, horizon = points.shape[:2]
++        if predictions is None or predictions.empty:
++            self.reset_diagnostics()
++            return np.zeros((k, horizon))
++        o, m, t = predictions.means.shape[:3]
++        if t != horizon:
++            raise ValueError('prediction and rollout horizons must match')
++        radii = np.broadcast_to(np.asarray(collision_radius, dtype=float), (o,))
++        if np.any(radii <= 0) or not np.all(np.isfinite(radii)):
++            raise ValueError('collision radii must be finite and positive')
++        start = time.perf_counter()
++        inv, _ = self._gaussian_parameters(predictions)
++        # Axis order K,O,M,T keeps mode and obstacle reductions explicit.
++        mu = (predictions.means[None]-points[:, None, None]).reshape(-1, 2)
++        precision = np.broadcast_to(inv, (k, o, m, t, 2, 2)).reshape(-1, 2, 2)
++        radius = np.broadcast_to(radii[None, :, None, None], (k, o, m, t)).ravel()
++        iso = ((np.abs(precision[:, 0, 1]) <= 1e-12*precision[:, 0, 0])
++               & (np.abs(precision[:, 0, 0]-precision[:, 1, 1]) <= 1e-12*precision[:, 0, 0]))
++        # A disk is contained in the half-space toward its center. Its 1D
++        # Gaussian tail is an upper bound, including for rotated covariance.
++        # Negligible tails are retained as that upper bound, never set to zero.
++        distance = np.linalg.norm(mu, axis=1)
++        a, b, c = precision[:, 0, 0], precision[:, 0, 1], precision[:, 1, 1]
++        variance = ((c*mu[:, 0]**2-2*b*mu[:, 0]*mu[:, 1]+a*mu[:, 1]**2)
++                    / (a*c-b*b) / np.maximum(distance**2, 1e-30))
++        upper = np.ones(len(mu))
++        outside = distance > radius
++        upper[outside] = ndtr((radius[outside]-distance[outside])
++                              / np.sqrt(variance[outside]))
++        active = upper > 1e-10
++        mass = upper.copy()
++        iso &= active
++        mass[iso] = ncx2.cdf(radius[iso]**2*precision[iso, 0, 0], 2,
++                            np.sum(mu[iso]**2, axis=1)*precision[iso, 0, 0]) + 1e-12
++        unresolved = 0
++        work = 0
++        error_max = 0.
++        indices = np.flatnonzero(active & ~iso)
++        # Chunking bounds quadrature temporaries independently of candidate count.
++        for offset in range(0, len(indices), 1024):
++            idx = indices[offset:offset+1024]
++            low = self._integrate(mu[idx], precision[idx], radius[idx], 16)
++            work += len(idx)*16
++            # A minimum order based on the narrowest regularized axis prevents
++            # two coarse grids from both missing a very narrow Gaussian peak.
++            min_order = np.maximum(32, 4*radius[idx]*np.sqrt(np.linalg.eigvalsh(precision[idx])[:, -1]))
++            for order in (32, 64, 128, 256, 512):
++                high = self._integrate(mu[idx], precision[idx], radius[idx], order)
++                work += len(idx)*order
++                error = np.abs(high-low)
++                converged = (error <= 1e-8) & (order >= min_order) & np.isfinite(high)
++                mass[idx[converged]] = high[converged]+4*error[converged]+5e-8
++                if np.any(converged):
++                    error_max = max(error_max, float(np.max(error[converged])))
++                idx = idx[~converged]
++                low = high[~converged]
++                min_order = min_order[~converged]
++                if not len(idx):
++                    break
++            if len(idx):
++                mass[idx] = 1.
++                unresolved += len(idx)
++        bad = ~np.isfinite(mass)
++        unresolved += int(np.sum(bad))
++        mass[bad] = 1.
++        mass = np.clip(mass.reshape(k, o, m, t), 0., 1.)
++        weights = predictions.mode_weights
++        if weights.ndim == 2:
++            weights = weights[..., None]
++        marginal = np.sum(mass*weights[None], axis=2)
++        joint = 1.-np.prod(1.-marginal, axis=1)
++        self.last_diagnostics = MonteCarloDiagnostics(
++            sampling_mode=self.sampling_mode, region_areas=np.zeros(t),
++            sample_counts=np.zeros(t, dtype=np.int64), total_samples=0,
++            compute_time_ms=(time.perf_counter()-start)*1000., empty_circle_count=0,
++            clipped_marginal_count=0, raw_marginal_minimum=float(np.min(marginal)),
++            raw_marginal_maximum=float(np.max(marginal)),
++            analytic_evaluations=int(np.sum(iso)), quadrature_evaluations=work,
++            unresolved_integrals=unresolved, error_estimate_max=error_max)
++        return joint
+--- before/dra_mppi/guide_conditioned.py
++++ after/dra_mppi/guide_conditioned.py
+@@ -17,7 +17,7 @@
+ from .control_sampling import HaltonSplineSampler
+ from .dynamic_risk import (
+     MonteCarloDiagnostics,
+-    MonteCarloJointCollisionProbability,
++    make_probability_estimator,
+ )
+ from .geometry import wrap_angle
+ from .mecanum_model import rollout
+@@ -61,7 +61,7 @@
+             if self.risk_workers > 1 else None
+         )
+         self._guide_risk_estimators = [
+-            MonteCarloJointCollisionProbability(
++            make_probability_estimator(risk,
+                 reject_underresolved=risk.mc_reject_underresolved,
+                 num_samples=risk.guide_mc_samples_min,
+                 minimum_sigma=risk.minimum_sigma,
+@@ -73,7 +73,7 @@
+             )
+             for g in range(self.count)
+         ]
+-        self._final_risk_estimator = MonteCarloJointCollisionProbability(
++        self._final_risk_estimator = make_probability_estimator(risk,
+             reject_underresolved=risk.mc_reject_underresolved,
+             num_samples=risk.final_mc_samples_min,
+             minimum_sigma=risk.minimum_sigma,
+@@ -185,6 +185,10 @@
+             region_areas=np.sum(areas, axis=0) if active else np.empty(0),
+             sample_counts=np.sum(samples, axis=0) if active else np.empty(0, dtype=np.int64),
+             total_samples=int(np.sum(samples)),
++            analytic_evaluations=sum(d.analytic_evaluations for d in diagnostics),
++            quadrature_evaluations=sum(d.quadrature_evaluations for d in diagnostics),
++            unresolved_integrals=sum(d.unresolved_integrals for d in diagnostics),
++            error_estimate_max=max(d.error_estimate_max for d in diagnostics),
+             candidate_sample_comparisons=sum(d.candidate_sample_comparisons for d in diagnostics),
+             underresolved_steps=sum(d.underresolved_steps for d in diagnostics),
+             peak_pairwise_bytes=sum(d.peak_pairwise_bytes for d in diagnostics),
+@@ -465,6 +469,7 @@
+             mode_static_costs=final_static_costs,
+             sampled_rollout_indices=indices,
+             primary_risk_time_ms=primary_diagnostics.compute_time_ms,
++            final_risk_diagnostics=final_diagnostics,
+             final_risk_time_ms=final_diagnostics.compute_time_ms,
+             candidate_names=self.names, guide_anchors=anchor_paths,
+             guide_active_mask=active, guide_rollout_counts=counts,
+--- before/dra_mppi/mppi_controller.py
++++ after/dra_mppi/mppi_controller.py
+@@ -10,7 +10,7 @@
+ from .common_cost import common_costs, project_path
+ from .dynamic_risk import (
+     DynamicRiskConfig,
+-    MonteCarloJointCollisionProbability,
++    make_probability_estimator,
+     dynamic_risk_cost,
+ )
+ from .geometry import wrap_angle
+@@ -152,6 +152,7 @@
+     selected_cost_raw: dict = None
+     selected_cost_weighted: dict = None
+     stage_ms: dict = None
++    final_risk_diagnostics: object = None
+ 
+ 
+ class MppiController:
+@@ -246,7 +247,7 @@
+         if self.config.strategy == 'guide_conditioned':
+             from .guide_conditioned import GuideConditionedOptimizer
+             self._guide_optimizer = GuideConditionedOptimizer(self)
+-        self._risk_estimator = MonteCarloJointCollisionProbability(
++        self._risk_estimator = make_probability_estimator(self.config.dynamic_risk,
+             reject_underresolved=self.config.dynamic_risk.mc_reject_underresolved,
+             num_samples=self.config.dynamic_risk.mc_samples,
+             minimum_sigma=self.config.dynamic_risk.minimum_sigma,
+@@ -472,6 +473,7 @@
+             primary_risk_time_ms=float(
+                 primary_diagnostics.compute_time_ms
+             ),
++            final_risk_diagnostics=final_diagnostics,
+             final_risk_time_ms=final_diagnostics.compute_time_ms,
+             final_mc_region_areas=final_diagnostics.region_areas.copy(),
+             final_mc_sample_counts=final_diagnostics.sample_counts.copy(),
+--- before/config/dra_mppi.yaml
++++ after/config/dra_mppi.yaml
+@@ -97,9 +97,9 @@
+     mppi.noise_std: [0.15, 0.12, 0.45]
+ 
+     # ── guide_conditioned 전용: 로봇 기준 5방향 anchor ensemble ──
+-    # 이동 rollout만 100개; 최종 비교에 독립 Stop 1개를 추가한다.
++    # 이동 rollout만 500개; 최종 비교에 독립 Stop 1개를 추가한다.
+     # 정적 맵으로 guide를 제거하지 않고 5개 guide에 총 예산을 균등 분배한다.
+-    mppi.guide_num_rollouts: 100
++    mppi.guide_num_rollouts: 500
+     mppi.guide_angles_deg: [0.0, 45.0, 90.0, -45.0, -90.0]
+     mppi.guide_noise_std: [0.15, 0.12, 0.45]
+     mppi.guide_anchor_blend: 0.25
+@@ -149,16 +149,17 @@
+     static_cost.decay: 0.10
+ 
+     # ── 공통: 사람 예측 기반 동적 충돌확률 ──
+-    # 제어 noise와 별개인 공간 MC 표본. standard는 전체 배치,
+-    # guide_conditioned 1차 평가는 guide별 지역 배치를 사용한다.
+-    dynamic_risk.mode: monte_carlo
++    # Gaussian disk CP: isotropic CDF / anisotropic conditional quadrature.
++    # Same probability/cost/epsilon; unresolved integrals fail closed.
++    # monte_carlo remains available for reproducible MC comparisons below.
++    dynamic_risk.mode: gaussian_disk
+     dynamic_risk.soft_weight: 18.0
+     dynamic_risk.obstacle_radius: 0.25
+     dynamic_risk.minimum_sigma: 0.08
+     dynamic_risk.mc_samples: 4096
+     dynamic_risk.adaptive_halton_mc: true
+     # Numerical sweep: density 2048 failed held-out maximum-error criterion.
+-    # Density 4096 passed; limits never lower the requested density silently.
++    # MC comparison profile only; gaussian_disk does not use these budgets.
+     dynamic_risk.mc_sample_density: 4096.0
+     dynamic_risk.mc_samples_min: 4096
+     dynamic_risk.mc_samples_max: 131072
+--- before/test/test_configuration.py
++++ after/test/test_configuration.py
+@@ -16,7 +16,8 @@
+ def test_guide_budget_is_independent_of_standard_budget():
+     config_path = Path(__file__).parents[1] / 'config' / 'dra_mppi.yaml'
+     p = yaml.safe_load(config_path.read_text())['dra_mppi_node']['ros__parameters']
+-    assert p['mppi.guide_num_rollouts'] == 100
++    assert p['mppi.guide_num_rollouts'] == 500
++    assert p['dynamic_risk.mode'] == 'gaussian_disk'
+     assert p['mppi.guide_angles_deg'] == [0.0, 45.0, 90.0, -45.0, -90.0]
+     assert p['mppi.num_rollouts'] == 321
+     assert p['traversability.unknown_is_obstacle'] is True
+--- before/test/test_gaussian_disk.py
++++ after/test/test_gaussian_disk.py
+@@ -0,0 +1,78 @@
++"""Independent numerical and model checks for direct disk integration."""
++from dataclasses import replace
++import importlib.util
++from pathlib import Path
++
++import numpy as np
++import pytest
++from scipy.stats import ncx2
++
++from dra_mppi.dynamic_risk import DynamicRiskConfig, PredictionSet, dynamic_risk_cost
++from dra_mppi.gaussian_disk import GaussianDiskCollisionProbability
++
++
++def reference():
++    spec = importlib.util.spec_from_file_location('disk_reference', Path(__file__).parents[1]/'tools/validate_mc_accuracy.py')
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module.disk_reference
++
++
++def pred(means, covariance, weights=None):
++    return PredictionSet(np.asarray(means)[:, :, None], np.asarray(covariance)[:, :, None], np.array([.2]), weights)
++
++
++@pytest.mark.parametrize('sigma', [.08, .2, .6])
++def test_isotropic_matches_cdf_at_and_around_threshold(sigma):
++    points = np.stack((np.linspace(0, 3, 301), np.zeros(301)), axis=-1)[:, None]
++    p = pred([[[0., 0.]]], np.eye(2)[None, None]*sigma**2)
++    actual = GaussianDiskCollisionProbability().evaluate(points, p, .47)[:, 0]
++    expected = ncx2.cdf(.47**2/(sigma**2+1e-12), 2, points[:, 0, 0]**2/(sigma**2+1e-12))
++    np.testing.assert_allclose(actual, expected, atol=1.01e-10)
++
++
++def test_rotated_mixtures_match_independent_polar_integral():
++    rng = np.random.default_rng(927)
++    ref = reference()
++    solver = GaussianDiskCollisionProbability()
++    for _ in range(32):
++        theta = rng.uniform(-np.pi, np.pi)
++        rot = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
++        covariance = np.broadcast_to(rot@np.diag([.08**2, .6**2])@rot.T, (2, 2, 2, 2)).copy()
++        means = rng.uniform(-1.2, 1.2, (2, 2, 2))
++        weights = np.array([[.7, .3], [.2, .8]])
++        expected = ref(means, covariance, weights, .47, 160)
++        actual = solver.evaluate(np.zeros((1, 1, 2)), pred(means, covariance, weights), .47)[0, 0]
++        assert abs(actual-expected) < 3e-7
++        assert actual >= expected-2e-10
++        assert solver.last_diagnostics.unresolved_integrals == 0
++
++
++def test_far_anisotropic_tail_is_upper_bound_and_candidate_independent():
++    p = pred([[[3., 2.]]], [[[[.04, .015], [.015, .02]]]])
++    solver = GaussianDiskCollisionProbability()
++    alone = solver.evaluate(np.zeros((1, 1, 2)), p, .47)[0, 0]
++    together = solver.evaluate(np.array([[[0., 0.]], [[100., -100.]]]), p, .47)[0, 0]
++    assert alone == together
++    assert solver.last_diagnostics.quadrature_evaluations == 0
++    assert 0 <= alone <= 1e-10
++
++
++def test_factory_radius_weights_and_hard_threshold():
++    means = np.array([[[[0., 0.]], [[4., 0.]]]])
++    covariance = np.broadcast_to(np.eye(2)*.02, (1, 2, 1, 2, 2))
++    p = PredictionSet(means, covariance, np.array([.2]), np.array([[[1.], [0.]]]), np.array([.3]))
++    cfg = DynamicRiskConfig(mode='gaussian_disk', robot_radius=.22)
++    result = dynamic_risk_cost(np.zeros((1, 1, 2)), p, cfg)
++    assert result.collision_probability[0, 0] > .99
++    assert result.cost[0] > cfg.hard_penalty
++    off = dynamic_risk_cost(np.zeros((1, 1, 2)), p, replace(cfg, mode='off'))
++    assert off.cost[0] == 0.
++
++
++def test_unresolved_integral_fails_closed(monkeypatch):
++    solver = GaussianDiskCollisionProbability()
++    monkeypatch.setattr(solver, '_integrate', lambda mu, precision, radius, order: np.full(len(mu), float(order % 3)/10))
++    p = pred([[[0., 0.]]], [[[[.04, .01], [.01, .02]]]])
++    assert solver.evaluate(np.zeros((1, 1, 2)), p, .47)[0, 0] == 1.
++    assert solver.last_diagnostics.unresolved_integrals == 1
+--- before/test/test_guide_conditioned.py
++++ after/test/test_guide_conditioned.py
+@@ -444,3 +444,27 @@
+     # A short tracking window must not act like the real global endpoint.
+     r = c.compute(np.zeros(3), near_goal, guide_path=PATH, distance_field=field())
+     assert r.guide_anchors[0, -1, 0] > 1.
++
++
++@pytest.mark.parametrize('workers', [1, 2, 5])
++def test_disk_integrator_has_identical_parallel_results_and_final_check(workers):
++    means = np.zeros((5, 2, 10, 2))
++    means[..., 0] = np.linspace(.8, 2.5, 5)[:, None, None]
++    means[..., 1] = np.array([.4, -.5])[None, :, None]
++    covariance = np.broadcast_to(np.array([[.05, .025], [.025, .025]]), (5, 2, 10, 2, 2))
++    prediction = PredictionSet(means, covariance, .2*np.arange(1, 11))
++    results = []
++    for worker_count in (1, workers):
++        c = controller(dynamic_risk=DynamicRiskConfig(mode='gaussian_disk', guide_parallel_workers=worker_count))
++        try:
++            result = compute(c, dynamic_predictions=prediction)
++            assert c.risk_diagnostics.quadrature_evaluations > 0
++            assert result.final_risk_diagnostics.quadrature_evaluations > 0
++            assert c.risk_diagnostics.total_samples == 0
++            assert result.final_risk_diagnostics.unresolved_integrals == 0
++            results.append(result)
++        finally:
++            c.close()
++    np.testing.assert_array_equal(results[0].collision_probabilities, results[1].collision_probabilities)
++    np.testing.assert_array_equal(results[0].mode_collision_probabilities, results[1].mode_collision_probabilities)
++    np.testing.assert_array_equal(results[0].control_sequence, results[1].control_sequence)
+--- before/tools/benchmark_risk_optimization.py
++++ after/tools/benchmark_risk_optimization.py
+@@ -0,0 +1,88 @@
++#!/usr/bin/env python3
++"""Matched-candidate, short risk integration ablation; excludes ROS scheduling."""
++import argparse
++import csv
++from dataclasses import replace
++import hashlib
++import json
++from pathlib import Path
++import time
++
++import numpy as np
++
++from benchmark_guide_conditioned import config_from_yaml
++from dra_mppi.dynamic_risk import PredictionSet
++from dra_mppi.grid_costmap import DistanceField, GridMetadata
++from dra_mppi.mppi_controller import MppiController
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--output', type=Path, required=True)
++    parser.add_argument('--profiles', nargs='+', default=['mc_legacy', 'mc_high', 'mc_high_final_disk', 'gaussian_disk'])
++    parser.add_argument('--rollouts', nargs='+', type=int, default=[100, 500])
++    parser.add_argument('--iterations', type=int, default=8)
++    parser.add_argument('--workers', nargs='+', type=int, default=[2])
++    args = parser.parse_args()
++    args.output.mkdir(parents=True, exist_ok=True)
++    base = config_from_yaml()
++    t = base.dt*np.arange(1, base.horizon_steps+1)
++    means = np.zeros((10, 2, len(t), 2))
++    means[..., 0] = np.linspace(.8, 3., 10)[:, None, None]+.1*t
++    means[:, 0, :, 1] = np.linspace(-1.4, 1.4, 10)[:, None]+.1*t
++    means[:, 1, :, 1] = means[:, 0, :, 1]+.2
++    path = np.array([[0., 0.], [3., 0.]])
++    grid = np.zeros((200, 200)); grid[:2] = 100
++    field = DistanceField.from_occupancy(grid, GridMetadata(200, 200, .05, -5., -5., 0.))
++    rows = []
++    geometry_hash = {}
++    for covariance in ('isotropic', 'anisotropic'):
++        matrix = np.eye(2)*.04 if covariance == 'isotropic' else np.array([[.05, .025], [.025, .025]])
++        pred = PredictionSet(means, np.broadcast_to(matrix, (10, 2, len(t), 2, 2)), t, np.tile([.6, .4], (10, 1)))
++        for k in args.rollouts:
++            for workers in args.workers:
++                for profile in args.profiles:
++                    risk = replace(base.dynamic_risk, mode='monte_carlo', guide_parallel_workers=workers)
++                    if profile == 'mc_legacy':
++                        risk = replace(risk, mc_sample_density=124., mc_samples_min=512, mc_samples_max=4096,
++                                       guide_mc_sample_density=124., guide_mc_samples_min=128, guide_mc_samples_max=1024,
++                                       final_mc_sample_density=124., final_mc_samples_min=256, final_mc_samples_max=4096)
++                    elif profile == 'gaussian_disk':
++                        risk = replace(risk, mode='gaussian_disk')
++                    elif profile not in ('mc_high', 'mc_high_final_disk'):
++                        raise ValueError(profile)
++                    cfg = replace(base, guide_num_rollouts=k, guide_timeout=10., dynamic_risk=risk)
++                    c = MppiController(cfg)
++                    if profile == 'mc_high_final_disk':
++                        from dra_mppi.gaussian_disk import GaussianDiskCollisionProbability
++                        c._guide_optimizer._final_risk_estimator = GaussianDiskCollisionProbability(minimum_sigma=risk.minimum_sigma)
++                    try:
++                        for iteration in range(args.iterations+2):
++                            c.reset()
++                            start = time.perf_counter()
++                            r = c.compute(np.zeros(3), path, np.zeros(3), pred,
++                                          visualization_rollouts=0, distance_field=field)
++                            elapsed = (time.perf_counter()-start)*1000
++                            digest = hashlib.sha256(r.sampled_controls.tobytes()).hexdigest()
++                            key = (covariance, k)
++                            if key in geometry_hash:
++                                assert digest == geometry_hash[key], 'different candidate budget/geometry'
++                            geometry_hash[key] = digest
++                            if iteration >= 2:
++                                rows.append(dict(covariance=covariance, K=k, profile=profile, workers=workers,
++                                    iteration=iteration-2, total_ms=elapsed, primary_wall_ms=r.stage_ms['primary_wall'],
++                                    final_ms=c.representative_time_ms, primary_mc_samples=c.risk_diagnostics.total_samples,
++                                    final_mc_samples=int(np.sum(r.final_mc_sample_counts)),
++                                    selected=r.selected_mode, safety_status=r.safety_status, candidate_sha256=digest))
++                    finally:
++                        c.close()
++                    values = [r['total_ms'] for r in rows if r['covariance']==covariance and r['K']==k and r['profile']==profile and r['workers']==workers]
++                    print(covariance, k, workers, profile, 'mean/p99', round(float(np.mean(values)), 2), round(float(np.percentile(values, 99)), 2), flush=True)
++    with (args.output/'kernel_raw.csv').open('w') as stream:
++        writer = csv.DictWriter(stream, fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
++    (args.output/'manifest.json').write_text(json.dumps(dict(args={**vars(args), 'output':str(args.output)}, scope='kernel only; fixed identical candidates; fresh process recommended for controlled comparisons',
++        source_sha256={str(p.name):hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__).parents[1]/'dra_mppi').glob('*.py')}), indent=2))
++
++
++if __name__ == '__main__':
++    main()
+--- before/tools/validate_gaussian_disk.py
++++ after/tools/validate_gaussian_disk.py
+@@ -0,0 +1,71 @@
++#!/usr/bin/env python3
++"""Direct conditional disk integration versus independent polar integration."""
++import argparse
++import csv
++import json
++from pathlib import Path
++
++import numpy as np
++from scipy.optimize import brentq
++
++from dra_mppi.dynamic_risk import PredictionSet
++from dra_mppi.gaussian_disk import GaussianDiskCollisionProbability
++from validate_mc_accuracy import disk_reference
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--output', type=Path, required=True)
++    args = parser.parse_args()
++    args.output.mkdir(parents=True, exist_ok=True)
++    rng = np.random.default_rng(80117)
++    rows = []
++    solver = GaussianDiskCollisionProbability()
++    radius = .47
++    for case in range(64):
++        o = (1, 2, 5, 20)[case % 4]
++        m = 2
++        angle = rng.uniform(-np.pi, np.pi, (o, m))
++        rotation = np.stack((np.stack((np.cos(angle), -np.sin(angle)), -1),
++                             np.stack((np.sin(angle), np.cos(angle)), -1)), -2)
++        sigma = rng.uniform(.08, .6, (o, m, 2))
++        if case % 8 == 0:
++            sigma[..., 1] = sigma[..., 0]
++        covariance = np.einsum('...ik,...k,...jk->...ij', rotation, sigma**2, rotation)
++        covariance += np.eye(2)*1e-12
++        means = rng.uniform(-.6, .6, (o, m, 2))
++        weights = rng.dirichlet([1., 1.], o)
++        # Independently locate a joint CP threshold, then probe either side.
++        def shifted(distance):
++            value = means.copy()
++            value[..., 0] += distance
++            return value
++        distance = brentq(lambda d: disk_reference(shifted(d), covariance, weights, radius, 64)-.05, 0., 5.)
++        for delta in (-.03, -.003, -.00003, .00003, .003, .03):
++            mu = shifted(distance+delta)
++            low = disk_reference(mu, covariance, weights, radius, 80)
++            expected = disk_reference(mu, covariance, weights, radius, 160)
++            prediction = PredictionSet(mu[:, :, None], covariance[:, :, None], np.array([.2]), weights)
++            actual = solver.evaluate(np.zeros((1, 1, 2)), prediction, radius)[0, 0]
++            diag = solver.last_diagnostics
++            rows.append(dict(case=case, obstacles=o, delta=delta, reference=expected,
++                estimate=actual, error=actual-expected, reference_refinement=abs(expected-low),
++                false_safe=bool(actual <= .05 < expected), false_unsafe=bool(expected <= .05 < actual),
++                unresolved=diag.unresolved_integrals, analytic=diag.analytic_evaluations,
++                quadrature_evaluations=diag.quadrature_evaluations))
++    with (args.output/'accuracy_raw.csv').open('w') as stream:
++        writer = csv.DictWriter(stream, fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
++    error = np.array([r['error'] for r in rows])
++    summary = dict(evaluations=len(rows), absolute_max=float(np.max(abs(error))),
++        absolute_p95=float(np.percentile(abs(error), 95)), mae=float(np.mean(abs(error))),
++        reference_refinement_max=max(r['reference_refinement'] for r in rows),
++        false_safe=sum(r['false_safe'] for r in rows), unsafe_denominator=sum(r['reference'] > .05 for r in rows),
++        false_unsafe=sum(r['false_unsafe'] for r in rows), unresolved=sum(r['unresolved'] for r in rows),
++        seed=80117, reference='Independent polar Gauss-Legendre 80/160; regularized covariance',
++        limitation='Synthetic distributions only; refinement is not a certified error bound or prediction calibration.')
++    (args.output/'summary.json').write_text(json.dumps(summary, indent=2))
++    print(json.dumps(summary, indent=2))
++
++
++if __name__ == '__main__':
++    main()
+--- before/tools/validate_ros_pilot.py
++++ after/tools/validate_ros_pilot.py
+@@ -126,7 +126,9 @@
+                     point = GaussianPrediction2D()
+                     point.mean_x = .8+(i % 5)*.5+(.12 if mode_index == 0 else -.08)*t
+                     point.mean_y = -1.5+(i//5)*.9+.15*t
+-                    point.covariance = [.04, 0., 0., .04]
++                    point.covariance = ([.05, .025, .025, .025]
++                        if args.covariance == 'anisotropic' or (args.covariance == 'mixed' and i % 2)
++                        else [.04, 0., 0., .04])
+                     point.weight = .6 if mode_index == 0 else .4
+                     mode.points.append(point)
+                 obj.modes.append(mode)
+@@ -169,6 +171,8 @@
+     parser.add_argument('--timeout', type=float)
+     parser.add_argument('--seed', type=int)
+     parser.add_argument('--density', type=float)
++    parser.add_argument('--risk-mode', choices=('monte_carlo', 'gaussian_disk'))
++    parser.add_argument('--covariance', choices=('isotropic', 'anisotropic', 'mixed'), default='isotropic')
+     parser.add_argument('--frozen', action='store_true', help='reset nominal each callback for matched candidates')
+ 
+     parser.add_argument('--helper', action='store_true')
+@@ -201,6 +205,8 @@
+     if args.seed is not None:
+         parameters['mppi.seed'] = args.seed
+         parameters['dynamic_risk.seed'] = args.seed+10
++    if args.risk_mode is not None:
++        parameters['dynamic_risk.mode'] = args.risk_mode
+     if args.density is not None:
+         for prefix in ('mc', 'guide_mc', 'final_mc'):
+             parameters['dynamic_risk.'+prefix+'_sample_density'] = args.density
+@@ -304,6 +310,7 @@
+         'publish_interval_ms': stats(r['publish_interval_ms'] for r in rows),
+         'receive_interval_ms': stats(r['interval_ms'] for r in received),
+         'receive_count_in_window': len(received), 'recorder': recorder,
++        'covariance': args.covariance, 'risk_mode': parameters['dynamic_risk.mode'],
+         'warmup_cycles': args.warmup, 'obstacles': args.obstacles, 'modes': 2,
+         'detour': args.detour, 'static_enabled': not args.static_off,
+         'strategy': parameters['mppi.strategy'],

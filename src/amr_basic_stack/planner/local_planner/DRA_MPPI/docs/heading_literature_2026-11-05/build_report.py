@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""Build the Korean literature-only report. Requires WeasyPrint."""
+from pathlib import Path
+from html import escape
+from weasyprint import HTML
+
+ROOT = Path(__file__).resolve().parent
+PAPERS = [
+    ("APREBot: Active Perception System for Reflexive Evasion Robot", "ICRA 2026 · 학회", "본문 핵심 절 + 저자 프로젝트", "https://arxiv.org/html/2509.24733v1", "arXiv:2509.24733v1. ICRA 게재 표시는 https://aprebot-2026.github.io/ 에서 확인."),
+    ("Crowd navigation in a multi-room environment: a model predictive control framework for mobile robots", "Frontiers in Robotics and AI, 2026 · 저널", "본문 §6, §8 및 실험 설명", "https://www.frontiersin.org/journals/robotics-and-ai/articles/10.3389/frobt.2026.1812386/full", "DOI: 10.3389/frobt.2026.1812386"),
+    ("Time-Interval-Based Collision Detection for 4WIS Mobile Robots in Human-Shared Indoor Environments", "Sensors 25(3), 890, 2025 · 저널", "본문 방법·실험·결론", "https://www.mdpi.com/1424-8220/25/3/890", "DOI: 10.3390/s25030890. 공개 본문: https://pmc.ncbi.nlm.nih.gov/articles/PMC11819964/"),
+    ("Monocular Visual-Inertial-Based Navigation for Mobile Robots with Perception Aware Exploration and Map Construction", "국립대만대학교, 2020 · 석사학위논문", "공식 초록·목차·학위 정보", "https://tdr.lib.ntu.edu.tw/handle/123456789/51298?mode=full", "Chung-En Liu. DOI: 10.6342/NTU202002787. 전체 PDF 미검토."),
+    ("PA-MPPI: Perception-Aware Model Predictive Path Integral Control for Quadrotor Navigation in Unknown Environments", "IEEE Robotics and Automation Letters, 2026 · 저널", "저자 공개 본문 v3, 특히 IV-D", "https://arxiv.org/html/2509.14978v3", "Yifan Zhai, Rudolf Reiter, Davide Scaramuzza. DOI: 10.1109/LRA.2026.3662653. 게재 정보: https://arxiv.org/abs/2509.14978"),
+    ("Nonmyopic View Planning for Active Object Classification and Pose Estimation", "IEEE Transactions on Robotics 30(5), 1078–1090, 2014 · 저널", "저자 PDF, 특히 §VI–VII", "https://natanaso.github.io/ref/Atanasov_ActiveObjectRecognition_TRO14.pdf", "Nikolay Atanasov et al. DOI: 10.1109/TRO.2014.2320795"),
+    ("UEREBot: Learning Safe Quadrupedal Locomotion under Unstructured Environments and High-Speed Dynamic Obstacles", "arXiv, 2026 · 프리프린트", "본문·실험·부록 VIII-G", "https://arxiv.org/html/2602.07363v1", "arXiv:2602.07363v1. 이번 조사에서 별도 저널·학회 게재는 확인하지 못함."),
+    ("LV-DOT: LiDAR-visual dynamic obstacle detection and tracking for autonomous robot navigation", "arXiv, 2025 · 프리프린트", "초록 + 저자 공개 저장소", "https://arxiv.org/abs/2502.20607", "arXiv:2502.20607. 코드: https://github.com/Zhefan-Xu/LV-DOT . 별도 정식 게재 미확인."),
+    ("FAPP: Fast and Adaptive Perception and Planning for UAVs in Dynamic Cluttered Environments", "IEEE Transactions on Robotics 41, 871–886, 2025 · 저널", "초록 + 저자 저장소·서지", "https://arxiv.org/abs/2312.08743", "DOI: 10.1109/TRO.2024.3522187. 2024년 수락·온라인 시기와 2025년 권호를 구분. https://github.com/arclab-hku/FAPP"),
+    ("Real-Time Multi-Modal Active Vision for Object Detection on UAVs Equipped With Limited Field of View LiDAR and Camera", "IEEE Robotics and Automation Letters 8(10), 6571–6578, 2023 · 저널", "IEEE 공개 초록·서지; 전체 본문 미검토", "https://doi.org/10.1109/LRA.2023.3309575", "Chuanbeibei Shi et al. IEEE 초록 색인: https://xplorestaging.ieee.org/document/10233103/ . 전체 원문 접근 제한."),
+    ("PANTHER: Perception-Aware Trajectory Planner in Dynamic Environments", "IEEE Access, 2022 · 저널", "저자 공개 초록·서지", "https://arxiv.org/abs/2103.06372", "DOI: 10.1109/ACCESS.2022.3154037. arXiv 초판 2021, 저널 게재 2022."),
+    ("Adaptive Heading for Perception-Aware Trajectory Following", "ICRA 2023 · 학회", "소속기관 초록·서지", "https://researchportal.hw.ac.uk/en/publications/adaptive-heading-for-perception-aware-trajectory-following/", "DOI: 10.1109/ICRA48891.2023.10160521. 전체 본문 미검토."),
+    ("Quasi-min-max MPC for visual servoing stabilization of omnidirectional wheeled mobile robots", "Asian Journal of Control 25, 1924–1938, 2023 · 저널", "출판사 초록·서지", "https://onlinelibrary.wiley.com/doi/10.1002/asjc.2813", "DOI: 10.1002/asjc.2813. 온라인 공개 2022-04-05, 권호 2023. 특정 메카넘/4WS 구성은 이번 조사에서 확정하지 않음."),
+    ("Bridging maneuverability and precision: An autonomous navigation framework for industrial 4WISD robots", "Control Engineering Practice 166, 106636, 2026 · 저널", "출판사 초록·공개 본문 발췌", "https://www.sciencedirect.com/science/article/pii/S0967066125003983", "DOI: 10.1016/j.conengprac.2025.106636. DOI 연도와 권호 연도를 구분."),
+    ("Eight-Wheel Mecanum Omnidirectional Autonomous Mobile Robot: Kinematics, Architecture, and Validation", "Electronics 15(11), 2441, 2026 · 저널", "출판사 서지·검색 가능한 본문 일부", "https://www.mdpi.com/2079-9292/15/11/2441", "DOI: 10.3390/electronics15112441. 전체 본문 재접근 제한; 상세 능동 관측 기능은 판단 보류."),
+    ("Robot Evolutionary Localization Based on Attentive Visual Short-Term Memory", "Sensors 13(1), 1268, 2013 · 저널", "공개 본문 attention·실험·결론 절", "https://pmc.ncbi.nlm.nih.gov/articles/PMC3574735/", "DOI: 10.3390/s130101268. 출판사: https://www.mdpi.com/1424-8220/13/1/1268"),
+]
+
+CSS = """
+@page {size:A4; margin:18mm 18mm 18mm;
+ @top-left {content:'DRA-MPPI  /  LITERATURE REVIEW';font-size:8pt;color:#597080;font-family:'Noto Sans CJK KR';}
+ @top-right {content:'2026.11.05';font-size:8pt;color:#597080;}
+ @bottom-left {content:'LiDAR · Camera · Mecanum / 4WS';font-size:8pt;color:#597080;}
+ @bottom-right {content:counter(page) ' / ' counter(pages);font-size:8pt;color:#597080;}}
+* {box-sizing:border-box;}
+body {font-family:'Noto Sans CJK KR',sans-serif;font-size:10pt;line-height:1.65;color:#203244;margin:0;}
+h1 {font-size:27pt;line-height:1.4;letter-spacing:-.6pt;margin:10mm 0 6mm;color:#122b40;}
+h2 {font-size:19pt;line-height:1.4;margin:0 0 5mm;color:#122b40;}
+h3 {font-size:12.5pt;line-height:1.5;margin:0 0 2mm;color:#123e52;}
+p {margin:0 0 3mm;} a {color:#096d7d;text-decoration:none;overflow-wrap:anywhere;}
+.page {break-after:page;} .page:last-child{break-after:auto;}
+.eyebrow {font-size:10pt;letter-spacing:1.2pt;color:#16818c;margin-top:5mm;}
+.subtitle {font-size:13pt;color:#597080;margin-bottom:8mm;}
+.box {background:#edf5f6;border-left:3pt solid #16818c;padding:4mm 5mm;margin:4mm 0;}
+.muted,.meta {color:#5d6e7b;font-size:8.7pt;}
+.meta {margin-bottom:3mm;}
+.rule {height:1px;background:#ccdae1;margin:5mm 0;}
+.card {margin-bottom:5mm;break-inside:avoid;}
+.card p {margin-bottom:2mm;}
+.label {font-weight:bold;color:#183d53;}
+ul,ol {margin:2mm 0 4mm;padding-left:6mm;} li {margin:1.5mm 0;}
+table {width:100%;border-collapse:collapse;font-size:8.5pt;line-height:1.5;table-layout:fixed;}
+th {background:#17384b;color:white;text-align:left;padding:2.5mm 2mm;font-weight:500;}
+td {border-bottom:1px solid #d7e2e7;padding:2.4mm 2mm;vertical-align:top;overflow-wrap:anywhere;}
+tr:nth-child(even) td {background:#f3f7f9;} tr {break-inside:avoid;}
+.compact {font-size:9pt;line-height:1.55;}
+.compact .card {margin-bottom:4mm;}
+.compact h3 {font-size:11pt;}
+.refs .ref {margin-bottom:2mm;break-inside:avoid;font-size:8pt;line-height:1.4;}
+.refs .title {font-size:8.5pt;font-weight:600;color:#17384b;}
+.ref p {margin:0 0 1mm;}
+.pill {color:#16818c;font-weight:bold;font-size:9pt;}
+"""
+
+def card(n, title, body):
+    paper = PAPERS[n-1]
+    return f'<div class="card"><h3>[{n}] {title}</h3><p class="meta">{escape(paper[1])} · 확인: {escape(paper[2])}</p>{body}<p class="meta"><a href="{escape(paper[3],quote=True)}">원문 / 공식 자료 ↗</a> · 전체 제목과 식별자는 참고문헌 [{n}]</p></div>'
+
+pages=[]
+pages.append('''<section class="page">
+<div class="eyebrow">PRIOR ART · EVIDENCE · RELEVANCE</div>
+<h1>선택적 관측 heading<br>선행연구 조사</h1>
+<p class="subtitle">LiDAR–Camera 기반 메카넘 AMR 및 4WS와의 관련성</p>
+<div class="box"><b>조사 질문</b><br>주변 객체를 LiDAR로 인지한 뒤 관측할 대상을 고르고, 제한된 카메라 시야를 확보하기 위해 로봇 또는 센서 방향을 바꾸는 연구는 어디까지 진행되어 있는가?</div>
+<p>2026년 11월 5일까지 이번 대화에서 확인한 주요 문헌 16편을 정리했다. 센서 조합, 이동 플랫폼, 관측 대상 선정, 방향 제어, 관측 종료와 추적 계산량에 관련된 근거를 구분한다.</p>
+<h3>확인된 핵심 사실</h3>
+<ol>
+<li><b>LiDAR 탐지 → 위협 대상 선정 → 차체 회전 → 카메라 정밀 관측</b>과 매우 가까운 구조가 APREBot에 있다. 대상 전환 억제도 포함한다. [1]</li>
+<li>지상로봇에서 <b>LiDAR·RGB-D·일반 KF·MPC·카메라 방향 조절</b>을 함께 사용하는 저널 사례가 있다. 다만 차동구동과 팬틸트 구성이다. [2]</li>
+<li><b>4WIS 주행 모드와 검출 안정성</b>, <b>메카넘의 관측 지향 yaw 제어</b>에도 선행 사례가 있다. 후자는 학위논문의 초록·목차 수준으로 확인했다. [3, 4]</li>
+<li><b>MPPI의 관측 비용 및 조건부 해제</b>, <b>추가 관측과 종료의 비용 비교</b>도 기존 연구에서 다룬다. [5, 6]</li>
+</ol>
+<div class="rule"></div>
+<h3>자료를 읽는 기준</h3>
+<p><b>A</b> = 공개 본문의 관련 방법·실험 절을 확인.<br><b>B</b> = 공식 초록·목차·저자 코드 설명·본문 발췌를 확인.<br><b>C</b> = 서지와 제한적인 공개 부분만 확인.</p>
+<p class="muted">A는 전체 논문 재현이나 모든 주장 검증을 뜻하지 않는다. B·C 자료에서 확인하지 못한 기능은 ‘없다’고 단정하지 않는다. 이 문서는 공개 자료 기반의 조사 요약이며 Scopus·Web of Science 전체 검색에 의한 체계적 문헌고찰은 아니다. 우리 아이디어의 신규성을 확정하는 문서도 아니다.</p>
+</section>''')
+
+matrix = [
+('1','APREBot','사족 / LiDAR + RGB-D','대상 선정·차체 회전·전환 억제','A'),
+('2','Crowd navigation','차동 / LiDAR + RGB-D','일반 KF·최근접 사람 팬틸트 관측','A'),
+('3','4WIS collision detection','4WIS / LiDAR 중심','주행 모드와 검출·충돌 예측','A'),
+('4','NTU perception-aware navigation','메카넘 / 시각·관성','위치추정 목적 관측 방향·yaw','B'),
+('5','PA-MPPI','UAV / Depth','관측 비용·상황별 비용 해제','A'),
+('6','Nonmyopic view planning','PR2 / Depth','관측 계획·분류·적응적 종료','A'),
+('7','UEREBot','사족 / LiDAR + RGB-D','목표 이동·회피·APRE 인지 활용','A'),
+('8','LV-DOT','UAV / LiDAR·Depth·RGB','다중 센서 검출·KF 추적','B'),
+('9','FAPP','UAV / RGB-D 기반','빠른 인지·적응적 추정·계획','B'),
+('10','Multi-modal active vision','UAV / LiDAR + Camera','센서 융합·EKF·관측 지향 MPC','B'),
+('11','PANTHER','UAV','위치·yaw 계획·시야 고려','B'),
+('12','Adaptive Heading','전방향 수중로봇','궤적 추종 중 관측 heading 조절','B'),
+('13','Quasi-min-max MPC','전방향 차륜로봇','시각 서보·상태 및 입력 제약','B'),
+('14','Industrial 4WISD navigation','4WISD / Dual LiDAR','산업용 플랫폼·계획·제어','B'),
+('15','Eight-Wheel Mecanum','8륜 메카넘','기구학·구조·검증의 배경 자료','C'),
+('16','Attentive visual memory','Pioneer / Nao','관측 기억·재관측·주의 전환','A'),
+]
+rows=''.join('<tr>'+''.join(f'<td>{escape(x)}</td>' for x in row)+'</tr>' for row in matrix)
+pages.append(f'''<section class="page"><h2>01 / 문헌 비교 지도</h2>
+<p>관련성은 서로 다르다. 같은 센서를 탑재했다는 사실만으로 같은 능동 관측 문제를 해결했다고 보지 않는다.</p>
+<table><colgroup><col style="width:6%"><col style="width:28%"><col style="width:25%"><col style="width:35%"><col style="width:6%"></colgroup><thead><tr><th>번호</th><th>문헌 약칭</th><th>플랫폼 / 센서</th><th>확인한 관련 내용</th><th>범위</th></tr></thead><tbody>{rows}</tbody></table>
+<div class="box"><b>직접 비교 우선 문헌:</b> [1] 센서 간 능동 관측 구조, [2] 지상로봇 통합 구조, [3–4] 이동 자유도와 인지, [5] MPPI 관측 비용, [6] 관측 종료 기준.</div>
+<p class="muted">UAV = 무인항공기. 4WIS = 4륜 독립조향. 4WISD = 4륜 독립조향·구동. 전방향 차륜로봇이라는 표현만으로 메카넘 또는 4WS 플랫폼을 확정하지 않았다.</p></section>''')
+
+pages.append('<section class="page"><h2>02 / 센서 구성과 지상로봇에 가까운 연구</h2>' +
+card(1,'APREBot', '''<p><span class="label">핵심 구조.</span> 360° LiDAR의 검출·추적으로 접근 객체를 파악하고, 위협도가 높은 대상을 선정한다. 차체를 돌려 전방 RGB-D 시야에 넣고 정밀한 기하 정보를 회피에 사용한다. LiDAR 쪽에는 클러스터링, 데이터 연관, 칼만 필터가 포함된다.</p>
+<p><span class="label">선정·유지.</span> 접근 속도와 거리에 기반한 위협도를 사용한다. 다른 대상이 여러 주기 연속 더 높은 위협도를 유지해야 선택을 바꾸므로 전환 억제가 이미 존재한다.</p>
+<p><span class="label">공통점과 차이.</span> 센서 간 시야 차이를 차체 방향으로 보완한다는 발상과 직접 겹친다. 플랫폼은 사족보행이며 반사적 회피가 중심이다. 검토한 v1에서 ‘분류 정보 확보 후 경로 heading 복귀’에 해당하는 명시적 종료 규칙은 확인하지 못했다. 후속 이동 연구 [7]도 함께 봐야 한다.</p>''') +
+card(2,'Crowd navigation in a multi-room environment', '''<p><span class="label">핵심 구조.</span> 차동구동 TIAGo에서 2D LiDAR와 RGB-D 검출을 결합하고 등속도 모델의 일반 KF로 사람을 추적한다. MPC와 충돌 회피 제약을 연결한다.</p>
+<p><span class="label">관측·계산량.</span> 팬틸트 카메라를 가장 가까운 사람 쪽으로 돌리고, 주변 장애물이 없으면 목표 위치를 바라본다. 처리 대상 수에 상한을 두고 가까운 검출을 우선 포함한다.</p>
+<p><span class="label">해석 범위.</span> LiDAR·카메라·KF·방향 조절·MPC의 통합 사례다. 차체 heading 대신 센서의 팬틸트를 사용한다. 센서 융합 성능 비교를 관측 방향 조절만의 효과로 해석할 수는 없다.</p>''') +
+card(3,'Time-Interval-Based Collision Detection for 4WIS', '''<p><span class="label">핵심 구조.</span> 4WIS 로봇의 운동학적 궤적과 LiDAR 사람 검출·선형 KF 예측을 이용해 충돌 시점을 판단한다. 하드웨어에 카메라도 있지만 검토한 핵심 추적·충돌 판단은 LiDAR 중심이다.</p>
+<p><span class="label">실험.</span> Parallel 모드와 Ackermann 모드를 비교하며, 해당 실험에서 Parallel 모드가 선회 중 사람 검출을 더 안정적으로 유지했다고 보고한다.</p>
+<p><span class="label">공통점과 차이.</span> 이동 방향과 차체 방향의 관계가 인지에 영향을 준다는 근거다. 미확인 객체를 선택해 카메라로 보고 관측을 종료하는 구조를 검증한 연구로 확대 해석하지 않는다.</p>''') + '</section>')
+
+pages.append('<section class="page"><h2>03 / Heading·MPPI·관측 종료의 선행연구</h2>' +
+card(4,'메카넘의 perception-aware navigation', '''<p><span class="label">공식 기록.</span> Chung-En Liu의 국립대만대학교 2020년 석사학위논문이다. 초록은 시각·관성 위치추정과 관측 방향 계획, 위치 제어 및 yaw 제어를 설명한다.</p>
+<p><span class="label">메카넘 관련성.</span> 목차 7.2절에 Turtlebot Mecanum 기반 관측 지향 주행이 명시되어 있으며 복도, 대각선 및 곡선 궤적 실험 항목이 있다.</p>
+<p><span class="label">확인 한계.</span> 목적은 시각적 위치추정·지도 작성에 가깝다. 동적 LiDAR 객체의 선택적 관측과 동일하다고 볼 근거는 없다. 전체 PDF를 읽지 않았으므로 제어 세부식이나 실험 수치의 근거로 사용하지 않는다.</p>''') +
+card(5,'PA-MPPI', '''<p><span class="label">핵심 구조.</span> 드론의 Depth 기반 환경 표현을 이용해 MPPI 후보를 평가한다. 관측 비용은 목표 방향의 미확인 공간을 관측할 수 있는 움직임을 유도한다.</p>
+<p><span class="label">비용 전환.</span> 검토한 v3의 IV-D에서는 목표까지 직접 연결되는 시선 경로가 확보되면 관측 비용을 더 이상 부여하지 않는 단계로 전환한다.</p>
+<p><span class="label">공통점과 차이.</span> MPPI에 인지 목적 비용을 넣고 조건에 따라 해제한다는 구성은 선행된다. 주요 대상은 미확인 공간과 목표 접근이며, 여러 동적 객체 중 하나를 골라 정보를 보완하는 문제와는 구분된다. 초기 버전과 v3의 지도·비용 세부 구성을 혼용하지 않았다.</p>''') +
+card(6,'Nonmyopic View Planning', '''<p><span class="label">핵심 구조.</span> 물체 종류와 자세의 가설을 유지하면서 Depth 카메라의 관측 위치를 계획한다. PR2 실험과 시뮬레이션을 제시한다.</p>
+<p><span class="label">종료 기준.</span> 관측 이동·측정 비용과 잘못된 판단의 기대 비용을 함께 다루며 관측 종료 시점도 결정한다. 적응적 종료가 주요 효과 중 하나로 분석된다.</p>
+<p><span class="label">공통점과 차이.</span> ‘충분히 정보를 얻으면 관측을 그만한다’는 원칙의 명확한 선행연구다. 객체 분류·자세 판단이 목적이며 주행 중 충돌 회피에 필요한 정보만 선택하는 문제와 완전히 같지는 않다. 이 논문의 종료식을 AMR 안전 판단의 보장으로 바로 사용할 수는 없다.</p>''') + '</section>')
+
+pages.append('<section class="page compact"><h2>04 / 인지·추적·공중로봇의 인접 연구</h2>' +
+card(7,'UEREBot — APREBot 이후의 이동·회피 결합', '''<p>목표 지점 이동과 정적 지형·고속 동적 장애물 회피를 함께 다루는 사족보행 연구다. 부록 VIII-G는 APREBot의 인지 파이프라인을 채택하고 360° LiDAR, 전방 RGB-D, 가벼운 3D KF를 사용한다고 설명한다.</p><p>APREBot v1의 한계만 보고 ‘기존 연구는 목표 주행을 다루지 않는다’고 주장하기 어렵다. 다만 여기서 별도의 관측 가치 기반 heading 최적화를 검증했다고까지 확인한 것은 아니다.</p>''') +
+card(8,'LV-DOT — LiDAR·시각 검출과 추적', '''<p>LiDAR·Depth·RGB의 검출 결과를 활용하는 동적 장애물 인지·추적 연구다. 초록과 공개 구현에서 센서별 검출, 융합, 연관 및 KF 추적 구성을 확인했다.</p><p>센서 결합과 경량 추적의 구현 참고 자료다. 능동적으로 볼 대상을 선정하고 heading을 바꾸는 정책의 직접적인 증거로 사용하지 않는다.</p>''') +
+card(9,'FAPP — 빠른 인지와 적응적 추정', '''<p>동적·혼잡 환경의 UAV를 위한 빠른 인지와 적응적 상태 추정·계획을 다룬다. 이번 조사에서는 초록과 저자 저장소의 설명·서지 정보를 확인했다.</p><p>계산량과 불확실성 처리의 참고 연구다. 구체적인 추정기 구성이나 IMM 대비 우월성을 이 조사만으로 주장하지 않는다.</p>''') +
+card(10,'Real-Time Multi-Modal Active Vision', '''<p>제한된 시야의 LiDAR와 카메라를 장착한 UAV 연구다. 공개 초록은 다중 센서 검출 융합, EKF 활용, perception-aware MPC를 통한 능동 시각을 설명한다.</p><p>센서 조합과 관측 지향 제어가 가까운 저널 사례다. 전체 본문 접근이 제한되어 대상 선택·관측 종료의 세부 정책은 확인하지 못했다.</p>''') +
+card(11,'PANTHER — 인지 지향 궤적 계획', '''<p>동적 환경에서 UAV의 위치·yaw 궤적을 계획하며 시야와 영상 흐림 등 인지 조건을 고려하는 연구다.</p><p>이동 경로와 바라보는 방향을 함께 설계하는 선행 사례다. LiDAR 기반 미확인 객체 선정이나 메카넘 구동 제약의 직접 비교 문헌은 아니다. 본 보고서의 설명은 공개 초록 범위로 제한한다.</p>''') + '</section>')
+
+pages.append('<section class="page compact"><h2>05 / 플랫폼·시각 제어·관측 기억의 인접 연구</h2>' +
+card(12,'Adaptive Heading for Perception-Aware Trajectory Following', '''<p>전방향 수중로봇의 궤적 추종 중 heading을 조절한다. 소속기관 초록은 지도 특징 관측, 전방 지향, 방향 변화 억제 및 표면 방향과 관련된 목적을 설명한다.</p><p>궤적과 관측 heading의 관계를 다룬다는 점이 관련된다. 차륜형 AMR 실증이나 LiDAR–카메라 객체 선택의 증거는 아니다.</p>''') +
+card(13,'Quasi-min-max MPC for visual servoing', '''<p>전방향 차륜로봇의 시각 서보 안정화에 MPC를 적용하고 시각·물리 제약을 고려하는 연구다.</p><p>시야와 제어 제약을 함께 다루는 배경 자료다. 초록만으로 특정 메카넘·4WS 구성, 다중 객체 선택 또는 정보 획득 종료 기능을 확정하지 않았다.</p>''') +
+card(14,'Industrial 4WISD navigation', '''<p>산업용 4WISD AMR에 Dual LiDAR 인지, Hybrid DW-APF 계획, 주행 모드 제어를 결합한다. 출판사 공개 발췌에서 플랫폼과 인지 구성을 확인했다.</p><p>4WS 계열 산업 AMR의 통합 자율주행 참고 자료다. LiDAR 두 개를 쓴다는 사실을 LiDAR–카메라 능동 관측의 선행 사례로 분류하지 않는다.</p>''') +
+card(15,'Eight-Wheel Mecanum AMR', '''<p>8륜 메카넘 AMR의 기구학·구조·검증을 다루는 2026년 Electronics 논문이다. 출판사 서지와 공개 검색 부분을 확인했다.</p><p>메카넘 플랫폼의 배경 문헌으로 남긴다. 전체 본문 재접근 제한 때문에 대상 선정·관측 heading·종료 기능의 유무는 판단을 보류한다.</p>''') +
+card(16,'Attentive Visual Short-Term Memory', '''<p>로봇 주변의 시각 정보를 단기 기억으로 유지하고 salience에 따라 카메라가 볼 곳을 고른다. 최근 관측한 대상의 우선도를 낮추고, 오래 관측하지 않은 대상을 다시 보는 주의 전환과 상태기계를 설명한다.</p><p>관측 이력·재관측·반복 주시 억제는 오래된 선행 개념이다. 주된 목적은 시각 기억과 위치추정이며, 충돌 위험에 따른 동적 객체 관측과 동일한 문제는 아니다.</p>''') + '</section>')
+
+pages.append('''<section class="page"><h2>06 / 조사 결과의 해석과 한계</h2>
+<h3>이미 선행되는 구성 요소</h3>
+<table><colgroup><col style="width:49%"><col style="width:51%"></colgroup><thead><tr><th>구성 요소</th><th>확인한 선행 근거</th></tr></thead><tbody>
+<tr><td>LiDAR 객체를 선택해 카메라로 정밀 관측</td><td>APREBot [1]</td></tr>
+<tr><td>위협도 기반 선택과 잦은 대상 전환 억제</td><td>APREBot [1]</td></tr>
+<tr><td>지상로봇의 KF·MPC와 능동 센서 방향 조절</td><td>Crowd navigation [2]</td></tr>
+<tr><td>전방향 이동 자유도와 인지 성능의 관계</td><td>4WIS 실험 [3], 메카넘 학위논문 기록 [4]</td></tr>
+<tr><td>MPPI 관측 비용 및 상황에 따른 해제</td><td>PA-MPPI [5]</td></tr>
+<tr><td>관측 비용과 판단 오류를 고려한 종료</td><td>Nonmyopic View Planning [6]</td></tr>
+<tr><td>관측 이력·재관측·주의 전환</td><td>Attentive Visual Memory [16]</td></tr>
+</tbody></table>
+<div class="box"><b>종합 해석</b><br>위 요소 각각 또는 단순한 조합을 새로운 개념이라고 주장하기에는 선행 근거가 존재한다. 플랫폼만 달라졌다는 사실과 새로운 방법론적 기여도 구분해야 한다.</div>
+<h3>이번 조사에서 확정하지 못한 사항</h3>
+<ul>
+<li>메카넘 또는 4WS에서 LiDAR 객체 선택, 카메라 정보 보완, 주행 중 차체 heading, 정보 기반 종료를 모두 동일하게 결합한 연구의 존재 여부.</li>
+<li>원문 접근이 제한된 [4, 10, 13, 15] 등의 세부 제어 및 관측 종료 규칙.</li>
+<li>서로 다른 논문 간 계산 시간·안전성·관측 성공률의 직접 우열. 하드웨어, 장면, 목표와 측정 기준이 달라 수치의 단순 비교는 하지 않았다.</li>
+</ul>
+<h3>조사 경로</h3>
+<p>LiDAR–camera active perception, mecanum perception-aware navigation, omnidirectional heading, 4WIS/4WISD perception, perception-aware MPPI, active classification stopping 등을 조합해 검색했다. 가까운 논문의 참고문헌과 APREBot 관련 후속 연구를 추가 확인했다.</p>
+<p class="muted">대표 확인 경로: 출판사 원문·초록, arXiv 저자 공개본, 대학 저장소, 저자 프로젝트·코드. 검색 엔진의 게시·수집 시각보다 원문 서지와 판본을 우선했다. ‘미확인’은 ‘부재’와 다르며, 이 자료만으로 최초성 또는 선행연구의 완전한 부재를 단정할 수 없다.</p>
+</section>''')
+
+for start,end in [(0,8),(8,16)]:
+    content=f'<section class="page refs"><h2>참고문헌 / {start+1}–{end}</h2><p class="meta">제목과 링크를 통해 원문에 접근할 수 있다. 접근 제한이 있는 자료는 확인 범위를 함께 기재했다.</p>'
+    for idx in range(start,end):
+        title,venue,scope,url,note=PAPERS[idx]
+        content += f'<div class="ref" id="ref{idx+1}"><p class="title">[{idx+1}] {escape(title)}</p><p>{escape(venue)}</p><p>{escape(note)}</p><p>확인 범위: {escape(scope)}</p><a href="{escape(url,quote=True)}">{escape(url)}</a></div>'
+    pages.append(content+'</section>')
+
+html='<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>선택적 관측 heading 선행연구 조사</title><meta name="author" content="DRA-MPPI research notes"><style>'+CSS+'</style></head><body>'+''.join(pages)+'</body></html>'
+(ROOT/'heading_literature_review.html').write_text(html,encoding='utf-8')
+HTML(string=html,base_url=str(ROOT)).write_pdf(ROOT/'heading_literature_review.pdf')
+print(ROOT/'heading_literature_review.pdf')

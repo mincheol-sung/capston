@@ -1,0 +1,92 @@
+[
+  {
+    "time": 1532030.728097921,
+    "load": [
+      1.111328125,
+      1.0576171875,
+      0.634765625
+    ],
+    "rss_max_kib": 110912,
+    "threads": 13,
+    "thermal": {
+      "/sys/class/thermal/thermal_zone2/temp": "82000",
+      "/sys/class/thermal/thermal_zone0/temp": "-263200",
+      "/sys/class/thermal/thermal_zone3/temp": "57000",
+      "/sys/class/thermal/thermal_zone1/temp": "65000"
+    },
+    "frequency_khz": {
+      "/sys/devices/system/cpu/cpu11/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu9/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu5/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu3/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu10/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu8/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq": "2046579",
+      "/sys/devices/system/cpu/cpu2/cpufreq/scaling_cur_freq": "3121013",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq": "4800000"
+    }
+  },
+  {
+    "time": 1532040.790620778,
+    "load": [
+      1.09375,
+      1.0556640625,
+      0.63916015625
+    ],
+    "rss_max_kib": 140996,
+    "threads": 13,
+    "thermal": {
+      "/sys/class/thermal/thermal_zone2/temp": "69000",
+      "/sys/class/thermal/thermal_zone0/temp": "-263200",
+      "/sys/class/thermal/thermal_zone3/temp": "57000",
+      "/sys/class/thermal/thermal_zone1/temp": "67000"
+    },
+    "frequency_khz": {
+      "/sys/devices/system/cpu/cpu11/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu9/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu5/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu3/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq": "3630713",
+      "/sys/devices/system/cpu/cpu10/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu8/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq": "574083",
+      "/sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq": "472633",
+      "/sys/devices/system/cpu/cpu2/cpufreq/scaling_cur_freq": "400210",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq": "1176767"
+    }
+  },
+  {
+    "time": 1532050.794940922,
+    "load": [
+      1.1591796875,
+      1.07080078125,
+      0.6484375
+    ],
+    "rss_max_kib": 142524,
+    "threads": 13,
+    "thermal": {
+      "/sys/class/thermal/thermal_zone2/temp": "69000",
+      "/sys/class/thermal/thermal_zone0/temp": "-263200",
+      "/sys/class/thermal/thermal_zone3/temp": "58000",
+      "/sys/class/thermal/thermal_zone1/temp": "65000"
+    },
+    "frequency_khz": {
+      "/sys/devices/system/cpu/cpu11/cpufreq/scaling_cur_freq": "3000599",
+      "/sys/devices/system/cpu/cpu9/cpufreq/scaling_cur_freq": "3602608",
+      "/sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu5/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu3/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq": "2927168",
+      "/sys/devices/system/cpu/cpu10/cpufreq/scaling_cur_freq": "3600035",
+      "/sys/devices/system/cpu/cpu8/cpufreq/scaling_cur_freq": "3595274",
+      "/sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq": "829312",
+      "/sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq": "4202829",
+      "/sys/devices/system/cpu/cpu2/cpufreq/scaling_cur_freq": "4646684",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq": "1297777"
+    }
+  }
+]

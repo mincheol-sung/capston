@@ -1,0 +1,40 @@
+rviz_theta_star_node:
+  ros__parameters:
+    # Coordinate frames and ROS topics
+    map_frame: map
+    base_frame: base_footprint
+    initial_pose_topic: /initialpose
+    goal_topic: /goal_pose
+    path_topic: /global_path
+    waypoint_marker_topic: /global_path_waypoints
+
+    # Global path and RViz waypoint output
+    # Static walls are inflated using this robot footprint width [m].
+    robot_size: 0.4
+    # If a clicked start/goal is blocked in the planning costmap, move that
+    # endpoint to the nearest safe cell instead of rejecting the plan.
+    endpoint_snap_radius: 0.50
+    waypoint_interval: 0.10
+    waypoint_marker_size: 0.06
+    require_initial_pose: true
+    initial_pose_grace_period: 2.0
+    tf_timeout: 0.20
+    transform_max_age: 0.5
+
+    # Validate the remaining path against fresh traversable_map data only.
+    path_validation_frequency: 1.0
+
+    # traversability_node 가 내는 3-state 지도(0 통과 가능 / 100 통과 불가 /
+    # -1 미확인). 기하가 이 노드가 읽은 PGM 과 다르면 무시하고 경고한다.
+    #
+    # 신선한 traversable map 이 있으면 저장 PGM 대신 Theta*의 기준 costmap으로
+    # 사용한다. 목표 계획 시 토픽이 timeout 되면 저장 PGM으로 fallback하고,
+    # 주행 중 경로 검증과 재계획은 신선한 traversable map이 있을 때만 수행한다.
+    # 인지가 FREE로 재관측한 셀은 예전 PGM 장애물을 해제할 수 있다.
+    use_traversable_map: true
+    traversable_map_topic: /traversable_map
+    traversable_map_timeout: 2.0
+    # false: 미확인 셀을 통과 허용. 설계문서 §4 는 글로벌 경로를 기준 지도상
+    # 미리 생성할 수 있게 하고, 실제 주행 제한은 로컬 계획기에 맡긴다.
+    # 로컬(DRA-MPPI) 은 반대로 미확인을 통과 불가로 쓴다.
+    traversable_unknown_is_obstacle: false

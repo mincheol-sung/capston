@@ -1,0 +1,67 @@
+# 토크 MPC 스택(구조도 v3) 플랜트 파라미터 — 단일 출처
+# ===================================================================
+# 쓰는 곳: amr_mpc/torque/model.py(모델), sim_plant_torque_node(시뮬 플랜트),
+#          이후 torque_mpc_node·torque_output·ak40_can_node 도 같은 값을 읽는다.
+# 근거: 『메카넘 토크 MPC 1판 설계』(2026-11-05) 식-1~8, 설정값 표.
+# ★ 실측 전 값이 많다. "추정" 표시가 붙은 것은 amr/notes_amr/To do.md 의 측정 항목이다.
+#   측정이 끝나면 이 파일만 고친다. 코드는 바꾸지 않는다.
+#
+# 2026-11-10 결정 (torque_mpc_todo.md): 노미널 MPC 가 기본이고, 1판의 추가 항은 스위치로 둔다.
+#   - 모델의 바퀴 관성 J_w      → model.use_wheel_inertia (기본 false)
+#   - 구동계 마찰 보상 τ_fric   → friction.* (기본 0)
+#   - 외란 추정치 d̂            → torque_mpc.yaml (3단계에서 만든다, 기본 끔)
+# ===================================================================
+
+# ── 기하: 드라이버 twist_to_wheels 와 같은 값 (plant_wheel.yaml geometry 와 같다)
+#    ω_i = (v_x ± v_y ± k ω_z)/r,  k = (wheel_base + width)/2 = 0.19835 m
+geometry:
+  wheel_radius_m: 0.04
+  wheel_base_m:   0.1897
+  robot_width_m:  0.207
+
+# ── 차체
+body:
+  mass_kg: 4.0           # 추정. 1판 기준 로봇 자체 질량. 모터 교체 후 저울로 (To do 2절)
+  payload_kg: 0.0        # 적재 조건: 0 또는 5 (2차 발표). 실제 질량 = mass_kg + payload_kg
+  inertia_z_kgm2: 0.06   # 추정. 리포에 값 없음. 0.3 × 0.3 m 균일판 4 kg 근사 m(a²+b²)/12.
+                         #   CAD 또는 제자리 회전 가속 시험으로 바꾼다 (To do 2절)
+
+# ── 바퀴·모터 (CubeMars AK40-10 KV170, 10:1, MIT 모드)
+wheel:
+  inertia_J_w_kgm2: 8.9e-4   # 2026-11-12 팀원 벤치 (바퀴 장착·띄움, 출력축, 명령 토크 기준) 4개 평균.
+                             #   FL 8.65 / FR 8.89 / RL 9.18 / RR 8.76 ×10⁻⁴. FR·RL 은 중단된 판 일부 → 재시험 뒤 확정.
+                             #   예전 추정 9.7e-4 (데이터시트 로터 97.35 g·cm² × 기어비² 100) 와 10 % 안.
+                             #   amr/notes_amr/CAN/BENCH_RESULTS_KO.md
+motor:
+  tau_rated_Nm: 1.3          # 정격. 1판 식-21 의 τ_lim
+  tau_peak_Nm:  4.1          # 피크. 시뮬 플랜트·ak40_can_node 의 하드 클램프
+  damping_kd:   0.02         # 추정. MODE_DAMPING 정지의 MIT kd [N·m·s/rad].
+                             #   시뮬에서 4 kg 차체가 시정수 약 0.08 s 로 선다(4·kd/(r²·m)).
+                             #   바퀴 띄운 시험 → 바닥 제동 거리로 정한다 (To do 1절)
+
+# ── 구동계 마찰 τ_fric(ω) = sign(ω)·coulomb + viscous·ω  [N·m]
+#    쓰는 곳: torque_output (MPC·PI 토크에 미리 더해 지운다), sim_plant_torque (플랜트의 실제 마찰, × friction_scale),
+#             MPC·PI 상한 τ̄ = τ_lim − tau_fric_max (보상 몫을 남긴다)
+#    2026-11-12 R2 리뷰: 팀원 벤치(바퀴 띄움, 개루프 토크 0.02~0.1 N·m, 10 rad/s 까지) 4개 평균을 넣는다.
+#      바퀴별 τc  FL 0.0280 / FR 0.0279 / RL 0.0239 / RR 0.0253 N·m
+#      바퀴별 bv  FL 0.00113 / FR 0.00235 / RL 0.00221 / RR 0.00080 N·m·s/rad   (amr/notes_amr/CAN/BENCH_RESULTS_KO.md)
+#    ★ 무부하 값이다. 차체 하중이 실리면 베어링 마찰이 늘 수 있다. 10 rad/s 위는 외삽. 반복 재현성 미확인.
+#      바닥 위 주행으로 보상이 맞는지 확인한다 (일정 속도 직진에서 d̂ 의 x 성분 ≈ 0 인지)
+#    이전 값(2026-11-10 결정): 모두 0 — 시뮬에 마찰이 없어서 0 과 0 이 맞았다.
+friction:
+  coulomb_Nm: 0.026
+  viscous_Nms_per_rad: 0.0016
+  tau_fric_max_Nm: 0.1       # ≥ coulomb + viscous·ω_max = 0.026 + 0.0016 × 45.5 (V 범위 끝) = 0.099.
+                             #   B 상한 τ̄ = 1.3 − 0.1 = 1.2 N·m. C 는 τ_μ(0.067) 가 더 작아 영향 없음
+
+# ── 노면 (C 비교군의 마찰 토크 상한 τ_μ = (r/√2)·μ̂·(m g/4)·c_s, 1판 식-21)
+surface:
+  mu_hat: 0.3                # 추정. 노면마다 토크 램프 시험 (To do 2절)
+  c_s: 0.8                   # 안전계수
+
+# ── 모델 스위치 (MPC 예측 모델과 시뮬 플랜트가 같이 쓴다 — 1판 통과시험은 "플랜트 = 모델")
+model:
+  use_wheel_inertia: false   # true 면 M_eff = diag(m+μ, m+μ, I_z+μk²), μ = 4J_w/r², 그리고
+                             #   바퀴 반영 관성 항 w = M_eff⁻¹[μ ω_z S Ẋ_xy; 0] 을 넣는다 (1판 식-3~6).
+                             #   false 면 10/29 방향 정리의 "휠 관성 무시" 모델: M = diag(m, m, I_z), w = 0.
+  gravity: 9.81

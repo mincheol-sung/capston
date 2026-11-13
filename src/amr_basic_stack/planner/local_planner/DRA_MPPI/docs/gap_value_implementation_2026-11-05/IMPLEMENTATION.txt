@@ -1,0 +1,107 @@
+2026-11-05: 운영 gap 전략의 도달점/가치 최적화 및 가변 샘플 배분
+
+구현 범위
+  전후방 LiDAR -> 기존 feasible 깊이/급변 gap 분할
+  -> 일반 gap 중앙, 360도 열린 구역은 네 방향 probe
+  -> 방향별 도달거리 최대화 -> 해당 도달점에서 비용 최소화
+  -> 충돌/도달/중복 검사 -> 최대 3개 선택
+  -> nominal 포함 비용 기반 총 500개 배분 -> 기존 MPPI 및 최종 위험 검사.
+
+최대거리 단계
+  u_t = [vx, vy, omega] 전체를 변수로 사용한다.
+  heading 비용 없이 종단의 gap 방향 투영 거리를 최대화한다.
+  속도 box, 현재 속도에서 이어지는 가속도, wheel L1 제한을 적용한다.
+  |vx| + |vy| + 0.19835 |omega| <= 0.78 m/s.
+  종단 수직 투영 = 0, 종단 방향 이동 >= 0.25m,
+  모든 시점의 방향 투영 <= LiDAR 깊이 d(theta).
+  실제 회전/병진 적분을 사용한다. omega를 0으로 강제하지 않는다.
+  장애물 없는 거리와 d의 min만 취하는 선형 근사가 아니라,
+  d와 입력 제약을 함께 적용한 비선형 국소 최대거리 해다.
+
+비용 단계
+  최대거리 단계에서 구한 종단 거리를 1cm 안에서 유지한다.
+  J = 8 ||p_N - p_ref||^2
+    + 4 mean((gap 수직 방향으로의 위치)^2)
+    + 3 mean((unwrapped yaw - 공통 경로 heading)^2)
+    + mean(delta_u^T diag(0.5, 0.5, 0.055) delta_u).
+  p_ref는 모든 후보에서 공통: 경로 투영 진행도 + desired_speed * horizon.
+  horizon은 10 * 0.2s = 2초. 경로 끝에서 제한한다.
+  LiDAR로 gap이 짧아져도 공통 p_ref를 gap 목표점으로 바꾸지 않는다.
+  정적/동적 장애물 비용은 이 목적함수에 없다. 별도 swept 검사와 MPPI 위험 검사는 유지한다.
+  SLSQP와 해석 Jacobian을 사용하며 전역 최적성 보장은 없다.
+
+배분
+  nominal 최소 100, 선택된 gap 각각 최소 30.
+  남은 개수는 20% 균등 + 80% exp(-(J-min J)/tau) 정규화로 배분한다.
+  tau = max(1, median(J-min J)), nominal도 같은 경쟁에 참여한다.
+  소수점 잔여가 큰 순서로 정수 보정하며 정확히 총 500.
+  추가 gap이 없으면 nominal 500. 독립 감속 Stop은 별도 최종 후보다.
+  예전 rollouts_per_guide 설정은 호환성 입력이며 새 배분에는 영향이 없다.
+
+시간/재사용
+  전체 후보 준비/최적화 예산 50ms, 전체 180ms 중 MPPI용 100ms를 남기는
+  시각 중 더 이른 시각을 deadline으로 사용한다.
+  제약/충돌을 재검사한 이전 seed 또는 기존 규칙 기반 seed를 먼저 준비한다.
+  남은 시간에 reach/value를 풀며 순환 순서로 다음 주기에 다른 방향부터 시작한다.
+  미수렴/시간 초과 해를 최적해로 취급하지 않는다.
+  seed_source = optimized / reused / fallback / none을 진단에 기록한다.
+  이전 seed는 gap ID 대신 회전 보정 각도 구간 Jaccard >= 0.5 및 방향차 <=20도로 대응.
+  최대 나이 0.6s, 위치 변화 0.5m 이내. 경과 cycle만큼 제어열을 shift한다.
+  재사용 때 현재 입력 제약, 깊이, swept 충돌, 이동량, 비용을 다시 계산한다.
+  nominal은 실제 최종 선택 제어열을 한 step shift한 값이다.
+  시간 초과 시 결과를 폐기/hold하며 warm state를 reset한다.
+  평가/반복 경계에서 cooperative deadline을 검사하고 worker를 drain한다.
+  50ms/180ms는 OS 수준 강제 실행시간 상한이 아니다.
+
+검증
+  전체 package pytest: 259 passed, 3.96s.
+  관련 gap 테스트: 36 passed.
+  도함수 central difference, 실제 rollout 일치, 두 단계 비용 구분,
+  배분 정수 합계/최소치/nominal 경쟁, deadline fallback, 360도 처리,
+  world 좌표 변환 불변성, cache 회전/유효기간/장애물 재검사 등 포함.
+  colcon build --packages-select dra_mppi --symlink-install: 성공 (1.01s).
+  설치된 package로 standard / guide_conditioned / gap ROS 초기화 성공.
+  ROS_DOMAIN_ID=201, spin 없이 초기화/파괴만 수행; 제어 명령 발행 없음.
+  git diff --check: 통과.
+
+실제 bag snapshot 재생 (validation.json)
+  원본 MCAP에서 앞선 실험 때 추출/검증한 전후방 scan, 지도, 경로,
+  nominal, 정렬된 동적 예측을 사용했다. 출처는 원 실험 raw_sources.json 및
+  validation.json의 sources에 기록되어 있다.
+  새 실행에서는 저장된 원시 snapshot을 운영 gap compute에 입력했다.
+  3개 bag, 16개 장면, 장면당 12회 = 192회. 동적 예측 포함 장면 6개.
+  매 반복의 nominal은 기록값으로 되돌리며 cache/worker는 유지했다.
+  이는 동일 장면 반복이며 연속 시각의 폐루프 주행 재생이 아니다.
+  결과: 정상 191, 시간 초과 폐기 1 (b1_030의 첫 cycle, worker deadline).
+  평균 109.918ms, p95 158.559ms, p99 174.292ms, 최대 190.009ms.
+  180ms 초과 1, 200ms 초과 0. 시간 초과도 통계에 포함했다.
+  정상 반환된 모든 cycle에서 샘플 합계 500/최소 배분/shifted nominal을 assert.
+  후보 출처: optimized 399, reused 97, fallback 111.
+  선택된 추가 seed: optimized 295, reused 77, fallback 80.
+  예: b2_060 trial 11은 [nominal, G1, G2, G3] = [138, 171, 141, 50].
+      각 비용은 [17.463, 3.055, 5.317, 31.228]. G3는 재검사된 reused seed.
+      타이밍에 따라 solver 완료/재사용 여부와 배분은 바뀔 수 있다.
+
+추가 cold-start 검사 (safety_check/validation.json)
+  16개 장면 각 1회. 정상 15, 시간 초과 폐기 1 (b1_030).
+  최대 197.132ms, 200ms 초과 0. 정상 15회는 선택 경로의 정적 충돌 없음,
+  최종 동적 충돌확률 <= configured hard_threshold(0.05)를 명시적으로 assert.
+  정상 선택의 최대 동적 충돌확률 7.9611e-11.
+  이 숫자는 해당 snapshot 선택 결과이지 전체 환경에서의 안전 보장은 아니다.
+
+실시간성의 범위
+  포함: scan/map fuse, depth/partition, budgeted solve, 500개 MPPI,
+        실제 1차 MC/최종 Gaussian disk 및 정적 swept 검사.
+  제외: ROS callback 입출력/TF/deskew, prediction alignment, 발행,
+        perception 등 다른 노드와의 동시 실행 부하.
+  따라서 이번 측정은 전체 시스템 5Hz를 보장하지 않는다.
+  180ms timeout이 실제로 발생하므로 cold-start와 동시 부하를 포함한
+  현장 전체 callback 측정이 다음 검증 항목이다.
+
+재현 (workspace root에서)
+  source /opt/ros/jazzy/setup.bash
+  source /home/smoc/2026amr_ws/install/setup.bash
+  PYTHONPATH="$PWD/planner/local_planner/DRA_MPPI:$PYTHONPATH" OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 /usr/bin/python3 planner/local_planner/DRA_MPPI/tools/validate_gap_value_strategy.py
+
+현재 YAML은 mppi.strategy: gap이다. 설정을 읽는 노드를 재시작하면 적용된다.
+실행 중인 주행 노드나 하드웨어를 이 작업에서 재시작하지 않았다.

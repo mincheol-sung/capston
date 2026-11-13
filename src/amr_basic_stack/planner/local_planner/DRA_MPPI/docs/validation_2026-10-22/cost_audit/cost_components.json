@@ -1,0 +1,4357 @@
+{
+  "rows": [
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "path_error",
+      "raw": 0.03456665569107848,
+      "weighted": 9.65235784133642,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "progress",
+      "raw": -1.150040176656769,
+      "weighted": -7.146880830260697,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "heading",
+      "raw": 0.05462168806040428,
+      "weighted": 0.38527931728275466,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "speed",
+      "raw": 0.04373291637269194,
+      "weighted": 0.16951158860483378,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "rotation",
+      "raw": 0.12433519597593065,
+      "weighted": 0.036178761748558476,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_x",
+      "raw": 0.02474056969151089,
+      "weighted": 0.007965123946491303,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_y",
+      "raw": 0.003279378839753236,
+      "weighted": 0.00035506223648976577,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_omega",
+      "raw": 0.050405085593494124,
+      "weighted": 0.0038634070344785946,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "dynamic_probability",
+      "raw": 0.1727640082587068,
+      "weighted": 2.2748338358879536,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "dynamic_exceedances",
+      "raw": 5.75,
+      "weighted": 500000.0,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "static",
+      "raw": 2.3390699155352888,
+      "weighted": 0.40384016359139874,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "static_collision",
+      "raw": 0.95,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "path_error",
+      "raw": 0.1892224905394749,
+      "weighted": 13.982160102037483,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "progress",
+      "raw": -0.6414318562516526,
+      "weighted": -4.494254322204529,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "heading",
+      "raw": 0.034803843936490476,
+      "weighted": 0.06817205433907533,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "speed",
+      "raw": 0.2040386964838655,
+      "weighted": 0.42284953129905706,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "rotation",
+      "raw": 0.12025080392816216,
+      "weighted": 0.0205566379763165,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_x",
+      "raw": 0.016857404710945476,
+      "weighted": 0.00802290729424895,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_y",
+      "raw": 0.014791708399955389,
+      "weighted": 0.007280123481310955,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_omega",
+      "raw": 0.06071359030798691,
+      "weighted": 0.00392837817617844,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "dynamic_probability",
+      "raw": 0.06940501863187054,
+      "weighted": 0.9334138715815775,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "dynamic_exceedances",
+      "raw": 3.95,
+      "weighted": 360000.0,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "static",
+      "raw": 0.14888623294457817,
+      "weighted": 0.006885778568151411,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "static_collision",
+      "raw": 0.25,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 15
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "path_error",
+      "raw": 0.364812462657791,
+      "weighted": 23.347997610098624,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "progress",
+      "raw": -0.08043522893661606,
+      "weighted": -0.6434818314929285,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "heading",
+      "raw": 0.04097355248439809,
+      "weighted": 0.12292065745319428,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "speed",
+      "raw": 0.6236219237698154,
+      "weighted": 1.1100470243102711,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "rotation",
+      "raw": 0.12944949212400095,
+      "weighted": 0.021618065184708154,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_x",
+      "raw": 0.007663140633478613,
+      "weighted": 0.0038315703167393065,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_y",
+      "raw": 0.019412972117987704,
+      "weighted": 0.009706486058993852,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_omega",
+      "raw": 0.05345943875877801,
+      "weighted": 0.00294026913173279,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "dynamic_probability",
+      "raw": 0.0037576014548889015,
+      "weighted": 0.06763682618800022,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "dynamic_exceedances",
+      "raw": 0.35,
+      "weighted": 35000.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "path_error",
+      "raw": 0.18788289804556207,
+      "weighted": 13.660691285009865,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "progress",
+      "raw": -0.6653724913317597,
+      "weighted": -4.9364553417913495,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "heading",
+      "raw": 0.03925008027149276,
+      "weighted": 0.10543562340870852,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "speed",
+      "raw": 0.1878794422845702,
+      "weighted": 0.369485167818314,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "rotation",
+      "raw": 0.14159891044159717,
+      "weighted": 0.023106880876018122,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_x",
+      "raw": 0.01598207602595113,
+      "weighted": 0.007676185261907158,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_y",
+      "raw": 0.014271452338381285,
+      "weighted": 0.007469000804752558,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_omega",
+      "raw": 0.051842585492140415,
+      "weighted": 0.002856282015685143,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "dynamic_probability",
+      "raw": 0.10842189231827608,
+      "weighted": 1.6240372702518955,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "dynamic_exceedances",
+      "raw": 4.75,
+      "weighted": 456250.0,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "static",
+      "raw": 0.09076664613645691,
+      "weighted": 0.025240010224462425,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "static_collision",
+      "raw": 0.2,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 16
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "path_error",
+      "raw": 0.37596716220305526,
+      "weighted": 24.061898380995537,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "progress",
+      "raw": -0.09688539764726713,
+      "weighted": -0.775083181178137,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "heading",
+      "raw": 0.04733626626237222,
+      "weighted": 0.14200879878711667,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "speed",
+      "raw": 0.6334740961412152,
+      "weighted": 1.127583891131363,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "rotation",
+      "raw": 0.14040302663809245,
+      "weighted": 0.023447305448561436,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_x",
+      "raw": 0.006593773963008318,
+      "weighted": 0.003296886981504159,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_y",
+      "raw": 0.019539702887472643,
+      "weighted": 0.009769851443736322,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_omega",
+      "raw": 0.06205756466742707,
+      "weighted": 0.003413166056708488,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "dynamic_probability",
+      "raw": 0.0032791398478816325,
+      "weighted": 0.05902451726186937,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "dynamic_exceedances",
+      "raw": 0.15,
+      "weighted": 15000.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "path_error",
+      "raw": 0.15081809127088155,
+      "weighted": 9.65235784133642,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "progress",
+      "raw": -0.8933601037825871,
+      "weighted": -7.146880830260697,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "heading",
+      "raw": 0.12842643909425155,
+      "weighted": 0.38527931728275466,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "speed",
+      "raw": 0.09523122955327741,
+      "weighted": 0.16951158860483378,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "rotation",
+      "raw": 0.21663929190753578,
+      "weighted": 0.036178761748558476,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_x",
+      "raw": 0.0159302478929826,
+      "weighted": 0.0079651239464913,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_y",
+      "raw": 0.0007101244729795315,
+      "weighted": 0.00035506223648976577,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_omega",
+      "raw": 0.07024376426324717,
+      "weighted": 0.0038634070344785946,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "dynamic_probability",
+      "raw": 0.1264652263362062,
+      "weighted": 2.2763740740517115,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "dynamic_exceedances",
+      "raw": 5.0,
+      "weighted": 500000.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "static",
+      "raw": 0.05048002044892484,
+      "weighted": 0.40384016359139874,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "path_error",
+      "raw": 0.24324140716181888,
+      "weighted": 15.567450058356409,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "progress",
+      "raw": -0.2722880375149915,
+      "weighted": -2.178304300119932,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "heading",
+      "raw": 0.019854367878483093,
+      "weighted": 0.05956310363544928,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "speed",
+      "raw": 0.39235938222701117,
+      "weighted": 0.6983997003640798,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "rotation",
+      "raw": 0.06167090639594748,
+      "weighted": 0.01029904136812323,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_x",
+      "raw": 0.017313368000308162,
+      "weighted": 0.008656684000154081,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_y",
+      "raw": 0.010370757468505878,
+      "weighted": 0.005185378734252939,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_omega",
+      "raw": 0.03718190660184237,
+      "weighted": 0.0020450048631013304,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "dynamic_probability",
+      "raw": 0.006688595862500701,
+      "weighted": 0.12039472552501262,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "path_error",
+      "raw": 0.2921838918906568,
+      "weighted": 18.699769081002035,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "progress",
+      "raw": -0.0,
+      "weighted": -0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "heading",
+      "raw": 0.0005558068589496367,
+      "weighted": 0.0016674205768489102,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "speed",
+      "raw": 0.6677447202092804,
+      "weighted": 1.1885856019725192,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "rotation",
+      "raw": 0.008876723259329911,
+      "weighted": 0.0014824127843080953,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_x",
+      "raw": 0.001422694164471578,
+      "weighted": 0.000711347082235789,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_y",
+      "raw": 0.014245105888178816,
+      "weighted": 0.007122552944089408,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_omega",
+      "raw": 0.00640476726715552,
+      "weighted": 0.0003522621996935536,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "dynamic_probability",
+      "raw": 0.00010839619318713245,
+      "weighted": 0.0019511314773683842,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "path_error",
+      "raw": 0.27337785885720833,
+      "weighted": 17.496182966861333,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "progress",
+      "raw": -0.28103651031873556,
+      "weighted": -2.2482920825498844,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "heading",
+      "raw": 0.1753885216842548,
+      "weighted": 0.5261655650527645,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "speed",
+      "raw": 0.380105001573931,
+      "weighted": 0.6765869028015972,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "rotation",
+      "raw": 0.40209858080533917,
+      "weighted": 0.06715046299449165,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_x",
+      "raw": 0.021116825900103463,
+      "weighted": 0.010558412950051731,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_y",
+      "raw": 0.01125027862834844,
+      "weighted": 0.00562513931417422,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_omega",
+      "raw": 0.11179864752658095,
+      "weighted": 0.006148925613961952,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "dynamic_probability",
+      "raw": 0.010384215745208902,
+      "weighted": 0.18691588341376023,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "path_error",
+      "raw": 0.3016740021251506,
+      "weighted": 19.30713613600964,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "progress",
+      "raw": -0.15630857545060395,
+      "weighted": -1.2504686036048316,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "heading",
+      "raw": 0.008328088220085073,
+      "weighted": 0.024984264660255218,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "speed",
+      "raw": 0.4515349450241242,
+      "weighted": 0.8037322021429412,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "rotation",
+      "raw": 0.020606017158393625,
+      "weighted": 0.0034412048654517357,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_x",
+      "raw": 0.0006388429092904894,
+      "weighted": 0.0003194214546452447,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_y",
+      "raw": 0.01873366803999245,
+      "weighted": 0.009366834019996224,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_omega",
+      "raw": 0.007118476203948651,
+      "weighted": 0.0003915161912171758,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "dynamic_probability",
+      "raw": 0.002356009506757739,
+      "weighted": 0.042408171121639304,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "path_error",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "progress",
+      "raw": -0.0,
+      "weighted": -0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "heading",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "speed",
+      "raw": 0.5625,
+      "weighted": 1.00125,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "rotation",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_x",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_y",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_omega",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "dynamic_probability",
+      "raw": 0.0001855763769183949,
+      "weighted": 0.003340374784531108,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "straight",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "path_error",
+      "raw": 0.8623341719102268,
+      "weighted": 55.18938700225451,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "progress",
+      "raw": -0.03776212648199377,
+      "weighted": -0.30209701185595017,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "heading",
+      "raw": 0.2150937058341905,
+      "weighted": 0.6452811175025716,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "speed",
+      "raw": 0.692173444292862,
+      "weighted": 1.2320687308412945,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "rotation",
+      "raw": 1.036585511552292,
+      "weighted": 0.17310978042923278,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_x",
+      "raw": 0.0177942905359146,
+      "weighted": 0.0088971452679573,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_y",
+      "raw": 0.009096086980158728,
+      "weighted": 0.004548043490079364,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_omega",
+      "raw": 0.27967336725692793,
+      "weighted": 0.015382035199131039,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "dynamic_probability",
+      "raw": 0.00043246636882923403,
+      "weighted": 0.007784394638926212,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "path_error",
+      "raw": 0.701458962475068,
+      "weighted": 44.89337359840435,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "progress",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "heading",
+      "raw": 0.18871531797788282,
+      "weighted": 0.5661459539336484,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "speed",
+      "raw": 1.0980203170132579,
+      "weighted": 1.9544761642835986,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "rotation",
+      "raw": 1.1093544282525336,
+      "weighted": 0.18526218951817314,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_x",
+      "raw": 0.012759252654755549,
+      "weighted": 0.006379626327377774,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_y",
+      "raw": 0.007833697807673314,
+      "weighted": 0.003916848903836657,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_omega",
+      "raw": 0.3188636247602926,
+      "weighted": 0.017537499361816096,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "dynamic_probability",
+      "raw": 8.714414609015121e-05,
+      "weighted": 0.0015685946296227216,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "path_error",
+      "raw": 0.3740808721659976,
+      "weighted": 23.941175818623847,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "progress",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "heading",
+      "raw": 0.20250505294646617,
+      "weighted": 0.6075151588393984,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "speed",
+      "raw": 1.0916188084270164,
+      "weighted": 1.9430814790000899,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "rotation",
+      "raw": 1.252833350580218,
+      "weighted": 0.2092231695468964,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_x",
+      "raw": 0.008484851605514609,
+      "weighted": 0.004242425802757304,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_y",
+      "raw": 0.012045855992516017,
+      "weighted": 0.006022927996258008,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_omega",
+      "raw": 0.3876811042481145,
+      "weighted": 0.0213224607336463,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "dynamic_probability",
+      "raw": 3.920381634334835e-05,
+      "weighted": 0.0007056686941802703,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "path_error",
+      "raw": 0.6787732647079766,
+      "weighted": 43.4414889413105,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "progress",
+      "raw": -0.48026284040114386,
+      "weighted": -3.842102723209151,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "heading",
+      "raw": 0.20342057474241787,
+      "weighted": 0.6102617242272538,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "speed",
+      "raw": 0.27733189723520246,
+      "weighted": 0.4936507770786605,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "rotation",
+      "raw": 1.0669059647526389,
+      "weighted": 0.1781732961136907,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_x",
+      "raw": 0.010892424300074881,
+      "weighted": 0.0054462121500374406,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_y",
+      "raw": 0.012385572988970155,
+      "weighted": 0.0061927864944850775,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_omega",
+      "raw": 0.28566712901848845,
+      "weighted": 0.015711692096016867,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "dynamic_probability",
+      "raw": 0.015063069649345895,
+      "weighted": 0.2711352536882261,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "dynamic_exceedances",
+      "raw": 0.65,
+      "weighted": 65000.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "path_error",
+      "raw": 0.2998376315532011,
+      "weighted": 24.815927365479588,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "progress",
+      "raw": -0.885387702282243,
+      "weighted": -6.57759048053956,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "heading",
+      "raw": 0.19027478881765553,
+      "weighted": 0.6805684268844278,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "speed",
+      "raw": 0.12722490814971493,
+      "weighted": 0.245390872877873,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "rotation",
+      "raw": 1.1522606446347343,
+      "weighted": 0.17160220140503163,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_x",
+      "raw": 0.014038631724302978,
+      "weighted": 0.006102222011241203,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_y",
+      "raw": 0.010429685180276711,
+      "weighted": 0.005842296016669942,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_omega",
+      "raw": 0.30018652250831634,
+      "weighted": 0.015462897925503006,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "dynamic_probability",
+      "raw": 0.0955882268946585,
+      "weighted": 1.2456384462867902,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "dynamic_exceedances",
+      "raw": 4.55,
+      "weighted": 440000.0,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "static",
+      "raw": 0.37727814409487115,
+      "weighted": 0.1166399945784086,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "static_collision",
+      "raw": 0.5,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 10
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "path_error",
+      "raw": 0.6566388007277044,
+      "weighted": 42.02488324657308,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "progress",
+      "raw": -0.08529505829377051,
+      "weighted": -0.6823604663501641,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "heading",
+      "raw": 0.1530291134314645,
+      "weighted": 0.45908734029439346,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "speed",
+      "raw": 0.5158567626507902,
+      "weighted": 0.9182250375184066,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "rotation",
+      "raw": 1.3890941457449157,
+      "weighted": 0.23197872233940095,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_x",
+      "raw": 0.018761634177054332,
+      "weighted": 0.009380817088527166,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_y",
+      "raw": 0.006662804621461545,
+      "weighted": 0.0033314023107307725,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_omega",
+      "raw": 0.30196456185527354,
+      "weighted": 0.016608050902040046,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "dynamic_probability",
+      "raw": 0.00033037686127910246,
+      "weighted": 0.0059467835030238446,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "path_error",
+      "raw": 0.48649768060762144,
+      "weighted": 31.135851558887772,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "progress",
+      "raw": -0.0,
+      "weighted": -0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "heading",
+      "raw": 0.1990866978468069,
+      "weighted": 0.5972600935404208,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "speed",
+      "raw": 1.0795910947223786,
+      "weighted": 1.921672148605834,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "rotation",
+      "raw": 1.1081985342092828,
+      "weighted": 0.18506915521295025,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_x",
+      "raw": 0.004908181117521236,
+      "weighted": 0.002454090558760618,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_y",
+      "raw": 0.0014507793842289632,
+      "weighted": 0.0007253896921144816,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_omega",
+      "raw": 0.3705228283701655,
+      "weighted": 0.0203787555603591,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "dynamic_probability",
+      "raw": 0.00013070934770339492,
+      "weighted": 0.0023527682586611085,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "path_error",
+      "raw": 0.2324822434126684,
+      "weighted": 14.878863578410778,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "progress",
+      "raw": -0.0,
+      "weighted": -0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "heading",
+      "raw": 0.2414744959464954,
+      "weighted": 0.7244234878394862,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "speed",
+      "raw": 1.0201212364576635,
+      "weighted": 1.815815800894641,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "rotation",
+      "raw": 0.7647761270700933,
+      "weighted": 0.1277176132207056,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_x",
+      "raw": 0.005806652858803906,
+      "weighted": 0.002903326429401953,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_y",
+      "raw": 0.010167002293023107,
+      "weighted": 0.005083501146511554,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_omega",
+      "raw": 0.2635859961443109,
+      "weighted": 0.0144972297879371,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "dynamic_probability",
+      "raw": 2.8468084467525577e-05,
+      "weighted": 0.0005124255204154603,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "path_error",
+      "raw": 0.5586955919562275,
+      "weighted": 35.75651788519856,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "progress",
+      "raw": -0.5126841851404031,
+      "weighted": -4.101473481123225,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "heading",
+      "raw": 0.1924901211594789,
+      "weighted": 0.5774703634784366,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "speed",
+      "raw": 0.25060503375591936,
+      "weighted": 0.4460769600855365,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "rotation",
+      "raw": 1.0574465490393417,
+      "weighted": 0.17659357368957007,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_x",
+      "raw": 0.009421476434793612,
+      "weighted": 0.004710738217396806,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_y",
+      "raw": 0.016395115902300823,
+      "weighted": 0.008197557951150411,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_omega",
+      "raw": 0.16688788577943273,
+      "weighted": 0.0091788337178688,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "dynamic_probability",
+      "raw": 0.012182422481826072,
+      "weighted": 0.2192836046728693,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "path_error",
+      "raw": 0.12148380996511463,
+      "weighted": 7.774963837767336,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "progress",
+      "raw": -0.620421245155841,
+      "weighted": -4.963369961246728,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "heading",
+      "raw": 0.13174809880426946,
+      "weighted": 0.3952442964128084,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "speed",
+      "raw": 0.20366973679856476,
+      "weighted": 0.36253213150144525,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "rotation",
+      "raw": 2.253485700995737,
+      "weighted": 0.3763321120662881,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_x",
+      "raw": 0.0105650828521651,
+      "weighted": 0.00528254142608255,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_y",
+      "raw": 0.014836961982428096,
+      "weighted": 0.007418480991214048,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_omega",
+      "raw": 0.7424123218323121,
+      "weighted": 0.04083267770077716,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "dynamic_probability",
+      "raw": 0.05102276967325997,
+      "weighted": 0.9184098541186795,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "dynamic_exceedances",
+      "raw": 3.0,
+      "weighted": 300000.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "path_error",
+      "raw": 0.25,
+      "weighted": 16.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "progress",
+      "raw": -0.0,
+      "weighted": -0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "terminal",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "heading",
+      "raw": 0.9999999999999998,
+      "weighted": 2.999999999999999,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "speed",
+      "raw": 0.5625,
+      "weighted": 1.00125,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "rotation",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_x",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_y",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_omega",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "dynamic_probability",
+      "raw": 0.0006509081568284558,
+      "weighted": 0.011716346822912204,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "path_error",
+      "raw": 0.19980973564275786,
+      "weighted": 12.787823081136503,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "progress",
+      "raw": -0.20000000000000018,
+      "weighted": -1.6000000000000014,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "terminal",
+      "raw": 0.6449156425252549,
+      "weighted": 15.477975420606123,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "heading",
+      "raw": 0.058619635031715966,
+      "weighted": 0.17585890509514795,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "speed",
+      "raw": 0.18900994337806176,
+      "weighted": 0.33643769921294997,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "rotation",
+      "raw": 0.2233744963766227,
+      "weighted": 0.03730354089489599,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_x",
+      "raw": 0.02959934400824115,
+      "weighted": 0.014799672004120575,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_y",
+      "raw": 0.004692553267660725,
+      "weighted": 0.0023462766338303623,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "delta_omega",
+      "raw": 0.16066138944396885,
+      "weighted": 0.008836376419418288,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "dynamic_probability",
+      "raw": 3.206830156359031e-05,
+      "weighted": 0.0005772294281446256,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+0",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "path_error",
+      "raw": 0.2996654096891485,
+      "weighted": 19.178586220105505,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "progress",
+      "raw": -0.17098067552344431,
+      "weighted": -1.3678454041875545,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "terminal",
+      "raw": 0.823564402741526,
+      "weighted": 19.765545665796626,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "heading",
+      "raw": 0.03586056616164719,
+      "weighted": 0.10758169848494159,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "speed",
+      "raw": 0.09290938515449079,
+      "weighted": 0.16537870557499362,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "rotation",
+      "raw": 0.22151629424171623,
+      "weighted": 0.0369932211383666,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_x",
+      "raw": 0.012152113728791257,
+      "weighted": 0.006076056864395629,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_y",
+      "raw": 0.01210154346363749,
+      "weighted": 0.006050771731818745,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "delta_omega",
+      "raw": 0.1971333599910448,
+      "weighted": 0.010842334799507464,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "dynamic_probability",
+      "raw": 0.0012221727967608226,
+      "weighted": 0.021999110341694807,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "path_error",
+      "raw": 0.3215946540906065,
+      "weighted": 20.582057861798816,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "progress",
+      "raw": 0.35505168384548164,
+      "weighted": 2.840413470763853,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "terminal",
+      "raw": 1.202115194793779,
+      "weighted": 28.85076467505069,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "heading",
+      "raw": 0.04124755862244862,
+      "weighted": 0.12374267586734586,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "speed",
+      "raw": 0.14720978275282787,
+      "weighted": 0.2620334133000336,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "rotation",
+      "raw": 0.2337053425570778,
+      "weighted": 0.039028792207032,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_x",
+      "raw": 0.0077350980422785124,
+      "weighted": 0.0038675490211392562,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_y",
+      "raw": 0.01808978355636216,
+      "weighted": 0.00904489177818108,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "delta_omega",
+      "raw": 0.21520584196220502,
+      "weighted": 0.011836321307921276,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "dynamic_probability",
+      "raw": 0.05576782296789393,
+      "weighted": 1.0038208134220905,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "dynamic_exceedances",
+      "raw": 3.8,
+      "weighted": 380000.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_+90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "path_error",
+      "raw": 0.2116010241375518,
+      "weighted": 13.542465544803315,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "progress",
+      "raw": -0.20000000000000018,
+      "weighted": -1.6000000000000014,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "terminal",
+      "raw": 0.6460080721852728,
+      "weighted": 15.504193732446543,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "heading",
+      "raw": 0.0409571904927363,
+      "weighted": 0.12287157147820889,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "speed",
+      "raw": 0.18605469771654323,
+      "weighted": 0.33117736193544695,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "rotation",
+      "raw": 0.2455403908346639,
+      "weighted": 0.04100524526938887,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_x",
+      "raw": 0.014202285205559962,
+      "weighted": 0.007101142602779981,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_y",
+      "raw": 0.009710946387328038,
+      "weighted": 0.004855473193664019,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "delta_omega",
+      "raw": 0.18871687773084425,
+      "weighted": 0.010379428275196431,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "dynamic_probability",
+      "raw": 5.197895138922105e-05,
+      "weighted": 0.0009356211250059786,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "path_error",
+      "raw": 0.3501343160298129,
+      "weighted": 22.408596225908024,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "progress",
+      "raw": -0.11321442811318587,
+      "weighted": -0.905715424905487,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "terminal",
+      "raw": 0.9719816402292676,
+      "weighted": 23.327559365502417,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "heading",
+      "raw": 0.04302949156974274,
+      "weighted": 0.1290884747092282,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "speed",
+      "raw": 0.0872121933903499,
+      "weighted": 0.1552377042348228,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "rotation",
+      "raw": 0.25009392648085826,
+      "weighted": 0.04176568572230334,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_x",
+      "raw": 0.00674667961753434,
+      "weighted": 0.00337333980876717,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_y",
+      "raw": 0.018611777789599094,
+      "weighted": 0.009305888894799547,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "delta_omega",
+      "raw": 0.2257376873426465,
+      "weighted": 0.012415572803845554,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "dynamic_probability",
+      "raw": 0.004642890443854965,
+      "weighted": 0.08357202798938937,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "dynamic_exceedances",
+      "raw": 0.2,
+      "weighted": 20000.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "primary_mean",
+      "guide": "guide_-90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 20,
+      "valid_count": 20
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "path_error",
+      "raw": 0.0723607214240963,
+      "weighted": 4.631086171142163,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "progress",
+      "raw": -0.20000000000000018,
+      "weighted": -1.6000000000000014,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "terminal",
+      "raw": 0.2979692236034338,
+      "weighted": 7.151261366482411,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "heading",
+      "raw": 0.009561067527115297,
+      "weighted": 0.028683202581345893,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "speed",
+      "raw": 0.13496423329086776,
+      "weighted": 0.24023633525774463,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "rotation",
+      "raw": 0.1513888943534811,
+      "weighted": 0.025281945357031346,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_x",
+      "raw": 0.024902791735597705,
+      "weighted": 0.012451395867798852,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_y",
+      "raw": 0.002593892087942521,
+      "weighted": 0.0012969460439712604,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "delta_omega",
+      "raw": 0.11313939887026367,
+      "weighted": 0.006222666937864502,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "dynamic_probability",
+      "raw": 4.894301254348976e-05,
+      "weighted": 0.0008809742257828157,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+0",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "path_error",
+      "raw": 0.1908463677316153,
+      "weighted": 12.21416753482338,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "progress",
+      "raw": -0.20000000000000018,
+      "weighted": -1.6000000000000014,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "terminal",
+      "raw": 0.5515320184036179,
+      "weighted": 13.236768441686829,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "heading",
+      "raw": 0.005977789551627755,
+      "weighted": 0.017933368654883264,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "speed",
+      "raw": 0.07695648413343323,
+      "weighted": 0.13698254175751115,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "rotation",
+      "raw": 0.09825921944190236,
+      "weighted": 0.016409289646797696,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_x",
+      "raw": 0.007018696557646409,
+      "weighted": 0.0035093482788232043,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_y",
+      "raw": 0.0037826415456337207,
+      "weighted": 0.0018913207728168604,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "delta_omega",
+      "raw": 0.08704533697666277,
+      "weighted": 0.004787493533716452,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "dynamic_probability",
+      "raw": 0.0001433629172455264,
+      "weighted": 0.0025805325104194753,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "path_error",
+      "raw": 0.3443890044159575,
+      "weighted": 22.04089628262128,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "progress",
+      "raw": -0.20000000000000018,
+      "weighted": -1.6000000000000014,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "terminal",
+      "raw": 0.947698451551452,
+      "weighted": 22.74476283723485,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "heading",
+      "raw": 0.12189434551990921,
+      "weighted": 0.36568303655972767,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "speed",
+      "raw": 0.10830595289401423,
+      "weighted": 0.19278459615134533,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "rotation",
+      "raw": 0.4775171347757675,
+      "weighted": 0.07974536150755318,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_x",
+      "raw": 0.003672166525698204,
+      "weighted": 0.001836083262849102,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_y",
+      "raw": 0.014645744548825454,
+      "weighted": 0.007322872274412727,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "delta_omega",
+      "raw": 0.22802742791990055,
+      "weighted": 0.01254150853559453,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "dynamic_probability",
+      "raw": 0.0022007617694331572,
+      "weighted": 0.03961371184979683,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_+90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "path_error",
+      "raw": 0.1310693998210608,
+      "weighted": 8.388441588547892,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "progress",
+      "raw": -0.20000000000000018,
+      "weighted": -1.6000000000000014,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "terminal",
+      "raw": 0.45335362928510464,
+      "weighted": 10.880487102842512,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "heading",
+      "raw": 0.016026056279857516,
+      "weighted": 0.04807816883957255,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "speed",
+      "raw": 0.18446728023907175,
+      "weighted": 0.32835175882554773,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "rotation",
+      "raw": 0.09506344274360144,
+      "weighted": 0.015875594938181442,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_x",
+      "raw": 0.006132151947972899,
+      "weighted": 0.0030660759739864494,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_y",
+      "raw": 0.004633330851686334,
+      "weighted": 0.002316665425843167,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "delta_omega",
+      "raw": 0.13834939149458078,
+      "weighted": 0.007609216532201943,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "dynamic_probability",
+      "raw": 5.7398640302808165e-05,
+      "weighted": 0.001033175525450547,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-45",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "path_error",
+      "raw": 0.24621509277500048,
+      "weighted": 15.75776593760003,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "progress",
+      "raw": -0.20000000000000018,
+      "weighted": -1.6000000000000014,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "terminal",
+      "raw": 0.6948454185876934,
+      "weighted": 16.676290046104643,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "heading",
+      "raw": 0.03229083871911662,
+      "weighted": 0.09687251615734987,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "speed",
+      "raw": 0.09534992064664445,
+      "weighted": 0.16972285875102713,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "rotation",
+      "raw": 0.20664376226266606,
+      "weighted": 0.034509508297865234,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_x",
+      "raw": 0.005311042458407303,
+      "weighted": 0.0026555212292036514,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_y",
+      "raw": 0.019602640318537916,
+      "weighted": 0.009801320159268958,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "delta_omega",
+      "raw": 0.28644350253978657,
+      "weighted": 0.01575439263968826,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "dynamic_probability",
+      "raw": 0.00019977303557586757,
+      "weighted": 0.0035959146403656164,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "guide_-90",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "path_error",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "progress",
+      "raw": -0.0,
+      "weighted": -0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "terminal",
+      "raw": 0.04000000000000007,
+      "weighted": 0.9600000000000017,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "heading",
+      "raw": 0.04466351087439391,
+      "weighted": 0.13399053262318172,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "speed",
+      "raw": 0.06250000000000004,
+      "weighted": 0.11125000000000007,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "rotation",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_x",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_y",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "delta_omega",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "dynamic_probability",
+      "raw": 0.0031882939296883238,
+      "weighted": 0.05738929073438983,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "dynamic_exceedances",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "static",
+      "raw": 0.0,
+      "weighted": 0.0,
+      "count": 1,
+      "valid_count": 1
+    },
+    {
+      "scenario": "near_goal",
+      "scope": "representative",
+      "guide": "stop",
+      "term": "static_collision",
+      "raw": 0.0,
+      "weighted": null,
+      "count": 1,
+      "valid_count": 1
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario": "straight",
+      "selected": "guide_+45",
+      "safety_status": "ok",
+      "final_costs": [
+        500005.7888445096,
+        14.293689396726652,
+        19.9016418100391,
+        16.727042176452247,
+        18.941311146860954,
+        1.004590374784531
+      ],
+      "reasons": [
+        "representative_dynamic_risk",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "scenario": "offpath_yaw90",
+      "selected": "guide_+90",
+      "safety_status": "ok",
+      "final_costs": [
+        42.98708093417944,
+        33.865763960316876,
+        17.569816963249878,
+        33.09655603588816,
+        300004.9176459707,
+        20.01296634682291
+      ],
+      "reasons": [
+        "",
+        "",
+        "",
+        "",
+        "representative_dynamic_risk"
+      ]
+    },
+    {
+      "scenario": "near_goal",
+      "selected": "guide_+0",
+      "safety_status": "ok",
+      "final_costs": [
+        10.497401003896112,
+        24.035029871665174,
+        43.885186289997414,
+        18.075259347451187,
+        31.16696801557944,
+        1.2626298233575735
+      ],
+      "reasons": [
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    }
+  ],
+  "scope": "offline raw/weighted decomposition, not latency"
+}

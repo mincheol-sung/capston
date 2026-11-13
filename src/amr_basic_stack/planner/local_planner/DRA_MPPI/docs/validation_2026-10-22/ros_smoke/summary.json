@@ -1,0 +1,90 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 15,
+  "normal_optimizer_cycles": 13,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 10,
+  "callback_over_200ms_ratio": 0.6666666666666666,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 15,
+    "mean": 198.77642908444008,
+    "p50": 219.971431652084,
+    "p95": 250.68090218119323,
+    "p99": 255.83512431941926,
+    "max": 257.1236798539758
+  },
+  "backend": "split",
+  "workers": 2,
+  "frozen_nominal": false,
+  "statuses": {
+    "stale_map": 1,
+    "normal": 13,
+    "stale_prediction": 1
+  },
+  "fallback_ratio": 0.13333333333333333,
+  "deadline_miss_ratio": 0.8666666666666667,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 15,
+    "mean": 176.4657783942918,
+    "p50": 202.52975611947477,
+    "p95": 213.86653678491712,
+    "p99": 216.91299049183726,
+    "max": 217.6746039185673
+  },
+  "normal_optimizer_ms": {
+    "count": 13,
+    "mean": 200.04048169805452,
+    "p50": 199.50229907408357,
+    "p95": 210.6145089957863,
+    "p99": 212.63811700977385,
+    "max": 213.14401901327074
+  },
+  "start_delay_ms": {
+    "count": 15,
+    "mean": 24.268932004148763,
+    "p50": 19.1091385204345,
+    "p95": 52.43542559910565,
+    "p99": 55.70040261838585,
+    "max": 56.5166468732059
+  },
+  "deadline_lateness_ms": {
+    "count": 15,
+    "mean": 24.052428367237244,
+    "p50": 22.109527559950937,
+    "p95": 52.472829446196535,
+    "p99": 57.922642566263654,
+    "max": 59.28509584628044
+  },
+  "publish_interval_ms": {
+    "count": 15,
+    "mean": 217.1246620050321,
+    "p50": 207.07799796946347,
+    "p95": 371.47748826537276,
+    "p99": 403.9937767805531,
+    "max": 412.12284890934825
+  },
+  "receive_interval_ms": {
+    "count": 15,
+    "mean": 217.12867620711526,
+    "p50": 207.12053100578487,
+    "p95": 371.57638717908407,
+    "p99": 404.0580039331689,
+    "max": 412.17840812169015
+  },
+  "receive_count_in_window": 15,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 18,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 3,
+  "obstacles": 5,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

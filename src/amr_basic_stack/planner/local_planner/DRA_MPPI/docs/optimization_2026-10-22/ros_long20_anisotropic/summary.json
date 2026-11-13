@@ -1,0 +1,49 @@
+{
+  "scope": "Interrupted synthetic ROS DDS run; 3000 target NOT completed",
+  "interrupted_to_finish_promptly": true,
+  "cycles": 1297,
+  "warmup": 50,
+  "statuses": {
+    "normal": 1296,
+    "exception": 1
+  },
+  "selected": {
+    "guide_+90": 1296,
+    "null": 1
+  },
+  "all_callback_ms": {
+    "count": 1297,
+    "mean": 111.34398453897649,
+    "p99": 126.1999857611954,
+    "max": 136.88892708159983
+  },
+  "scheduled_response_ms": {
+    "count": 1296,
+    "mean": 116.89666627074827,
+    "p99": 129.39107870915905,
+    "max": 137.41473550908267
+  },
+  "publish_interval_ms": {
+    "count": 1296,
+    "mean": 199.99805566036275,
+    "p99": 219.02727540582418,
+    "max": 228.45946089364588
+  },
+  "timeout_count": 0,
+  "callback_over_200ms_count": 0,
+  "primary_unresolved": 0,
+  "final_unresolved": 0,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 1347,
+    "dropped": 0,
+    "error": null
+  },
+  "interruption_note": "SIGINT; recorder flushed completely. ROS already-shutdown exception prevented original summary/telemetry finalization. This summary reconstructed from raw cycle records.",
+  "completed_normal_cycles": 1296,
+  "completed_normal_callback_ms": {
+    "p99": 126.20427669025956,
+    "max": 136.88892708159983
+  },
+  "interrupted_cycle_count": 1
+}

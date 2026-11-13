@@ -1,0 +1,46 @@
+{
+  "scope": "synthetic perturbations around zero measured body twist; not measured estimator noise",
+  "seed": 20261022,
+  "samples": [
+    {
+      "translation_sigma_mps": 0.0,
+      "rotation_sigma_radps": 0.0,
+      "trials": 30,
+      "zero_noise_relative_translation_change_mean_mps": 0.0,
+      "zero_noise_relative_rotation_change_mean_radps": 0.0,
+      "selected_counts": {
+        "guide_+0": 30
+      }
+    },
+    {
+      "translation_sigma_mps": 0.01,
+      "rotation_sigma_radps": 0.03,
+      "trials": 30,
+      "zero_noise_relative_translation_change_mean_mps": 0.008681517442318577,
+      "zero_noise_relative_rotation_change_mean_radps": 0.011895911019295468,
+      "selected_counts": {
+        "guide_+0": 30
+      }
+    },
+    {
+      "translation_sigma_mps": 0.03,
+      "rotation_sigma_radps": 0.09,
+      "trials": 30,
+      "zero_noise_relative_translation_change_mean_mps": 0.020412439696300317,
+      "zero_noise_relative_rotation_change_mean_radps": 0.029223510899403678,
+      "selected_counts": {
+        "guide_+0": 30
+      }
+    },
+    {
+      "translation_sigma_mps": 0.1,
+      "rotation_sigma_radps": 0.30000000000000004,
+      "trials": 30,
+      "zero_noise_relative_translation_change_mean_mps": 0.0853681633661359,
+      "zero_noise_relative_rotation_change_mean_radps": 0.10608386936479729,
+      "selected_counts": {
+        "guide_+0": 30
+      }
+    }
+  ]
+}

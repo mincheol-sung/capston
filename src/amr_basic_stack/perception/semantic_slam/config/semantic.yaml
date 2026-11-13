@@ -1,0 +1,74 @@
+rgbd_detection_node:
+  ros__parameters:
+    publish_semantic: true
+    semantic_classes: [56, 60]
+    semantic_max_points: 512
+    semantic_max_objects: 8
+    semantic_debug_image: false
+    inference_hz: 5.0
+    openvino_device: AUTO
+    yolo_conf: 0.4
+
+semantic_slam_node:
+  ros__parameters:
+    save_period_sec: 10.0
+    map_frame: map
+    # Short-term association and movement are judged in odom, where map->odom
+    # correction jumps do not appear. Empty disables it (map only).
+    odom_frame: odom
+    odom_association_window: 5.0
+    # Fixed-map mode: a newly confirmed object within this distance of exactly one
+    # same-class object that was last seen before it first appeared is the same
+    # object re-created by a map->odom jump out of view. 0 disables.
+    duplicate_merge_distance: 1.5
+    require_localization: true
+    localization_topic: /odometry/map
+    localization_is_odometry: true
+    observation_max_age: 2.0
+    localization_timeout: 3.0
+    localization_settle_time: 2.0
+    max_pose_variance: 0.5
+    association_distance: 0.8
+    ambiguity_margin: 0.2
+    confirm_count: 3
+    min_observation_interval: 0.3
+    stale_after: 60.0
+    voxel_size: 0.05
+    max_points: 512
+    max_objects: 200
+    enable_cartographer_correction: true
+    cartographer_graph_id: ''  # Required: same saved graph/session only.
+    cartographer_tracking_frame: camera_gyro_frame
+    cartographer_trajectory_id: -1  # Auto only when exactly one is ACTIVE.
+    graph_max_interpolation_gap: 1.0
+    graph_max_anchors_per_object: 16
+    graph_max_nodes: 20000
+    graph_max_trajectories: 8
+    graph_poll_period: 1.0
+    graph_service_timeout: 3.0
+    graph_freshness: 3.0
+    graph_node_timeout: 5.0
+
+semantic_navigation_node:
+  ros__parameters:
+    map_frame: map
+    base_frame: base_footprint
+    enable_goal_dispatch: false
+    require_localization: true
+    require_pose_graph: true
+    localization_topic: /odometry/map
+    localization_is_odometry: true
+    odometry_topic: /odometry/filtered
+    object_freshness: 15.0
+    max_target_variance: 0.5
+    # Graph corrections below this target change [m] do not stop a dispatched mission.
+    target_change_tolerance: 0.1
+    standoff: 0.8
+    min_standoff: 0.5
+    max_standoff: 1.5
+    max_snap_distance: 0.2
+    mission_timeout: 120.0
+    reverify_timeout: 8.0
+    # Sentinel disables search. Replace with surveyed x,y,yaw triples in map.
+    search_viewpoints: [0.0]
+    max_search_views: 3

@@ -1,0 +1,20 @@
+/**:
+  ros__parameters:
+    mask_method: tracked_cluster
+    filter_policy: confirmed_person
+    tracked_observations_topic: /tracked_observations
+    # Explicit native sensor identity is required. These node sections match
+    # cartographer.launch.py. Custom sensors must override these identities.
+    observation_sensor_id: ''
+    observation_wait_timeout: 0.30
+    max_observation_lag: 0.75
+    max_observation_links: 2000
+    pending_queue_size: 5
+    history_duration: 2.0
+    person_label_timeout: 1.0
+dynamic_filter_front:
+  ros__parameters:
+    observation_sensor_id: /scan_front
+dynamic_filter_rear:
+  ros__parameters:
+    observation_sensor_id: /scan_rear

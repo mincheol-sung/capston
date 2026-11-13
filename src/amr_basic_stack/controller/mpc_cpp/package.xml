@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>amr_mpc_cpp</name>
+  <version>0.1.0</version>
+  <description>구조 B 바퀴 각속도 MPC 의 C++ 이식 (100 Hz). amr_mpc(Python) 와 같은 식·토픽, d 단 dead time, DAQP QP.</description>
+  <maintainer email="hw030918@pusan.ac.kr">smoc</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>ament_index_cpp</depend>
+  <depend>amr_interfaces</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>eigen</depend>
+  <depend>yaml_cpp_vendor</depend>
+  <!-- 물리값의 단일 출처 config/plant_wheel.yaml, 시뮬 플랜트·가짜 기준 노드 -->
+  <exec_depend>amr_mpc</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

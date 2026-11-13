@@ -1,0 +1,97 @@
+관측 대상 선정·종료 규칙의 실제 bag 검증 가능성
+작성: 2026-11-04
+
+결론
+- 실제 bag 3개 전체의 관련 메시지를 읽어 확인했다. 대상 선정용 입력과 기록상
+  종류 정보 갱신 사례가 있으므로 오프라인 규칙 검토가 가능하다.
+- 이 작업은 데이터/전환 사례 감사다. 대상 선택 알고리즘, 우선순위, 회전 동작,
+  성공 종료 상태 머신을 구현하거나 검증한 결과는 아니다.
+- 기록된 카메라 관측은 고정되어 있다. 새 heading에서 무엇이 보였을지 또는
+  관측 heading의 이득은 이 bag만으로 검증할 수 없다.
+
+원본: /home/smoc/2026amr_ws/bags/
+이름                       길이     관측된 ID  semantic_age<0인 ID  미분류→종류 갱신  그중 person
+mpc_chain_20260923_113151   287.99초     157           0                  0             0
+mpc_chain_20260923_135325   128.13초    1102        1056                 48             9
+mpc_chain_20260923_135606   350.75초    2500        2347                140            25
+
+주의: ID 수는 물리적 사람/물체 수가 아니다. 재생성·분할·재연결이 포함될 수 있다.
+전환 수는 같은 ID의 연속 표본에서 semantic_age<0 → >=0인 사건 수이며,
+동일 물체 식별이나 카메라 분류의 정답 여부를 검증한 수가 아니다.
+연속 비교는 두 표본의 header 시각 차이가 (0, 0.5]초인 경우만 사용했다.
+semantic_age>1초 → [0, 0.15]초로 바뀌는 기록상 갱신은 각각 1/40/45회다.
+이는 추적기의 갱신이며 서로 다른 새 카메라 프레임임을 증명하지 않는다.
+
+bag별 판단
+1) 113151
+   /lidar_clusters는 2,833 메시지, 81,607 클러스터 표본으로 존재한다.
+   그러나 /tracked_object_modes의 last_measurement_source=1 표본은 0개,
+   semantic_age<0 표본도 0개다. /detections_tracking 토픽은 없다.
+   따라서 기록된 트랙만으로 LiDAR 전용 미분류 대상 선정 실험을 하기 어렵다.
+   클러스터와 검출 입력을 다시 추적하는 별도 오프라인 재처리가 필요하다.
+2) 135325, 135606
+   /detections_tracking에 LiDAR-only 입력과 카메라/융합 입력이 같이 기록됐다.
+   /tracked_object_modes에 ID, lifecycle, measurement_age, semantic_age,
+   last_measurement_source, 각 IMM mode의 위치/속도/공분산이 존재한다.
+   두 bag을 먼저 대상으로 규칙을 개발할 수 있다.
+
+실제 전환 사례 (bag 시작 기준 메시지 header 시각)
+- 135606, track_id=3645:
+  120.356초에 semantic_age<0인 표본이 관측됨.
+  121.025초에 같은 ID가 person, semantic_age=0, last_source=0(camera)로 갱신됨.
+  두 시점 차이는 약 0.668초.
+- 135606, track_id=3726:
+  121.559초에 semantic_age<0인 표본이 관측됨.
+  121.827초에 같은 ID가 person, semantic_age=0, last_source=2(fused)로 갱신됨.
+- 135325, track_id=1772:
+  12.242초에 semantic_age<0인 표본이 관측됨.
+  13.176초에 person, semantic_age=0, last_source=0으로 갱신됨.
+이 시각들은 관측 행동 시작/성공 시각이 아니다. 기존 주행 중 기록된 트랙 전환이다.
+
+규칙별 가능한 확인 범위
+- 최근 유효 LiDAR 추적 / 카메라 정보 없음·오래됨: 기록된 ages/source/lifecycle로 가능.
+- 접근 방향·시점·최근접 거리: 위치/속도/공분산, odometry, 경로, TF로 계산 가능.
+  이번 감사에서는 계산하지 않았다. 실제 충돌·행동 정답은 별도로 필요하다.
+- 여러 후보의 선정·유지·전환: 규칙 구현 후 입력을 순서대로 읽는 shadow replay로 검토 가능.
+  실제 heading을 바꾸지 않은 데이터라는 한계가 있다.
+- 같은 ID의 종류 정보 갱신: 사례 확인 가능. ID 연결이 올바른지는 보장하지 않는다.
+- 서로 다른 카메라 프레임에서 3회 확인: 직접 증명할 연결 정보 부족.
+  원본 /detections의 시간은 존재하지만 구형 트랙에는 대응되는 원본 카메라
+  observation_id/capture stamp가 없다. 별도 재연결·재추적 결과는 추정으로 구분해야 한다.
+- 시간초과·대상 손실·재시도 억제: 규칙 구현 후 상태 전이 논리 검증 가능.
+- 시야 가림 / 검출 정답 / 새로운 방향의 관측 이득: 현재 자료만으로 확정 불가.
+
+카메라 및 기록 한계
+- 세 bag 모두 CameraInfo/검출 결과는 있지만 sensor_msgs/Image 또는
+  CompressedImage 토픽은 없다. CameraInfo/metadata는 영상이 아니다.
+- 세 bag 모두 관측 대상 topic이 없고 신규 ObservationProvenance가 없다.
+- 내장 CameraInfo의 핀홀 수평 FOV 추정은 약 79.2도(반각 약 39.6도).
+  검출이 유효한 FOV나 가림 여부를 뜻하지 않는다.
+- 기록된 정적 TF: base_link→camera_link XYZ=(0.11398,0.0475,0.092772),
+  camera_link→camera_color_frame XYZ=(0,-0.059,0), 두 회전 모두 항등.
+  기록 당시 color camera 평면 offset은 합산하면 (0.11398,-0.0115)m다.
+  현재 장착 상태와 같다는 보장은 없다. 운영 YAML은 변경하지 않았다.
+- 미분류 트랙이 많으므로 '미분류=관측 대상'만 사용하면 벽/가구 클러스터도 선정된다.
+  경로 관련성, 추적 유지시간, 관측 여유시간 조건까지 적용한 후 후보 수를 봐야 한다.
+
+권장 다음 검증
+1. 135606의 115~140초 구간을 시작점으로 선정·유지·종류 갱신·종료 로그를 만든다.
+   그 후 두 bag 전체로 평가한다. 성공 사례 구간만으로 성능을 주장하지 않는다.
+2. 새 카메라 관측 여부를 track ID와 원본 capture stamp/observation ID로 연결한다.
+3. 실제 heading 변경 효과는 능동 관측 ON/OFF 실험 또는 센서 시뮬레이션으로 비교한다.
+
+재현 및 검증
+- 분석 스크립트: tools/audit_observation_targets_bag.py
+- 결과: 같은 폴더의 각 bag 이름.json
+- 원본 bag 읽기 전용. ROS 토픽 발행, 로봇 동작, 운영 설정 변경 없음.
+- 현재 amr_interfaces 타입으로 구형 CDR를 읽지 않고 bag 내장 ros2msg 정의를 사용했다.
+- 선택된 모든 토픽의 실제 읽은 메시지 수가 metadata의 개수와 일치함을 assert했다.
+- ROS Jazzy + 별도 /tmp/dra_observation_audit_env 환경의 rosbags 사용.
+
+실행 (패키지 루트 기준):
+source /opt/ros/jazzy/setup.bash
+/tmp/dra_observation_audit_env/bin/python tools/audit_observation_targets_bag.py \
+  /home/smoc/2026amr_ws/bags/mpc_chain_20260923_113151 \
+  /home/smoc/2026amr_ws/bags/mpc_chain_20260923_135325 \
+  /home/smoc/2026amr_ws/bags/mpc_chain_20260923_135606 \
+  --output docs/observation_bag_audit_2026-11-04

@@ -1,0 +1,53 @@
+joy_node:
+  ros__parameters:
+    device_id: 0
+    deadzone: 0.05
+    autorepeat_rate: 20.0
+
+joy_teleop:
+  ros__parameters:
+    # ── 속도 한계 ────────────────────────────────────────────────────────
+    # 출력은 joy_teleop_node.py:110-112 의 max_vel x scale x axis 다.
+    # max_* 는 하드웨어 한계, scale_* 이 그 중 실제로 쓰는 비율이다.
+    #
+    # 하드웨어 한계 (plant_wheel.yaml geometry, max_wheel_rad_per_sec 30):
+    #   k = (wheel_base + robot_width)/2 = 0.19835 m
+    #   vx_max = 30 x 0.04           = 1.200 m/s
+    #   wz_max = 30 x 0.04 / 0.19835 = 6.050 rad/s
+    # 이전 값 3.0 m/s 는 이 한계를 2.5 배 넘어 실효가 없었다(드라이버가 잘랐다).
+    max_linear_vel: 1.2
+    max_angular_vel: 1.0    # 하드웨어 한계 6.05 의 17 %. 매핑에는 이것도 충분히 빠르다.
+
+    # Stick driving: axis 1 = forward/back, axis 3 = strafe.
+    # Rotation is controlled only by buttons 4 and 5.
+    enable_axis_control: true
+    axis_linear_x: 1
+    axis_linear_y: 3
+    axis_angular_z: -1
+    # ★ 매핑용 슬립 억제: 스틱을 끝까지 밀어도 한계의 60 % 만 나간다.
+    #   실효 최대  vx, vy = 1.2 x 0.6 = 0.720 m/s
+    #              wz     = 1.0 x 0.6 = 0.600 rad/s
+    #   메카넘은 횡이동이 롤러 슬립을 타고, 슬립은 /odom 을 오염시켜
+    #   cartographer pose extrapolator 의 초기 추정을 흐린다.
+    #   회전을 함께 줄이는 이유: 2026-09-11 실측에서 map->odom 샘플간 이동이
+    #   |wz| 0~0.05 대비 0.3 rad/s 이상에서 41~62 배였다. 매핑 중 빠른 회전은
+    #   정합 품질을 직접 떨어뜨린다.
+    #   자율주행으로 돌아갈 때는 1.0 으로 되돌린다.
+    scale_linear_x: 0.6
+    scale_linear_y: 0.6
+    scale_angular_z: 0.2
+    axis_deadzone: 0.08
+
+    # Set to a button index to require a held deadman/enable button. -1 disables it.
+    enable_button: -1
+
+    enable_button_control: true
+    # Logitech F310/F710 in XInput mode: A=0 B=1 X=2 Y=3 LB=4 RB=5.
+    button_forward: -1
+    button_backward: -1
+    button_left: -1
+    button_right: -1
+    button_rotate_ccw: 4
+    button_rotate_cw: 5
+
+    joy_timeout_s: 0.5

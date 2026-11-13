@@ -1,0 +1,88 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 100,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 0,
+  "callback_over_200ms_ratio": 0.0,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 141.33972155163065,
+    "p50": 139.84836684539914,
+    "p95": 149.0784410852939,
+    "p99": 150.73591205989948,
+    "max": 163.8384631369263
+  },
+  "backend": "split",
+  "workers": 2,
+  "frozen_nominal": false,
+  "statuses": {
+    "normal": 100
+  },
+  "fallback_ratio": 0.0,
+  "deadline_miss_ratio": 0.0,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 142.17352493433282,
+    "p50": 140.98237606231123,
+    "p95": 150.10425536893308,
+    "p99": 152.21442176261917,
+    "max": 153.0205679591745
+  },
+  "normal_optimizer_ms": {
+    "count": 100,
+    "mean": 139.3173052673228,
+    "p50": 138.15346255432814,
+    "p95": 147.32803270453587,
+    "p99": 148.8212787010707,
+    "max": 150.12755780480802
+  },
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 0.5676536750979722,
+    "p50": 0.20536186639219522,
+    "p95": 1.3742979033850131,
+    "p99": 11.834011913742872,
+    "max": 12.172577204182744
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 200.01610812963918,
+    "p50": 199.97625111136585,
+    "p95": 205.75170319061726,
+    "p99": 210.5897453986109,
+    "max": 222.0498227979988
+  },
+  "receive_interval_ms": {
+    "count": 100,
+    "mean": 200.01389659009874,
+    "p50": 200.00430603977293,
+    "p95": 205.38955569500104,
+    "p99": 210.61616822145885,
+    "max": 222.2238399554044
+  },
+  "receive_count_in_window": 100,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 10,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "standard",
+  "primary_K": 100
+}

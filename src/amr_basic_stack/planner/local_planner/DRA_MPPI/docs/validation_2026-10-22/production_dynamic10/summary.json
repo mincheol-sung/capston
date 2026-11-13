@@ -1,0 +1,82 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 0,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 71,
+  "callback_over_200ms_ratio": 0.71,
+  "timeout_count": 71,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 218.03093442460522,
+    "p50": 237.12218494620174,
+    "p95": 319.09231742611155,
+    "p99": 323.00853258930147,
+    "max": 325.72361500933766
+  },
+  "backend": "split",
+  "workers": 2,
+  "frozen_nominal": false,
+  "statuses": {
+    "timeout": 71,
+    "stale_odom": 29
+  },
+  "fallback_ratio": 1.0,
+  "deadline_miss_ratio": 0.71,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 167.41978692589328,
+    "p50": 233.99077053181827,
+    "p95": 238.81564792245626,
+    "p99": 244.1437330120243,
+    "max": 244.4962589070201
+  },
+  "normal_optimizer_ms": null,
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 50.6452223053202,
+    "p50": 37.04158158507198,
+    "p95": 119.44743089843541,
+    "p99": 124.9488978809677,
+    "max": 126.12019712105393
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 48.86243425961583,
+    "p50": 37.16589296236633,
+    "p95": 119.13510365411638,
+    "p99": 123.05824990849942,
+    "max": 125.77414507977663
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 202.31543239904568,
+    "p50": 240.83601555321366,
+    "p95": 395.7797203678638,
+    "p99": 400.23074629483745,
+    "max": 405.18336999230087
+  },
+  "receive_interval_ms": {
+    "count": 100,
+    "mean": 202.31785017997026,
+    "p50": 240.89512694627047,
+    "p95": 396.0299291065894,
+    "p99": 400.38173511391506,
+    "max": 405.2013598848134
+  },
+  "receive_count_in_window": 100,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 10,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

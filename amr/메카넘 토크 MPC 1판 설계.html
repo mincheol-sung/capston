@@ -1,0 +1,982 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>메카넘 토크 MPC 1판 설계</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+window.__fitMath = function () {
+  document.querySelectorAll('mjx-container:not([display="true"])').forEach(function (c) {
+    c.classList.remove("mjx-wide");
+    var p = c.parentElement; if (!p) return;
+    var pr = p.getBoundingClientRect(), cr = c.getBoundingClientRect();
+    if (cr.right > pr.right + 1) c.classList.add("mjx-wide");
+  });
+};
+var __fitT; window.addEventListener("resize", function () { clearTimeout(__fitT); __fitT = setTimeout(function () { if (window.__fitMath) window.__fitMath(); }, 150); });
+</script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' }, startup: { pageReady: function () { return MathJax.startup.defaultPageReady().then(function () { if (window.__fitMath) window.__fitMath(); }); } }, options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+<style>
+:root{--paper:#F7F8F6;--panel:#FFFFFF;--ink:#1B2430;--muted:#5B6672;--rule:#D9DED8;--accent:#1F4FD8;--accent-soft:#E7EDFB;--amber:#B86E00;--amber-soft:#FBF1E3;--code-bg:#EEF1EE;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#12161B;--panel:#191E25;--ink:#E8ECEF;--muted:#9AA5B1;--rule:#2C343D;--accent:#7FA4FF;--accent-soft:#1B2740;--amber:#E6A23C;--amber-soft:#332816;--code-bg:#1F252D;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#12161B;--panel:#191E25;--ink:#E8ECEF;--muted:#9AA5B1;--rule:#2C343D;--accent:#7FA4FF;--accent-soft:#1B2740;--amber:#E6A23C;--amber-soft:#332816;--code-bg:#1F252D;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans KR",-apple-system,"Noto Sans KR","Malgun Gothic",sans-serif;font-size:16px;line-height:1.75}
+code{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;background:var(--code-bg);padding:.05em .35em;border-radius:3px;font-size:.88em}
+a{color:var(--accent)}
+.wrap{display:grid;grid-template-columns:230px minmax(0,1fr);max-width:1180px;margin:0 auto;padding:0 16px}
+nav{position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto;padding:2.2rem 1.2rem 2rem 0;border-right:1px solid var(--rule);font-size:.85em}
+nav .eyebrow{margin-bottom:.8rem}
+nav ol{list-style:none;margin:0;padding:0;counter-reset:s}
+nav li{counter-increment:s;margin:.12rem 0}
+nav li a{display:grid;grid-template-columns:1.7rem 1fr;color:var(--ink);text-decoration:none;padding:.15rem 0}
+nav li a::before{content:counter(s,decimal-leading-zero);font-family:"IBM Plex Mono",monospace;color:var(--muted);font-size:.9em}
+nav li a:hover{color:var(--accent)}
+main{padding:2.4rem 0 5rem 2.6rem;min-width:0}
+header{border-bottom:1px solid var(--rule);padding-bottom:1.5rem;margin-bottom:2.4rem}
+.eyebrow{font-size:.74em;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:1.9rem;font-weight:600;margin:.4rem 0 .6rem;letter-spacing:-.01em}
+.lede{max-width:70ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:.3rem 1.6rem;margin-top:.9rem;font-size:.85em;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:500}
+section{margin:0 0 3.2rem;scroll-margin-top:1rem}
+h2{font-size:1.3rem;font-weight:600;margin:0 0 .6rem}
+h2 .n{font-family:"IBM Plex Mono",monospace;color:var(--muted);font-weight:400;margin-right:.6rem;font-size:.82em}
+h3{font-size:1rem;font-weight:600;margin:1.6rem 0 .4rem}
+p,ul,ol.body{max-width:74ch}
+p{margin:.45rem 0 .85rem}
+ul{padding-left:1.2rem;margin:.3rem 0 .9rem}
+li{margin:.25rem 0}
+.eq{margin:.4rem 0 1rem;overflow-x:auto;max-width:100%}
+.step{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.82em;color:var(--accent);background:var(--accent-soft);border-radius:3px;padding:.05em .5em;margin-right:.5rem;font-weight:500}
+.note{border-left:3px solid var(--amber);background:var(--amber-soft);padding:.6rem .95rem;margin:.9rem 0 1.2rem;max-width:74ch;border-radius:0 4px 4px 0;font-size:.95em}
+.claim{border-left:3px solid var(--accent);background:var(--accent-soft);padding:.6rem .95rem;margin:.9rem 0 1.2rem;max-width:74ch;border-radius:0 4px 4px 0;font-size:.95em}
+.tw{overflow-x:auto;margin:.6rem 0 1.1rem}
+table{border-collapse:collapse;width:100%;font-size:.9em}
+th{text-align:left;font-weight:600;border-bottom:1.5px solid var(--ink);padding:.45rem .6rem;white-space:nowrap}
+td{border-bottom:1px solid var(--rule);padding:.45rem .6rem;vertical-align:top}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+figure{margin:1rem 0 1.4rem;background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:1rem 1.2rem;max-width:860px}
+figure > svg{width:100%;height:auto;display:block}
+figcaption{font-size:.85em;color:var(--muted);margin-top:.6rem;max-width:80ch}
+.f-ax{stroke:var(--ink);stroke-width:1.2;fill:none}
+.f-ld{stroke:var(--muted);stroke-width:.8;stroke-dasharray:4 3;fill:none}
+.f-body{fill:var(--panel);stroke:var(--muted);stroke-width:1}
+.f-wh{fill:var(--rule);stroke:var(--muted);stroke-width:.8}
+.f-bf{stroke:var(--accent);stroke-width:1.6;fill:none}
+.f-vl{stroke:var(--amber);stroke-width:2.4;fill:none}
+.t-ink{fill:var(--ink)} .t-mut{fill:var(--muted)} .t-acc{fill:var(--accent)} .t-amb{fill:var(--amber)}
+.mk-ink{fill:var(--ink)} .mk-acc{fill:var(--accent)} .mk-amb{fill:var(--amber)}
+svg text{font-family:"IBM Plex Sans KR",sans-serif}
+footer{border-top:1px solid var(--rule);padding-top:1rem;color:var(--muted);font-size:.86em}
+footer ol{padding-left:1.4rem}
+@media (max-width:860px){.wrap{grid-template-columns:1fr}nav{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--rule);padding:1.4rem 0}main{padding:1.6rem 0 4rem}h1{font-size:1.55rem}}
+@media print{nav{display:none}.wrap{grid-template-columns:1fr}main{padding:0}}
+.f-ax2{stroke:var(--ink);stroke-width:2;fill:none}
+.f-thin{stroke:var(--ink);stroke-width:1.1;fill:none}
+.f-bf3{stroke:var(--accent);stroke-width:2.4;fill:none}
+.f-vl2{stroke:var(--amber);stroke-width:2;fill:none}
+.f-mutline{stroke:var(--muted);stroke-width:2;fill:none}
+.f-roller{stroke:var(--muted);stroke-width:6;stroke-linecap:round;stroke-opacity:.5;fill:none}
+.f-dash-acc{stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 4;fill:none}
+.f-dash-amb{stroke:var(--amber);stroke-width:1.6;stroke-dasharray:6 4;fill:none}
+.f-dash-mut{stroke:var(--muted);stroke-width:1.4;stroke-dasharray:6 4;fill:none}
+.f-grid{stroke:var(--rule);stroke-width:1}
+.f-acc-soft,.f-acc-fill-soft{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1}
+.f-amb-soft{fill:var(--amber-soft);stroke:var(--amber);stroke-width:1}
+.f-acc-fill{fill:var(--accent)}.f-amb-fill{fill:var(--amber)}.f-ink-fill{fill:var(--ink)}.f-mut-fill{fill:var(--muted)}
+.f-cell{fill:none;stroke:var(--rule);stroke-width:1}
+.f-hollow{fill:var(--panel);stroke:var(--muted);stroke-width:1.5}
+.t-paper{fill:var(--panel)}.mk-mut{fill:var(--muted)}
+.part{margin:3.8rem 0 1.8rem;padding-top:1rem;border-top:2px solid var(--ink);font-size:.78em;letter-spacing:.12em;color:var(--muted)}
+.part b{display:block;font-size:1.45rem;letter-spacing:0;color:var(--ink);font-weight:600;margin-top:.25rem}
+.part span{display:block;font-size:1.05rem;letter-spacing:0;color:var(--muted);margin-top:.35rem;max-width:74ch;line-height:1.6}
+nav li.pt{counter-increment:none;margin:1rem 0 .25rem;color:var(--muted);font-size:.86em;letter-spacing:.05em;font-weight:600}
+.ex{border:1px solid var(--rule);background:var(--panel);padding:.65rem .95rem;margin:.9rem 0 1.2rem;max-width:74ch;border-radius:4px;font-size:.95em}
+.ex::before{content:"예";display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.78em;color:var(--amber);border:1px solid var(--amber);border-radius:3px;padding:0 .4em;margin-right:.55rem}
+.ex .eq{margin:.3rem 0 .5rem}
+.why{margin:.9rem 0 1.1rem}
+.why .lbl,.gen .lbl{font-family:"IBM Plex Mono",monospace;font-size:.74em;letter-spacing:.1em;color:var(--accent);margin-bottom:.35rem}
+.why table{font-size:.86em}
+.why td:first-child{font-weight:500;min-width:7.5em}
+.why td{min-width:8em}
+.gen{border-left:3px solid var(--accent);background:var(--accent-soft);padding:.7rem 1rem .25rem;margin:.9rem 0 1rem;max-width:74ch;border-radius:0 4px 4px 0}
+.gen p{margin:.15rem 0 .65rem}
+.gen .map{font-size:.92em;color:var(--muted)}
+.apply{display:flex;align-items:center;gap:.7rem;margin:1.5rem 0 .9rem;font-family:"IBM Plex Mono",monospace;font-size:.74em;letter-spacing:.1em;color:var(--muted)}
+.apply::after{content:"";flex:1;border-top:1px solid var(--rule)}
+nav li.z{counter-increment:none}
+.mjx-wide{display:block;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:.1rem 0}
+nav li.z a::before{content:"00"}
+</style>
+
+<style>
+a.eqref,a.figref,a.secref{color:var(--accent);text-decoration:none;border-bottom:1px dotted currentColor;cursor:pointer}
+a.eqref:hover,a.figref:hover,a.secref:hover,a.eqref:focus-visible,a.figref:focus-visible{background:var(--accent-soft);outline:none}
+.step,figure,section>h2{scroll-margin-top:20px}
+.eqpop{position:fixed;z-index:1000;max-width:min(92vw,780px);background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.22);padding:10px 14px 8px;font-size:.9rem;line-height:1.5}
+.eqpop-h{font-weight:600;font-size:.8rem;color:var(--accent);margin-bottom:6px}
+.eqpop-b{overflow:auto;max-height:55vh}
+.eqpop-b mjx-container{margin:6px 0!important;display:block!important}
+.eqpop-b.fig svg{display:block;width:100%;height:auto;max-width:700px}
+.eqpop-f{font-size:.72rem;color:var(--muted);margin-top:6px}
+.hl-target{animation:hlflash 1.8s ease-out}
+@keyframes hlflash{0%{background:rgba(255,196,64,.65)}100%{background:transparent}}
+@media (hover:none){.eqpop{display:none!important}}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var pop=document.createElement('div');pop.className='eqpop';pop.hidden=true;document.body.appendChild(pop);
+  var showT=null,hideT=null,touch=false;
+  function previewEq(tgt){
+    var k=parseInt(tgt.dataset.pv||'0',10),p=tgt.closest('p')||tgt,node=p,n=0,eq=null;
+    while((node=node.nextElementSibling)){
+      if(node.tagName==='P'&&node.querySelector('span.step'))break;
+      var eqs=node.matches('div.eq')?[node]:Array.prototype.slice.call(node.querySelectorAll('div.eq'));
+      for(var i=0;i<eqs.length;i++){if(n===k){eq=eqs[i];break;}n++;}
+      if(eq)break;
+    }
+    var b=document.createElement('div');b.className='eqpop-b';
+    if(eq){var c=eq.querySelector('mjx-container');b.appendChild((c||eq).cloneNode(true));}
+    return {title:tgt.textContent+' · '+(tgt.dataset.title||''),body:b};
+  }
+  function previewFig(tgt){
+    var svg=tgt.querySelector('svg'),cap=tgt.querySelector('figcaption');
+    var b=document.createElement('div');b.className='eqpop-b fig';if(svg)b.appendChild(svg.cloneNode(true));
+    var t=cap?cap.textContent.trim():'';if(t.length>90)t=t.slice(0,90)+'…';
+    return {title:t,body:b};
+  }
+  function build(a){
+    var id=(a.getAttribute('href')||'').slice(1),tgt=document.getElementById(id);if(!tgt)return null;
+    if(id.indexOf('eq')===0)return previewEq(tgt);
+    if(id.indexOf('fig')===0)return previewFig(tgt);
+    return null;
+  }
+  function place(a){
+    var r=a.getBoundingClientRect(),pw=pop.offsetWidth,ph=pop.offsetHeight;
+    var x=r.left,y=r.bottom+8;
+    if(x+pw>window.innerWidth-8)x=Math.max(8,window.innerWidth-8-pw);
+    if(y+ph>window.innerHeight-8){y=r.top-8-ph;if(y<8)y=8;}
+    pop.style.left=x+'px';pop.style.top=y+'px';
+  }
+  function show(a){
+    var c=build(a);if(!c)return;
+    pop.innerHTML='';var h=document.createElement('div');h.className='eqpop-h';h.textContent=c.title;pop.appendChild(h);pop.appendChild(c.body);
+    var f=document.createElement('div');f.className='eqpop-f';f.textContent='클릭하면 해당 위치로 이동';pop.appendChild(f);
+    pop.hidden=false;place(a);
+  }
+  function hide(){pop.hidden=true;}
+  function arm(a){clearTimeout(hideT);clearTimeout(showT);showT=setTimeout(function(){if(!touch)show(a);},120);}
+  function disarm(){clearTimeout(showT);hideT=setTimeout(hide,180);}
+  var links=document.querySelectorAll('a.eqref,a.figref');
+  Array.prototype.forEach.call(links,function(a){
+    a.addEventListener('mouseenter',function(){arm(a);});
+    a.addEventListener('mouseleave',disarm);
+    a.addEventListener('focus',function(){arm(a);});
+    a.addEventListener('blur',disarm);
+    a.addEventListener('touchstart',function(){touch=true;},{passive:true});
+    a.addEventListener('click',function(){hide();});
+  });
+  pop.addEventListener('mouseenter',function(){clearTimeout(hideT);});
+  pop.addEventListener('mouseleave',disarm);
+  window.addEventListener('scroll',hide,{passive:true});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')hide();});
+  function flash(){
+    var id=location.hash.slice(1);if(!id)return;var t=document.getElementById(id);if(!t)return;
+    var box=t.classList.contains('step')?(t.closest('p')||t):t;
+    box.classList.remove('hl-target');void box.offsetWidth;box.classList.add('hl-target');
+  }
+  window.addEventListener('hashchange',flash);
+  if(location.hash)setTimeout(flash,300);
+});
+</script>
+</head>
+<body>
+<div class="wrap">
+<nav aria-label="목차"><div class="eyebrow">목차</div>
+<ol>
+<li class="pt">Ⅰ 모델</li>
+<li class="z"><a href="#s0">왜 구조를 바꾸는가</a></li>
+<li><a href="#s1">기호, 상태, 입력</a></li>
+<li><a href="#s2">관성 좌표계 운동방정식</a></li>
+<li><a href="#s3">이산화: 이중적분기의 ZOH</a></li>
+<li class="pt">Ⅱ 모델 예측 제어</li>
+<li><a href="#s4">적분 작용: 외란 추정치</a></li>
+<li><a href="#s5">예측</a></li>
+<li><a href="#s6">기준 지평과 플래너 인터페이스</a></li>
+<li><a href="#s7">비용과 QP 표준형</a></li>
+<li><a href="#s8">제약</a></li>
+<li class="pt">Ⅲ 구현</li>
+<li><a href="#s9">한 주기의 계산 순서</a></li>
+<li><a href="#s10">설정값과 측정 항목</a></li>
+<li><a href="#s11">통과 시험</a></li>
+<li><a href="#s12">트레이드오프와 2판</a></li>
+<li><a href="#s13">식의 출처</a></li>
+</ol></nav>
+
+<main>
+<header>
+<div class="eyebrow">SMOC Lab · 4WD Mecanum AMR · 2026-11-05</div>
+<h1>메카넘 AMR 토크 입력 MPC 1판: 관성 좌표 모델과 외란 추정치</h1>
+<p class="lede">토크 입력 MPC의 1판 설계를 유도한다. 기본 문서 『메카넘 AMR 토크 입력 MPC의 식 정리』가 몸체 좌표 오차 모델과 Wang 증분형으로 쓴 설계를, 네 가지 선택을 바꾸어 같은 성질을 유지한 채 절반 길이로 줄인 것이다. 네 선택은 관성 좌표계로 쓴 운동방정식, 이중적분기의 정확한 ZOH, 비용에 넣는 기준 지평, 외란 추정치로 쓴 적분 작용이다. 기본 문서는 바퀴 속도 입력 MPC(현재 판)와 토크 입력 MPC(토크 판)를 다루며, 이 문서는 토크 판의 첫 구현 버전(1판)을 다룬다. 2판은 슬립 모델을 넣는 후속 버전을 뜻한다. 플래너·상태 추정기·토크 출력 노드는 같은 로봇의 기존 제어기 구조 설계(제품개발설계 과목의 구조도 v2, 이하 기존 설계)의 것을 그대로 쓰며, 이 문서는 그중 MPC 노드만 다룬다. 기구학·정역학·유효 질량·마찰 한계는 기본 문서의 결과를 그대로 가져오며, 그 식은 "기본 식-N"으로 가리킨다. 각 절은 유도 개관 표와 일반 개념으로 시작하고, 모든 식에 손으로 확인할 수 있는 예를 붙인다.</p>
+<div class="meta"><span>대상 <b>토크 판 1판 (8자 추종, 하중 0–20 kg)</b></span><span>수치 <b>r = 0.04 m, k = 0.19835 m, m = 4 kg, J<sub>w</sub> = 9.7×10⁻⁴ kg·m², T<sub>s</sub> = 10 ms</b></span><span>교재 <b>Meriam &amp; Kraige, Franklin–Powell–Workman, Wang (2009), Rawlings–Mayne–Diehl (2017)</b></span></div>
+</header>
+<div class="part">PART Ⅰ<b>모델</b><span>제어기가 쓰는 운동 모델을 세운다. 기본 문서 Ⅲ부의 몸체 좌표 운동방정식을 관성 좌표계로 옮기면 코리올리·구심 항이 사라지고, 모델은 야코비안 전치 \((T^{-1})^\top\) 을 \(R(\theta)\) 로 회전한 입력 행렬을 갖는 이중적분기가 된다.</span></div>
+
+<!-- 00 -->
+<section id="s0">
+<h2><span class="n">00</span>왜 구조를 바꾸는가</h2>
+
+<div class="why"><div class="lbl">정리 개관</div><div class="tw"><table>
+<tr><th>내용</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>1판 설계의 단순화</td><td>기본 문서의 토크 판은 12상태 증강, 시변 야코비안, 모델 안의 미리보기를 쓴다. 구현과 디버깅이 무겁다</td><td>같은 폐루프 성질(오프셋 없는 추종, 토크 상한, 변화율 제한)을 더 적은 식으로 얻는 것</td><td>좌표계, 이산화, 기준의 위치, 적분 작용의 표현 네 가지 선택을 바꾼다</td><td>관성계 뉴턴 법칙, ZOH, 기준 추종 비용, 오프셋 없는 MPC</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>같은 제어 문제를 여러 꼴의 식으로 쓸 수 있고, 꼴에 따라 구현의 길이가 크게 달라진다. 뉴턴 법칙은 관성 좌표계에서 가장 단순하며, 회전하는 좌표계로 옮기면 좌표계 자체의 회전이 만드는 항(코리올리·구심 항)이 추가된다. 선형 시불변 모델의 이산화는 행렬 지수로 정확히 풀리고, 이중적분기(위치–속도)에서는 그 결과가 등가속도 운동 공식이다. 기준 궤적은 모델에 넣어 오차 좌표로 쓸 수도 있고 비용에 넣어 절대 좌표로 쓸 수도 있는데, 두 QP는 변수 치환으로 같다. 상수 외란에 대한 적분 작용은 상태를 증강해 얻을 수도 있고, 지난 스텝의 예측 잔차를 외란 추정치로 더해 얻을 수도 있으며, 역시 같은 식이다.</p>
+<p class="map"><b>대응.</b> 이 문서는 네 선택을 모두 단순한 쪽으로 잡는다. 관성 좌표계(<a class="secref" href="#s2">02절</a>), 이중적분기 ZOH(<a class="secref" href="#s3">03절</a>), 비용 안의 기준 지평(<a class="secref" href="#s6">06절</a>), 외란 추정치(<a class="secref" href="#s4">04절</a>)이다. 기본 문서의 설계와 무엇이 같고 무엇이 다른지는 <a class="secref" href="#s12">12절</a>에서 따진다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<h3>바뀌는 것과 바뀌지 않는 것</h3>
+<div class="tw"><table>
+<tr><th>항목</th><th>기본 문서의 토크 판</th><th>이 문서의 1판</th><th>달라지는 이유</th></tr>
+<tr><td>상태</td><td>오차 좌표 \([X_e;\ v_e]\), \(v_e\) 는 몸체 좌표, 증강하여 12개</td><td>절대 좌표 \([X;\ \dot X]\), 모두 관성 좌표, 6개</td><td>관성 좌표에서는 코리올리 항이 없어 선형화할 것이 없다</td></tr>
+<tr><td>시변 항</td><td>기준 궤적에서 구한 야코비안 \(A_X(\theta_r,v_r)\), \(K_c(v_r)\)(기본 문서의 기호)</td><td>\(B(k)\) 안의 \(R(\theta_r)\) 하나</td><td>\(A\) 가 상수 이중적분기가 된다</td></tr>
+<tr><td>이산화</td><td>전진 오일러 + 오차 검산</td><td>정확한 ZOH (등가속도 공식)</td><td>\(A\) 가 상수이므로 닫힌 형이 있다</td></tr>
+<tr><td>기준(피드포워드)</td><td>모델 안의 기준 가속도 항 \(E_md_r\)(기본 문서의 기호)</td><td>비용 안의 \(Y_r\)</td><td>같은 QP. 가속도 기준이 필요 없어진다</td></tr>
+<tr><td>적분 작용</td><td>Wang 증강 \([\Delta x;\ x]\)</td><td>외란 추정치 \(\hat d\)</td><td>같은 식. 상태가 6개로 남고 결정변수가 절대 토크가 된다</td></tr>
+<tr><td>결정변수</td><td>토크 증분 \(\Delta T\)</td><td>절대 토크 \(T\)</td><td>마찰 토크 상한이 상자 제약이 된다</td></tr>
+<tr><td>유지</td><td colspan="3">유효 질량 \(M_{eff}\), 토크–일반화 힘 변환 행렬 \((T^{-1})^\top\), 영공간 벌점 \(q_{null}\), 변화율 제약, 마찰 기반 토크 상한, \(N_p\) = 50, \(N_c\) = 5, torque_output의 \(\tau_{fric}\)</td></tr>
+</table></div>
+
+<p><a class="figref" href="#fig1">그림 1</a>이 1판의 제어 루프이다. 플래너와 상태 추정기는 기존 설계의 것을 그대로 쓴다. 새로 만드는 것은 두 좌표 변환, 외란 추정치 계산, QP이며, 피드포워드 블록과 포화 블록은 없다. 피드포워드는 기준 지평 \(Y_r\) 이 비용에 들어가 QP가 앞을 보고 토크를 계획하는 것으로 대신하고, 포화는 QP의 하드 제약이 대신한다.</p>
+<figure id="fig1">
+<svg viewBox="0 0 820 330" role="img" aria-label="1판 토크 MPC의 제어 루프: 플래너 지평, 기준 변환, QP, 토크 출력, 로봇, 상태 추정, 외란 추정치"><defs><marker id="fLInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-ink"/></marker><marker id="fLAcc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-acc"/></marker><marker id="fLAmb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-amb"/></marker><marker id="fLMut" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-mut"/></marker></defs><rect x="10.0" y="72.0" width="118.0" height="48.0" rx="5" class="f-body"/><text x="69.0" y="92.0" font-size="12" text-anchor="middle" class="t-ink" font-weight="600">플래너</text><text x="69.0" y="109.0" font-size="11" text-anchor="middle" class="t-mut">X<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan>, u<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan> 지평 (10 Hz)</text><line x1="128.0" y1="96.0" x2="160.0" y2="96.0" class="f-thin" marker-end="url(#fLInk)"/><rect x="160.0" y="72.0" width="128.0" height="48.0" rx="5" class="f-body"/><rect x="160.0" y="72.0" width="128.0" height="48.0" rx="5" class="f-bf"/><text x="224.0" y="92.0" font-size="12" text-anchor="middle" class="t-ink" font-weight="600">기준 변환</text><text x="224.0" y="109.0" font-size="11" text-anchor="middle" class="t-mut">Ẋ<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan> = R(θ<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan>)u<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan>, 언랩</text><line x1="288.0" y1="96.0" x2="322.0" y2="96.0" class="f-thin" marker-end="url(#fLInk)"/><text x="305.0" y="88.0" font-size="12" text-anchor="middle" class="t-acc">Y<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan></text><rect x="322.0" y="62.0" width="176.0" height="68.0" rx="5" class="f-body"/><rect x="322.0" y="62.0" width="176.0" height="68.0" rx="5" class="f-bf"/><text x="410.0" y="82.0" font-size="12" text-anchor="middle" class="t-ink" font-weight="600">MPC (QP)</text><text x="410.0" y="100.0" font-size="11" text-anchor="middle" class="t-mut">예측 F, Φ, Ψ · 비용 · 제약</text><text x="410.0" y="116.0" font-size="11" text-anchor="middle" class="t-mut">결정변수: 절대 토크 T</text><line x1="498.0" y1="96.0" x2="534.0" y2="96.0" class="f-thin" marker-end="url(#fLInk)"/><text x="516.0" y="88.0" font-size="12" text-anchor="middle" class="t-ink">τ*</text><rect x="534.0" y="72.0" width="130.0" height="48.0" rx="5" class="f-body"/><text x="599.0" y="92.0" font-size="12" text-anchor="middle" class="t-ink" font-weight="600">torque_output</text><text x="599.0" y="109.0" font-size="11" text-anchor="middle" class="t-mut">+ τ<tspan dy="4" font-size="10">fric</tspan><tspan dy="-4">&#8203;</tspan>(ω) (기존 설계)</text><line x1="664.0" y1="96.0" x2="698.0" y2="96.0" class="f-thin" marker-end="url(#fLInk)"/><rect x="698.0" y="72.0" width="112.0" height="48.0" rx="5" class="f-body"/><text x="754.0" y="92.0" font-size="12" text-anchor="middle" class="t-ink" font-weight="600">로봇</text><text x="754.0" y="109.0" font-size="11" text-anchor="middle" class="t-mut">AK 액추에이터·지면</text><line x1="754.0" y1="120.0" x2="754.0" y2="210.0" class="f-thin"/><line x1="754.0" y1="210.0" x2="674.0" y2="210.0" class="f-thin" marker-end="url(#fLInk)"/><rect x="540.0" y="186.0" width="134.0" height="48.0" rx="5" class="f-body"/><text x="607.0" y="206.0" font-size="12" text-anchor="middle" class="t-ink" font-weight="600">state_estimator</text><text x="607.0" y="223.0" font-size="11" text-anchor="middle" class="t-mut">X, v 추정 (기존 설계)</text><line x1="540.0" y1="210.0" x2="514.0" y2="210.0" class="f-thin" marker-end="url(#fLInk)"/><rect x="404.0" y="186.0" width="110.0" height="48.0" rx="5" class="f-body"/><rect x="404.0" y="186.0" width="110.0" height="48.0" rx="5" class="f-bf"/><text x="459.0" y="206.0" font-size="12" text-anchor="middle" class="t-ink" font-weight="600">좌표 변환</text><text x="459.0" y="223.0" font-size="11" text-anchor="middle" class="t-mut">Ẋ = R(θ)v</text><line x1="404.0" y1="210.0" x2="350.0" y2="210.0" class="f-thin"/><text x="377.0" y="204.0" font-size="12" text-anchor="middle" class="t-ink">x̂</text><line x1="350.0" y1="210.0" x2="350.0" y2="132.0" class="f-thin" marker-end="url(#fLInk)"/><path d="M350 210 V 263 H 362" class="f-thin" marker-end="url(#fLInk)"/><rect x="362.0" y="240.0" width="176.0" height="46.0" rx="5" class="f-body"/><rect x="362.0" y="240.0" width="176.0" height="46.0" rx="5" class="f-bf"/><text x="450.0" y="259.0" font-size="12" text-anchor="middle" class="t-ink" font-weight="600">외란 추정치</text><text x="450.0" y="276.0" font-size="11" text-anchor="middle" class="t-mut">d̂ = x̂ − Ax̂<tspan dy="4" font-size="10">prev</tspan><tspan dy="-4">&#8203;</tspan> − Bτ<tspan dy="4" font-size="10">prev</tspan><tspan dy="-4">&#8203;</tspan></text><line x1="386.0" y1="240.0" x2="386.0" y2="132.0" class="f-thin" marker-end="url(#fLInk)"/><text x="394.0" y="176.0" font-size="12" text-anchor="start" class="t-acc">d̂</text><path d="M516 98 V 300 H 450 V 288" class="f-thin" marker-end="url(#fLInk)"/><text x="530.0" y="300.0" font-size="11" text-anchor="start" class="t-mut">τ<tspan dy="4" font-size="10">prev</tspan><tspan dy="-4">&#8203;</tspan></text><rect x="10.0" y="290.0" width="14.0" height="14.0" rx="3" class="f-bf"/><text x="30.0" y="301.0" font-size="11" text-anchor="start" class="t-ink">새로 만드는 블록</text><rect x="140.0" y="290.0" width="14.0" height="14.0" rx="3" class="f-body"/><text x="160.0" y="301.0" font-size="11" text-anchor="start" class="t-ink">기존 설계 그대로</text><text x="10.0" y="40.0" font-size="12" text-anchor="start" class="t-mut">피드포워드는 별도 블록이 아니다. 기준 지평 Y<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan> 가 비용에 들어가 QP가 앞을 보고 토크를 계획한다.</text></svg>
+<figcaption>그림 1. 1판 토크 MPC의 제어 루프. 파란 테두리가 새로 만드는 블록이다. 플래너와 추정기는 기존 설계의 것을 그대로 쓰고, 그 출력을 관성 좌표로 돌리는 변환 둘, 외란 추정치 계산, QP가 추가된다. 피드포워드 블록과 포화 블록은 없다.</figcaption>
+</figure>
+
+
+<h3>읽는 법</h3>
+<p>각 식은 성분(스칼라) 방정식으로 먼저 쓰고 항마다 물리적 뜻을 붙인 뒤, "행렬로 모으면"으로 합친다. 행렬은 같은 꼴의 식 여러 줄을 한 줄로 적는 표기일 뿐이며, 뜻은 성분 식에 있다. 식 번호는 이 문서 안에서만 센다. 기본 문서의 식은 "기본 식-48"처럼 적고 이름을 붙인다. 각 절은 유도 개관 표(왜 하는가, 문제, 접근, 개념), 일반 개념(교과서 수준의 설명과 이 문서와의 대응), 이 로봇에 적용(유도와 예)의 순서이다. 수치 예는 \(m\) = 4 kg(하중 없음) 기준이며, 하중이 있는 경우는 10 kg, 20 kg으로 따로 적는다.</p>
+</section>
+
+<!-- 01 -->
+<section id="s1">
+<h2><span class="n">01</span>기호, 상태, 입력</h2>
+
+<div class="why"><div class="lbl">유도 개관</div><div class="tw"><table>
+<tr><th>유도</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>상태와 입력의 정의</td><td>뒤의 모든 행렬 크기와 좌표계가 여기서 정해진다</td><td>어느 좌표계의 어떤 양을 상태로 쓰고, 무엇을 결정변수로 둘 것인가</td><td>관성 좌표 포즈와 그 시간 미분을 상태로, 네 바퀴 절대 순토크를 입력으로</td><td>상태공간 표현, 일반화 좌표</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>상태는 "지금 값을 알면 앞으로의 운동을 입력만으로 예측할 수 있는 최소의 양"이다. 2차 역학계에서는 일반화 좌표와 그 속도가 상태이다. 속도를 어느 좌표계의 성분으로 쓰느냐는 자유이며, 물리는 같지만 식의 꼴이 달라진다. 입력은 제어기가 정하는 양이고, 모델 예측 제어에서는 예측 구간의 입력열이 최적화의 결정변수가 된다.</p>
+<p class="map"><b>대응.</b> 상태는 관성 좌표 포즈 \(X\) 와 그 미분 \(\dot X\), 입력은 바퀴 토크 \(\tau\) 이다. 기본 문서가 속도를 몸체 좌표 \(v\) 로 쓴 것과 다른 점이 <a class="secref" href="#s2">02절</a>의 단순화를 만든다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<p><span class="step" id="eq1" data-title="상태 벡터: 관성 좌표 포즈와 그 미분" data-pv="1">식-1</span>상태 벡터이다. 몸체 포즈 \(X=[x,\ y,\ \theta]^\top\) 는 관성 좌표계 {O}(odom 프레임)에서 본 위치와 방향이다. 상태 추정기는 속도를 몸체 좌표 \(v=[v_x,\ v_y,\ \omega_z]^\top\) (앞, 왼쪽, 반시계)로 주므로 이것을 {O}의 속도로 바꾼다. 로봇이 \(\theta\) 만큼 돌아 있으면 "앞으로 \(v_x\)"는 {O}의 \(x\) 축으로 \(v_x\cos\theta\), \(y\) 축으로 \(v_x\sin\theta\) 만큼이고, "왼쪽으로 \(v_y\)"는 \(x\) 축으로 \(-v_y\sin\theta\), \(y\) 축으로 \(v_y\cos\theta\) 만큼이다. 회전은 두 좌표계의 축이 같은 \(z\) 축이라 그대로이다.</p>
+<div class="eq">\[
+\dot x=v_x\cos\theta-v_y\sin\theta,\qquad \dot y=v_x\sin\theta+v_y\cos\theta,\qquad \dot\theta=\omega_z
+\]</div>
+<p>세 식을 행렬로 모으면 기본 식-1〈몸체 속도를 지면 좌표 속도로 돌리는 식〉의 \(\dot X=R(\theta)v\) 이다. 회전행렬 \(R(\theta)\) 의 각 열은 몸체 축 \(\hat x_B,\ \hat y_B,\ \hat z\) 를 {O} 성분으로 쓴 것이다. 상태 \(x\) 는 포즈 세 개 위에 그 미분 세 개를 쌓은 6개이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}\dot x\\\dot y\\\dot\theta\end{bmatrix}}_{\dot X\ (\{O\})}=
+\underbrace{\begin{bmatrix}\cos\theta&-\sin\theta&0\\\sin\theta&\cos\theta&0\\0&0&1\end{bmatrix}}_{R(\theta):\ \text{열}=\hat x_B,\ \hat y_B,\ \hat z}
+\underbrace{\begin{bmatrix}v_x\\v_y\\\omega_z\end{bmatrix}}_{v\ (\{B\})},\qquad
+x=\underbrace{\begin{bmatrix}x\\y\\\theta\\\dot x\\\dot y\\\dot\theta\end{bmatrix}}_{\text{포즈 3} + \text{미분 3}}\in\mathbb R^6
+\]</div>
+<div class="ex">로봇이 북쪽(\(\theta\) = 90°)을 보고 자기 앞으로 1 m/s로 가면 \(v=[1,\ 0,\ 0]^\top\) 이고 \(\dot X=[0,\ 1,\ 0]^\top\) 이다. 상태 추정기가 \(v\) 를 주면 이 한 번의 회전으로 \(\dot X\) 를 만든다. 반대로 \(v=R(\theta)^\top\dot X\) 이다.</div>
+
+<p><span class="step" id="eq2" data-title="토크–일반화 힘 변환 행렬, 영공간 n" data-pv="1">식-2</span>입력은 네 바퀴의 순토크 \(\tau=[\tau_{FL},\ \tau_{FR},\ \tau_{RL},\ \tau_{RR}]^\top\) (바퀴축 마찰을 뺀, 지면을 미는 견인 토크와 회전자를 가속하는 반영 관성 토크의 합)이다. 토크 \(\tau_i\) 는 접지 롤러의 축 방향(전방에서 45°)으로 \(\sqrt2\,\tau_i/r\) 의 견인력을 만들고(기본 식-26〈정역학 바퀴 평형〉), 그 전방 성분은 \(\tau_i/r\), 횡 성분은 롤러 방향에 따라 \(\pm\tau_i/r\) 이다. FL과 RR의 롤러 축은 횡 성분이 \(-\)(오른쪽), FR과 RL은 \(+\)(왼쪽)이다. 모멘트는 각 성분에 팔 길이 \(l_x\), \(l_y\) 를 곱한 것이고, 합치면 \(k=l_x+l_y\) 하나로 묶인다(기본 식-6의 유도). 네 바퀴를 더하면 몸체가 받는 힘과 모멘트이다.</p>
+<div class="eq">\[
+F_x=\frac{\tau_{FL}+\tau_{FR}+\tau_{RL}+\tau_{RR}}{r},\qquad F_y=\frac{-\tau_{FL}+\tau_{FR}+\tau_{RL}-\tau_{RR}}{r},\qquad M_z=\frac{k}{r}\big(-\tau_{FL}+\tau_{FR}-\tau_{RL}+\tau_{RR}\big)
+\]</div>
+<p>행렬로 모으면 기본 식-28〈바퀴 토크 → 몸체 힘〉이며, 행렬은 기본 식-6〈역기구학〉의 \(T^{-1}\) 을 전치한 것이다(가상일의 원리, 기본 식-29). 변환 행렬 \((T^{-1})^\top\) 의 열 \(i\) 는 "바퀴 \(i\) 에 단위 토크를 줄 때 몸체가 받는 힘·모멘트"이다. 세 식을 모두 0으로 만드는 토크 패턴이 하나 있다. 앞 두 바퀴에 \(+a\), 뒤 두 바퀴에 \(-a\) 를 주면 \(F_x=0\), \(F_y=(-a+a-a+a)/r=0\), \(M_z\propto(-a+a+a-a)=0\) 이다. 이것이 영공간 방향 \(n\)(기본 식-22〈영공간 방향〉)이며, 아래 둘째 식이 그 검산이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}F_x\\F_y\\M_z\end{bmatrix}}_{F_B\ (\{B\})}=
+\underbrace{\frac1r\begin{bmatrix}1&1&1&1\\-1&1&1&-1\\-k&k&-k&k\end{bmatrix}}_{(T^{-1})^\top:\ \text{열}\,i=\text{바퀴}\,i\text{의 힘 방향}}
+\underbrace{\begin{bmatrix}\tau_{FL}\\\tau_{FR}\\\tau_{RL}\\\tau_{RR}\end{bmatrix}}_{\tau},\qquad
+(T^{-1})^\top\underbrace{\tfrac12\begin{bmatrix}1\\1\\-1\\-1\end{bmatrix}}_{n}=\frac1{2r}\begin{bmatrix}1+1-1-1\\-1+1-1+1\\-k+k+k-k\end{bmatrix}=0
+\]</div>
+<div class="ex">네 바퀴 모두 0.1 N·m이면 \(F_x=4\times0.1/0.04\) = 10 N, \(F_y=M_z=0\) 이다. \(n\) 방향으로 0.1 N·m, 곧 \(\tau=[0.05,\ 0.05,\ -0.05,\ -0.05]^\top\) 이면 \(F_B=0\) 이다. 앞바퀴 쌍과 뒷바퀴 쌍이 서로 밀어 몸체는 움직이지 않는다. 이 성분은 상태에 보이지 않으므로 <a class="secref" href="#s7">07절</a>의 벌점으로 0에 묶는다.</div>
+<p>토크의 단위와 부호는 AK 액추에이터의 MIT 모드 명령과 같다. 바퀴축 마찰 \(\tau_f(\omega)\) 는 모델에 넣지 않는다. 기존 설계의 torque_output 노드(MPC가 낸 순토크에 마찰 보상을 더해 모터 명령으로 보내는 노드)가 \(\tau_{cmd}=\tau+\tau_{fric}(\omega)\) 로 더하기 때문이다. 따라서 이 문서의 모델은 마찰이 없는 식이다.</p>
+
+</section>
+
+<!-- 02 -->
+<section id="s2">
+<h2><span class="n">02</span>관성 좌표계 운동방정식</h2>
+
+<div class="why"><div class="lbl">유도 개관</div><div class="tw"><table>
+<tr><th>유도</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>몸체 좌표 식 → 관성 좌표 식</td><td>몸체 좌표 식의 코리올리·구심 항은 선형화와 야코비안을 요구한다</td><td>같은 물리를 선형화 없이 쓰는 것</td><td>\(\dot X=Rv\) 를 미분해 \(\dot v\) 를 \(\ddot X\) 로 바꿔 넣는다</td><td>관성계 뉴턴 법칙, 회전 좌표계의 미분 규칙(Meriam 5.7), 홀로노믹 구속</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>뉴턴 법칙 \(m\mathbf a=\mathbf F\) 는 관성 좌표계에서 성립한다. 회전하는 좌표계의 성분으로 쓰면 가속도에 \(\omega\times\mathbf v\) 꼴의 항이 더해지는데(Meriam &amp; Kraige 5.7절), 이것은 물리적 힘이 아니라 축이 도는 데서 오는 항이다. 차량·선박 동역학이 몸체 좌표를 쓰는 이유는 비홀로노믹 구속(옆으로 못 감)과 힘이 몸체에 붙어 있기 때문이다. 메카넘 로봇은 홀로노믹이라 속도에 구속이 없고, 힘은 몸체 좌표에서 관성 좌표로 회전 한 번으로 옮겨진다. 따라서 관성 좌표계로 쓰면 운동방정식은 질량 × 가속도 = 회전된 힘이 된다.</p>
+<p class="map"><b>대응.</b> 기본 식-48〈유효 질량 운동방정식〉의 코리올리·구심 항 \(m\omega_zSv\) 는 관성 좌표계에서 사라진다. 바퀴 관성이 만드는 항 하나만 남고, 그것은 기준 궤적에서 미리 계산할 수 있다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<p><span class="step" id="eq3" data-title="몸체 좌표 운동방정식, 코리올리·구심 항 포함" data-pv="0">식-3</span>출발점은 기본 식-48〈유효 질량 운동방정식〉에서 바퀴축 마찰과 구름 저항을 뺀 식이다. 성분으로 쓰면 세 줄이다. 첫 줄은 전방 운동량의 변화이다. 전방 가속에 드는 관성은 몸체 질량 \(m\) 에 네 회전자의 환산 질량 \(\mu=4J_w/r^2\) 을 더한 \(m_{eff}\) 이고, 몸체가 \(\omega_z\) 로 돌면 왼쪽 속도 \(v_y\) 의 일부가 전방 성분으로 돌아 들어오므로 \(m\omega_zv_y\) 가 생긴다. 둘째 줄은 같은 내용의 횡 방향이며 부호가 반대이다(전방 속도가 왼쪽 성분으로 돌아 들어온다). 셋째 줄은 요 회전으로, 관성은 \(I_z\) 에 회전자 환산분을 더한 \(I_{eff}\) 이다.</p>
+<div class="eq">\[
+m_{eff}\,\dot v_x-m\,\omega_z\,v_y=F_x,\qquad m_{eff}\,\dot v_y+m\,\omega_z\,v_x=F_y,\qquad I_{eff}\,\dot\omega_z=M_z
+\]</div>
+<div class="eq">\[
+m_{eff}=m+\mu,\quad \mu=\frac{4J_w}{r^2}=2.425\ \text{kg},\qquad I_{eff}=I_z+\frac{4J_wk^2}{r^2}=I_z+0.0954\ \text{kg·m}^2
+\]</div>
+<p>코리올리·구심 항에 \(m_{eff}\) 가 아니라 \(m\) 이 붙는 이유는, 회전자의 관성이 바퀴 각가속도 \(\dot\omega=T^{-1}\dot v\) 를 통해서만 들어오고 \(T^{-1}\) 이 몸체 좌표에서 상수라 \(\dot v\) 에만 곱해지기 때문이다(기본 식-48의 유도). 앞 두 식을 행렬로 모으면 다음과 같다. \(S\) 는 90° 회전 행렬이고 \(Sv_{xy}=[-v_y,\ v_x]^\top\) 는 속도를 왼쪽으로 90° 돌린 벡터이다. 첫 항은 유효 질량 × 몸체 좌표 가속도, 둘째 항은 몸체 질량 × 요 각속도 × (90° 돌린 속도)이며, 셋째 행은 회전이라 따로 쓴다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}m_{eff}&0\\0&m_{eff}\end{bmatrix}}_{\text{유효 질량}}
+\begin{bmatrix}\dot v_x\\\dot v_y\end{bmatrix}+m\,\omega_z
+\underbrace{\begin{bmatrix}0&-1\\1&0\end{bmatrix}}_{S:\ 90^\circ\ \text{회전}}
+\underbrace{\begin{bmatrix}v_x\\v_y\end{bmatrix}}_{\to[-v_y,\ v_x]^\top}=
+\underbrace{\begin{bmatrix}F_x\\F_y\end{bmatrix}}_{F_{B,xy}},\qquad
+\underbrace{I_{eff}}_{I_z+\frac{4J_wk^2}{r^2}}\dot\omega_z=M_z
+\]</div>
+
+<p><span class="step" id="eq4" data-title="몸체 좌표 가속도를 관성 좌표 가속도로 바꾸는 식" data-pv="0">식-4</span><a class="eqref" href="#eq1">식-1</a>의 \(\dot x=v_x\cos\theta-v_y\sin\theta\) 를 시간으로 미분한다. 곱의 미분이므로 성분의 변화율에 의한 항과 각도의 변화율에 의한 항(\(\dot\theta=\omega_z\))이 나온다. \(\ddot y\) 도 같다.</p>
+<div class="eq">\[
+\ddot x=\underbrace{\dot v_x\cos\theta-\dot v_y\sin\theta}_{\text{성분 변화율}}\ \underbrace{-\ \omega_z\,(v_x\sin\theta+v_y\cos\theta)}_{\text{좌표계 회전 항}},\qquad
+\ddot y=\dot v_x\sin\theta+\dot v_y\cos\theta+\omega_z\,(v_x\cos\theta-v_y\sin\theta)
+\]</div>
+<p>좌표계 회전 항의 괄호는 <a class="eqref" href="#eq1">식-1</a>의 \(\dot y\) 와 \(\dot x\) 그 자체이다. 곧 \(\ddot x\) 에는 \(-\omega_z\dot y\), \(\ddot y\) 에는 \(+\omega_z\dot x\) 가 붙는다. 좌표계 회전에 따른 항(Meriam &amp; Kraige 5.7절의 \(\omega\times\mathbf V\))이다. 행렬로 모으면 \(\dot R_2=\omega_zR_2S\) 이고(\(R_2\): \(R\) 의 왼쪽 위 2×2 블록), \(R_2S\) 를 직접 곱하면 \(\begin{bmatrix}-s&-c\\c&-s\end{bmatrix}\) 로 위 성분 식의 "좌표계 회전 항" 괄호가 나온다. 이것을 \(\dot v\) 에 대해 풀면 몸체 좌표 가속도는 관성 가속도를 몸체 축으로 돌린 것에서 좌표계 회전 항을 뺀 것이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}\ddot x\\\ddot y\end{bmatrix}}_{\ddot X_{xy}}=
+\underbrace{\begin{bmatrix}c&-s\\s&c\end{bmatrix}}_{R_2}
+\underbrace{\begin{bmatrix}\dot v_x\\\dot v_y\end{bmatrix}}_{\text{성분 변화율}}+\omega_z
+\underbrace{\begin{bmatrix}c&-s\\s&c\end{bmatrix}\begin{bmatrix}0&-1\\1&0\end{bmatrix}}_{R_2S=\begin{bmatrix}-s&-c\\c&-s\end{bmatrix}}
+\begin{bmatrix}v_x\\v_y\end{bmatrix}
+\quad\Rightarrow\quad \dot v_{xy}=R_2^\top\ddot X_{xy}-\omega_zSv_{xy},\qquad c=\cos\theta,\ s=\sin\theta
+\]</div>
+<div class="ex">등속 원운동 \(v_{xy}=[1,\ 0]^\top\) m/s, \(\omega_z\) = 1 rad/s, \(\dot v=0\) 을 넣으면 \(\ddot X_{xy}=\omega_zR_2Sv_{xy}=R_2[0,\ 1]^\top\) 이다. 로봇 왼쪽으로 1 m/s², 곧 원 중심 방향의 구심 가속도이다. 몸체 성분이 일정해도 관성 가속도는 0이 아니다.</div>
+
+<p><span class="step" id="eq5" data-title="관성 좌표 운동방정식, 코리올리 항 소거" data-pv="2">식-5</span><a class="eqref" href="#eq3">식-3</a>의 앞 두 식을 {O} 성분으로 옮긴다. 세 단계이다.</p>
+<p><b>(1) {O}의 \(x\) 축으로 투영.</b> {O}의 \(x\) 축 단위벡터는 몸체 축으로 \(\hat x_O=\cos\theta\,\hat x_B-\sin\theta\,\hat y_B\) 이다. 그래서 몸체 성분으로 쓴 어떤 벡터든 {O}의 \(x\) 성분은 "(\(x\) 성분)\(\cos\theta\) − (\(y\) 성분)\(\sin\theta\)"이다(<a class="eqref" href="#eq1">식-1</a>이 속도에 한 것과 같은 계산). <a class="eqref" href="#eq3">식-3</a>의 첫 식에 \(\cos\theta\), 둘째 식에 \(-\sin\theta\) 를 곱해 더한다.</p>
+<div class="eq">\[
+m_{eff}\underbrace{(\dot v_x\cos\theta-\dot v_y\sin\theta)}_{①}-m\,\omega_z\underbrace{(v_y\cos\theta+v_x\sin\theta)}_{②}=F_x\cos\theta-F_y\sin\theta
+\]</div>
+<p><b>(2) 두 괄호를 {O} 양으로 바꾼다.</b> ①은 <a class="eqref" href="#eq4">식-4</a>의 "성분 변화율" 항이다. <a class="eqref" href="#eq4">식-4</a>를 그것에 대해 풀면 \(\dot v_x\cos\theta-\dot v_y\sin\theta=\ddot x+\omega_z\dot y\) 이다. ②는 <a class="eqref" href="#eq1">식-1</a>의 \(\dot y=v_x\sin\theta+v_y\cos\theta\) 그 자체이다.</p>
+<div class="eq">\[
+m_{eff}(\ddot x+\omega_z\dot y)-m\,\omega_z\dot y=F_x\cos\theta-F_y\sin\theta
+\]</div>
+<p><b>(3) \(\dot y\) 항을 모은다.</b> \((m_{eff}-m)\omega_z\dot y=\mu\,\omega_z\dot y\) 를 우변으로 넘긴다. \(y\) 축은 \(\hat y_O=\sin\theta\,\hat x_B+\cos\theta\,\hat y_B\) 이므로 첫 식에 \(\sin\theta\), 둘째 식에 \(\cos\theta\) 를 곱해 더하면 ①′ \(=\ddot y-\omega_z\dot x\), ②′ \(=\dot x\) 가 되어 같은 꼴이 나온다.</p>
+<div class="eq">\[
+m_{eff}\,\ddot x=F_x\cos\theta-F_y\sin\theta-\mu\,\omega_z\,\dot y,\qquad m_{eff}\,\ddot y=F_x\sin\theta+F_y\cos\theta+\mu\,\omega_z\,\dot x
+\]</div>
+<p>단계 (3)에서 \(\dot v\) 항이 내놓은 \(+m_{eff}\omega_z\dot y\) 와 <a class="eqref" href="#eq3">식-3</a>의 코리올리·구심 항 \(-m\omega_z\dot y\) 가 합쳐져 \(\mu\omega_z\dot y\) 만 남았다. 몸체 질량 \(m\) 에 비례하는 항은 완전히 사라진다. 뉴턴 법칙을 관성 좌표계에서 쓰면 가상의 힘이 없다는 뜻이다. 남는 \(\mu\) 항의 뜻은 이렇다. 관성 좌표 속도가 일정해도 몸체가 돌면 몸체 좌표 성분이 돌고, 그러면 바퀴 속도 \(T^{-1}v\) 가 변하여 회전자가 가속된다. 그 반영 관성 토크가 지면 반력으로 몸체에 돌아온다. 행렬로 모으면 다음과 같다. 첫 항은 일반화 힘을 {O} 축으로 분해한 것, 둘째 항은 바퀴 반영 관성 항이며, \(R_2S=SR_2\)(평면 회전은 서로 교환한다)를 써서 \(R_2Sv_{xy}=S\dot X_{xy}=[-\dot y,\ \dot x]^\top\) 로 썼다. <a class="figref" href="#fig2">그림 2</a>가 두 좌표계의 그림이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}m_{eff}&0\\0&m_{eff}\end{bmatrix}}_{\text{유효 질량}}
+\begin{bmatrix}\ddot x\\\ddot y\end{bmatrix}=
+\underbrace{\begin{bmatrix}c&-s\\s&c\end{bmatrix}}_{R_2:\ \{B\}\to\{O\}}
+\underbrace{\begin{bmatrix}F_x\\F_y\end{bmatrix}}_{\text{일반화 힘}}+
+\underbrace{\frac{4J_w}{r^2}}_{\mu}\,\omega_z
+\underbrace{\begin{bmatrix}0&-1\\1&0\end{bmatrix}}_{S}
+\underbrace{\begin{bmatrix}\dot x\\\dot y\end{bmatrix}}_{\to[-\dot y,\ \dot x]^\top}
+\qquad\big(m_{eff}\,\ddot X_{xy}=R_2F_{B,xy}+\mu\,\omega_z\,S\dot X_{xy}\big)
+\]</div>
+<figure id="fig2">
+<svg viewBox="0 0 760 330" role="img" aria-label="원운동에서 관성 좌표 속도 Ẋ, 가속도 Ẍ = ω S Ẋ, 몸체 좌표 속도 v의 관계"><defs><marker id="fFInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-ink"/></marker><marker id="fFAcc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-acc"/></marker><marker id="fFAmb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-amb"/></marker><marker id="fFMut" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-mut"/></marker></defs><circle cx="200.0" cy="170.0" r="110.0" class="f-dash-mut"/><circle cx="200.0" cy="170.0" r="3.0" class="t-ink"/><text x="200.0" y="188.0" font-size="11" text-anchor="middle" class="t-mut">원 중심</text><rect x="274.1" y="82.9" width="32.0" height="48.0" rx="4" class="f-body" transform="rotate(55.0 290.1 106.9)"/><line x1="290.1" y1="106.9" x2="336.0" y2="172.4" class="f-bf" marker-end="url(#fFAcc)"/><text x="346.0" y="176.4" font-size="12" text-anchor="start" class="t-acc">Ẋ (접선)</text><line x1="290.1" y1="106.9" x2="245.1" y2="138.5" class="f-vl2" marker-end="url(#fFAmb)"/><text x="233.0" y="157.3" font-size="12" text-anchor="end" class="t-amb">Ẍ = ω<tspan dy="4" font-size="10">z</tspan><tspan dy="-4">&#8203;</tspan> S Ẋ</text><line x1="40.0" y1="300.0" x2="110.0" y2="300.0" class="f-ax" marker-end="url(#fFInk)"/><line x1="40.0" y1="300.0" x2="40.0" y2="230.0" class="f-ax" marker-end="url(#fFInk)"/><text x="114.0" y="304.0" font-size="12" text-anchor="start" class="t-ink">X</text><text x="44.0" y="230.0" font-size="12" text-anchor="start" class="t-ink">Y</text><text x="40.0" y="318.0" font-size="11" text-anchor="start" class="t-mut">{O}: 축이 고정</text><text x="316.1" y="76.9" font-size="11" text-anchor="start" class="t-mut">로봇 (앞 = x<tspan dy="4" font-size="10">B</tspan><tspan dy="-4">&#8203;</tspan> = 접선)</text><text x="420.0" y="60.0" font-size="13" text-anchor="start" class="t-ink" font-weight="600">{B} 성분으로 쓰면</text><text x="420.0" y="84.0" font-size="12" text-anchor="start" class="t-ink">v = [v<tspan dy="4" font-size="10">x</tspan><tspan dy="-4">&#8203;</tspan>, 0]: 크기 일정 → v̇ = 0</text><text x="420.0" y="106.0" font-size="12" text-anchor="start" class="t-mut">필요한 힘은 m ω<tspan dy="4" font-size="10">z</tspan><tspan dy="-4">&#8203;</tspan> S v 항이 낸다 (코리올리·구심 항)</text><text x="420.0" y="150.0" font-size="13" text-anchor="start" class="t-ink" font-weight="600">{O} 성분으로 쓰면</text><text x="420.0" y="174.0" font-size="12" text-anchor="start" class="t-ink">Ẋ 의 방향이 돈다 → Ẍ = ω<tspan dy="4" font-size="10">z</tspan><tspan dy="-4">&#8203;</tspan> S Ẋ ≠ 0</text><text x="420.0" y="196.0" font-size="12" text-anchor="start" class="t-mut">필요한 힘은 m Ẍ, 기준 궤적에 이미 들어 있다</text><text x="420.0" y="240.0" font-size="12" text-anchor="start" class="t-ink" font-weight="600">같은 힘 m v²/R. 어느 항이 내느냐만 다르다</text><text x="420.0" y="262.0" font-size="12" text-anchor="start" class="t-mut">1 m/s, R = 2.4 m, m = 4 kg → 1.67 N</text><text x="420.0" y="284.0" font-size="12" text-anchor="start" class="t-mut">바퀴 반영 관성 항 μ ω<tspan dy="4" font-size="10">z</tspan><tspan dy="-4">&#8203;</tspan> S Ẋ 는 {O} 에서도 남는다 (1.01 N)</text></svg>
+<figcaption>그림 2. 등속 원운동. 몸체 좌표 성분 \(v\) 는 일정하므로 구심력이 코리올리·구심 항 \(m\omega_zSv\) 로 나타나고, 관성 좌표 성분 \(\dot X\) 는 방향이 돌므로 같은 힘이 \(m\ddot X\) 로 나타난다. 제어 모델을 {O}로 쓰면 이 항이 기준 궤적의 \(\ddot X_r\) 에 흡수되어 모델에서 사라진다.</figcaption>
+</figure>
+
+<div class="ex">\(\theta\) = 90°(북쪽 향함), \(v_x\) = 1, \(v_y\) = 0, \(\omega_z\) = 1 rad/s, \(\dot v=0\), \(m\) = 4 kg, \(\mu\) = 2.425 kg. <a class="eqref" href="#eq3">식-3</a>에서 \(F_x=0\), \(F_y=m\omega_zv_x\) = 4 N(왼쪽, 곧 서쪽). <a class="eqref" href="#eq1">식-1</a>에서 \(\dot x=0\), \(\dot y=1\). <a class="eqref" href="#eq5">식-5</a>에서 \(m_{eff}\ddot x=0-4\times1-2.425\times1\times1=-6.425\) 이므로 \(\ddot x=-1\) m/s²이다. 기하로 확인하면 북쪽으로 1 m/s로 가며 반시계로 돌 때 원 중심은 서쪽이고 구심 가속도는 \(\omega_zv\) = 1 m/s², 방향 \(-x\) 로 일치한다. 회전된 힘 −4 N만으로는 −0.62 m/s²밖에 안 나오고, 나머지 −2.425 N은 \(\mu\) 항이 낸다.</div>
+<div class="ex">반경 2.4 m를 1 m/s로 도는 선회(\(\omega_z\) = 0.417 rad/s)에서 \(m\) = 4 kg이면 <a class="eqref" href="#eq3">식-3</a>의 코리올리·구심 항은 \(m\omega_z|v|\) = 1.67 N이고, <a class="eqref" href="#eq5">식-5</a>의 \(\ddot X_{xy}\) 는 \(v^2/R\) = 0.417 m/s²이므로 \(m_{eff}\ddot X\) = 2.68 N, \(\mu\omega_z|\dot X|\) = 1.01 N이다. \(R_2F_B=2.68-1.01\) = 1.67 N으로 <a class="eqref" href="#eq3">식-3</a>과 같은 값이다. 같은 힘을 두 식이 다른 항으로 표현한 것뿐이다. 하중 10 kg에서는 4.17 N 대 1.01 N, 20 kg에서는 8.34 N 대 1.01 N이다.</div>
+
+<p><span class="step" id="eq6" data-title="제어 모델: 가속도 = 회전된 변환 행렬 × 토크 + 바퀴 관성 항" data-pv="1">식-6</span>제어 모델이다. <a class="eqref" href="#eq5">식-5</a>의 양변을 \(m_{eff}\) 로 나누고 <a class="eqref" href="#eq3">식-3</a>의 \(\theta\) 행을 합친다. 힘 \(F_x\), \(F_y\), \(M_z\) 는 <a class="eqref" href="#eq2">식-2</a>로 토크에서 나온다. \(\mu\) 항은 기준 궤적에서 미리 계산할 수 있는 알려진 가속도 \(w\) 로 둔다.</p>
+<div class="eq">\[
+\ddot x=\frac{F_x\cos\theta-F_y\sin\theta}{m_{eff}}+w_x,\qquad \ddot y=\frac{F_x\sin\theta+F_y\cos\theta}{m_{eff}}+w_y,\qquad \ddot\theta=\frac{M_z}{I_{eff}},\qquad w_x=-\frac{\mu\,\omega_z\dot y}{m_{eff}},\quad w_y=\frac{\mu\,\omega_z\dot x}{m_{eff}}
+\]</div>
+<p>가속도 = (토크가 만든 일반화 힘을 {O}로 돌려 관성으로 나눈 것) + (바퀴 반영 관성 항)이다. 행렬로 모으면 토크에서 가속도로의 입력 행렬 \(G(\theta)\) 하나로 쓴다. \(M_{eff}\) 의 앞 두 원소가 같으므로 \(R\) 과 교환하며(\(RM_{eff}^{-1}=M_{eff}^{-1}R\)), 그래서 \(G\) 를 \(M_{eff}^{-1}R(T^{-1})^\top\) 한 블록으로 쓸 수 있다.</p>
+<div class="eq">\[
+\ddot X=G(\theta)\,\tau+w,\qquad G(\theta)=M_{eff}^{-1}R(\theta)(T^{-1})^\top\in\mathbb R^{3\times4},\qquad M_{eff}=\mathrm{diag}(m_{eff},\ m_{eff},\ I_{eff}),\qquad w=M_{eff}^{-1}\begin{bmatrix}\mu\,\omega_zS\dot X_{xy}\\0\end{bmatrix}
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다. 첫 항은 일반화 힘을 {O} 축으로 분해해 관성으로 나눈 것이고, 둘째 항은 속도를 90° 돌린 \(S_3\dot X=[-\dot y,\ \dot x,\ 0]^\top\) 에 \(\mu\omega_z\) 를 곱해 관성으로 나눈 바퀴 반영 관성 항이다. 셋째 행은 \(S_3\) 의 마지막 행이 0이라 이 항이 없다. \(c=\cos\theta\), \(s=\sin\theta\).</p>
+<div class="eq">\[
+\begin{bmatrix}\ddot x\\\ddot y\\\ddot\theta\end{bmatrix}=
+\underbrace{\begin{bmatrix}\frac1{m_{eff}}&0&0\\0&\frac1{m_{eff}}&0\\0&0&\frac1{I_{eff}}\end{bmatrix}}_{M_{eff}^{-1}}
+\underbrace{\begin{bmatrix}c&-s&0\\s&c&0\\0&0&1\end{bmatrix}}_{R(\theta)}
+\underbrace{\begin{bmatrix}F_x\\F_y\\M_z\end{bmatrix}}_{(T^{-1})^\top\tau}
++\underbrace{\frac{4J_w}{r^2}}_{\mu}\,\omega_z
+\underbrace{\begin{bmatrix}\frac1{m_{eff}}&0&0\\0&\frac1{m_{eff}}&0\\0&0&\frac1{I_{eff}}\end{bmatrix}}_{M_{eff}^{-1}}
+\underbrace{\begin{bmatrix}0&-1&0\\1&0&0\\0&0&0\end{bmatrix}}_{S_3}
+\underbrace{\begin{bmatrix}\dot x\\\dot y\\\dot\theta\end{bmatrix}}_{\dot X}
+\]</div>
+<p>\(G(\theta)\) 의 각 열은 "바퀴 \(i\) 에 단위 토크를 줄 때의 가속도"이다. 바퀴 \(i\) 의 힘 \(\tfrac{\tau_i}r[1,\ \pm1]\) 을 \(\theta\) 돌리면 FL·RR은 \([c+s,\ s-c]/r\), FR·RL은 \([c-s,\ s+c]/r\) 이므로 \(G\) 의 성분과 \(\ddot x\) 행은 다음과 같다. \(\theta\) = 0일 때의 수치는 \(1/(rm_{eff})\) = 3.891, \(k/r\) = 4.959이다.</p>
+<div class="eq">\[
+G(\theta)=\begin{bmatrix}\dfrac{c+s}{rm_{eff}}&\dfrac{c-s}{rm_{eff}}&\dfrac{c-s}{rm_{eff}}&\dfrac{c+s}{rm_{eff}}\\[6pt]\dfrac{s-c}{rm_{eff}}&\dfrac{s+c}{rm_{eff}}&\dfrac{s+c}{rm_{eff}}&\dfrac{s-c}{rm_{eff}}\\[6pt]-\dfrac{k}{rI_{eff}}&\dfrac{k}{rI_{eff}}&-\dfrac{k}{rI_{eff}}&\dfrac{k}{rI_{eff}}\end{bmatrix},\qquad
+\ddot x=\frac{(c+s)(\tau_{FL}+\tau_{RR})+(c-s)(\tau_{FR}+\tau_{RL})}{r\,m_{eff}}-\frac{\mu\omega_z\dot y}{m_{eff}}
+\]</div>
+<div class="eq">\[
+G(0)=\begin{bmatrix}3.891&3.891&3.891&3.891\\-3.891&3.891&3.891&-3.891\\-4.959/I_{eff}&4.959/I_{eff}&-4.959/I_{eff}&4.959/I_{eff}\end{bmatrix}
+\]</div>
+<div class="ex">정지 상태에서 네 바퀴에 0.1 N·m를 주면 \(\ddot x=4\times3.891\times0.1\) = 1.556 m/s²이다. 기본 식-48의 예 \(10/6.425\) = 1.556 m/s²와 같다. \(\theta\) = 90°(\(c\) = 0, \(s\) = 1)이면 \(G\) 의 첫 행은 \(3.891[1,-1,-1,1]\), 둘째 행은 \(3.891[1,1,1,1]\) 이 되어 같은 토크가 \(\ddot y\) = 1.556 m/s²를 만든다. 북쪽을 보고 있으니 전진이 {O}의 \(+y\) 이기 때문이다. \(\theta\) = 45°면 첫 행 \(3.891[1.414,0,0,1.414]\), 둘째 행 \(3.891[0,1.414,1.414,0]\) 로 FL·RR은 \(x\) 로만, FR·RL은 \(y\) 로만 민다. 롤러 축이 {O} 축과 나란해지기 때문이다.</div>
+<p>시변인 것은 \(R(\theta)\) 하나이고, 예측에서는 \(\theta\) 자리에 기준 \(\theta_r\) 를 넣는다(<a class="secref" href="#s5">05절</a>). \(w\) 는 선택 항이다. 하중 4 kg에서는 구심력의 60 %, 20 kg에서는 12 %이므로 1판에 넣되, 넣지 않으면 <a class="secref" href="#s4">04절</a>의 \(\hat d\) 가 흡수한다(<a class="secref" href="#s12">12절</a>).</p>
+<div class="note">무슬립 가정은 \(\dot\omega=T^{-1}\dot v\) 한 곳에만 쓰였다. 미끄러지면 <a class="eqref" href="#eq6">식-6</a>의 \(\mu\) 가 줄고 \(G\) 가 커지며, 그 차이는 외란 추정치에 나타난다. 미끄럼 자체를 막는 것은 모델이 아니라 <a class="secref" href="#s8">08절</a>의 토크 상한이다.</div>
+
+<p><span class="step" id="eq7" data-title="연속시간 상태공간 모델: 이중적분기 + 회전하는 입력 행렬" data-pv="0">식-7</span>연속시간 상태공간 모델이다. <a class="eqref" href="#eq6">식-6</a>은 2계 미분방정식이므로 상태 \(x=[X;\ \dot X]\)(<a class="eqref" href="#eq1">식-1</a>)로 1계 연립 미분방정식으로 바꾼다. 위 세 행은 \(\dot X\) 의 정의이고 아래 세 행이 <a class="eqref" href="#eq6">식-6</a>이다. 이것이 이산화(<a class="secref" href="#s3">03절</a>)의 입력이 되는 최종 연속시간 모델이다.</p>
+<div class="eq">\[
+\dot x=A_c\,x+B_c(\theta)\,\tau+E_c\,w,\qquad A_c=\begin{bmatrix}0&I_3\\0&0\end{bmatrix},\quad B_c(\theta)=\begin{bmatrix}0\\G(\theta)\end{bmatrix},\quad E_c=\begin{bmatrix}0\\I_3\end{bmatrix}
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다. \(\rho=1/(rm_{eff})\) = 3.891, \(\kappa=k/(rI_{eff})\), \(c=\cos\theta\), \(s=\sin\theta\).</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}\dot x\\\dot y\\\dot\theta\\\ddot x\\\ddot y\\\ddot\theta\end{bmatrix}}_{\dot x}=
+\underbrace{\begin{bmatrix}0&0&0&1&0&0\\0&0&0&0&1&0\\0&0&0&0&0&1\\0&0&0&0&0&0\\0&0&0&0&0&0\\0&0&0&0&0&0\end{bmatrix}}_{A_c}
+\underbrace{\begin{bmatrix}x\\y\\\theta\\\dot x\\\dot y\\\dot\theta\end{bmatrix}}_{x}+
+\underbrace{\begin{bmatrix}0&0&0&0\\0&0&0&0\\0&0&0&0\\\rho(c+s)&\rho(c-s)&\rho(c-s)&\rho(c+s)\\\rho(s-c)&\rho(s+c)&\rho(s+c)&\rho(s-c)\\-\kappa&\kappa&-\kappa&\kappa\end{bmatrix}}_{B_c(\theta)}
+\underbrace{\begin{bmatrix}\tau_{FL}\\\tau_{FR}\\\tau_{RL}\\\tau_{RR}\end{bmatrix}}_{\tau}+
+\underbrace{\begin{bmatrix}0&0&0\\0&0&0\\0&0&0\\1&0&0\\0&1&0\\0&0&1\end{bmatrix}}_{E_c}
+\underbrace{\begin{bmatrix}-\mu\omega_z\dot y/m_{eff}\\\mu\omega_z\dot x/m_{eff}\\0\end{bmatrix}}_{w}
+\]</div>
+<p>성질 셋을 적는다. (1) \(A_c\) 는 상수이고 \(A_c^2=0\)(멱영 행렬)이다. 위치의 미분이 속도이고, 속도의 미분에는 상태가 들어 있지 않기 때문이다. (2) 시변·비선형인 것은 \(B_c(\theta)\) 의 \(R(\theta)\) 와 \(w\) 의 \(\omega_z\dot X\) 곱뿐이다. 예측에서는 둘 다 기준 궤적 값을 넣어 선형 시변(LTV)계로 다룬다. \(w\) 는 제어기가 정하는 입력이 아니라 미리 아는 입력이므로, MPC 문헌의 용어로 측정 가능 외란(measured disturbance)이며 \(B_c\tau\) 와 구분해 \(E_cw\) 로 쓴다. (3) 출력은 상태 전체 \(y=x\)(\(C=I_6\))이다.</p>
+<div class="ex">정지에서 네 바퀴 0.1 N·m, \(\theta\) = 0: \(\dot x=A_c\cdot0+B_c(0)\tau=[0,\ 0,\ 0,\ 4\rho\times0.1,\ 0,\ 0]^\top=[0,\ 0,\ 0,\ 1.556,\ 0,\ 0]^\top\). 가속도만 생기고 위치·속도의 변화율은 아직 0이다. <a class="eqref" href="#eq6">식-6</a>의 \(\ddot x\) = 1.556 m/s²와 같다.</div>
+
+</section>
+
+<!-- 03 -->
+<section id="s3">
+<h2><span class="n">03</span>이산화: 이중적분기의 ZOH</h2>
+
+<div class="why"><div class="lbl">유도 개관</div><div class="tw"><table>
+<tr><th>유도</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>연속 모델 → 10 ms 이산 모델</td><td>MPC는 샘플 단위로 예측한다</td><td>샘플 사이에 입력을 일정하게 둘 때 상태가 어떻게 넘어가는가</td><td>\(A_c\) 가 멱영이므로 행렬 지수를 손으로 계산한다</td><td>영차 유지(ZOH), 행렬 지수, 등가속도 운동</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>선형 시불변계 \(\dot x=A_cx+B_cu\) 에서 입력을 한 샘플 동안 일정하게 유지하면(ZOH) \(x(k+1)=e^{A_cT_s}x(k)+\int_0^{T_s}e^{A_c\tau}d\tau\,B_cu(k)\) 로 정확히 넘어간다(Franklin–Powell–Workman 4장). 위치–속도 이중적분기는 \(A_c^2=0\) 이므로 지수급수가 두 항에서 끝나고, 결과는 등가속도 운동 공식 \(x+vT_s+\tfrac12aT_s^2\), \(v+aT_s\) 이다. 오일러 근사와 달리 오차가 없다.</p>
+<p class="map"><b>대응.</b> <a class="eqref" href="#eq7">식-7</a>은 \(\ddot X\) 가 입력에 비례하는 이중적분기이다. \(G\) 가 \(\theta\) 에 따라 변하지만 한 샘플 동안 \(\theta_r(k)\) 로 고정하면(0.01 s에 0.004 rad 변한다) 위 공식이 그대로 적용된다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<p><b>유도.</b> <a class="eqref" href="#eq7">식-7</a>의 연속시간 상태공간 모델을 일반형 \(\dot x=A_cx+B_cu\) 로 쓰면, 그 해는 상수 변화법으로 다음과 같다. 스칼라 \(\dot x=ax+bu\) 의 \(x=e^{at}x_0+\int e^{a(t-\tau)}bu\,d\tau\) 를 행렬로 쓴 것이다. 적분 안의 \(\tau\) 는 시간 더미 변수이며 바퀴 토크 \(\tau\) 와 무관하다. <a class="eqref" href="#eq7">식-7</a>의 \(E_cw\) 는 \(B_c\tau\) 와 같은 자리의 강제항이므로 아래에서는 둘을 합쳐 \(B_cu\) 로 적고, 마지막에 다시 나눈다.</p>
+<div class="eq">\[
+x(t)=\underbrace{e^{A_c(t-t_0)}x(t_0)}_{\text{영입력 응답}}+\underbrace{\int_{t_0}^{t}e^{A_c(t-\tau)}B_c\,u(\tau)\,d\tau}_{\text{영상태 응답 (합성곱)}},\qquad e^{A_ct}=I+A_ct+\tfrac12A_c^2t^2+\cdots
+\]</div>
+<p>\(t_0=kT_s\), \(t=(k+1)T_s\) 로 두고 그 사이에 \(u(\tau)=u(k)\) 로 일정하다고 하면(ZOH) \(u\) 가 적분 밖으로 나온다. 적분 변수를 \(\eta=(k+1)T_s-\tau\) 로 바꾸면 구간이 \([0,T_s]\) 가 되어 \(k\) 가 사라지고, 그래서 \(A\), \(B\) 는 모든 샘플에서 같은 상수행렬이다. 이것이 ZOH 정확 이산화이며, 근사가 아니라 해를 샘플 시각에서 읽은 것이다.</p>
+<div class="eq">\[
+x(k+1)=\underbrace{e^{A_cT_s}}_{A}\,x(k)+\underbrace{\Big(\int_0^{T_s}e^{A_c\eta}d\eta\Big)B_c}_{B}\,u(k)
+\]</div>
+<p>보통은 \(e^{A_cT_s}\) 를 수치로 구해야 하지만(기본 문서의 블록 행렬 지수), <a class="eqref" href="#eq7">식-7</a>의 \(A_c=\begin{bmatrix}0&I\\0&0\end{bmatrix}\) 는 \(A_c^2=0\) 이라 급수가 두 항에서 끝난다. 위치가 가속도의 2차 다항식이라 \(t^3\) 항이 없기 때문이다. 적분 결과에 \(B_c=\begin{bmatrix}0\\G\end{bmatrix}\) 와 \(E_c=\begin{bmatrix}0\\I\end{bmatrix}\) 를 곱하면 각각 \(B\), \(E\) 가 된다.</p>
+<div class="eq">\[
+e^{A_cT_s}=I+A_cT_s=\begin{bmatrix}I&T_sI\\0&I\end{bmatrix},\qquad \int_0^{T_s}(I+A_c\eta)\,d\eta=\begin{bmatrix}T_sI&\tfrac{T_s^2}2I\\0&T_sI\end{bmatrix},\qquad \begin{bmatrix}T_sI&\tfrac{T_s^2}2I\\0&T_sI\end{bmatrix}\begin{bmatrix}0\\G\end{bmatrix}=\begin{bmatrix}\tfrac{T_s^2}2G\\T_sG\end{bmatrix}
+\]</div>
+<p>남는 근사는 샘플 안의 고정 둘이다. \(B_c\) 의 \(G(\theta)\) 는 \(\theta\) 로 변하므로 엄밀히는 LTI가 아니고, 한 샘플 동안 \(\theta=\theta_r(k)\) 로 고정한다. 10 ms에 \(\theta\) 는 0.004 rad 변한다. 측정 가능 외란 \(w\) 도 같은 이유로 격자점 값 \(w(k)\) 로 고정하며, 10 ms 동안의 변화는 0.4 % 정도이다.</p>
+
+<p><span class="step" id="eq8" data-title="이중적분기 ZOH 이산 모델, A 상수·B 시변" data-pv="1">식-8</span>이산시간 상태방정식이다. 위 결과를 성분으로 읽으면 등가속도 운동 공식이다. 가속도 \(a=[a_x,\ a_y,\ a_\theta]^\top=G\tau+w\) 를 한 샘플 동안 일정하게 두면, 위치는 등속 변위 \(\dot xT_s\) 와 가속 변위 \(\tfrac12a_xT_s^2\) 의 합만큼, 속도는 \(a_xT_s\) 만큼 변한다. 세 축 모두 같은 꼴이다.</p>
+<div class="eq">\[
+x(k+1)=x(k)+T_s\,\dot x(k)+\tfrac12T_s^2\,a_x(k),\qquad \dot x(k+1)=\dot x(k)+T_s\,a_x(k)\qquad(y,\ \theta\ \text{동일})
+\]</div>
+<p>여섯 식을 행렬로 모으고 \(a=G\tau+w\) 를 \(\tau\) 와 \(w\) 로 나누면 다음과 같다. 이것이 이후 모든 예측의 기본식이다.</p>
+<div class="eq">\[
+x(k+1)=A\,x(k)+B(k)\,\tau(k)+E\,w(k),\qquad A=\begin{bmatrix}I_3&T_sI_3\\0&I_3\end{bmatrix},\quad B(k)=\begin{bmatrix}\tfrac{T_s^2}{2}G(\theta_r(k))\\T_s\,G(\theta_r(k))\end{bmatrix},\quad E=\begin{bmatrix}\tfrac{T_s^2}{2}I_3\\T_sI_3\end{bmatrix}
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다. \(A\) 의 오른쪽 위 \(T_s\) 블록이 등속 변위 \(\dot xT_s\), \(B\) 의 위 블록이 가속 변위 \(\tfrac12aT_s^2\), 아래 블록이 속도 변화 \(aT_s\) 이다. \(c_r=\cos\theta_r(k)\), \(s_r=\sin\theta_r(k)\), \(\rho=1/(rm_{eff})\), \(\kappa=k/(rI_{eff})\) 로 줄였다.</p>
+<div class="eq">\[
+\begin{bmatrix}x\\y\\\theta\\\dot x\\\dot y\\\dot\theta\end{bmatrix}_{k+1}=
+\underbrace{\begin{bmatrix}1&0&0&T_s&0&0\\0&1&0&0&T_s&0\\0&0&1&0&0&T_s\\0&0&0&1&0&0\\0&0&0&0&1&0\\0&0&0&0&0&1\end{bmatrix}}_{A}
+\begin{bmatrix}x\\y\\\theta\\\dot x\\\dot y\\\dot\theta\end{bmatrix}_{k}+
+\underbrace{\begin{bmatrix}\tfrac{T_s^2}2\rho(c_r+s_r)&\tfrac{T_s^2}2\rho(c_r-s_r)&\tfrac{T_s^2}2\rho(c_r-s_r)&\tfrac{T_s^2}2\rho(c_r+s_r)\\\tfrac{T_s^2}2\rho(s_r-c_r)&\tfrac{T_s^2}2\rho(s_r+c_r)&\tfrac{T_s^2}2\rho(s_r+c_r)&\tfrac{T_s^2}2\rho(s_r-c_r)\\-\tfrac{T_s^2}2\kappa&\tfrac{T_s^2}2\kappa&-\tfrac{T_s^2}2\kappa&\tfrac{T_s^2}2\kappa\\T_s\rho(c_r+s_r)&T_s\rho(c_r-s_r)&T_s\rho(c_r-s_r)&T_s\rho(c_r+s_r)\\T_s\rho(s_r-c_r)&T_s\rho(s_r+c_r)&T_s\rho(s_r+c_r)&T_s\rho(s_r-c_r)\\-T_s\kappa&T_s\kappa&-T_s\kappa&T_s\kappa\end{bmatrix}}_{B(k)=\begin{bmatrix}\frac{T_s^2}2G\\T_sG\end{bmatrix}}
+\begin{bmatrix}\tau_{FL}\\\tau_{FR}\\\tau_{RL}\\\tau_{RR}\end{bmatrix}_k+
+\underbrace{\begin{bmatrix}\tfrac{T_s^2}2&0&0\\0&\tfrac{T_s^2}2&0\\0&0&\tfrac{T_s^2}2\\T_s&0&0\\0&T_s&0\\0&0&T_s\end{bmatrix}}_{E}
+\underbrace{\begin{bmatrix}-\mu\omega_z\dot y/m_{eff}\\\mu\omega_z\dot x/m_{eff}\\0\end{bmatrix}}_{w(k)}
+\]</div>
+<p>\(A\) 는 상수이다. 시변인 것은 \(B(k)\) 뿐이고, 그것도 \(G\) 안의 \(R(\theta_r(k))\) 가 전부이다. 기본 문서 13절의 오일러 근사와 그 오차 검산(기본 식-81〈전진 오일러 근사〉)은 필요 없다. \(A\) 의 거듭제곱도 닫힌 형이다: \(A^j=\begin{bmatrix}I&jT_sI\\0&I\end{bmatrix}\). 전진 오일러 \(A=I+T_sA_c\), \(B=T_sB_c\) 와 비교하면 \(A\) 는 같고 \(B\) 의 위 블록 \(\tfrac12T_s^2G\) 만 오일러에 빠진다.</p>
+<div class="ex">정지 상태, \(\theta_r\) = 0, 네 바퀴 0.1 N·m. <a class="eqref" href="#eq6">식-6</a>에서 \(\ddot x\) = 1.556 m/s²이므로 한 샘플 뒤 \(\dot x=T_s\ddot x\) = 0.01556 m/s, \(x=\tfrac12T_s^2\ddot x\) = 7.8×10⁻⁵ m이다. \(B(0)\) 의 첫 행 원소 \(\tfrac{T_s^2}{2}\times3.891\) = 1.95×10⁻⁴에 0.1을 곱해 네 바퀴를 더하면 같은 7.8×10⁻⁵ m이다. 오일러로 쓰면 이 7.8×10⁻⁵ m가 빠진다.</div>
+<div class="ex">\(A^j\) 의 검산: \(j\) 스텝 동안 입력이 없으면 속도는 그대로이고 위치는 \(jT_s\dot X\) 만큼 는다. \(\dot x\) = 0.5 m/s, \(j\) = 50이면 0.25 m이다.</div>
+
+</section>
+<div class="part">PART Ⅱ<b>모델 예측 제어</b><span><a class="eqref" href="#eq8">식-8</a>의 이산 모델로 예측 행렬을 만들고, 기준 지평과의 오차를 비용으로, 마찰 토크 상한과 변화율을 제약으로 둔 이차계획(QP)을 세운다. 적분 작용은 상태 증강 대신 외란 추정치로 넣는다.</span></div>
+
+<!-- 04 -->
+<section id="s4">
+<h2><span class="n">04</span>적분 작용: 외란 추정치</h2>
+
+<div class="why"><div class="lbl">유도 개관</div><div class="tw"><table>
+<tr><th>유도</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>모델에 없는 힘의 보정</td><td>구름 저항, 경사, 질량 오차, \(w\) 를 뺀 경우의 코리올리·구심 항 등은 모델에 없거나 틀리다. 그대로 두면 정상상태 오차가 남는다</td><td>외란을 따로 모델링하지 않고 상수 외란을 상쇄하는 것</td><td>지난 한 스텝의 예측 잔차를 외란 추정치로 삼아 예측에 더한다</td><td>오프셋 없는 MPC, 외란 모델, 속도형(증분형) 모델, 내부 모델 원리</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>제어기가 상수 외란에 오프셋 없이 추종하려면 외란을 상쇄하는 적분 작용이 있어야 한다(내부 모델 원리). MPC에서 적분 작용을 넣는 표준 방법은 둘이다. 하나는 상수 외란 상태 \(d\) 를 모델에 붙이고 관측기로 추정하는 것(Rawlings–Mayne–Diehl 1.5절, Pannocchia–Rawlings 2003), 다른 하나는 모델을 차분하여 상수가 사라지게 하는 속도형(증분형) 모델이다(Wang 1장). 둘은 같은 생각의 두 표현이다. 모델을 차분하면 \(x(k+1)-x(k)=A(x(k)-x(k-1))+B(u(k)-u(k-1))\) 인데, 이것을 풀어 쓰면 "지난 스텝에서 모델이 틀린 만큼을 앞으로도 더한다"가 된다.</p>
+<p class="map"><b>대응.</b> 기본 문서 14절의 Wang 증강(기본 식-86〈Wang 증강계〉, 기본 식-87〈적분 작용〉)을 풀어 쓴 것이 이 절의 \(\hat d\) 이다. 상태는 6개로 남고, 예측에는 상수 벡터 하나가 더해진다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<p><span class="step" id="eq9" data-title="외란 추정치: 지난 스텝 예측과 측정의 차이" data-pv="1">식-9</span>외란 추정치의 정의이다. 한 스텝 전의 상태와 그때 보낸 토크로 <a class="eqref" href="#eq8">식-8</a>이 예측한 값과, 지금 추정된 상태의 차이이다. 축마다 두 수가 나온다. 위치 잔차는 "예측보다 얼마나 더 갔는가", 속도 잔차는 "예측보다 속도가 얼마나 더 늘었는가"이다. \(x\) 축을 쓰면 다음과 같고 \(y\), \(\theta\) 도 같다. 잔차 계산에는 기준이 아니라 실제 값(\(\hat\theta(k-1)\), \(\hat{\dot X}(k-1)\))을 쓴다. 무엇이 실제로 일어났는지를 재는 식이기 때문이다.</p>
+<div class="eq">\[
+\hat d_x(k)=\hat x(k)-\Big[\hat x(k-1)+T_s\hat{\dot x}(k-1)+\tfrac12T_s^2a_x(k-1)\Big],\qquad \hat d_{\dot x}(k)=\hat{\dot x}(k)-\Big[\hat{\dot x}(k-1)+T_sa_x(k-1)\Big]
+\]</div>
+<p>모델에 없는 일정한 힘 \(f\) 가 있으면 속도 잔차는 매 스텝 \(fT_s/m_{eff}\) 로 같은 값이 나온다. 그래서 "앞으로도 이만큼씩 더 간다"고 보고 예측에 더하는 것이 적분 작용이다. 여섯 성분을 모으면 다음과 같다.</p>
+<div class="eq">\[
+\hat d(k)=\hat x(k)-A\,\hat x(k-1)-B\big(\hat\theta(k-1)\big)\,\tau(k-1)-E\,\hat w(k-1)\in\mathbb R^6
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다. 왼쪽이 측정, 오른쪽이 한 스텝 전 값으로 <a class="eqref" href="#eq8">식-8</a>이 예측한 값이다. \(a=[a_x,a_y,a_\theta]^\top=G(\hat\theta(k-1))\tau(k-1)+\hat w(k-1)\) 이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}\hat d_x\\\hat d_y\\\hat d_\theta\\\hat d_{\dot x}\\\hat d_{\dot y}\\\hat d_{\dot\theta}\end{bmatrix}}_{\hat d(k)}=
+\underbrace{\begin{bmatrix}\hat x\\\hat y\\\hat\theta\\\hat{\dot x}\\\hat{\dot y}\\\hat{\dot\theta}\end{bmatrix}_k}_{\text{측정(추정)}}-
+\underbrace{\begin{bmatrix}\hat x+T_s\hat{\dot x}+\tfrac12T_s^2a_x\\\hat y+T_s\hat{\dot y}+\tfrac12T_s^2a_y\\\hat\theta+T_s\hat{\dot\theta}+\tfrac12T_s^2a_\theta\\\hat{\dot x}+T_sa_x\\\hat{\dot y}+T_sa_y\\\hat{\dot\theta}+T_sa_\theta\end{bmatrix}_{k-1}}_{A\hat x(k-1)+B\tau(k-1)+E\hat w(k-1):\ \text{예측}}
+\]</div>
+
+<div class="ex">모델에 없는 1 N의 힘이 \(x\) 방향으로 작용하면(\(m_{eff}\) = 6.425 kg, \(a\) = 0.156 m/s²), 한 스텝에 속도는 \(aT_s\) = 0.00156 m/s, 위치는 \(\tfrac12aT_s^2\) = 7.8×10⁻⁶ m 더 움직인다. \(\hat d=[7.8\times10^{-6},\ 0,\ 0,\ 0.00156,\ 0,\ 0]^\top\) 이다. 앞으로 50 스텝 동안 이 값을 매 스텝 더하면 0.5 s 뒤 위치 예측이 \(50\times7.8\times10^{-6}+T_s\times\tfrac{50\times49}2\times0.00156\) = 0.0195 m 늘어나 실제와 일치한다(<a class="figref" href="#fig3">그림 3</a>).</div>
+<figure id="fig3">
+<svg viewBox="0 0 700 300" role="img" aria-label="모델에 없는 1 N 힘이 있을 때 외란 추정치을 더한 예측과 더하지 않은 예측의 비교"><defs><marker id="fDInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-ink"/></marker><marker id="fDAcc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-acc"/></marker><marker id="fDAmb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-amb"/></marker><marker id="fDMut" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-mut"/></marker></defs><line x1="80.0" y1="240.0" x2="660.0" y2="240.0" class="f-ax" marker-end="url(#fDInk)"/><line x1="80.0" y1="240.0" x2="80.0" y2="45.0" class="f-ax" marker-end="url(#fDInk)"/><text x="680.0" y="244.0" font-size="12" text-anchor="start" class="t-ink">t (s)</text><text x="74.0" y="50.0" font-size="12" text-anchor="end" class="t-ink">x − 0.5t (m)</text><line x1="76.0" y1="180.0" x2="640.0" y2="180.0" class="f-grid"/><text x="72.0" y="184.0" font-size="11" text-anchor="end" class="t-mut">0.01</text><line x1="76.0" y1="120.0" x2="640.0" y2="120.0" class="f-grid"/><text x="72.0" y="124.0" font-size="11" text-anchor="end" class="t-mut">0.02</text><text x="192.0" y="258.0" font-size="11" text-anchor="middle" class="t-mut">0.1</text><text x="304.0" y="258.0" font-size="11" text-anchor="middle" class="t-mut">0.2</text><text x="416.0" y="258.0" font-size="11" text-anchor="middle" class="t-mut">0.3</text><text x="528.0" y="258.0" font-size="11" text-anchor="middle" class="t-mut">0.4</text><text x="640.0" y="258.0" font-size="11" text-anchor="middle" class="t-mut">0.5</text><polyline points="80.0,240.0 91.2,240.0 102.4,239.8 113.6,239.6 124.8,239.3 136.0,238.8 147.2,238.3 158.4,237.7 169.6,237.0 180.8,236.2 192.0,235.3 203.2,234.4 214.4,233.3 225.6,232.1 236.8,230.8 248.0,229.5 259.2,228.0 270.4,226.5 281.6,224.9 292.8,223.1 304.0,221.3 315.2,219.4 326.4,217.4 337.6,215.3 348.8,213.1 360.0,210.8 371.2,208.4 382.4,206.0 393.6,203.4 404.8,200.7 416.0,198.0 427.2,195.1 438.4,192.2 449.6,189.2 460.8,186.0 472.0,182.8 483.2,179.5 494.4,176.1 505.6,172.6 516.8,169.0 528.0,165.3 539.2,161.5 550.4,157.6 561.6,153.7 572.8,149.6 584.0,145.4 595.2,141.2 606.4,136.9 617.6,132.4 628.8,127.9 640.0,123.3" class="f-bf3"/><polyline points="80.0,240.0 91.2,240.0 102.4,239.8 113.6,239.6 124.8,239.3 136.0,238.8 147.2,238.3 158.4,237.7 169.6,237.0 180.8,236.2 192.0,235.3 203.2,234.4 214.4,233.3 225.6,232.1 236.8,230.8 248.0,229.5 259.2,228.0 270.4,226.5 281.6,224.9 292.8,223.1 304.0,221.3 315.2,219.4 326.4,217.4 337.6,215.3 348.8,213.1 360.0,210.8 371.2,208.4 382.4,206.0 393.6,203.4 404.8,200.7 416.0,198.0 427.2,195.1 438.4,192.2 449.6,189.2 460.8,186.0 472.0,182.8 483.2,179.5 494.4,176.1 505.6,172.6 516.8,169.0 528.0,165.3 539.2,161.5 550.4,157.6 561.6,153.7 572.8,149.6 584.0,145.4 595.2,141.2 606.4,136.9 617.6,132.4 628.8,127.9 640.0,123.3" class="f-dash-amb"/><polyline points="80.0,240.0 91.2,240.0 102.4,240.0 113.6,240.0 124.8,240.0 136.0,240.0 147.2,240.0 158.4,240.0 169.6,240.0 180.8,240.0 192.0,240.0 203.2,240.0 214.4,240.0 225.6,240.0 236.8,240.0 248.0,240.0 259.2,240.0 270.4,240.0 281.6,240.0 292.8,240.0 304.0,240.0 315.2,240.0 326.4,240.0 337.6,240.0 348.8,240.0 360.0,240.0 371.2,240.0 382.4,240.0 393.6,240.0 404.8,240.0 416.0,240.0 427.2,240.0 438.4,240.0 449.6,240.0 460.8,240.0 472.0,240.0 483.2,240.0 494.4,240.0 505.6,240.0 516.8,240.0 528.0,240.0 539.2,240.0 550.4,240.0 561.6,240.0 572.8,240.0 584.0,240.0 595.2,240.0 606.4,240.0 617.6,240.0 628.8,240.0 640.0,240.0" class="f-mutline"/><text x="636.0" y="113.3" font-size="12" text-anchor="end" class="t-acc">실제 (오차 0.0195 m)</text><text x="580.0" y="157.3" font-size="12" text-anchor="end" class="t-amb">d̂ 를 더한 예측: 실제와 겹침</text><text x="636.0" y="228.0" font-size="12" text-anchor="end" class="t-mut">d̂ 없는 예측: 0.5t 그대로</text><text x="370.0" y="40.0" font-size="12" text-anchor="middle" class="t-ink">m<tspan dy="4" font-size="10">eff</tspan><tspan dy="-4">&#8203;</tspan> = 6.425 kg, 모르는 힘 1 N, τ = 0, v(0) = 0.5 m/s</text><text x="370.0" y="60.0" font-size="12" text-anchor="middle" class="t-mut">한 스텝 잔차: Δv = 0.00156 m/s, Δx = 7.8×10⁻⁶ m</text></svg>
+<figcaption>그림 3. 적분 작용의 원리. 모델에 없는 1 N의 힘(구름 저항, 경사 등)이 있으면 \(\hat d\) 없는 예측은 0.5 s 뒤에 1.9 cm 틀린다. 한 스텝 전에 잰 잔차 \(\hat d\) 를 앞으로도 일정하다고 보고 더하면 예측이 실제와 일치한다. 그래프는 \(0.5t\) 를 뺀 나머지만 그렸다.</figcaption>
+</figure>
+
+
+<p><span class="step" id="eq10" data-title="Wang 증분형과 외란 추정치의 항등식" data-pv="0">식-10</span>Wang 증분형과 같은 식임을 보인다. 증분 모델 \(\Delta x(k+1)=A\Delta x(k)+B\Delta\tau(k)\) 에 \(x(k+1)=x(k)+\Delta x(k+1)\) 을 쓰면 다음과 같다.</p>
+<div class="eq">\[
+x(k+1)=x(k)+A\big(x(k)-x(k-1)\big)+B\big(\tau(k)-\tau(k-1)\big)=A\,x(k)+B\,\tau(k)+\underbrace{\big[x(k)-Ax(k-1)-B\tau(k-1)\big]}_{\hat d(k)}
+\]</div>
+<p>유도가 아니라 항등식이다. 따라서 "증분형이 상수 외란을 소거한다"(기본 식-87〈적분 작용〉)는 성질은 그대로이고, 다만 증강 상태 \([\Delta x;\ x]\) 와 결정변수 \(\Delta T\) 대신 6상태와 절대 토크 \(T\) 로 쓴다. \(B\) 가 시변일 때는 증분형이 \((B(k)-B(k-1))\tau(k-1)\) 만큼의 오차를 갖지만 <a class="eqref" href="#eq9">식-9</a>는 그 오차가 없다.</p>
+<div class="ex">1차원으로 확인한다. 실제 \(x(k+1)=0.9x+0.1u+0.05\), 모델은 \(0.9x+0.1u\). \(x(0)=0\), \(u\) = 0으로 두면 \(x(1)\) = 0.05이고 잔차 \(\hat d(1)=0.05-0.9\times0-0.1\times0\) = 0.05이다. 다음 예측 \(0.9\times0.05+0.05\) = 0.095는 실제 \(x(2)\) = 0.095와 같다.</div>
+
+<p><span class="step" id="eq11" data-title="외란 추정치 저역통과" data-pv="0">식-11</span>선택 사항인 저역통과이다. \(\hat d\) 는 추정치 둘의 차분이라 측정 잡음이 \(\sqrt2\) 배로 들어온다. Wang 증분형의 \(\Delta x(k)\) 도 같은 차분이라 잡음이 같지만, <a class="eqref" href="#eq9">식-9</a> 꼴에는 필터를 넣을 자리가 있다.</p>
+<div class="eq">\[
+\hat d_f(k)=(1-\alpha)\,\hat d_f(k-1)+\alpha\,\hat d(k),\qquad 0\lt\alpha\le1
+\]</div>
+<p>\(\alpha\) = 1이면 <a class="eqref" href="#eq9">식-9</a> 그대로이고, \(\alpha\) = 0.1이면 시정수 \(T_s/\alpha\) = 0.1 s이다. 선회 중 <a class="eqref" href="#eq6">식-6</a>의 \(w\) 를 빼고 \(\hat d\) 에 맡겼을 때 그 항은 15 s 주기로 돌므로 0.1 s 지연은 보이지 않는다. 턱을 넘는 계단형 외란에는 0.1 s 늦게 반응한다. 1판은 \(\alpha\) = 1에서 시작하고, 토크 명령이 잡음으로 떨리면 줄인다.</p>
+<div class="note">잔차는 미끄럼과 질량 오차를 구별하지 못한다. 바퀴가 헛돌면 예측보다 가속이 작아 \(\hat d\) 가 음이 되고, QP는 토크를 더 내려 한다. 이것을 막는 것은 <a class="secref" href="#s8">08절</a>의 토크 상한이다. \(\hat d\) 를 로그에 남기면 슬립 로거의 \(\lambda\) 와 함께 "모델이 어디서 틀렸는가"의 기록이 된다.</div>
+</section>
+
+<!-- 05 -->
+<section id="s5">
+<h2><span class="n">05</span>예측</h2>
+
+<div class="why"><div class="lbl">유도 개관</div><div class="tw"><table>
+<tr><th>유도</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>지평 전체의 상태를 결정변수의 선형식으로</td><td>QP는 결정변수의 이차식만 다룬다</td><td>\(N_p\) 스텝 뒤 상태를 현재 상태, 토크열, 외란의 함수로 쓰는 것</td><td><a class="eqref" href="#eq8">식-8</a>을 반복 대입하고 블록 행렬로 쌓는다</td><td>상태 전이, 중첩 원리, 예측 행렬(Wang 1.3)</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>선형 모델에서는 미래 상태가 현재 상태의 자유 응답과 입력열의 강제 응답의 합이다(중첩 원리). 모든 스텝의 상태를 세로로 쌓으면 \(Y=Fx+\Phi U\) 꼴이 되고, \(F\) 는 \(A^j\) 를, \(\Phi\) 는 \(A^{j-1-i}B\) 를 블록으로 갖는다. 알려진 외란도 입력과 같은 자리에서 더해진다. 제어 구간 \(N_c\) 이후 입력을 마지막 값으로 고정하면 결정변수가 \(4N_c\) 개로 줄어든다.</p>
+<p class="map"><b>대응.</b> \(A^j\) 와 \(A^{j-1-i}B\) 가 닫힌 형이라 행렬 거듭제곱 없이 블록을 바로 쓴다. 외란은 알려진 \(w\)(기준에서 계산)와 추정한 \(\hat d\)(상수) 둘이다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<p><span class="step" id="eq12" data-title="j 스텝 예측, 닫힌 형 블록" data-pv="1">식-12</span><a class="eqref" href="#eq8">식-8</a>을 \(j\) 번 이어 붙인다. \(x\) 축으로 쓰면, 속도는 각 스텝의 가속도가 \(T_s\) 씩 쌓인 것에 속도 잔차가 \(j\) 번 더해진 것이다. 위치는 등속 변위 \(jT_s\dot x\) 에, 스텝 \(i\) 의 가속도가 자기 스텝에서 \(\tfrac12T_s^2\), 그 뒤 \(j-i-1\) 스텝에서 매번 \(T_s^2\) 씩 보탠 거리, 그리고 잔차가 보탠 거리를 더한 것이다. 외란 추정치의 위치 성분은 \(j\) 번, 속도 잔차가 만드는 위치는 \(T_s(0+1+\dots+(j-1))=T_s\tfrac{j(j-1)}2\) 배이다.</p>
+<div class="eq">\[
+\dot x(k+j)=\dot x(k)+T_s\sum_{i=0}^{j-1}a_{x,i}+j\,\hat d_{\dot x},\qquad
+x(k+j)=x(k)+jT_s\,\dot x(k)+\sum_{i=0}^{j-1}\big(j-i-\tfrac12\big)T_s^2\,a_{x,i}+j\,\hat d_x+T_s\frac{j(j-1)}{2}\,\hat d_{\dot x}
+\]</div>
+<p>여기서 \(a_i=G_i\tau_i+w_i\), \(G_i=G(\theta_r(k+i))\) 이다. 행렬로 모으면 \(A^p=\begin{bmatrix}I&pT_sI\\0&I\end{bmatrix}\), \(A^pB_i=\begin{bmatrix}(p+\tfrac12)T_s^2G_i\\T_sG_i\end{bmatrix}\), \(\sum_{p=0}^{j-1}A^p=\begin{bmatrix}jI&\tfrac{j(j-1)}2T_sI\\0&jI\end{bmatrix}\) 이며, 위 두 식이 그 성분이다.</p>
+<div class="eq">\[
+x(k+j)=A^jx(k)+\sum_{i=0}^{j-1}A^{j-1-i}\Big[B_i\tau_i+Ew_i\Big]+\Big(\sum_{p=0}^{j-1}A^p\Big)\hat d,\qquad A^{j-1-i}B_i=\begin{bmatrix}(j-i-\tfrac12)T_s^2G_i\\T_sG_i\end{bmatrix}
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다. \(A^j\) 는 오른쪽 위 블록이 \(jT_s\) 로 바뀔 뿐이고, \(A^{j-1-i}B_i\) 는 \(B_i\) 의 위 블록 계수가 \(\tfrac12\) 에서 \(j-i-\tfrac12\) 로 바뀔 뿐이다. \(g_{x,i},g_{y,i},g_{\theta,i}\) 는 \(G_i=G(\theta_r(k+i))\) 의 세 행(1×4)이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}1&0&0&jT_s&0&0\\0&1&0&0&jT_s&0\\0&0&1&0&0&jT_s\\0&0&0&1&0&0\\0&0&0&0&1&0\\0&0&0&0&0&1\end{bmatrix}}_{A^j:\ j\text{ 스텝의 등속 변위}},\qquad
+\underbrace{\begin{bmatrix}(j-i-\tfrac12)T_s^2\,g_{x,i}\\(j-i-\tfrac12)T_s^2\,g_{y,i}\\(j-i-\tfrac12)T_s^2\,g_{\theta,i}\\T_s\,g_{x,i}\\T_s\,g_{y,i}\\T_s\,g_{\theta,i}\end{bmatrix}}_{A^{j-1-i}B_i:\ \text{스텝 }i\text{ 입력의 }j\text{ 스텝 응답}},\qquad
+\underbrace{\begin{bmatrix}j&0&0&\tfrac{j(j-1)}2T_s&0&0\\0&j&0&0&\tfrac{j(j-1)}2T_s&0\\0&0&j&0&0&\tfrac{j(j-1)}2T_s\\0&0&0&j&0&0\\0&0&0&0&j&0\\0&0&0&0&0&j\end{bmatrix}}_{\sum_{p=0}^{j-1}A^p:\ \text{상수 외란의 }j\text{ 스텝 누적}}
+\]</div>
+
+<div class="ex">\(j\) = 2, \(i\) = 0: 스텝 0의 토크가 만든 가속도 \(a=G_0\tau_0\) 는 2 스텝 뒤 속도를 \(T_sa\), 위치를 \(\tfrac12T_s^2a+T_s\cdot T_sa=\tfrac32T_s^2a\) 만큼 바꾼다. 공식의 \((2-0-\tfrac12)T_s^2\) = \(\tfrac32T_s^2\) 과 같다. 첫 스텝의 \(\tfrac12T_s^2\) 에 둘째 스텝 동안 그 속도로 간 \(T_s^2\) 이 더해진 것이다.</div>
+
+<p><span class="step" id="eq13" data-title="예측 행렬 F, Φ, Ψ 적층" data-pv="0">식-13</span>\(j=1,\dots,N_p\) 를 쌓는다. \(N_c\) 이후의 토크는 \(\tau_{N_c-1}\) 로 고정하므로 \(\Phi\) 의 마지막 열 블록은 \(i\ge N_c-1\) 의 합이다. \(W_r=[w_0;\dots;w_{N_p-1}]\) 은 기준에서 미리 계산한다.</p>
+<div class="eq">\[
+Y=\begin{bmatrix}x(k+1)\\\vdots\\x(k+N_p)\end{bmatrix}=F\,x(k)+\Phi\,T+\Psi_w\,W_r+\Psi\,\hat d,\qquad T=\begin{bmatrix}\tau_0\\\vdots\\\tau_{N_c-1}\end{bmatrix}\in\mathbb R^{4N_c}
+\]</div>
+<div class="eq">\[
+F=\begin{bmatrix}A\\A^2\\\vdots\\A^{N_p}\end{bmatrix},\qquad \Phi_{(j,i)}=\begin{cases}A^{j-1-i}B_i&i\lt\min(j,N_c-1)\\\sum_{i'=N_c-1}^{j-1}A^{j-1-i'}B_{i'}&i=N_c-1,\ j\ge N_c\\0&i\ge j\end{cases},\qquad \Psi=\begin{bmatrix}I\\I+A\\\vdots\\\sum_{p=0}^{N_p-1}A^p\end{bmatrix}
+\]</div>
+<p>작은 경우로 블록 행렬을 전개한다. \(N_p\) = 3, \(N_c\) = 2이면 \(\tau_2=\tau_1\) 이므로 \(\Phi\) 의 둘째 열 블록 셋째 행이 \(AB_1+B_2\) 로 합쳐진다. 각 블록은 <a class="eqref" href="#eq12">식-12</a>의 닫힌 형이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}x(k+1)\\x(k+2)\\x(k+3)\end{bmatrix}}_{Y\ (18\times1)}=
+\underbrace{\begin{bmatrix}A\\A^2\\A^3\end{bmatrix}}_{F:\ \text{자유 응답}}x(k)+
+\underbrace{\begin{bmatrix}B_0&0\\AB_0&B_1\\A^2B_0&AB_1+B_2\end{bmatrix}}_{\Phi:\ \text{토크의 효과}}
+\underbrace{\begin{bmatrix}\tau_0\\\tau_1\end{bmatrix}}_{T\ (8\times1)}+
+\underbrace{\begin{bmatrix}E&0&0\\AE&E&0\\A^2E&AE&E\end{bmatrix}}_{\Psi_w:\ \text{알려진 가속도의 효과}}
+\begin{bmatrix}w_0\\w_1\\w_2\end{bmatrix}+
+\underbrace{\begin{bmatrix}I\\I+A\\I+A+A^2\end{bmatrix}}_{\Psi:\ \text{외란 추정치의 누적}}\hat d
+\]</div>
+
+<p>\(F\), \(\Psi\), \(\Psi_w\) 는 상수이다. 매 주기 다시 만드는 것은 \(\Phi\) 뿐이고, 그것도 \(G_i\) 의 \(R(\theta_r(k+i))\) 가 바뀌는 것이 전부이다. \(N_p\) = 50, \(N_c\) = 5이면 \(Y\) 는 300, \(T\) 는 20, \(\Phi\) 는 300×20이다.</p>
+<div class="ex">\(\Psi\) 의 마지막 블록은 \(\begin{bmatrix}50I&1225T_sI\\0&50I\end{bmatrix}\) 이다. <a class="secref" href="#s4">04절</a>의 예에서 \(\hat d\) 의 속도 성분 0.00156을 곱하면 위치에 \(1225\times0.01\times0.00156\) = 0.0191 m, 여기에 위치 성분 \(50\times7.8\times10^{-6}\) = 0.0004 m를 더해 0.0195 m이다.</div>
+</section>
+
+<!-- 06 -->
+<section id="s6">
+<h2><span class="n">06</span>기준 지평과 플래너 인터페이스</h2>
+
+<div class="why"><div class="lbl">유도 개관</div><div class="tw"><table>
+<tr><th>유도</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>플래너 출력 → \(Y_r\)</td><td>피드포워드는 지평 전체의 기준을 비용에 넣는 것으로 구현한다</td><td>플래너가 주는 포즈·몸체 속도를 상태 \([X;\ \dot X]\) 와 같은 좌표로 맞추는 것</td><td>속도를 \(R(\theta_r)\) 로 돌리고 각도를 언랩한다</td><td>기준 추종(reference tracking), 미리보기(preview), 궤적과 경로의 구분</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>기준 추종 MPC는 비용에 \(x(k+j)-x_r(k+j)\) 를 두어 지평 안의 기준을 모두 본다. 이것이 미리보기이며, 고전 제어의 피드포워드와 같은 역할을 한다. 기준을 오차 좌표로 모델에 넣는 방식과는 \(x=x_e+x_r\) 치환으로 같은 QP가 된다. 기준은 시간 파라미터화된 궤적이어야 하며(Siciliano 4장), 위치 기준과 속도 기준이 서로 맞을수록 비용이 한 방향을 가리킨다.</p>
+<p class="map"><b>대응.</b> 기본 문서 10절의 피드포워드 토크(기본 식-63)와 기본 문서 19절의 기준 가속도(기본 식-108)가 필요 없다. 플래너가 이미 주는 포즈와 속도만 쓴다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<p>로봇의 로컬 플래너는 샘플링 기반 MPPI 계열의 DRA-MPPI 노드이며, 토픽 <code>/dra_mppi/reference_trajectory</code>로 0.2 s 간격 20행의 기준열을 10 Hz로 보낸다. 행마다 포즈 \(X_r=[x_r,\ y_r,\ \theta_r]\) (odom 좌표)와 몸체 속도 \(u_r=[v_{xr},\ v_{yr},\ \omega_r]\) 가 있다. 현재 실차에서 운용 중인 바퀴 속도 입력 MPC 노드(wheel_mpc, 기본 문서의 현재 판 구현)의 기준열 보간 클래스 <code>ReferenceHorizon.horizon(now, T_s, N_p)</code> 가 이것을 \(T_s\) 격자로 선형 보간한다(<a class="figref" href="#fig4">그림 4</a>). 인터페이스는 그대로이고, 인자가 \((0.04,\ 20)\) 에서 \((0.01,\ 50)\) 으로 바뀐다.</p>
+<figure id="fig4">
+<svg viewBox="0 0 780 270" role="img" aria-label="플래너의 0.2 s 격자 기준열을 10 ms 격자로 보간하고 그중 0.5 s를 MPC 지평으로 쓰는 그림"><defs><marker id="fHInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-ink"/></marker><marker id="fHAcc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-acc"/></marker><marker id="fHAmb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-amb"/></marker><marker id="fHMut" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-mut"/></marker></defs><line x1="60.0" y1="70.0" x2="720.0" y2="70.0" class="f-thin"/><circle cx="60.0" cy="70.0" r="5.0" class="f-acc-fill"/><text x="60.0" y="58.0" font-size="11" text-anchor="middle" class="t-mut">0.0 s</text><circle cx="192.0" cy="70.0" r="5.0" class="f-acc-fill"/><text x="192.0" y="58.0" font-size="11" text-anchor="middle" class="t-mut">0.2 s</text><circle cx="324.0" cy="70.0" r="5.0" class="f-acc-fill"/><text x="324.0" y="58.0" font-size="11" text-anchor="middle" class="t-mut">0.4 s</text><circle cx="456.0" cy="70.0" r="5.0" class="f-acc-fill"/><text x="456.0" y="58.0" font-size="11" text-anchor="middle" class="t-mut">0.6 s</text><circle cx="588.0" cy="70.0" r="5.0" class="f-acc-fill"/><text x="588.0" y="58.0" font-size="11" text-anchor="middle" class="t-mut">0.8 s</text><circle cx="720.0" cy="70.0" r="5.0" class="f-acc-fill"/><text x="720.0" y="58.0" font-size="11" text-anchor="middle" class="t-mut">1.0 s</text><text x="715.0" y="92.0" font-size="11" text-anchor="end" class="t-mut">… 4 s (20행)</text><text x="60.0" y="36.0" font-size="12" text-anchor="start" class="t-ink">플래너 행: 0.2 s 간격, 각 행 [X<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan>, u<tspan dy="4" font-size="10">r</tspan><tspan dy="-4">&#8203;</tspan>]</text><line x1="60.0" y1="150.0" x2="720.0" y2="150.0" class="f-thin"/><line x1="60.0" y1="144.0" x2="60.0" y2="156.0" class="f-thin"/><line x1="66.6" y1="147.0" x2="66.6" y2="153.0" class="f-thin"/><line x1="73.2" y1="147.0" x2="73.2" y2="153.0" class="f-thin"/><line x1="79.8" y1="147.0" x2="79.8" y2="153.0" class="f-thin"/><line x1="86.4" y1="147.0" x2="86.4" y2="153.0" class="f-thin"/><line x1="93.0" y1="147.0" x2="93.0" y2="153.0" class="f-thin"/><line x1="99.6" y1="147.0" x2="99.6" y2="153.0" class="f-thin"/><line x1="106.2" y1="147.0" x2="106.2" y2="153.0" class="f-thin"/><line x1="112.8" y1="147.0" x2="112.8" y2="153.0" class="f-thin"/><line x1="119.4" y1="147.0" x2="119.4" y2="153.0" class="f-thin"/><line x1="126.0" y1="147.0" x2="126.0" y2="153.0" class="f-thin"/><line x1="132.6" y1="147.0" x2="132.6" y2="153.0" class="f-thin"/><line x1="139.2" y1="147.0" x2="139.2" y2="153.0" class="f-thin"/><line x1="145.8" y1="147.0" x2="145.8" y2="153.0" class="f-thin"/><line x1="152.4" y1="147.0" x2="152.4" y2="153.0" class="f-thin"/><line x1="159.0" y1="147.0" x2="159.0" y2="153.0" class="f-thin"/><line x1="165.6" y1="147.0" x2="165.6" y2="153.0" class="f-thin"/><line x1="172.2" y1="147.0" x2="172.2" y2="153.0" class="f-thin"/><line x1="178.8" y1="147.0" x2="178.8" y2="153.0" class="f-thin"/><line x1="185.4" y1="147.0" x2="185.4" y2="153.0" class="f-thin"/><line x1="192.0" y1="144.0" x2="192.0" y2="156.0" class="f-thin"/><line x1="198.6" y1="147.0" x2="198.6" y2="153.0" class="f-thin"/><line x1="205.2" y1="147.0" x2="205.2" y2="153.0" class="f-thin"/><line x1="211.8" y1="147.0" x2="211.8" y2="153.0" class="f-thin"/><line x1="218.4" y1="147.0" x2="218.4" y2="153.0" class="f-thin"/><line x1="225.0" y1="147.0" x2="225.0" y2="153.0" class="f-thin"/><line x1="231.6" y1="147.0" x2="231.6" y2="153.0" class="f-thin"/><line x1="238.2" y1="147.0" x2="238.2" y2="153.0" class="f-thin"/><line x1="244.8" y1="147.0" x2="244.8" y2="153.0" class="f-thin"/><line x1="251.4" y1="147.0" x2="251.4" y2="153.0" class="f-thin"/><line x1="258.0" y1="147.0" x2="258.0" y2="153.0" class="f-thin"/><line x1="264.6" y1="147.0" x2="264.6" y2="153.0" class="f-thin"/><line x1="271.2" y1="147.0" x2="271.2" y2="153.0" class="f-thin"/><line x1="277.8" y1="147.0" x2="277.8" y2="153.0" class="f-thin"/><line x1="284.4" y1="147.0" x2="284.4" y2="153.0" class="f-thin"/><line x1="291.0" y1="147.0" x2="291.0" y2="153.0" class="f-thin"/><line x1="297.6" y1="147.0" x2="297.6" y2="153.0" class="f-thin"/><line x1="304.2" y1="147.0" x2="304.2" y2="153.0" class="f-thin"/><line x1="310.8" y1="147.0" x2="310.8" y2="153.0" class="f-thin"/><line x1="317.4" y1="147.0" x2="317.4" y2="153.0" class="f-thin"/><line x1="324.0" y1="144.0" x2="324.0" y2="156.0" class="f-thin"/><line x1="330.6" y1="147.0" x2="330.6" y2="153.0" class="f-thin"/><line x1="337.2" y1="147.0" x2="337.2" y2="153.0" class="f-thin"/><line x1="343.8" y1="147.0" x2="343.8" y2="153.0" class="f-thin"/><line x1="350.4" y1="147.0" x2="350.4" y2="153.0" class="f-thin"/><line x1="357.0" y1="147.0" x2="357.0" y2="153.0" class="f-thin"/><line x1="363.6" y1="147.0" x2="363.6" y2="153.0" class="f-thin"/><line x1="370.2" y1="147.0" x2="370.2" y2="153.0" class="f-thin"/><line x1="376.8" y1="147.0" x2="376.8" y2="153.0" class="f-thin"/><line x1="383.4" y1="147.0" x2="383.4" y2="153.0" class="f-thin"/><line x1="390.0" y1="147.0" x2="390.0" y2="153.0" class="f-thin"/><line x1="396.6" y1="147.0" x2="396.6" y2="153.0" class="f-thin"/><line x1="403.2" y1="147.0" x2="403.2" y2="153.0" class="f-thin"/><line x1="409.8" y1="147.0" x2="409.8" y2="153.0" class="f-thin"/><line x1="416.4" y1="147.0" x2="416.4" y2="153.0" class="f-thin"/><line x1="423.0" y1="147.0" x2="423.0" y2="153.0" class="f-thin"/><line x1="429.6" y1="147.0" x2="429.6" y2="153.0" class="f-thin"/><line x1="436.2" y1="147.0" x2="436.2" y2="153.0" class="f-thin"/><line x1="442.8" y1="147.0" x2="442.8" y2="153.0" class="f-thin"/><line x1="449.4" y1="147.0" x2="449.4" y2="153.0" class="f-thin"/><line x1="456.0" y1="144.0" x2="456.0" y2="156.0" class="f-thin"/><line x1="462.6" y1="147.0" x2="462.6" y2="153.0" class="f-thin"/><line x1="469.2" y1="147.0" x2="469.2" y2="153.0" class="f-thin"/><line x1="475.8" y1="147.0" x2="475.8" y2="153.0" class="f-thin"/><line x1="482.4" y1="147.0" x2="482.4" y2="153.0" class="f-thin"/><line x1="489.0" y1="147.0" x2="489.0" y2="153.0" class="f-thin"/><line x1="495.6" y1="147.0" x2="495.6" y2="153.0" class="f-thin"/><line x1="502.2" y1="147.0" x2="502.2" y2="153.0" class="f-thin"/><line x1="508.8" y1="147.0" x2="508.8" y2="153.0" class="f-thin"/><line x1="515.4" y1="147.0" x2="515.4" y2="153.0" class="f-thin"/><line x1="522.0" y1="147.0" x2="522.0" y2="153.0" class="f-thin"/><line x1="528.6" y1="147.0" x2="528.6" y2="153.0" class="f-thin"/><line x1="535.2" y1="147.0" x2="535.2" y2="153.0" class="f-thin"/><line x1="541.8" y1="147.0" x2="541.8" y2="153.0" class="f-thin"/><line x1="548.4" y1="147.0" x2="548.4" y2="153.0" class="f-thin"/><line x1="555.0" y1="147.0" x2="555.0" y2="153.0" class="f-thin"/><line x1="561.6" y1="147.0" x2="561.6" y2="153.0" class="f-thin"/><line x1="568.2" y1="147.0" x2="568.2" y2="153.0" class="f-thin"/><line x1="574.8" y1="147.0" x2="574.8" y2="153.0" class="f-thin"/><line x1="581.4" y1="147.0" x2="581.4" y2="153.0" class="f-thin"/><line x1="588.0" y1="144.0" x2="588.0" y2="156.0" class="f-thin"/><line x1="594.6" y1="147.0" x2="594.6" y2="153.0" class="f-thin"/><line x1="601.2" y1="147.0" x2="601.2" y2="153.0" class="f-thin"/><line x1="607.8" y1="147.0" x2="607.8" y2="153.0" class="f-thin"/><line x1="614.4" y1="147.0" x2="614.4" y2="153.0" class="f-thin"/><line x1="621.0" y1="147.0" x2="621.0" y2="153.0" class="f-thin"/><line x1="627.6" y1="147.0" x2="627.6" y2="153.0" class="f-thin"/><line x1="634.2" y1="147.0" x2="634.2" y2="153.0" class="f-thin"/><line x1="640.8" y1="147.0" x2="640.8" y2="153.0" class="f-thin"/><line x1="647.4" y1="147.0" x2="647.4" y2="153.0" class="f-thin"/><line x1="654.0" y1="147.0" x2="654.0" y2="153.0" class="f-thin"/><line x1="660.6" y1="147.0" x2="660.6" y2="153.0" class="f-thin"/><line x1="667.2" y1="147.0" x2="667.2" y2="153.0" class="f-thin"/><line x1="673.8" y1="147.0" x2="673.8" y2="153.0" class="f-thin"/><line x1="680.4" y1="147.0" x2="680.4" y2="153.0" class="f-thin"/><line x1="687.0" y1="147.0" x2="687.0" y2="153.0" class="f-thin"/><line x1="693.6" y1="147.0" x2="693.6" y2="153.0" class="f-thin"/><line x1="700.2" y1="147.0" x2="700.2" y2="153.0" class="f-thin"/><line x1="706.8" y1="147.0" x2="706.8" y2="153.0" class="f-thin"/><line x1="713.4" y1="147.0" x2="713.4" y2="153.0" class="f-thin"/><line x1="720.0" y1="144.0" x2="720.0" y2="156.0" class="f-thin"/><rect x="60.0" y="128.0" width="330.0" height="44.0" rx="3" class="f-acc-soft" fill-opacity=".35"/><rect x="60.0" y="128.0" width="33.0" height="44.0" rx="3" class="f-amb-soft" fill-opacity=".6"/><text x="60.0" y="210.0" font-size="12" text-anchor="start" class="t-acc">N<tspan dy="4" font-size="10">p</tspan><tspan dy="-4">&#8203;</tspan> = 50 (0.5 s): 비용이 보는 구간</text><text x="60.0" y="192.0" font-size="12" text-anchor="start" class="t-amb">N<tspan dy="4" font-size="10">c</tspan><tspan dy="-4">&#8203;</tspan> = 5 (0.05 s): 토크가 바뀌는 구간, 이후 일정</text><text x="60.0" y="230.0" font-size="12" text-anchor="start" class="t-ink">보간 격자: 10 ms. ReferenceHorizon.horizon(now, 0.01, 50)</text><text x="400.0" y="176.0" font-size="11" text-anchor="start" class="t-mut">나머지는 쓰지 않는다</text><line x1="60.0" y1="78.0" x2="60.0" y2="126.0" class="f-dash-mut" marker-end="url(#fHMut)"/><line x1="192.0" y1="78.0" x2="192.0" y2="126.0" class="f-dash-mut" marker-end="url(#fHMut)"/><line x1="324.0" y1="78.0" x2="324.0" y2="126.0" class="f-dash-mut" marker-end="url(#fHMut)"/><text x="343.8" y="116.0" font-size="11" text-anchor="start" class="t-mut">선형 보간</text></svg>
+<figcaption>그림 4. 기준 지평. 플래너가 10 Hz로 보내는 20행(0.2 s 간격, 4 s)의 기준열을 기존 ReferenceHorizon이 10 ms 격자로 보간한다. MPC는 그중 앞 0.5 s(\(N_p\) = 50)를 비용에 쓰고, 토크는 앞 5 스텝(\(N_c\))에서만 바꾼다. 인터페이스는 현재 wheel_mpc와 같고 격자 간격 인자만 다르다.</figcaption>
+</figure>
+
+
+<p><span class="step" id="eq14" data-title="기준 변환: 몸체 속도 기준 → 관성 좌표, 바퀴 관성 항" data-pv="1">식-14</span>기준 변환이다. 플래너의 몸체 속도 기준 \(u_r=[v_{xr},\ v_{yr},\ \omega_r]\) 을 <a class="eqref" href="#eq1">식-1</a>과 같은 방법으로 {O}의 속도로 돌리고, <a class="eqref" href="#eq6">식-6</a>의 바퀴 관성 가속도 \(w\) 를 기준 값으로 계산한다. 각 격자점 \(j=0,\dots,N_p\) 마다 한다.</p>
+<div class="eq">\[
+\dot x_{r,j}=v_{xr,j}\cos\theta_{r,j}-v_{yr,j}\sin\theta_{r,j},\qquad \dot y_{r,j}=v_{xr,j}\sin\theta_{r,j}+v_{yr,j}\cos\theta_{r,j},\qquad \dot\theta_{r,j}=\omega_{r,j},\qquad w_{x,j}=-\frac{\mu\,\omega_{r,j}\dot y_{r,j}}{m_{eff}},\quad w_{y,j}=\frac{\mu\,\omega_{r,j}\dot x_{r,j}}{m_{eff}}
+\]</div>
+<p>모으면 기준 상태 \(x_{r,j}\) 와 알려진 가속도 \(w_j\) 이고, 지평 전체를 쌓은 것이 \(Y_r\), \(W_r\) 이다.</p>
+<div class="eq">\[
+x_{r,j}=\begin{bmatrix}X_{r,j}\\R(\theta_{r,j})\,u_{r,j}\end{bmatrix},\qquad w_j=M_{eff}^{-1}\begin{bmatrix}\mu\,\omega_{r,j}\,S\,\dot X_{r,xy,j}\\0\end{bmatrix},\qquad Y_r=\begin{bmatrix}x_{r,1}\\\vdots\\x_{r,N_p}\end{bmatrix},\quad W_r=\begin{bmatrix}w_0\\\vdots\\w_{N_p-1}\end{bmatrix}
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다. 위 세 성분은 플래너 포즈 그대로, 아래 세 성분은 몸체 속도를 \(\theta_{r,j}\) 만큼 돌린 것이다. \(c_j=\cos\theta_{r,j}\), \(s_j=\sin\theta_{r,j}\).</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}x_{r,j}\\y_{r,j}\\\theta_{r,j}\\v_{xr,j}c_j-v_{yr,j}s_j\\v_{xr,j}s_j+v_{yr,j}c_j\\\omega_{r,j}\end{bmatrix}}_{x_{r,j}=\begin{bmatrix}X_{r,j}\\R(\theta_{r,j})u_{r,j}\end{bmatrix}},\qquad
+\underbrace{\begin{bmatrix}-\mu\,\omega_{r,j}\,\dot y_{r,j}/m_{eff}\\\mu\,\omega_{r,j}\,\dot x_{r,j}/m_{eff}\\0\end{bmatrix}}_{w_j},\qquad
+\underbrace{\begin{bmatrix}x_{r,1}\\x_{r,2}\\\vdots\\x_{r,N_p}\end{bmatrix}}_{Y_r\ (6N_p\times1)},\quad
+\underbrace{\begin{bmatrix}w_0\\w_1\\\vdots\\w_{N_p-1}\end{bmatrix}}_{W_r\ (3N_p\times1)}
+\]</div>
+
+<div class="ex">\(\theta_r\) = 90°, \(u_r=[1,\ 0,\ 0.417]^\top\) 이면 \(\dot X_r=[0,\ 1,\ 0.417]^\top\) 이고, \(S\dot X_{r,xy}=[-1,\ 0]^\top\), \(w_{xy}=2.425\times0.417\times[-1,\ 0]^\top/6.425=[-0.157,\ 0]^\top\) m/s²이다. 북쪽으로 가며 왼쪽(서쪽)으로 도는 로봇에 바퀴 반영 관성 항이 서쪽, 곧 원 중심 쪽으로 0.157 m/s²의 가속도를 보탠다.</div>
+
+<p><span class="step" id="eq15" data-title="기준 각도 언랩" data-pv="0">식-15</span>각도 언랩이다. 8자 궤적은 한 바퀴에 +360°, 다음 바퀴에 −360° 돌므로 \(\theta_r\) 이 ±π로 접혀 있으면 \(\theta-\theta_r\) 가 2π만큼 뛴다. 지평의 첫 점을 현재 추정 \(\hat\theta\) 에 가장 가까운 가지로 옮기고, 이후 점은 앞 점과 연속이 되게 한다.</p>
+<div class="eq">\[
+\theta_{r,0}\leftarrow\hat\theta+\mathrm{wrap}(\theta_{r,0}-\hat\theta),\qquad \theta_{r,j}\leftarrow\theta_{r,j-1}+\mathrm{wrap}(\theta_{r,j}-\theta_{r,j-1}),\qquad \mathrm{wrap}(\cdot)\in(-\pi,\ \pi]
+\]</div>
+<div class="ex">\(\hat\theta\) = 3.0 rad, \(\theta_{r,0}\) = −3.1 rad(접힌 값)이면 \(\mathrm{wrap}(-3.1-3.0)=\mathrm{wrap}(-6.1)\) = 0.183이므로 \(\theta_{r,0}\) = 3.183 rad이다. 오차는 2π − 6.1이 아니라 0.183 rad이다. 상태 추정기의 \(\hat\theta\) 도 연속값(언랩)이어야 하며, 지금 wheel_mpc가 \(X_e\) 의 yaw에 하는 wrap과 같은 처리이다.</div>
+<div class="note">기준 속도와 위치의 정합이 조금 어긋나도(0.2 s 격자의 꺾은선 보간) 모델에는 편향이 생기지 않는다. 기준은 비용에만 있기 때문이다. 어긋난 만큼은 위치 가중과 속도 가중의 비율로 타협되며, 1 m/s·곡률 0.4에서 한 격자 안의 속도 불일치는 최대 \(\tfrac12a\Delta t\) = 0.04 m/s 정도이다.</div>
+</section>
+
+<!-- 07 -->
+<section id="s7">
+<h2><span class="n">07</span>비용과 QP 표준형</h2>
+
+<div class="why"><div class="lbl">유도 개관</div><div class="tw"><table>
+<tr><th>유도</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>비용 → \(T^\top HT+2g^\top T\)</td><td>QP 풀이기는 \(H\), \(g\), 제약 행렬만 받는다</td><td>추종 오차, 토크 변화, 영공간 성분을 결정변수 \(T\) 의 이차식으로 쓰는 것</td><td><a class="eqref" href="#eq13">식-13</a>을 넣고 전개한다. 변화율은 차분 행렬 \(D\) 로 쓴다</td><td>이차계획, 양의 정부호, 영공간 벌점</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>MPC 비용은 보통 추종 오차의 가중 제곱합과 입력(또는 입력 변화)의 가중 제곱합이다. 입력 자체를 벌하면 정상상태에서 입력이 0이 아닐 때 오차가 남으므로(선회 중 구심력), 입력 변화를 벌한다. 입력 변화를 결정변수로 잡을 수도 있고(Wang), 절대 입력을 결정변수로 잡고 변화를 차분 행렬로 계산할 수도 있다. 두 QP는 가역 선형 변환으로 같다. 입력 중 출력에 보이지 않는 방향(여기서는 영공간 \(n\))은 비용의 어느 항도 보지 못하므로 따로 벌해야 유일한 해가 된다.</p>
+<p class="map"><b>대응.</b> 결정변수는 절대 토크 \(T\), 변화율 벌점은 \(DT\), 영공간 벌점은 \((n^\top\tau_j)^2\) 이다. 기본 문서 16절(기본 식-92〈MPC 비용〉, 기본 식-98〈토크 판 영공간 벌점〉)과 같은 내용이며, 누적합 행렬 \(S_j\), \(\Gamma_j\) 가 없다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<p><span class="step" id="eq16" data-title="MPC 비용: 추종 오차 + 토크 변화 + 영공간" data-pv="1">식-16</span>비용이다. 세 항의 합이다. 첫째는 지평의 매 스텝에서 여섯 상태가 기준과 벌어진 양의 제곱을 가중치 \(w_x,\dots,w_{\dot\theta}\) 로 더한 것이고, 둘째는 토크가 한 스텝에 변한 양의 제곱(바퀴마다 \(w_\Delta\)), 셋째는 앞·뒤 바퀴 쌍이 서로 미는 영공간 성분의 제곱이다. \(\tau_{-1}=\tau(k-1)\) 은 지난 주기에 보낸 토크이다.</p>
+<div class="eq">\[
+J=\sum_{j=1}^{N_p}\Big[w_x(x_j-x_{r,j})^2+w_y(y_j-y_{r,j})^2+w_\theta(\theta_j-\theta_{r,j})^2+w_{\dot x}(\dot x_j-\dot x_{r,j})^2+w_{\dot y}(\dot y_j-\dot y_{r,j})^2+w_{\dot\theta}(\dot\theta_j-\dot\theta_{r,j})^2\Big]
++\sum_{j=0}^{N_c-1}\sum_{i\in\{FL,FR,RL,RR\}}w_\Delta\big(\tau_{i,j}-\tau_{i,j-1}\big)^2
++q_{null}\sum_{j=0}^{N_c-1}\Big(\tfrac12(\tau_{FL,j}+\tau_{FR,j}-\tau_{RL,j}-\tau_{RR,j})\Big)^2
+\]</div>
+<p>행렬로 모으면 \(W=\mathrm{diag}(w_x,\ w_y,\ w_\theta,\ w_{\dot x},\ w_{\dot y},\ w_{\dot\theta})\), \(W_\Delta=w_\Delta I_4\)(바퀴마다 다르게 둘 수도 있다), 영공간 성분은 \(n^\top\tau_j\) 이다.</p>
+<div class="eq">\[
+J=\sum_{j=1}^{N_p}\big(x(k+j)-x_{r,j}\big)^\top W\big(x(k+j)-x_{r,j}\big)+\sum_{j=0}^{N_c-1}\Delta\tau_j^\top W_\Delta\Delta\tau_j+q_{null}\sum_{j=0}^{N_c-1}(n^\top\tau_j)^2,\qquad \Delta\tau_j=\tau_j-\tau_{j-1}
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다. 추종 항은 오차 벡터를 양쪽에서 대각 가중행렬에 곱한 것이고, 그 결과가 위 성분 식의 여섯 제곱항이다. 영공간 항의 \(n^\top\tau_j\) 는 네 토크의 부호 합이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}e_x&e_y&e_\theta&e_{\dot x}&e_{\dot y}&e_{\dot\theta}\end{bmatrix}}_{(x_j-x_{r,j})^\top}
+\underbrace{\begin{bmatrix}w_x&&&&&\\&w_y&&&&\\&&w_\theta&&&\\&&&w_{\dot x}&&\\&&&&w_{\dot y}&\\&&&&&w_{\dot\theta}\end{bmatrix}}_{W}
+\underbrace{\begin{bmatrix}e_x\\e_y\\e_\theta\\e_{\dot x}\\e_{\dot y}\\e_{\dot\theta}\end{bmatrix}}_{x_j-x_{r,j}}
+=\sum w_\bullet e_\bullet^2,\qquad
+\Delta\tau_j^\top\underbrace{\begin{bmatrix}w_\Delta&&&\\&w_\Delta&&\\&&w_\Delta&\\&&&w_\Delta\end{bmatrix}}_{W_\Delta}\Delta\tau_j=w_\Delta\sum_i\Delta\tau_{i,j}^2,\qquad
+\underbrace{\tfrac12\begin{bmatrix}1&1&-1&-1\end{bmatrix}}_{n^\top}\begin{bmatrix}\tau_{FL}\\\tau_{FR}\\\tau_{RL}\\\tau_{RR}\end{bmatrix}_j
+\]</div>
+
+<p>토크 자체에 벌점이 없는 것이 요점이다. 선회 중 구심력 1.67 N을 내는 토크 0.0167 N·m가 정상상태에서 유지되어도 비용은 0이다. 기존 설계의 \(\|\tau\|_R^2\) 항이 만들던 정상상태 오차가 여기서 사라진다.</p>
+
+<p><span class="step" id="eq17" data-title="차분 행렬 D: 절대 토크 → 토크 변화" data-pv="1">식-17</span>차분 행렬이다. 토크 변화는 이웃한 두 토크의 차이이고, 첫 스텝만 지난 주기의 토크 \(\tau_{-1}\) 과의 차이이다. 한 바퀴, \(N_c\) = 3으로 쓰면 세 줄이다.</p>
+<div class="eq">\[
+\Delta\tau_0=\tau_0-\tau_{-1},\qquad \Delta\tau_1=\tau_1-\tau_0,\qquad \Delta\tau_2=\tau_2-\tau_1
+\]</div>
+<p>결정변수 \(T=[\tau_0;\ \tau_1;\ \dots]\) 에 대한 선형식이므로 상수 띠 행렬 \(D\) 와, 지난 토크를 첫 블록에 넣는 \(e_1\) 로 쓴다.</p>
+<div class="eq">\[
+\Delta T=\begin{bmatrix}\Delta\tau_0\\\vdots\\\Delta\tau_{N_c-1}\end{bmatrix}=D\,T-e_1\otimes\tau_{-1},\qquad D=\begin{bmatrix}I_4&&&\\-I_4&I_4&&\\&\ddots&\ddots&\\&&-I_4&I_4\end{bmatrix},\qquad e_1\otimes\tau_{-1}=\begin{bmatrix}\tau_{-1}\\0\\\vdots\\0\end{bmatrix}
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다(\(N_c\) = 3). 각 \(I_4\) 는 4×4 단위행렬이고, 바퀴 하나만 보면 3×3의 \([[1,0,0],[-1,1,0],[0,-1,1]]\) 이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}\Delta\tau_0\\\Delta\tau_1\\\Delta\tau_2\end{bmatrix}}_{\Delta T\ (12\times1)}=
+\underbrace{\begin{bmatrix}I_4&0&0\\-I_4&I_4&0\\0&-I_4&I_4\end{bmatrix}}_{D\ (12\times12):\ \text{1차 차분}}
+\underbrace{\begin{bmatrix}\tau_0\\\tau_1\\\tau_2\end{bmatrix}}_{T}-
+\underbrace{\begin{bmatrix}\tau_{-1}\\0\\0\end{bmatrix}}_{e_1\otimes\tau_{-1}:\ \text{이전 입력}}
+\]</div>
+
+<div class="ex">\(N_c\) = 2, 한 바퀴만 보면 \(D=\begin{bmatrix}1&0\\-1&1\end{bmatrix}\), \(\tau_{-1}\) = 0.1. \(T=[0.12,\ 0.15]^\top\) 이면 \(DT-e_1\tau_{-1}=[0.12-0.1,\ 0.15-0.12]^\top=[0.02,\ 0.03]^\top\) 이다. Wang 식으로는 \(\Delta\tau\) 가 결정변수이고 \(\tau_1=0.1+\Delta\tau_0+\Delta\tau_1\) 이 누적합인데, 여기서는 반대로 \(\tau\) 가 결정변수이고 \(\Delta\tau\) 가 차분이다.</div>
+
+<p><span class="step" id="eq18" data-title="QP 표준형 H, g" data-pv="1">식-18</span>QP 표준형이다. 먼저 1차원으로 본다. 상태 하나 \(p\), 토크 하나 \(t\), 한 스텝이면 예측은 \(p_1=p_0+bt\) 이고 비용은 \(J=w(p_0+bt-p_r)^2+w_\Delta(t-t_{-1})^2\) 이다. \(t\) 의 이차식으로 펼치면 다음과 같다.</p>
+<div class="eq">\[
+J=\underbrace{(wb^2+w_\Delta)}_{H}\,t^2+2\,\underbrace{\big(wb\,(p_0-p_r)-w_\Delta t_{-1}\big)}_{g}\,t+\text{const},\qquad t^*=-g/H
+\]</div>
+<p>\(H\) 는 비용의 헤시안(모델 이득의 제곱 × 가중 + 변화 가중), \(g\) 는 비용의 기울기 항(오차 × 이득 × 가중, 그리고 이전 입력 항)이다. 행렬로 모으면 \(b\) 자리에 \(\Phi\), \(p_0-p_r\) 자리에 \(Fx(k)+\Psi_wW_r+\Psi\hat d-Y_r\)(토크 0일 때의 예측 오차), \(t-t_{-1}\) 자리에 \(DT-e_1\otimes\tau_{-1}\) 이 들어간다. \(\bar W=I_{N_p}\otimes W\), \(\bar W_\Delta=I_{N_c}\otimes W_\Delta\), \(N=I_{N_c}\otimes nn^\top\) 이고, \(T\) 와 무관한 상수항은 버린다.</p>
+<div class="eq">\[
+J=T^\top HT+2g^\top T+\text{const},\qquad H=\Phi^\top\bar W\Phi+D^\top\bar W_\Delta D+q_{null}N,\qquad g=\Phi^\top\bar W\big(Fx(k)+\Psi_wW_r+\Psi\hat d-Y_r\big)-D^\top\bar W_\Delta(e_1\otimes\tau_{-1})
+\]</div>
+<p>블록 행렬로 전개하면 다음과 같다. \(\bar W\) 는 \(W\) 를 \(N_p\) 번, \(N\) 은 \(nn^\top\) 을 \(N_c\) 번 대각에 놓은 것이다. \(H\) 의 세 항은 비용의 세 항에 하나씩 대응하고, \(g\) 의 첫 항의 괄호는 "토크를 0으로 둘 때의 예측 오차"이다.</p>
+<div class="eq">\[
+H=\underbrace{\Phi^\top\underbrace{\begin{bmatrix}W&&\\&\ddots&\\&&W\end{bmatrix}}_{\bar W}\Phi}_{\text{추종 항의 헤시안}}+
+\underbrace{D^\top\underbrace{\begin{bmatrix}W_\Delta&&\\&\ddots&\\&&W_\Delta\end{bmatrix}}_{\bar W_\Delta}D}_{\text{입력 변화 항의 헤시안}}+
+\underbrace{q_{null}\begin{bmatrix}nn^\top&&\\&\ddots&\\&&nn^\top\end{bmatrix}}_{N:\ \text{영공간},\ nn^\top=\frac14\begin{bmatrix}1&1&-1&-1\\1&1&-1&-1\\-1&-1&1&1\\-1&-1&1&1\end{bmatrix}},\qquad
+g=\Phi^\top\bar W\underbrace{\big(Fx(k)+\Psi_wW_r+\Psi\hat d-Y_r\big)}_{\text{영입력 예측 오차}}-\underbrace{D^\top\bar W_\Delta\begin{bmatrix}\tau_{-1}\\0\\\vdots\end{bmatrix}}_{\text{이전 입력 항}}
+\]</div>
+<p>제약이 없으면 해는 \(T^*=-H^{-1}g\) 이다. \(H\) 는 \(D^\top\bar W_\Delta D\) 가 양의 정부호(\(D\) 가 가역)이고 \(q_{null}N\) 이 영공간 방향을 채우므로 항상 가역이다. 매 주기 바뀌는 것은 \(\Phi\) 가 들어가는 첫 항과 \(g\) 이며, \(D^\top\bar W_\Delta D\) 와 \(q_{null}N\) 은 오프라인 상수이다.</p>
+<div class="ex">손으로 푸는 최소 예: \(N_p=N_c\) = 1, 정지 상태 \(x\) = 0, \(\hat d\) = 0, \(w\) = 0, \(\theta_r\) = 0, 기준 \(x_r=[0.01,\ 0,\ 0,\ 0,\ 0,\ 0]^\top\) (1 cm 앞), \(W=\mathrm{diag}(100,100,100,1,1,1)\), \(W_\Delta=10^{-3}I\), \(q_{null}=10^{-2}\), \(\tau_{-1}\) = 0. 대칭성으로 네 토크가 같다고 두고 \(\tau_i=t\) 로 놓으면 <a class="eqref" href="#eq13">식-13</a>에서 \(\Delta x=4\times1.95\times10^{-4}t=7.8\times10^{-4}t\), \(\Delta\dot x=4\times0.0389t=0.156t\) 이므로
+<div class="eq">\[
+J(t)=100\,(7.8\times10^{-4}t-0.01)^2+(0.156t)^2+4\times10^{-3}t^2
+\]</div>
+이고 \(dJ/dt=0\) 에서 \(t=\dfrac{2\times100\times7.8\times10^{-4}\times0.01}{2\times100\times(7.8\times10^{-4})^2+2\times0.156^2+8\times10^{-3}}=\dfrac{1.56\times10^{-3}}{0.0568}\) = 0.0275 N·m이다. 4×4 행렬 \(H\) 로 푼 수치해도 \(\tau^*=[0.0275,\ 0.0275,\ 0.0275,\ 0.0275]^\top\), \(n^\top\tau^*\) = 0이다. 한 스텝에 0.0043 m/s를 얻으며, 1 cm를 한 번에 가지 않는 것은 속도 가중이 큰 속도를 벌하기 때문이다. 지평이 50이면 QP는 이 속도가 50 스텝 동안 만드는 위치를 보고 더 과감하게 밀고 끝에서 감속한다.</div>
+
+</section>
+
+<!-- 08 -->
+<section id="s8">
+<h2><span class="n">08</span>제약</h2>
+
+<div class="why"><div class="lbl">유도 개관</div><div class="tw"><table>
+<tr><th>유도</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>토크 상한과 변화율</td><td>미끄럼 억제는 전적으로 토크 상한이 맡는다. 변화율은 액추에이터와 마찰 보상을 보호한다</td><td>마찰 한계를 결정변수의 선형 부등식으로 쓰는 것</td><td>결정변수가 절대 토크이므로 상한은 상자 제약, 변화율은 \(D\) 를 쓴 띠 제약</td><td>마찰원(쿨롱 마찰 한계), 하드 제약, 활성 집합</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>접지점의 마찰력은 \(\mu N\) 을 넘지 못한다(마찰원). 바퀴 토크를 그 한계 이하로 묶으면 무슬립 가정이 유지된다. MPC의 하드 제약은 QP 안에서 지켜지므로, 제약 안에서 가장 좋은 해를 고른다. 사후 포화(계산한 명령을 잘라냄)는 방향까지 바꾸어 버리므로 쓰지 않는다. 입력 변화율 제약은 액추에이터 대역폭 밖의 급변을 막고 마찰 보상의 떨림을 줄인다.</p>
+<p class="map"><b>대응.</b> 기본 식-57〈마찰 한계〉 \(|\phi_i|\le\tfrac r{\sqrt2}\mu N_i\) 을 하중 이동 없이(\(N_i=mg/4\)) 안전계수 \(c_s\) 로 덮어 상수 \(\bar\tau\) 로 만든다. 기본 식-102〈접촉력 제약〉, 기본 식-101〈바퀴 속도 상태 제약〉, 기본 식-109〈포화 시 비례 축소〉는 1판에 없다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<p><span class="step" id="eq19" data-title="토크 상한, 상자 제약" data-pv="0">식-19</span>토크 상한이다. 바퀴 \(i\), 스텝 \(j\) 의 토크 하나하나가 \(\pm\bar\tau\) 안에 있어야 한다. 결정변수가 절대 토크이므로 변수 자체의 상·하한, 곧 상자 제약이다. \(N_c\) 이후의 토크는 \(\tau_{N_c-1}\) 과 같으므로 \(N_c\) 개만 걸면 지평 전체에 걸린다.</p>
+<div class="eq">\[
+-\bar\tau\le\tau_{i,j}\le\bar\tau\qquad(i\in\{FL,FR,RL,RR\},\ j=0,\dots,N_c-1),\qquad 8N_c=40\ \text{행}
+\]</div>
+
+<p><span class="step" id="eq20" data-title="토크 변화율, 띠 제약" data-pv="0">식-20</span>변화율 제약이다. 이웃한 두 토크의 차이가 \(\pm\Delta\bar\tau\) 안에 있어야 한다. <a class="eqref" href="#eq17">식-17</a>의 차분 그대로이다.</p>
+<div class="eq">\[
+-\Delta\bar\tau\le\tau_{i,j}-\tau_{i,j-1}\le\Delta\bar\tau\qquad(\tau_{i,-1}=\tau_{i}(k-1)),\qquad\text{행렬로}\quad -\Delta\bar\tau\le D\,T-e_1\otimes\tau_{-1}\le\Delta\bar\tau,\qquad 8N_c=40\ \text{행}
+\]</div>
+<p>두 제약을 블록 행렬로 쌓으면 다음과 같다(\(N_c\) = 2). 위 블록이 상한, 아래 블록이 변화율이고, QP 풀이기에는 이 \(l\), 제약 행렬, \(u\) 를 넘긴다. \(\mathbf 1\) 은 성분이 모두 1인 4×1 벡터이다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}-\bar\tau\mathbf 1\\-\bar\tau\mathbf 1\\-\Delta\bar\tau\mathbf 1+\tau_{-1}\\-\Delta\bar\tau\mathbf 1\end{bmatrix}}_{l}\le
+\underbrace{\begin{bmatrix}I_4&0\\0&I_4\\I_4&0\\-I_4&I_4\end{bmatrix}}_{\begin{bmatrix}I\\D\end{bmatrix}:\ \text{상한 / 변화율}}
+\underbrace{\begin{bmatrix}\tau_0\\\tau_1\end{bmatrix}}_{T}\le
+\underbrace{\begin{bmatrix}\bar\tau\mathbf 1\\\bar\tau\mathbf 1\\\Delta\bar\tau\mathbf 1+\tau_{-1}\\\Delta\bar\tau\mathbf 1\end{bmatrix}}_{u}
+\]</div>
+
+<p>두 제약을 합쳐 \(l\le\begin{bmatrix}I\\D\end{bmatrix}T\le u\) 꼴로 QP 풀이기(OSQP 등)에 넘긴다. 제약 행렬 \(\begin{bmatrix}I\\D\end{bmatrix}\) 는 상수이고, 매 주기 바뀌는 것은 \(\tau_{-1}\) 이 들어가는 \(l\), \(u\) 뿐이다.</p>
+<div class="ex">\(N_c\) = 2, 한 바퀴, \(\tau_{-1}\) = 0.1, \(\Delta\bar\tau\) = 0.03이면 \(\tau_0\in[0.07,\ 0.13]\), \(\tau_1-\tau_0\in[-0.03,\ 0.03]\) 이다. 증분형이면 둘째 조건이 상자이고 첫째 상한 \(|0.1+\Delta\tau_0+\Delta\tau_1|\le\bar\tau\) 가 누적합이 된다. 어느 쪽이든 같은 영역이다.</div>
+
+<p><span class="step" id="eq21" data-title="토크 상한값: 마찰 한계와 정격의 최솟값" data-pv="0">식-21</span>토크 상한값이다. 한 바퀴가 받치는 하중을 \(N=mg/4\) 로 두면 지면이 낼 수 있는 마찰력은 \(\hat\mu N\) 이고, 견인 토크는 롤러 축이 45°라 \(\phi=\tfrac r{\sqrt2}f\) 이므로(기본 식-57〈마찰 한계〉) 토크로는 \(\tfrac r{\sqrt2}\hat\mu N\) 이다. 가속 중 하중 이동으로 앞바퀴 하중이 줄어드는 것을 안전계수 \(c_s\) 로 덮는다. 모터 쪽 한계는 정격 \(\tau_{lim}\) 에서 torque_output이 더할 마찰 보상 \(\tau_{fric,max}\) 를 뺀 값이다. 둘 중 작은 쪽이 상한이다. \(\hat\mu\) 는 주행 전 기존 설계가 측정하는 노면 마찰계수, \(m\) 은 하중을 포함한 전체 질량이다.</p>
+<div class="eq">\[
+\bar\tau=\min\Big(\tau_{lim}-\tau_{fric,max},\ \ \frac{r}{\sqrt2}\,\hat\mu\,\frac{mg}{4}\,c_s\Big),\qquad c_s=0.8
+\]</div>
+<p>각 인자의 뜻을 붙이면 다음과 같다.</p>
+<div class="eq">\[
+\bar\tau=\min\Big(\underbrace{\tau_{lim}-\tau_{fric,max}}_{\text{모터 정격} - \text{마찰 보상 토크}},\ \
+\underbrace{\tfrac{r}{\sqrt2}}_{\text{롤러 }45^\circ:\ \text{힘}\to\text{토크}}\cdot
+\underbrace{\hat\mu}_{\text{노면}}\cdot
+\underbrace{\tfrac{mg}{4}}_{\text{바퀴 하나의 하중}}\cdot
+\underbrace{c_s}_{\text{하중 이동 여유}}\Big)
+\]</div>
+
+<div class="ex">\(\hat\mu\) = 0.3: \(m\) = 4 kg이면 \(0.02828\times0.3\times9.81\times0.8\) = 0.067 N·m, 10 kg이면 0.166 N·m, 20 kg이면 0.333 N·m이다(<a class="figref" href="#fig5">그림 5</a>). 정격 1.3 N·m에서 마찰 보상 토크를 빼도 이보다 훨씬 크므로 μ̂ = 0.3 노면에서는 항상 마찰 상한이 걸린다. \(c_s\) = 0.8은 기본 식-58〈하중 이동〉의 예(15 kg, 2 m/s²에서 전륜 하중 21 % 감소)를 덮는 값이다.</div>
+<figure id="fig5">
+<svg viewBox="0 0 700 300" role="img" aria-label="마찰 기반 토크 상한이 전체 질량에 비례하는 모습과 정격 토크의 비교"><defs><marker id="fTInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-ink"/></marker><marker id="fTAcc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-acc"/></marker><marker id="fTAmb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-amb"/></marker><marker id="fTMut" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" class="mk-mut"/></marker></defs><line x1="80.0" y1="240.0" x2="640.0" y2="240.0" class="f-ax" marker-end="url(#fTInk)"/><line x1="80.0" y1="240.0" x2="80.0" y2="35.0" class="f-ax" marker-end="url(#fTInk)"/><text x="640.0" y="258.0" font-size="12" text-anchor="end" class="t-ink">m (kg)</text><text x="74.0" y="40.0" font-size="12" text-anchor="end" class="t-ink">τ̄ (N·m)</text><line x1="76.0" y1="202.0" x2="620.0" y2="202.0" class="f-grid"/><text x="72.0" y="206.0" font-size="11" text-anchor="end" class="t-mut">0.1</text><line x1="76.0" y1="164.0" x2="620.0" y2="164.0" class="f-grid"/><text x="72.0" y="168.0" font-size="11" text-anchor="end" class="t-mut">0.2</text><line x1="76.0" y1="126.0" x2="620.0" y2="126.0" class="f-grid"/><text x="72.0" y="130.0" font-size="11" text-anchor="end" class="t-mut">0.3</text><line x1="76.0" y1="88.0" x2="620.0" y2="88.0" class="f-grid"/><text x="72.0" y="92.0" font-size="11" text-anchor="end" class="t-mut">0.4</text><text x="170.0" y="258.0" font-size="11" text-anchor="middle" class="t-mut">4</text><text x="305.0" y="258.0" font-size="11" text-anchor="middle" class="t-mut">10</text><text x="530.0" y="258.0" font-size="11" text-anchor="middle" class="t-mut">20</text><line x1="80.0" y1="240.0" x2="620.0" y2="88.2" class="f-bf3"/><circle cx="170.0" cy="214.7" r="4.0" class="f-acc-fill"/><text x="178.0" y="208.7" font-size="12" text-anchor="start" class="t-acc">0.067</text><circle cx="305.0" cy="176.7" r="4.0" class="f-acc-fill"/><text x="313.0" y="170.7" font-size="12" text-anchor="start" class="t-acc">0.166</text><circle cx="530.0" cy="113.5" r="4.0" class="f-acc-fill"/><text x="538.0" y="107.5" font-size="12" text-anchor="start" class="t-acc">0.333</text><text x="100.0" y="50.0" font-size="12" text-anchor="start" class="t-ink">μ̂ = 0.3, c<tspan dy="4" font-size="10">s</tspan><tspan dy="-4">&#8203;</tspan> = 0.8: τ̄ = (r/√2)·μ̂·(mg/4)·c<tspan dy="4" font-size="10">s</tspan><tspan dy="-4">&#8203;</tspan></text><text x="100.0" y="72.0" font-size="12" text-anchor="start" class="t-mut">정격 1.3 N·m 에서 마찰 보상 토크를 뺀 값은 그래프 밖(위)</text><text x="100.0" y="94.0" font-size="12" text-anchor="start" class="t-mut">→ 낮은 μ 에서는 마찰 상한이 항상 먼저 걸린다</text></svg>
+<figcaption>그림 5. 토크 상한 \(\bar\tau\) 는 하중에 비례한다. 하중 4 kg에서 0.067 N·m, 20 kg에서 0.333 N·m이며, μ̂ = 0.3인 노면에서는 모터 정격(1.3 N·m)보다 한참 아래이므로 미끄럼 억제는 전적으로 이 제약이 맡는다.</figcaption>
+</figure>
+
+<p>\(\bar\tau\) 는 <a class="eqref" href="#eq6">식-6</a>의 \(\tau\)(마찰을 뺀 순토크)에 거는 값이다. 가속 중에는 실제 견인 토크가 \(\tau\) 보다 반영 관성 토크만큼 작으므로(기본 식-53〈견인 토크〉), 이 제약은 보수적이다. 제약이 너무 빡빡하면 기본 식-55의 \(G\) 행렬로 반영 관성 토크를 빼는 것이 2판의 항목이다.</p>
+<div class="ex">정지에서 네 바퀴 0.1 N·m를 주면 견인 토크는 \(0.1\times m/m_{eff}\) = 0.062 N·m(기본 식-55)이다. \(m\) = 4 kg의 \(\bar\tau\) = 0.067 N·m은 \(\tau\) 에 걸리므로 실제 견인 토크를 0.042 N·m 이하로 묶는다. 마찰 한계 0.083 N·m의 절반이며, 등속에서는 회전자 가속이 없어 \(\tau\) 와 견인 토크가 같아져 여유가 \(c_s\) 만큼인 20 %가 된다.</div>
+</section>
+<div class="part">PART Ⅲ<b>구현</b><span>앞의 식을 한 주기의 계산 순서로 정리하고, 설정값과 측정 항목, 통과 시험, 그리고 이 단순화가 무엇을 버렸는지를 적는다.</span></div>
+
+<!-- 09 -->
+<section id="s9">
+<h2><span class="n">09</span>한 주기의 계산 순서</h2>
+
+<div class="why"><div class="lbl">정리 개관</div><div class="tw"><table>
+<tr><th>내용</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>식 → 코드 순서</td><td>어느 양이 상수이고 어느 양이 매 주기 바뀌는지가 실행 시간을 정한다</td><td>10 ms 안에 QP까지 끝내는 것</td><td>오프라인 상수와 온라인 갱신을 나눈다</td><td>후퇴 지평(receding horizon), 웜 스타트</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>MPC는 매 샘플 지평 전체의 입력열을 풀고 첫 값만 보낸 뒤, 다음 샘플에 새 측정으로 다시 푼다(후퇴 지평). 매 주기 바뀌는 행렬만 다시 만들고 나머지는 미리 만들어 두는 것이 실시간 구현의 기본이다. 지난 해를 한 스텝 밀어 초기값으로 주면(웜 스타트) 반복 횟수가 준다.</p>
+<p class="map"><b>대응.</b> 상수인 것은 \(A\), \(F\), \(\Psi\), \(\Psi_w\), \(D^\top\bar W_\Delta D\), \(q_{null}N\), 제약 행렬이다. 매 주기 바뀌는 것은 \(\Phi\)(기준 방향 회전), \(g\), 제약의 \(l\), \(u\) 뿐이다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<div class="tw"><table>
+<tr><th>단계</th><th>계산</th><th>식</th><th>언제</th></tr>
+<tr><td>0</td><td>\(A\), \(F\), \(\Psi\), \(\Psi_w\), \(D\), \(N\), \(D^\top\bar W_\Delta D+q_{null}N\), 제약 행렬 \([I;\ D]\)</td><td><a class="eqref" href="#eq8">식-8</a>, <a class="eqref" href="#eq13">식-13</a>, <a class="eqref" href="#eq17">식-17</a>, <a class="eqref" href="#eq18">식-18</a></td><td>시작 시 한 번</td></tr>
+<tr><td>1</td><td>\(\hat X\), \(\hat v\) 수신 → \(\hat{\dot X}=R(\hat\theta)\hat v\), \(\hat x=[\hat X;\ \hat{\dot X}]\), \(\hat\theta\) 언랩</td><td><a class="eqref" href="#eq1">식-1</a></td><td>매 10 ms</td></tr>
+<tr><td>2</td><td>\(\hat d=\hat x-A\hat x_{prev}-B(\hat\theta_{prev})\tau_{prev}-E\hat w_{prev}\), 필요하면 저역통과</td><td><a class="eqref" href="#eq9">식-9</a>, <a class="eqref" href="#eq11">식-11</a></td><td>매 10 ms</td></tr>
+<tr><td>3</td><td><code>horizon(now, 0.01, 50)</code> → \(X_{r,j}\), \(u_{r,j}\) → \(x_{r,j}\), \(w_j\), 언랩 → \(Y_r\), \(W_r\)</td><td><a class="eqref" href="#eq14">식-14</a>, <a class="eqref" href="#eq15">식-15</a></td><td>매 10 ms</td></tr>
+<tr><td>4</td><td>\(j=0..N_p-1\): \(G_j=M_{eff}^{-1}R(\theta_{r,j})(T^{-1})^\top\), \(B_j\) → \(\Phi\)</td><td><a class="eqref" href="#eq8">식-8</a>, <a class="eqref" href="#eq13">식-13</a></td><td>매 10 ms</td></tr>
+<tr><td>5</td><td>\(H=\Phi^\top\bar W\Phi+(\text{상수})\), \(g=\Phi^\top\bar W(F\hat x+\Psi_wW_r+\Psi\hat d-Y_r)-D^\top\bar W_\Delta(e_1\otimes\tau_{prev})\)</td><td><a class="eqref" href="#eq18">식-18</a></td><td>매 10 ms</td></tr>
+<tr><td>6</td><td>\(l\), \(u\) 갱신(\(\bar\tau\), \(\Delta\bar\tau\), \(\tau_{prev}\)), QP 풀이, 웜 스타트는 지난 \(T^*\) 를 한 블록 민 것</td><td><a class="eqref" href="#eq19">식-19</a>, <a class="eqref" href="#eq20">식-20</a>, <a class="eqref" href="#eq21">식-21</a></td><td>매 10 ms</td></tr>
+<tr><td>7</td><td>\(\tau^*=T^*[0{:}4]\) 발행, \(\hat x_{prev}\leftarrow\hat x\), \(\tau_{prev}\leftarrow\tau^*\), 로그</td><td><a class="eqref" href="#eq22">식-22</a></td><td>매 10 ms</td></tr>
+</table></div>
+
+<p><span class="step" id="eq22" data-title="출력: QP 첫 블록 + 마찰 보상" data-pv="0">식-22</span>출력이다. QP 해의 첫 블록이 이번 주기의 순토크이고, 모터 명령은 torque_output이 마찰 보상을 더해 만든다.</p>
+<div class="eq">\[
+\tau^*(k)=T^*[0{:}4],\qquad \tau_{cmd}(k)=\tau^*(k)+\tau_{fric}\big(\omega(k)\big)
+\]</div>
+<p>블록 행렬로 쓰면 다음과 같다. QP 해 \(T^*\) 의 첫 네 성분만 쓰고 나머지는 다음 주기의 웜 스타트로만 쓴다.</p>
+<div class="eq">\[
+\underbrace{\begin{bmatrix}\tau_{FL}\\\tau_{FR}\\\tau_{RL}\\\tau_{RR}\end{bmatrix}^*_k}_{\tau^*(k)}=
+\underbrace{\begin{bmatrix}I_4&0&\cdots&0\end{bmatrix}}_{\text{첫 블록 선택 행렬}}
+\underbrace{\begin{bmatrix}\tau_0^*\\\tau_1^*\\\vdots\\\tau_{N_c-1}^*\end{bmatrix}}_{T^*},\qquad
+\underbrace{\tau_{cmd}(k)}_{\text{모터 명령}}=\tau^*(k)+\underbrace{\tau_{fric}(\omega(k))}_{\text{torque\_output}}
+\]</div>
+
+<p>결정변수 20개, 제약 80행으로 현재 wheel_mpc와 같은 규모이다. 단계 4의 \(\Phi\) 구성은 300×20 행렬에 \(R(\theta_{r,j})\) 50개를 곱하는 것이며, 단계 5의 \(\Phi^\top\bar W\Phi\) 가 가장 큰 곱(20×300×20)이다. \(\bar W\) 가 대각이므로 \(\Phi^\top(\bar W\Phi)\) 로 계산하면 행렬 곱 한 번이다.</p>
+<div class="ex">자기검사. \(N_p=N_c\) = 1, 제약 없음으로 두면 단계 5–6이 \(HT=-g\) 한 줄이고, <a class="secref" href="#s7">07절</a>의 예(정지, 1 cm 앞, 0.0275 N·m)가 그대로 나와야 한다. 다음으로 \(N_p\) = 50에서 정지 상태의 기준을 현재 포즈로 두면 \(T^*\) = 0, \(n^\top\tau^*\) = 0이어야 한다. 셋째로 등속 선회 기준을 주고 \(\hat x=x_{r,0}\) 로 맞추면 \(\tau^*\) 가 구심력 \(m\omega_z|v|\) 를 \((T^{-1})^\top\) 로 나눈 최소 노름 분배(기본 식-35)와 같아야 한다. 1 m/s, 반경 2.4 m, 4 kg이면 \(F_y\) = 1.67 N이고 \(\tau=[-0.0167,\ 0.0167,\ 0.0167,\ -0.0167]^\top\) 이다.</div>
+<div class="note">wheel_mpc 노드의 실행 순서(센서·기준열 수신 끊김 검사, 도착 후 정지 래치(HoldLatch), 기준 부하 경고)는 그대로 쓴다. <code>stop()</code> 과 hold 진입에서 \(\hat x_{prev}\), \(\tau_{prev}\), \(\hat d\) 를 버리는 <code>reset()</code> 이 필요하다. 명령 이력이 끊기면 잔차가 뜻을 잃기 때문이다.</div>
+</section>
+
+<!-- 10 -->
+<section id="s10">
+<h2><span class="n">10</span>설정값과 측정 항목</h2>
+
+<div class="why"><div class="lbl">정리 개관</div><div class="tw"><table>
+<tr><th>내용</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>파라미터 표</td><td>행렬을 수치로 채워야 동작한다</td><td>어느 값을 어디서 얻는가</td><td>설계 자료, 분리 실험, 튜닝으로 나눈다</td><td>시스템 식별, 가중치 스케일링</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>MPC의 가중치는 단위가 다른 양을 더하므로 스케일을 맞추어야 한다. 흔한 출발점은 "허용 오차의 역제곱"이다. 위치 1 cm와 속도 0.1 m/s를 같은 정도로 보려면 \(w_x/w_{\dot x}=(0.1/0.01)^2\) = 100이다. 변화율 가중은 토크 명령의 떨림을 보고 올리고, 영공간 벌점은 추종 비용을 깎지 않는 가장 작은 값으로 둔다.</p>
+<p class="map"><b>대응.</b> 기본 문서 21절의 측정 목록 중 1판에 필요한 것은 \(m\), \(I_z\), \(J_w\), \(\hat\mu\), \(\tau_{fric,max}\) 다섯이다. \(\mu_{rr}\), \(h_g\), \(b_v\), \(\tau_c\) 는 2판으로 넘어간다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<div class="tw"><table>
+<tr><th>항목</th><th>시작값</th><th>근거</th><th>어디서</th></tr>
+<tr><td>\(T_s\), \(N_p\), \(N_c\)</td><td>10 ms, 50, 5</td><td>0.5 s 지평이 1 m/s에서 0.5 m 앞을 본다. 결정변수 20개</td><td>설계</td></tr>
+<tr><td>\(W\)</td><td>\(\mathrm{diag}(100,\ 100,\ 50,\ 1,\ 1,\ 0.5)\)</td><td>위치 1 cm ≈ 속도 0.1 m/s ≈ 방향 1.4°</td><td>튜닝</td></tr>
+<tr><td>\(W_\Delta\)</td><td>\(10^{-2}I\) (N·m)⁻²</td><td>토크 떨림을 보고 조정. 추종 비용보다 작게</td><td>튜닝</td></tr>
+<tr><td>\(q_{null}\)</td><td>\(10^{-2}\)</td><td>wheel_mpc에서 바퀴 속도 기준 \(10^{-4}\) 가 hold 중 영공간을 0.14 s에 지웠다. 토크 스케일로 환산해 시작</td><td>튜닝</td></tr>
+<tr><td>\(\bar\tau\)</td><td><a class="eqref" href="#eq21">식-21</a></td><td>\(\hat\mu\), \(m\) 에서 계산</td><td>매 주행</td></tr>
+<tr><td>\(\Delta\bar\tau\)</td><td>\(\bar\tau/3\)</td><td>3 스텝(30 ms)에 상한까지. AK 전류 루프 대역폭보다 느리고 마찰 보상의 떨림을 막는다</td><td>튜닝</td></tr>
+<tr><td>\(\alpha\)</td><td>1</td><td>떨리면 0.1까지 줄인다(<a class="eqref" href="#eq11">식-11</a>)</td><td>튜닝</td></tr>
+<tr><td>\(m\)</td><td>4 kg + 하중</td><td>하중을 올릴 때마다 갱신. \(M_{eff}\), \(\bar\tau\) 둘에 쓰인다</td><td>저울</td></tr>
+<tr><td>\(I_z\)</td><td>CAD</td><td>하중 위치에 따라 달라지므로 하중 조건별로</td><td>CAD, 또는 제자리 회전 가속 시험</td></tr>
+<tr><td>\(J_w\)</td><td>\(9.7\times10^{-4}\) kg·m²</td><td>회전자 관성(데이터시트) × 기어비² + 바퀴 관성</td><td>데이터시트, 바퀴를 띄운 가속 시험</td></tr>
+<tr><td>\(\hat\mu\)</td><td>노면마다</td><td>기존 설계의 주행 전 측정 절차</td><td>토크 램프 시험</td></tr>
+<tr><td>\(\tau_{fric,max}\)</td><td>torque_output의 모델 최댓값</td><td><a class="eqref" href="#eq21">식-21</a>의 상한 여유에만 쓴다</td><td>바퀴를 띄운 등속 시험</td></tr>
+</table></div>
+<div class="ex">\(W\) 의 검산: 위치 오차 1 cm는 비용 \(100\times0.01^2\) = 0.01, 속도 오차 0.1 m/s는 \(1\times0.1^2\) = 0.01, 방향 오차 1.4°(0.0245 rad)는 \(50\times0.0245^2\) = 0.03이다. 세 오차가 같은 등급으로 보인다.</div>
+</section>
+
+<!-- 11 -->
+<section id="s11">
+<h2><span class="n">11</span>통과 시험</h2>
+
+<div class="why"><div class="lbl">정리 개관</div><div class="tw"><table>
+<tr><th>내용</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>시뮬레이션 합격 기준</td><td>실차 전에 식이 맞는지, 적분 작용과 제약이 동작하는지 확인한다</td><td>한 번에 한 성질만 드러나는 시험을 고르는 것</td><td>정상상태, 하중 변화, 마찰 상한의 순서</td><td>정상상태 오차, 강인성, 활성 제약</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>제어기 검증은 가장 단순한 상황에서 해석적으로 아는 답과 맞추는 데서 시작한다. 정상상태에서 오차가 0인지(적분 작용), 모델 파라미터를 바꿔도 추종이 유지되는지(강인성), 제약이 실제로 활성화되고 그때 목적이 달성되는지(제약의 효과)를 따로 본다.</p>
+<p class="map"><b>대응.</b> 시험 1은 <a class="secref" href="#s7">07절</a>의 비용 성질, 시험 2는 <a class="secref" href="#s4">04절</a>의 외란 추정치, 시험 3은 <a class="secref" href="#s8">08절</a>의 토크 상한을 각각 확인한다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<div class="tw"><table>
+<tr><th>시험</th><th>조건</th><th>통과 기준</th><th>확인하는 식</th></tr>
+<tr><td>1 정상상태</td><td>직선 가속 → 등속, 그리고 등속 선회(1 m/s, 반경 2.4 m). 플랜트 = 모델</td><td>등속 구간 오차 0. 선회 토크가 최소 노름 분배 \([-0.0167,\ 0.0167,\ 0.0167,\ -0.0167]\) N·m(4 kg)와 일치. \(n^\top\tau\) = 0</td><td><a class="eqref" href="#eq16">식-16</a>, <a class="eqref" href="#eq18">식-18</a></td></tr>
+<tr><td>2 하중 변화</td><td>플랜트 질량 10 → 20 kg. (a) 제어기 \(m\) 도 갱신, (b) 갱신하지 않음</td><td>(a) 시험 1과 같은 오차. (b) 과도 뒤 정상상태 오차 0, \(\hat d\) 가 질량 오차에 의한 성분을 보임</td><td><a class="eqref" href="#eq9">식-9</a>, <a class="eqref" href="#eq10">식-10</a></td></tr>
+<tr><td>3 마찰 상한</td><td>\(\hat\mu\) = 0.3 노면 모델(견인력 포화 포함). 급가속 기준</td><td>토크가 \(\bar\tau\) 에 붙고(활성 제약), 슬립 \(\lambda\) 가 상한 없이 돌릴 때보다 작음. 추종은 느려지되 발산하지 않음</td><td><a class="eqref" href="#eq19">식-19</a>, <a class="eqref" href="#eq21">식-21</a></td></tr>
+<tr><td>4 플래너 연동</td><td>DRA-MPPI 기준열을 bag에서 재생</td><td>언랩이 8자 두 바퀴에서 2π 점프를 만들지 않음. 기준 부하 WARN이 뜨지 않음</td><td><a class="eqref" href="#eq14">식-14</a>, <a class="eqref" href="#eq15">식-15</a></td></tr>
+</table></div>
+<div class="ex">시험 1의 선회 토크 검산: \(F_y\) = 1.67 N을 기본 식-35〈최소 노름 분배 토크〉 \(\tau=T_{fwd}^\top F_B\) 로 나누면 \(\tau_i=\pm\tfrac r4F_y=\pm0.01\times1.67\) = ±0.0167 N·m이다. 부호는 \((T^{-1})^\top\) 의 둘째 행 \([-1,\ 1,\ 1,\ -1]\) 을 따른다.</div>
+<p>로그에는 \(\hat x\), \(x_{r,0}\), \(\tau^*\), \(\hat d\), 활성 제약 수, QP 반복 수, 계산 시간을 남긴다. \(\hat d\) 의 시계열이 "모델이 어디서 얼마나 틀렸는가"의 직접 기록이며, 2판에서 어느 항을 되살릴지의 근거가 된다.</p>
+</section>
+
+<!-- 12 -->
+<section id="s12">
+<h2><span class="n">12</span>트레이드오프와 2판</h2>
+
+<div class="why"><div class="lbl">정리 개관</div><div class="tw"><table>
+<tr><th>내용</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>단순화가 버린 것</td><td>단순화는 공짜가 아니다. 무엇을 잃었는지 알아야 되살릴 때를 안다</td><td>어느 손실이 언제 문제가 되는가</td><td>항목별 크기와 대책, 되살리는 조건</td><td>모델 불확실성, 선형화 오차, 외란 추정의 지연</td></tr>
+</table></div></div>
+
+<div class="gen"><div class="lbl">일반 개념</div>
+<p>모델에서 뺀 항은 외란 추정이 떠맡는다. 외란 추정은 상수에는 정확하지만 빠르게 변하는 것에는 늦고, 측정 잡음을 통과시킨다. 따라서 "아는 것은 모델에, 모르는 것은 외란에"가 원칙이다. 선형화 점을 기준 궤적에 두는 설계는 오차가 작을 때 정확하고, 큰 초기 오차에서는 플래너가 기준을 현재 상태에서 다시 시작해야 한다.</p>
+<p class="map"><b>대응.</b> 기본 문서의 토크 판은 2판의 틀로 남는다. 슬립 상태를 모델에 넣는 단계가 오면 몸체 좌표 오차 모델로 돌아가는 편이 자연스럽다.</p>
+</div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<div class="tw"><table>
+<tr><th>잃는 것</th><th>왜 생기나</th><th>크기</th><th>1판의 대책</th><th>되살릴 때</th></tr>
+<tr><td>종·횡 가중치 분리</td><td>관성 좌표의 \(W\) 는 \(x\), \(y\) 를 같이 벌한다</td><td>8자 추종 1판에서는 같게 둬도 된다</td><td>—</td><td>\(W_j=R(\theta_{r,j})W_BR(\theta_{r,j})^\top\) 한 줄</td></tr>
+<tr><td>방향 오차의 1차 효과</td><td>\(B\) 를 \(\theta_r\) 로 짓는다. \(\theta_e\) 만큼 토크 방향이 틀린다. 기본 식-67의 \(A_X\) 가 담던 항</td><td>\(\theta_e\) = 5°에서 힘의 9 %가 횡으로 샌다</td><td>\(\hat d\) 가 흡수. 큰 초기 오차는 플래너가 재시작</td><td>\(\theta_e\) 가 10°를 넘는 운전이 필요하면</td></tr>
+<tr><td>\(\hat d\) 의 부담</td><td>모델 오차가 모두 \(\hat d\) 로 간다. 잡음이 \(\sqrt2\) 배</td><td>\(\alpha\) = 0.1이면 0.1 s 지연</td><td><a class="eqref" href="#eq11">식-11</a>의 저역통과. \(w\) 를 모델에 두어 부담을 줄임</td><td>—</td></tr>
+<tr><td>슬립과 질량 오차의 구별</td><td>잔차는 원인을 모른다</td><td>미끄러지면 토크를 더 내려 함</td><td>\(\bar\tau\) 가 막는다</td><td>슬립 로거 \(\lambda\) 로 \(\bar\tau\) 를 낮추는 2판</td></tr>
+<tr><td>몸체 좌표 양의 확장</td><td>구름 저항 \(f_d\), 하중 이동 \(\hat N_i\), 바퀴 속도 상태는 몸체 좌표 양이다</td><td>1판에는 없음</td><td>—</td><td>슬립 동역학을 모델에 넣을 때 기본 문서 Ⅳ부로</td></tr>
+</table></div>
+<p>잃지 않는 것은 적분 작용, 토크 벌점 없음, 마찰 상한, 영공간 벌점, QP 크기, 기준 미리보기이다. <a class="secref" href="#s4">04절</a>·<a class="secref" href="#s6">06절</a>·<a class="secref" href="#s7">07절</a>의 변경(증분 → 절대 토크, 모델 미리보기 → \(Y_r\))은 같은 QP의 변수 치환이라 트레이드오프가 없다. 트레이드오프는 좌표계 선택(<a class="secref" href="#s2">02절</a>)에서만 나온다.</p>
+<div class="ex">방향 오차 5°의 크기: 선회 중 필요한 힘 1.67 N(4 kg)이 \(\sin5°\) = 0.087만큼 옆으로 새면 0.15 N, 가속도 0.023 m/s²이다. 0.5 s 지평 끝에서 위치 3 mm이다. \(\hat d\) 가 다음 스텝에 이 성분을 보정한다.</div>
+<p>2판의 순서는 \(\hat d\) 로그가 정한다. \(\hat d\) 의 속도 성분이 속도에 비례해 커지면 구름 저항(\(\mu_{rr}\) 측정 후 모델에), 가속에 비례하면 하중 이동(\(h_g\) 측정 후 \(\hat N_i\)), 선회에서만 커지면 \(w\) 의 \(I_z\) 또는 \(J_w\) 오차이다.</p>
+</section>
+
+<!-- 13 -->
+<section id="s13">
+<h2><span class="n">13</span>식의 출처</h2>
+
+<div class="why"><div class="lbl">정리 개관</div><div class="tw"><table>
+<tr><th>내용</th><th>왜 하는가</th><th>풀어야 할 문제</th><th>접근 방식</th><th>사용 개념</th></tr>
+<tr><td>식별 출처표</td><td>어느 식이 기본 문서의 어느 식에서 왔고 어느 교재에 있는지를 남긴다</td><td>검증과 인용</td><td>식마다 한 줄</td><td>—</td></tr>
+</table></div></div>
+
+<div class="apply">이 로봇에 적용</div>
+
+<div class="tw"><table>
+<tr><th>식</th><th>내용</th><th>기본 문서</th><th>교재</th></tr>
+<tr><td><a class="eqref" href="#eq1">식-1</a></td><td>상태 벡터, \(\dot X=Rv\)</td><td>기본 식-1</td><td>Lynch &amp; Park 13.2</td></tr>
+<tr><td><a class="eqref" href="#eq2">식-2</a></td><td>토크–일반화 힘 변환 행렬 \((T^{-1})^\top\), 영공간 \(n\)</td><td>기본 식-6, 22, 28</td><td>Lynch &amp; Park 5.2, 13.2.1</td></tr>
+<tr><td><a class="eqref" href="#eq3">식-3</a></td><td>몸체 좌표 운동방정식(마찰 제외)</td><td>기본 식-44, 48</td><td>Meriam &amp; Kraige 5.7</td></tr>
+<tr><td><a class="eqref" href="#eq4">식-4</a></td><td>\(\dot v=R^\top\ddot X-\omega_zSv\)</td><td>기본 문서 08절 미분 규칙</td><td>Meriam &amp; Kraige 5.7 (5.13)</td></tr>
+<tr><td><a class="eqref" href="#eq5">식-5</a>, 6</td><td>관성 좌표 운동방정식, 제어 모델</td><td>신규</td><td>—</td></tr>
+<tr><td><a class="eqref" href="#eq7">식-7</a></td><td>연속시간 상태공간 모델</td><td>기본 식-75</td><td>Franklin–Powell–Workman 4.3, Kirk A.2</td></tr>
+<tr><td><a class="eqref" href="#eq8">식-8</a></td><td>이중적분기 ZOH</td><td>기본 식-78 (정확 이산화)</td><td>Franklin–Powell–Workman 4.3</td></tr>
+<tr><td><a class="eqref" href="#eq9">식-9</a>, 10, 11</td><td>외란 추정치, Wang 증분형과의 항등식, 저역통과</td><td>기본 식-84~87 풀어 쓴 것</td><td>Wang 1.2, Rawlings–Mayne–Diehl 1.5, Pannocchia &amp; Rawlings 2003</td></tr>
+<tr><td><a class="eqref" href="#eq12">식-12</a>, 13</td><td>예측, 예측 행렬</td><td>기본 식-88~91</td><td>Wang 1.3</td></tr>
+<tr><td><a class="eqref" href="#eq14">식-14</a>, 15</td><td>기준 변환, 언랩</td><td>기본 식-1, 기본 문서 19절</td><td>Siciliano 4장</td></tr>
+<tr><td><a class="eqref" href="#eq16">식-16</a>, 17, 18</td><td>비용, 차분 행렬, QP 표준형</td><td>기본 식-92~94, 98</td><td>Wang 1.3, Nocedal &amp; Wright 16</td></tr>
+<tr><td><a class="eqref" href="#eq19">식-19</a>, 20, 21</td><td>토크 상한, 변화율, \(\bar\tau\)</td><td>기본 식-57, 100</td><td>Wang 2장, Gillespie 2장</td></tr>
+<tr><td><a class="eqref" href="#eq22">식-22</a></td><td>출력</td><td>기본 식-95</td><td>—</td></tr>
+</table></div>
+</section>
+
+<footer>
+<b>참고문헌</b>
+<ol>
+<li>J. L. Meriam and L. G. Kraige, <i>Engineering Mechanics: Dynamics</i>, 9th ed., Wiley, 2018, Ch. 5.7.</li>
+<li>G. F. Franklin, J. D. Powell, and M. L. Workman, <i>Digital Control of Dynamic Systems</i>, 3rd ed., Addison-Wesley, 1998, Ch. 4.</li>
+<li>L. Wang, <i>Model Predictive Control System Design and Implementation Using MATLAB</i>, Springer, 2009, Ch. 1–2.</li>
+<li>J. B. Rawlings, D. Q. Mayne, and M. M. Diehl, <i>Model Predictive Control: Theory, Computation, and Design</i>, 2nd ed., Nob Hill, 2017, Ch. 1.5.</li>
+<li>G. Pannocchia and J. B. Rawlings, "Disturbance models for offset-free model-predictive control," <i>AIChE J.</i>, 49(2), 2003.</li>
+<li>K. M. Lynch and F. C. Park, <i>Modern Robotics</i>, Cambridge Univ. Press, 2017, Ch. 5.2, 13.2.</li>
+<li>B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, <i>Robotics: Modelling, Planning and Control</i>, Springer, 2009, Ch. 4.</li>
+<li>J. Nocedal and S. J. Wright, <i>Numerical Optimization</i>, 2nd ed., Springer, 2006, Ch. 16.</li>
+<li>SMOC Lab, 『메카넘 AMR 토크 입력 MPC의 식 정리』(기본 문서), 2026-11.</li>
+</ol>
+</footer>
+</main>
+</div>
+</body>
+</html>
+
+</body></html>

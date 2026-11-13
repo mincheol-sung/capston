@@ -1,0 +1,12 @@
+{
+  "standard": {
+    "successes": 15,
+    "collisions": 0,
+    "trials": 20
+  },
+  "guide": {
+    "successes": 16,
+    "collisions": 0,
+    "trials": 20
+  }
+}

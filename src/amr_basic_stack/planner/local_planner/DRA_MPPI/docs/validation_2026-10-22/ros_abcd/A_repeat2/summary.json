@@ -1,0 +1,82 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 0,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 50,
+  "callback_over_200ms_ratio": 0.5,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 165.8645338122733,
+    "p50": 175.4514875356108,
+    "p95": 279.3148753349669,
+    "p99": 292.03417323529726,
+    "max": 298.42336056753993
+  },
+  "backend": "batch",
+  "workers": 1,
+  "frozen_nominal": true,
+  "statuses": {
+    "stale_odom": 50,
+    "expired_input": 50
+  },
+  "fallback_ratio": 1.0,
+  "deadline_miss_ratio": 0.5,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 132.71246283315122,
+    "p50": 126.1079179821536,
+    "p95": 279.09115188522264,
+    "p99": 291.4984498056583,
+    "max": 291.76504304632545
+  },
+  "normal_optimizer_ms": null,
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 33.155485873576254,
+    "p50": 30.021901708096266,
+    "p95": 81.08868050621821,
+    "p99": 92.40088037448007,
+    "max": 98.75917970202863
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 32.71680576959624,
+    "p50": 25.844633206725113,
+    "p95": 79.31857195217158,
+    "p99": 92.03852182254197,
+    "max": 98.4270646702498
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 200.05451700184494,
+    "p50": 184.48854959569871,
+    "p95": 409.88988659810275,
+    "p99": 428.9639645931311,
+    "max": 433.05114191025496
+  },
+  "receive_interval_ms": {
+    "count": 101,
+    "mean": 201.97529399002173,
+    "p50": 366.9166620820761,
+    "p95": 409.8647350911051,
+    "p99": 428.964122897014,
+    "max": 433.01927507855
+  },
+  "receive_count_in_window": 101,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 10,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

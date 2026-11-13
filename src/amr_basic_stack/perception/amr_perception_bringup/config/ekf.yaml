@@ -1,0 +1,174 @@
+# robot_localization EKF 설정 — 이슈 C 보강(측위 부트스트랩)
+#
+# 목적: IMU + 휠 오도메트리를 융합해 SLAM 없이도 매끄러운 임시 pose 생성.
+#       => odom -> base_footprint TF를 발행(연속·고주파). map -> odom 보정은 SLAM 담당.
+#
+# 좌표계 계층: map --(SLAM)--> odom --(이 EKF)--> base_link
+#
+# config 배열 순서(15개): [x, y, z,  roll, pitch, yaw,  vx, vy, vz,  vroll, vpitch, vyaw,  ax, ay, az]
+# 산업용 AMR은 평면 주행 → two_d_mode: true (z·roll·pitch 자동 0 고정).
+
+ekf_filter_node:
+  ros__parameters:
+    # ★ ekf_carto(ekf_carto_localization.yaml) 의 frequency 와 같아야 한다.
+    #
+    # 왜: ekf_carto 는 world_frame 이 map 이라 자기 상태(map->base)를 그대로
+    # 내지 못하고
+    #     map->odom = (map->base, 자기 상태) ∘ (odom->base, TF 조회)⁻¹
+    # 로 만든다. 그 odom->base 가 이 노드가 내는 TF 다. 주기가 다르면 ekf_carto
+    # 는 최대 (1/이 주기) 만큼 묵은 값을 빼게 되고, 그 시차가
+    #     병진 |v|·Δt      회전 |wz|·Δt·r   (r = odom 원점에서 로봇까지)
+    # 만큼의 위치 오차가 되어 map->odom 에 그대로 실린다. 두 EKF 의 출력
+    # 자체는 깨끗한데(누적/순변위 비 3.4 와 3.7) 그 차인 map->odom 만 떠는
+    # 것이 이 때문이다.
+    #
+    # 2026-09-14 실측 (bag mpc_chain_20260914_155111, 108.9 s):
+    #   30 Hz 일 때 /odometry/filtered stamp 간격 35.0 ms, ekf_carto 는 20.0 ms
+    #   시차 p50 15.0 / p90 30.0 / max 45.0 ms
+    #   map->odom 누적경로 35.87 m, 순변위 0.23 m  => 비 156.2
+    #   두 EKF 출력을 같은 stamp 로 보간해 재계산하면 16.02 m => 비 69.7
+    #     -> 떨림의 55.3 % 가 주기 불일치다. 구간을 나누면
+    #          완전 정지 |v|<0.02 |wz|<0.02 :  0.6 %   (기여 없음)
+    #          병진만    |v|>0.1  |wz|<0.05 : 65.1 %
+    #          회전 포함          |wz|>0.2  : 72.1 %
+    #        정지 중에도 남는 44.7 % 는 주기가 아니라 스캔 정합 쪽이다
+    #        (두 라이다 방위 의존 오차 진폭 139 mm, δy 약 70 mm).
+    #
+    # 50 으로 올려도 20 ms 격자는 남는다. 시차가 p50 15->10, p90 30->20 ms 로
+    # 줄어 주기 몫의 약 2/3 가 사라지는 것이지 0 이 되지는 않는다.
+    # 대가는 이 노드 CPU 1.67 배. /odom 이 48.9 Hz 로 들어오므로 입력은 충분하다.
+    frequency: 50.0             # EKF 출력 주기(Hz) — ekf_carto 와 동일
+    sensor_timeout: 0.1         # 센서 입력 끊김 허용 시간(s)
+    two_d_mode: true            # 평면 주행 가정
+    publish_tf: true            # odom->base_footprint TF 발행
+    publish_acceleration: false
+    # 정지 중에는 process noise를 속도에 맞춰 줄여, 관측되지 않는 x/y/yaw의
+    # 공분산이 시간만 지나도 계속 커지는 현상을 막는다.
+    dynamic_process_noise_covariance: true
+
+    # 좌표계 정의
+    map_frame: map
+    odom_frame: odom
+    # URDF 루트가 base_footprint 이고 roboclaw 의 base_frame_id 도
+    # base_footprint 다. 여기를 base_link 로 두면 base_link 의 부모가
+    # odom 과 base_footprint 둘이 되어 TF 트리가 끊긴다.
+    base_link_frame: base_footprint
+    world_frame: odom           # odom에 융합 => 연속·국소 추정치(SLAM 점프와 분리)
+
+    # ── 입력 1: 휠 오도메트리 — 이동 담당(x, y, vx, vy) ──
+    # 메카넘 바퀴는 회전 슬립이 커 yaw 오도메트리가 부정확 => yaw/vyaw는 odom에서 빼고
+    # gyro(imu0)가 담당. odom은 이동(위치·병진속도)만 제공. (imu와 동시 융합)
+    odom0: /odom
+    # x, y(절대 위치)를 융합하지 않는다 — 속도(vx, vy)만 준다.
+    #
+    # 2026-09-03 실측으로 확정. /odom 의 x,y 는 드라이버가 **자기 휠 yaw** 로 적분한 값인데
+    # 이 필터의 yaw 는 **자이로** 다. 둘은 회전 중 35 % 어긋난다
+    # (제자리 왕복 시험 총회전: 휠 66 ° vs 자이로 114 °, wz 이득 0.85 vs 0.99).
+    # 그래서 위치 측정이 포즈를 휠 방향으로 끌고 필터의 yaw 는 다른 방향을 가리켜,
+    # 출력된 pose 와 twist 가 서로 다른 운동을 말하게 된다.
+    #
+    # 자기일관성 검산 (보고된 twist 를 보고된 yaw 로 적분한 변위 vs 보고된 pose 변화):
+    #     /odom               15 s 주행에 불일치 0.2 cm
+    #     /odometry/filtered  0.8 s 주행에 불일치 26.4 cm     <- 이 설정에서
+    # mpc_tracking_node 는 pose 로 오차를, twist 로 내부 FOPDT 상태를 만든다. 둘이 모순이면
+    # 예측모델이 깨져 발산한다. 8자가 이것 때문에 발산했다 (Q 를 아무리 튜닝해도 안 고쳐졌다).
+    #
+    # 속도만 융합하면 위치는 필터가 자기(자이로) yaw 로 적분하므로 pose 와 twist 가 일치한다.
+    # odom 프레임은 원래 연속·국소 추정이고 전역 표류는 SLAM(map -> odom)이 잡는 구조이므로
+    # 절대 위치를 여기서 받을 이유가 없다.
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  true,  false,
+                   false, false, false,
+                   false, false, false]
+    odom0_differential: false   # 절대값 사용(누적차분 아님)
+    odom0_relative: false
+    odom0_queue_size: 10
+
+    # ── 입력: D455 IMU (yaw 각속도만) ──
+    # 원본 /camera/imu 가 아니라 imu_to_base_node 가 body 프레임으로 회전시킨
+    # 토픽을 쓴다. robot_localization 은 _config 배열을 센서 프레임 기준으로
+    # 해석한 뒤 회전시키므로, optical 프레임 원본에 vyaw 를 켜면 로봇의 vroll
+    # 로 옮겨가고 two_d_mode 가 그걸 0 으로 눌러 자이로가 통째로 버려진다.
+    # (증상: 정지 중에도 odom->base_footprint 가 계속 회전)
+    # D455 IMU는 gyro(각속도)+accel(가속도)만 제공, 절대 자세(orientation) 없음.
+    # => yaw 각속도(vyaw)만 융합. orientation·accel은 미사용(자세추정은 odom+gyro 적분).
+    imu0: /imu/base_link
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 10
+    imu0_remove_gravitational_acceleration: true
+
+    # process_noise_covariance (Q) — 2026-09-03 실측 튜닝.
+    #
+    # 왜 건드렸나: 기본값(vx,vy=0.025, vyaw=0.02)에서 /odometry/filtered 의 twist 가
+    # /odom 보다 한참 늦었다. 회전+병진 동시 시험(±0.15 m/s, ±1.0 rad/s 를 1 s 마다 반전,
+    # /cmd_vel 대비 상호상관)에서:
+    #     /odom               vx 50 ms   wz 50 ms
+    #     /odometry/filtered  vx 160 ms  wz 130 ms      <- 추가 +110 / +80 ms
+    # mpc 의 예측모델은 model.py 의 FOPDT(θ=40 ms)를 쓰는데 그 지연은 모델에 없다.
+    #
+    # ★ 정정 (2026-09-09). 여기 원래 "8자 추종이 이것 때문에 발산했다"고 적혀 있었는데 틀렸다.
+    #   발산의 근본 원인은 지연이 아니라 아래 odom0_config 였다 — 같은 커밋(bd66eac)의 첫 문단이
+    #   그렇게 적고 있고, 본문에 "process_noise_covariance 를 다섯 개 쓸어도 안 고쳐졌다
+    #   (튜닝이 아니라 구조 문제였다)"고 명시돼 있다. /odom 의 x,y 는 드라이버가 휠 yaw 로 적분한
+    #   값인데 이 필터의 yaw 는 자이로라, 메카넘 슬립으로 둘이 어긋나면서(제자리 왕복 총회전
+    #   휠 66° vs 자이로 114°) 포즈와 twist 가 서로 모순됐다 (자기일관성 불일치 0.8 s 에 26.4 cm).
+    #   MPC 는 pose 로 오차를, twist 로 FOPDT 상태를 만드니 예측모델이 깨진 것이다.
+    #   odom0_config 에서 x,y 를 뺀 뒤 RMS 115 cm → 0.28 cm 로 완주했다.
+    #
+    #   따라서 Q 를 되돌려도 8자 발산이 돌아오지는 않는다. Q 는 순수하게 지연 대 잡음 거래다.
+    #   다만 되돌릴 이유도 없어졌다 — 아래 잡음 대가를 controller 쪽 관측기가 이미 처리한다.
+    #
+    # Q 가 작으면 필터가 자기 예측을 과신해 측정 반영이 느려진다 = 지연.
+    # vx,vy(6,7)와 vyaw(11) 대각만 올려 쓸었다:
+    #     Q[vx,vy]   0.025   0.1    0.5    2.0    8.0
+    #     vx 지연     160    150    120    140     60  ms
+    #     Q[vyaw] (Q[vx,vy]=8.0 고정)   0.02   0.5    2.0
+    #     wz 지연                        130     90     90  ms   (vx 는 70 / 70 / 90)
+    # 채택: vx,vy = 8.0, vyaw = 0.5  ->  vx 70 ms, wz 90 ms (추가 +20 / +40)
+    #
+    # 대가는 없었다. 정지 90 초 재측정: yaw 드리프트 0.30 °/min (기본값일 때 0.35),
+    # 위치 드리프트 0.00 cm, vx 잡음 σ 0.00000, wz 잡음 σ 0.00207 rad/s.
+    # 정지 중에는 측정이 조용해서 더 믿어도 잡음이 안 는다.
+    #
+    # ★ 정정 (2026-09-09). "대가는 없었다" 는 정지에서만 참이다 — Q 의 대가는 정의상
+    #   움직일 때만 나타나는데 검증을 정지로만 했다. 주행 중 실측
+    #   (bags/mpc_chain_20260909_151007, 390~416 s):
+    #     Kalman gain K = P/(P+R) = (8.0/30)/((8.0/30)+0.0303²) = 0.9966  → 측정 99.7 % 통과
+    #     잡음 저감비 (출력/입력)  vx 0.883   wz 1.187 (wz 는 오히려 증폭)
+    #     /odometry/filtered 잡음 1σ  vx 12.0 / vy 9.6 mm/s,  wz 42.2 mrad/s
+    #   이 잡음이 MPC 의 incremental form 에서 1 차 차분돼 Δu 부호반전 63 %, 2.48 Hz 맥동을 만들었다.
+    #   → 고친 곳은 여기가 아니라 controller/mpc/amr_mpc/core/observer.py (Wang Ch.4 관측기) 다.
+    #     Q 를 낮춰 잡음을 줄이면 지연이 돌아오고, 그 지연은 MPC 모델에 없다(model.py 는 d≤1).
+    #     관측기는 명령 u 로 위상을 만들고 측정은 innovation 으로만 받으므로 둘을 분리한다.
+    #     추정오차 1σ 12.24 → 2.16 mm/s. 그래서 Q 는 8.0 그대로 두는 것이 맞다.
+    #
+    # 재측정 방법은 아래 스크립트가 그대로 재현한다 (로봇이 앞뒤로 되짚으며 움직인다):
+    #   python3 controller/mpc/tools/combo_lag_test.py
+    #
+    # 순서: [x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az] 의 15x15
+    process_noise_covariance: [
+      0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.060, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.030, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.030, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.001, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 8.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,   # <-- 튜닝
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 8.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,   # <-- 튜닝
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.040, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.500, 0.000, 0.000, 0.000,   # <-- 튜닝
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.015
+    ]
+
+    # initial_estimate_covariance 는 기본값 사용.

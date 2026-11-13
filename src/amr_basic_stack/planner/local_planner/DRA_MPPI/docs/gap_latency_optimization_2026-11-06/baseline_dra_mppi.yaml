@@ -1,0 +1,257 @@
+dra_mppi_node:
+  ros__parameters:
+    # ── 공통: ROS 입출력·상태 유효시간·종단 정렬 ──
+    planning_frame: odom
+
+    global_path_topic: /global_path
+    # A new RViz goal releases the completed-goal latch. Until then the exact
+    # requested goal pose remains the fixed zero-velocity hold target.
+    goal_pose_topic: /goal_pose
+    odometry_topic: /odometry/filtered
+    predictions_topic: /predictions
+    # Tracker/predictor는 전체 클래스를 유지하고 DRA-MPPI 입력에서만 거른다.
+    # 나중에 동적 회피 대상을 늘릴 때 예: [person, bicycle, car]
+    # 빈 리스트 또는 ['*']는 모든 클래스를 허용한다.
+    prediction_filter.class_names: [person]
+    prediction_filter.output_topic: /dra_mppi/predictions_used
+    # person semantic evidence and geometry must both be recent. LOST tracks are
+    # excluded by require_confirmed instead of being treated as new obstacles.
+    prediction_filter.max_semantic_age: 1.0
+    prediction_filter.max_measurement_age: 0.5
+    prediction_filter.require_confirmed: true
+    # 한두 프레임 가림은 마지막 예측 위치의 고정 안전 원으로만 유지한다.
+    prediction_filter.allow_recent_lost: true
+    prediction_filter.lost_grace_time: 0.30
+    # STATIC/UNKNOWN people remain collision obstacles. Their current t=0 IMM
+    # posterior becomes one fixed safety disc; only DYNAMIC tracks keep a
+    # moving CV/CT future path.
+    prediction_filter.stationary_nondynamic: true
+    # A missing/stale predictor is a perception fault, not an empty scene.
+    prediction_fail_safe: true
+
+    reference_topic: /dra_mppi/reference
+    reference_trajectory_topic: /dra_mppi/reference_trajectory
+    cmd_vel_topic: /dra_mppi/cmd_vel
+    selected_path_topic: /dra_mppi/selected_path
+    rollouts_topic: /dra_mppi/rollouts
+    # Flattened [guide, timestep] matrices. These retain the complete rollout
+    # MC geometry even though /dra_mppi/rollouts publishes only 32 RViz samples.
+    guide_mc_region_areas_topic: /dra_mppi/guide_mc_region_areas
+    guide_mc_sample_counts_topic: /dra_mppi/guide_mc_sample_counts
+
+    # This is intentionally isolated from /cmd_vel. A downstream dynamics
+    # controller should consume PlanarReferenceArray and own the real /cmd_vel.
+    publish_cmd_vel: false
+    # One planner callback advances the warm start by one mppi.dt step.
+    controller_frequency: 5.0
+    # Optional raw per-cycle wall-clock JSONL. Empty disables recording.
+    timing.jsonl_path: ''
+    odom_timeout: 0.25
+    transform_max_age: 0.5
+    prediction_timeout: 0.50
+    path_lookahead: 2.0
+    max_path_points: 80
+    # goal_tolerance enters the shared terminal pose controller. It is not the
+    # final completion tolerance; exit_tolerance hysteresis prevents 15 cm
+    # boundary noise from alternating between MPPI motion and terminal control.
+    goal_tolerance: 0.15
+    goal_yaw_tolerance: 0.0872665  # 5 deg [rad]
+    goal_terminal.exit_tolerance: 0.25
+    goal_terminal.completion_tolerance: 0.08
+    # Terminal mode gently corrects both XY and yaw toward the exact goal.
+    goal_terminal.max_linear_speed: 0.10
+    goal_terminal.linear_gain: 1.0
+    # Completion requires measured velocity to stay below these thresholds
+    # for settle_cycles consecutive planner updates.
+    goal_terminal.settle_linear_speed: 0.03
+    goal_terminal.settle_yaw_rate: 0.05
+    goal_terminal.settle_cycles: 3
+    goal_heading.gain: 1.5
+    goal_heading.max_yaw_rate: 0.60
+    visualization_rollouts: 32
+    robot_radius: 0.2
+
+    # ── 전략 선택: standard / guide_conditioned / gap ──
+    # strategy만 바꾸고 노드를 재시작하면 기존 전략·예산으로 복귀한다.
+    mppi.strategy: gap
+
+    # ── 공통: horizon·MPPI weight·Halton spline 설정 ──
+    mppi.dt: 0.20
+    mppi.horizon_steps: 10
+    mppi.temperature: 2.0
+    # Official DRA-MPPI beta update targets eta=sum(exp(-(S-rho)/beta)) in [5,10].
+    mppi.adaptive_temperature: true
+    mppi.temperature_eta_lower: 5.0
+    mppi.temperature_eta_upper: 10.0
+    mppi.temperature_decrease_factor: 0.9
+    mppi.temperature_increase_factor: 1.2
+    mppi.spline_knots: 4
+    mppi.halton_scramble: true
+    mppi.seed: 7
+
+    # ── standard 전용: 총 rollout 예산 (guide_conditioned에서는 미사용) ──
+    mppi.num_rollouts: 321
+
+    # ── standard 전용 ──
+    mppi.noise_std: [0.15, 0.12, 0.45]
+
+    # ── guide_conditioned 전용: 로봇 기준 5방향 anchor ensemble ──
+    # 이동 rollout만 500개; 최종 비교에 독립 Stop 1개를 추가한다.
+    # 정적 맵으로 guide를 제거하지 않고 5개 guide에 총 예산을 균등 분배한다.
+    mppi.guide_num_rollouts: 500
+    mppi.guide_angles_deg: [0.0, 45.0, 90.0, -45.0, -90.0]
+    mppi.guide_noise_std: [0.15, 0.12, 0.45]
+    mppi.guide_anchor_blend: 0.25
+    mppi.guide_switch_penalty: 0.25
+    mppi.guide_hysteresis: 0.10
+    mppi.guide_evaluation: split  # batch is the reproducible common-domain comparator
+    mppi.guide_timeout: 0.18  # seconds; drain workers then reject expired result
+
+    # ── gap 전용: 바퀴 한계 거리/비용 → LiDAR 적용 목표점/비용 → 가변 배분 ──
+    # mppi.strategy: gap 으로 선택하고 재시작한다. 위 guide 노이즈/평가 방식은 공유.
+    # nominal + 최대 3개 gap guide; 이동 rollout 총 500, 독립 Stop은 최종 비교.
+    gap.total_rollouts: 500
+    gap.max_guides: 3
+    gap.timeout: 0.18
+    gap.nominal_min_rollouts: 100
+    gap.guide_min_rollouts: 30
+    gap.allocation_exploration: 0.20
+    gap.allocation_temperature_floor: 1.0
+    # D_g와 V_wheel은 LiDAR 제한 없이 계산한다(omega는 자유 변수).
+    # rho=min(D_g,d_g)가 짧아지면 같은 4항으로 다시 최적화한 V_actual을 배분에 쓴다.
+    # 거리 제한이 없고 중간 깊이 조건도 만족하면 wheel 해/비용을 그대로 재사용한다.
+    # 전체 후보 준비/최적화에 50ms. 반복/평가 사이 deadline을 검사한다.
+    # 전체 180ms 중 MPPI용 100ms도 예약하며, 초과 결과는 폐기한다.
+    gap.optimization_timeout: 0.05
+    gap.optimization_mppi_reserve: 0.10
+    gap.optimization_maxiter: 45
+    gap.optimization_ftol: 0.000001
+    gap.optimization_constraint_tolerance: 0.00001
+    gap.optimization_target_tolerance_m: 0.01
+    # 두 목표점의 비교 비용에 동일 가중치/공통 진행 기준을 적용한다.
+    # 500개 rollout 및 최종 대표의 기존 MPPI 평가 비용과는 별도이다.
+    gap.value_progress_weight: 8.0
+    gap.value_straight_weight: 4.0
+    gap.value_heading_weight: 3.0
+    gap.value_delta_x_weight: 0.5
+    gap.value_delta_y_weight: 0.5
+    gap.value_delta_omega_weight: 0.055
+    gap.cache_max_age: 0.6
+    gap.cache_max_translation_m: 0.5
+    gap.cache_min_overlap: 0.5
+    gap.cache_max_angle_deg: 20.0
+    gap.scan_front_topic: /scan_front_carto
+    gap.scan_rear_topic: /scan_rear_carto
+    gap.base_frame: base_link
+    gap.scan_timeout: 0.25
+    gap.scan_max_skew: 0.05
+    gap.adjacent_jump_m: 0.40
+    gap.relative_jump: 0.12
+    gap.side_window_beams: 3
+    gap.side_median_jump_m: 0.40
+    gap.side_spread_fraction: 0.35
+    gap.geometry_window_bins: 5
+    gap.geometry_jump_m: 0.25
+    gap.maximum_projection_bins: 8
+    gap.minimum_cut_separation_deg: 20.0
+    gap.minimum_region_bins: 6
+    gap.minimum_depth_m: 0.50
+    gap.max_depth_m: 2.0
+    gap.radial_step_m: 0.02
+    gap.extra_margin_m: 0.05
+    gap.grid_resolution_m: 0.04
+    gap.grid_extent_m: 4.0
+    gap.min_displacement_m: 0.25
+    gap.max_target_error_m: 0.35  # 검증된 재사용/규칙 기반 fallback에 적용
+    gap.nominal_rms_m: 0.22
+    gap.nominal_tail_m: 0.30
+    gap.guide_rms_m: 0.25
+    gap.target_reserve_m: 0.10  # 아래 세 항은 fallback seed에만 적용
+    gap.reach_scale: 0.90
+    gap.target_floor_m: 0.25
+    gap.path_lookahead_m: 1.0
+
+    # 정적 비용의 입력 지도와 유효성 검사.
+    traversability.topic: /traversable_map
+    traversability.timeout: 1.0  # 지도 발행 주기 0.5초(2 Hz)보다 길게
+    traversability.unknown_is_obstacle: true
+
+    # ── 공통: 축·가속도·wheel L1 제한 ──
+    limits.control_min: [-0.3750, -0.5625, -3.00]
+    limits.control_max: [0.7800, 0.5625, 3.00]
+    limits.acceleration: [2.25, 2.25, 6.75]
+    limits.wheel_radius: 0.04
+    limits.yaw_lever: 0.19835
+    limits.max_wheel_rad_per_sec: 30.0
+    limits.load_budget: 0.65
+
+    # ── 공통: Global Path 비용 (guide 도착·재합류 강제 비용 없음) ──
+    cost.desired_speed: 0.75
+    cost.tracking_path_weight: 64.0
+    cost.tracking_goal_weight: 24.0
+    cost.heading_weight: 3.0
+    cost.heading_lookahead: 0.20
+    # Squared residuals in SI units (2026-11-04): heading [rad^2],
+    # terminal progress-reference error [m^2], no absolute yaw-rate penalty.
+    # heading/progress weights need retuning against the previous objective.
+    # Weights multiply raw units directly; no hidden normalization or /dt.
+    cost.speed_weight: 1.78
+    cost.progress_weight: 8.0
+    cost.projection_window: 0.5
+    cost.goal_activation_distance: 0.5
+    cost.input_delta_weight: [0.5, 0.5, 0.055]
+
+    # Optional selected-target horizontal visibility cost (no target selector yet).
+    observation_cost.enabled: false
+    observation_cost.weight: 3.0
+    # Effective half horizontal FOV, after margin. Initial example, calibrate
+    # for the actual camera before enabling; these are not measured extrinsics.
+    observation_cost.half_fov_deg: 35.0
+    observation_cost.camera_offset: [0.0, 0.0]  # body-frame camera XY [m]
+    observation_cost.camera_yaw_deg: 0.0  # camera forward relative to body +X
+    # geometry_msgs/PointStamped; exact planning_frame and nonzero source stamp.
+    observation_cost.target_topic: /dra_mppi/observation_target
+    observation_cost.target_timeout: 0.5
+
+    # ── 정적 장애물 비용: /traversable_map distance field ──
+    # false이면 map/TF가 없어도 기존처럼 정적 비용 없이 동작한다.
+    # true이면 map이 없거나 stale/TF 오류일 때 fail-safe hold한다.
+    static_cost.enabled: true
+    # 런타임: ros2 param set /dra_mppi_node static_cost.enabled true (또는 false)
+    # true: swept footprint 충돌은 invalid, 근접 cost는 mean hinge-square.
+    # false: 정적 soft/hard 검사와 map freshness gate를 함께 끈다.
+    # decay는 d_safe[m]. 정적 충돌은 무한대 비용으로 제외한다.
+    static_cost.soft_weight: 8.0
+    static_cost.decay: 0.10
+
+    # ── 공통: 사람 예측 기반 동적 충돌확률 ──
+    # Adaptive Halton MC: 기존 밀도/최소·최대 예산의 8배.
+    # 2026-10-23: K500, 장애물20 ROS 50주기 callback p99 137ms.
+    # mc_samples는 adaptive_halton_mc=false에서 사용하는 고정 예산.
+    dynamic_risk.mode: monte_carlo
+    # Primary candidates retain the 8x MC budget; final representatives/Stop
+    # and terminal alignment use direct Gaussian disk integration.
+    dynamic_risk.final_mode: gaussian_disk
+    # Count prediction objects after the existing control-input filter, not modes.
+    # Above this limit: publish hold; never keep only the nearest 20 people.
+    # 0 disables this guard. Re-evaluate latency before increasing the budget.
+    dynamic_risk.max_obstacles: 20
+    dynamic_risk.soft_weight: 18.0
+    dynamic_risk.obstacle_radius: 0.25
+    dynamic_risk.minimum_sigma: 0.08
+    dynamic_risk.mc_samples: 2048
+    dynamic_risk.adaptive_halton_mc: true
+    dynamic_risk.mc_sample_density: 992.0
+    dynamic_risk.mc_samples_min: 4096
+    dynamic_risk.mc_samples_max: 32768
+    dynamic_risk.guide_parallel_workers: 2
+    dynamic_risk.guide_mc_sample_density: 992.0
+    dynamic_risk.guide_mc_samples_min: 1024
+    dynamic_risk.guide_mc_samples_max: 8192
+    dynamic_risk.final_mc_sample_density: 992.0
+    dynamic_risk.final_mc_samples_min: 2048
+    dynamic_risk.final_mc_samples_max: 32768
+    dynamic_risk.mc_reject_underresolved: true
+    dynamic_risk.hard_threshold: 0.05
+    dynamic_risk.hard_penalty: 100000.0
+    dynamic_risk.seed: 17

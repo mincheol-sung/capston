@@ -1,0 +1,3909 @@
+diff --git a/src/amr_basic_stack/controller/mpc/amr_mpc/nodes/sim_plant_wheel.py b/src/amr_basic_stack/controller/mpc/amr_mpc/nodes/sim_plant_wheel.py
+index 6152e04..44f8c09 100644
+--- a/src/amr_basic_stack/controller/mpc/amr_mpc/nodes/sim_plant_wheel.py
++++ b/src/amr_basic_stack/controller/mpc/amr_mpc/nodes/sim_plant_wheel.py
+@@ -29,6 +29,7 @@ class SimPlantWheelNode(Node):
+         self.cmd = np.zeros(4); self.last_cmd = None; self.timeout = float(g("cmd_timeout")); self.frame = str(g("frame_id"))
+         self.pub_odom = self.create_publisher(Odometry, str(g("odom_topic")), 10)
+         self.pub_wheel = self.create_publisher(Float32MultiArray, "/measured_wheel_speeds", 10)
++        self.pub_wheel_enc = self.create_publisher(Float32MultiArray, "/encoder_wheel_speeds", 10)   # C++ 노드용, 같은 값
+         self.create_subscription(Float32MultiArray, "/wheel_cmd", self.cb_cmd, 10)
+         self.create_timer(DT, self.on_tick)
+         self.get_logger().info(f"바퀴 τ={np.round(wm.TAU*1000)} ms  K={np.round(wm.K_DC,3)}  θ={wm.THETA*1000:.0f} ms → a={np.round(self.a,3)} d={d}")
+@@ -51,6 +52,7 @@ class SimPlantWheelNode(Node):
+         o.twist.twist.linear.x, o.twist.twist.linear.y, o.twist.twist.angular.z = map(float, v)
+         self.pub_odom.publish(o)
+         self.pub_wheel.publish(Float32MultiArray(data=[float(x) for x in self.w]))
++        self.pub_wheel_enc.publish(Float32MultiArray(data=[float(x) for x in self.w]))
+ 
+ 
+ def main():
+diff --git a/src/amr_basic_stack/controller/mpc/config/plant_wheel.yaml b/src/amr_basic_stack/controller/mpc/config/plant_wheel.yaml
+index ef85664..63525a0 100644
+--- a/src/amr_basic_stack/controller/mpc/config/plant_wheel.yaml
++++ b/src/amr_basic_stack/controller/mpc/config/plant_wheel.yaml
+@@ -15,6 +15,21 @@ model:
+   k_dc:  {FL: 1.010, FR: 1.010, RL: 1.011, RR: 1.010}    # [-]
+   theta: 0.040                                           # [s]  Python: tuning.Ts 와 같아야 d = 1.  C++: Ts 의 정수배
+ 
++# ── 모델 (100 Hz, C++ 노드 amr_mpc_cpp 전용): 바퀴별 1차 근사, dead time 없음. 측정은 /encoder_wheel_speeds.
++# 2026-10-22 교수님 피드백: "데드타임 40 ms 는 쓰기 어렵다, 1차 근사로, 남은 오차는 MPC 가 상쇄, 10 ms 기준".
++# 위 model(θ 40 / τ ≈ 100 ms)은 cmd 18 속도 기준이고, 그 속도는 RoboClaw 펌웨어 필터 때문에 실제보다 θ+τ 로
++# 91~94 ms 늦다 (바퀴 띄우고 실측, base.yaml 주석·analysis/roboclaw_100hz). 실제 바퀴는 θ ≈ 11 ms 라 1 스텝 수준이다.
++# 1차 근사 τ₁ = θ + τ (평균 체류시간 T_ar 보존 = e^{-θs} ≈ 1/(θs+1) 로 지연을 시정수에 흡수, SIMC 모델 축소와 같은 계열).
++# 바닥 값은 직렬 LTI 의 T_ar 가산성으로 추정했다:  바닥 실제 T_ar = 바닥 cmd 18 T_ar (wp2_log_20260903_160518, 1차 맞춤)
++#   − 측정필터 T_ar (띄운 실측, 하중 무관).  FL 136.6−93.1, FR 132.8−90.5, RL 136.3−94.4, RR 128.5−90.9 ms.
++#   이득도 같은 식: 바닥 cmd 18 K / 필터 이득 (cmd 18 은 카운트 기준보다 1.1~1.8 % 작다).
++# ★ 간접 추정이다. 바닥 계단 sysid (wp2_step_logger --ramp 0 --rate 100, 드라이버 encoder 모드)로 확인할 것.
++#   띄운 상태 실측은 τ₁ 26~28 ms — 바닥이 차체 관성만큼 느린 방향이 맞다.
++model_100hz:
++  tau:   {FL: 0.043, FR: 0.042, RL: 0.042, RR: 0.038}    # [s]  τ₁ = θ + τ
++  k_dc:  {FL: 1.024, FR: 1.030, RL: 1.023, RR: 1.029}    # [-]
++  theta: 0.0                                             # [s]  1차 근사 — dead time 상태 없음
++
+ # ── 기하: 드라이버 twist_to_wheels 와 같은 식.  ω_i = (v_x ± v_y ± k ω)/r,  k = (wheel_base + width)/2
+ geometry:
+   wheel_radius_m: 0.04
+diff --git a/src/amr_basic_stack/controller/mpc_cpp/launch/wheel_circle.launch.py b/src/amr_basic_stack/controller/mpc_cpp/launch/wheel_circle.launch.py
+index b1a8029..acc7dff 100644
+--- a/src/amr_basic_stack/controller/mpc_cpp/launch/wheel_circle.launch.py
++++ b/src/amr_basic_stack/controller/mpc_cpp/launch/wheel_circle.launch.py
+@@ -22,6 +22,7 @@ def generate_launch_description():
+         DeclareLaunchArgument('odom_topic', default_value='/odom'),
+         DeclareLaunchArgument('pose_extrapolation', default_value='true',
+                               description='묵은 포즈를 현재 틱으로 외삽 (노드 머리주석). false 는 비교 시험용.'),
++        DeclareLaunchArgument('model_section', default_value='model_100hz', description='plant_wheel.yaml 의 모델 절.'),
+         DeclareLaunchArgument('tuning_section', default_value='tuning_100hz'),
+         DeclareLaunchArgument('log_prefix', default_value='wheel_cpp_sim'),
+         Node(package='amr_mpc', executable='sim_plant_wheel_node', name='sim_plant_wheel_node', output='screen',
+@@ -31,6 +32,7 @@ def generate_launch_description():
+                           'odom_topic': lc('odom_topic')}]),
+         Node(package='amr_mpc_cpp', executable='wheel_mpc_node', name='wheel_mpc_node', output='screen',
+              parameters=[{'odom_topic': lc('odom_topic'), 'log_prefix': lc('log_prefix'),
+-                          'tuning_section': lc('tuning_section'),
++                          'wheel_topic': '/encoder_wheel_speeds',
++                          'tuning_section': lc('tuning_section'), 'model_section': lc('model_section'),
+                           'pose_extrapolation': ParameterValue(lc('pose_extrapolation'), value_type=bool)}]),
+     ])
+diff --git a/src/amr_basic_stack/controller/mpc_cpp/launch/wheel_mpc.launch.py b/src/amr_basic_stack/controller/mpc_cpp/launch/wheel_mpc.launch.py
+index bb3bd1b..511f65a 100644
+--- a/src/amr_basic_stack/controller/mpc_cpp/launch/wheel_mpc.launch.py
++++ b/src/amr_basic_stack/controller/mpc_cpp/launch/wheel_mpc.launch.py
+@@ -25,16 +25,19 @@ def generate_launch_description():
+         DeclareLaunchArgument('config_file', default_value=default_config, description='배선 YAML (amr_mpc/config/wheel.yaml).'),
+         DeclareLaunchArgument('pose_extrapolation', default_value='true',
+                               description='묵은 포즈를 현재 틱으로 외삽 (노드 머리주석). false 는 비교 시험용.'),
++        DeclareLaunchArgument('model_section', default_value='model_100hz', description='plant_wheel.yaml 의 모델 절.'),
+         DeclareLaunchArgument('tuning_section', default_value='tuning_100hz', description='plant_wheel.yaml 의 튜닝 절.'),
+         DeclareLaunchArgument('odom_topic', default_value='/odometry/filtered'),
+-        DeclareLaunchArgument('wheel_topic', default_value='/measured_wheel_speeds'),
++        # 엔코더 카운트 차분 속도 (드라이버 encoder_wheel_speeds). model_100hz 1차 모델이 실제 바퀴 속도 기준이라
++        # cmd 18 기반 /measured_wheel_speeds (91~94 ms 늦음, base.yaml 주석) 를 쓰면 모델과 어긋난다
++        DeclareLaunchArgument('wheel_topic', default_value='/encoder_wheel_speeds'),
+         DeclareLaunchArgument('wheel_cmd_topic', default_value='/wheel_cmd'),
+         DeclareLaunchArgument('log_prefix', default_value=''),
+         DeclareLaunchArgument('publish_debug', default_value='true'),
+         Node(
+             package='amr_mpc_cpp', executable='wheel_mpc_node', name='wheel_mpc_node', output='screen',
+             parameters=[lc('config_file'),
+-                        {'tuning_section': lc('tuning_section'),
++                        {'tuning_section': lc('tuning_section'), 'model_section': lc('model_section'),
+                           'pose_extrapolation': ParameterValue(lc('pose_extrapolation'), value_type=bool),
+                          'odom_topic': lc('odom_topic'), 'wheel_topic': lc('wheel_topic'),
+                          'wheel_cmd_topic': lc('wheel_cmd_topic'), 'log_prefix': lc('log_prefix'),
+diff --git a/src/amr_basic_stack/controller/mpc_cpp/src/wheel_mpc_node.cpp b/src/amr_basic_stack/controller/mpc_cpp/src/wheel_mpc_node.cpp
+index 413d7b6..b7c11d2 100644
+--- a/src/amr_basic_stack/controller/mpc_cpp/src/wheel_mpc_node.cpp
++++ b/src/amr_basic_stack/controller/mpc_cpp/src/wheel_mpc_node.cpp
+@@ -9,6 +9,7 @@
+ //
+ // 파라미터 출처
+ //   물리값 (model / geometry / limits / safety / hold) : plant_file (기본 amr_mpc 의 plant_wheel.yaml)
++//   모델 절은 model_section (기본 model_100hz — 1차 근사, 실제 바퀴 속도 기준. 없으면 model)
+ //   튜닝 (Ts, Np, Nc, 가중치, k_obs)                  : 같은 파일의 tuning_section 절 (기본 tuning_100hz)
+ //   위 값은 ROS 파라미터의 기본값으로만 쓴다 → --ros-args -p Nc:=10 처럼 실행마다 덮어쓸 수 있다.
+ //   theta 도 파라미터다 (기본 model.theta). Ts 의 정수배가 아니면 기동 시 거부한다.
+@@ -87,8 +88,13 @@ public:
+   {
+     const std::string plant_file = declare_parameter<std::string>("plant_file", default_plant_file());
+     const std::string section = declare_parameter<std::string>("tuning_section", "tuning_100hz");
++    std::string model_section = declare_parameter<std::string>("model_section", "model_100hz");
+     const YAML::Node y = YAML::LoadFile(plant_file);
+-    const YAML::Node ym = y["model"], yg = y["geometry"], yl = y["limits"], ys = y["safety"], yh = y["hold"];
++    if (!y[model_section]) {
++      RCLCPP_WARN(get_logger(), "%s 에 %s 절이 없어 model 을 쓴다", plant_file.c_str(), model_section.c_str());
++      model_section = "model";
++    }
++    const YAML::Node ym = y[model_section], yg = y["geometry"], yl = y["limits"], ys = y["safety"], yh = y["hold"];
+     const YAML::Node yt = y[section];
+     if (!yt) {throw std::runtime_error(plant_file + " 에 " + section + " 절이 없다");}
+ 
+@@ -169,9 +175,9 @@ public:
+     RCLCPP_INFO(
+       get_logger(),
+       "구조 B (바퀴 입력, C++/DAQP).  기준 %s  포즈 %s  바퀴 %s → %s   Ts %.0f ms  Np %d  Nc %d  θ %.0f ms (d=%d)  "
+-      "|ω| ≤ %.0f rad/s  [%s : %s]",
++      "|ω| ≤ %.0f rad/s  [%s : %s, %s]",
+       ref_topic.c_str(), odom_topic.c_str(), wheel_topic.c_str(), cmd_topic.c_str(), tu.Ts * 1e3, tu.Np, tu.Nc,
+-      md.theta * 1e3, mpc_->d(), md.w_max, plant_file.c_str(), section.c_str());
++      md.theta * 1e3, mpc_->d(), md.w_max, plant_file.c_str(), model_section.c_str(), section.c_str());
+   }
+ 
+   void finish()
+diff --git a/src/amr_basic_stack/controller/mpc_cpp/tools/sim.cpp b/src/amr_basic_stack/controller/mpc_cpp/tools/sim.cpp
+index e84b16a..54ca3f7 100644
+--- a/src/amr_basic_stack/controller/mpc_cpp/tools/sim.cpp
++++ b/src/amr_basic_stack/controller/mpc_cpp/tools/sim.cpp
+@@ -4,6 +4,8 @@
+ //       pose_hz  포즈 측정 갱신 주기 (실차 /odometry/filtered 50 Hz).  기본은 매 틱
+ //       extrap   1 이면 묵은 포즈를 측정 시각의 몸체 twist 로 현재 틱까지 외삽 (wheel_mpc_node 와 같은 처리)
+ //       fresh    1 이면 새 바퀴 측정이 있는 틱에만 관측기 보정 (wheel_mpc_node 와 같은 처리)
++//       model_tau model_k   모델 τ·이득 (네 바퀴 같은 값. 0 이면 WheelModel 기본)
++//       plant_tau plant_k   실제 플랜트 τ·이득 (0 이면 모델과 같음) — 모델 오차 시험
+ // 플랜트: 바퀴별 FOPDT (τ, K 는 모델과 같음, θ 는 plant_theta) → 순기구학 → 포즈 Euler 적분.
+ // 종료코드 0 = 4 s 이후 위치오차 최대 < 2 cm 이고 바퀴 한계 안 (python demo() 와 같은 판정).
+ #include "amr_mpc_cpp/wheel_mpc.hpp"
+@@ -29,7 +31,8 @@ int main(int argc, char ** argv)
+     {"speed", 0.5}, {"radius", 1.0}, {"T", 16.0}, {"meas_hz", 50.0}, {"noise", 0.05},
+     {"ex", 0.0}, {"ey", -0.35}, {"eyaw", -23.0}, {"seed", 0},
+     {"q_pos", 1.5}, {"q_yaw", 0.125}, {"r_dw", 0.0064}, {"q_null", 0.000025}, {"k_obs", 0.04},
+-    {"pose_hz", 0.0}, {"extrap", 0}, {"fresh", 0}};
++    {"pose_hz", 0.0}, {"extrap", 0}, {"fresh", 0},
++    {"model_tau", 0.0}, {"model_k", 0.0}, {"plant_tau", 0.0}, {"plant_k", 0.0}};
+   for (int i = 1; i < argc; ++i) {
+     const char * eq = std::strchr(argv[i], '=');
+     if (!eq || !P.count(std::string(argv[i], eq - argv[i]))) {
+@@ -40,13 +43,23 @@ int main(int argc, char ** argv)
+   }
+   WheelModel md;
+   md.theta = P["theta"];
++  if (P["model_tau"] > 0) {md.tau = Vec4::Constant(P["model_tau"]);}
++  if (P["model_k"] > 0) {md.k_dc = Vec4::Constant(P["model_k"]);}
+   WheelTuning tu;
+   tu.Ts = P["Ts"]; tu.Np = static_cast<int>(P["Np"]); tu.Nc = static_cast<int>(P["Nc"]);
+   tu.q_pos = P["q_pos"]; tu.q_yaw = P["q_yaw"]; tu.r_dw = P["r_dw"]; tu.q_null = P["q_null"]; tu.k_obs = P["k_obs"];
+   WheelMPC m(md, tu);
+   const double Ts = tu.Ts;
+   const int dp = static_cast<int>(std::lround(P["plant_theta"] / Ts));
+-  const Vec4 a = m.a(), b = m.b();
++  Vec4 a = m.a(), b = m.b();
++  if (P["plant_tau"] > 0 || P["plant_k"] > 0) {
++    for (int i = 0; i < 4; ++i) {
++      const double tau = P["plant_tau"] > 0 ? P["plant_tau"] : md.tau(i);
++      const double k = P["plant_k"] > 0 ? P["plant_k"] : md.k_dc(i);
++      a(i) = std::exp(-Ts / tau);
++      b(i) = k * (1.0 - a(i));
++    }
++  }
+   const double V = P["speed"], R = P["radius"], om = V / R;
+   auto rf = [&](double t, Vec3 & Xr, Vec3 & ur) {
+       Xr << R * std::sin(om * t), R * (1 - std::cos(om * t)), om * t;
+@@ -107,10 +120,11 @@ int main(int argc, char ** argv)
+   std::sort(ts.begin(), ts.end());
+   const bool ok = e_ss < 0.02 && wmax <= m.w_max() + 1e-9 && std::isfinite(e_ss);
+   std::printf(
+-    "Ts %.0f ms Np %d Nc %d  모델 θ %.0f ms (d=%d, 상태 %d+3)  플랜트 θ %.0f ms | 과도RMS %.2f cm  정상RMS %.3f cm  "
++    "Ts %.0f ms Np %d Nc %d  모델 θ %.0f ms (d=%d, 상태 %d+3) τ %.0f ms  플랜트 θ %.0f τ %.0f ms | 과도RMS %.2f cm  정상RMS %.3f cm  "
+     "정상max %.3f cm  1cm진입 %.2f s  명령TV %.1f  Δω부호반전 %.0f %%  |ω|max %.1f  fallback %d  DAQP 실패 %d  반복max %d | "
+     "step p50 %.3f  p99 %.3f  max %.3f ms  → %s\n",
+-    Ts * 1e3, tu.Np, tu.Nc, md.theta * 1e3, m.d(), m.n_m(), P["plant_theta"] * 1e3,
++    Ts * 1e3, tu.Np, tu.Nc, md.theta * 1e3, m.d(), m.n_m(), md.tau(0) * 1e3, P["plant_theta"] * 1e3,
++    (P["plant_tau"] > 0 ? P["plant_tau"] : md.tau(0)) * 1e3,
+     std::sqrt(s_tr / n0) * 100, std::sqrt(s_ss / (steps - n0)) * 100, e_ss * 100, entry * Ts,
+     tv / P["T"] / 4.0, 100.0 * flips / std::max(1, flip_n), wmax, fb, bad_exit, itmax, ts[ts.size() / 2], ts[ts.size() * 99 / 100], ts.back(),
+     ok ? "OK" : "✗");
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/README.md b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/README.md
+index b748aba..25d7158 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/README.md
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/README.md
+@@ -3,9 +3,8 @@
+ ## Guide-conditioned strategy (현재 YAML 기본값)
+ 
+ `mppi.strategy: guide_conditioned`는 AERO-MPPI의 anchor/ensemble 아이디어를
+-메카넘에 적용한다. 아래의 기존 321-rollout 설명은 `mode_conditioned`에 해당하며,
+-`standard`와 `mode_conditioned` 계산 경로 및 기존 파라미터는 유지한다.
+-YAML에서 strategy만 바꾸고 재시작하면 기존 321-rollout 전략으로 복귀한다.
++메카넘에 적용한다. 지원 전략은 `guide_conditioned`와 `standard` 두 가지다.
++YAML에서 strategy를 바꾸고 노드를 재시작하면 전환된다.
+ 
+ 새 전략의 순서는 다음과 같다.
+ 
+@@ -34,10 +33,15 @@ YAML에서 strategy만 바꾸고 재시작하면 기존 321-rollout 전략으로
+ 
+ `static_cost.enabled: true`이면 `/traversable_map` distance field로 각 noise
+ rollout, 최종 대표 궤적과 Stop의 swept clearance를 평가한다. footprint가 정적
+-장애물과 겹치면 hard penalty, 겹치지 않으면 거리에 따라 지수형 soft cost를 준다.
++장애물과 겹치면 invalid mask로 제외하고, footprint clearance의 hinge-square 평균을 soft cost로 준다.
+ Anchor 충돌만으로 guide 전체를 제거하지는 않는다. 지도 누락·stale·TF 오류 때는
+-fail-safe hold한다. `false`이면 map을 요구하지 않고 기존 동작으로 돌아간다.
+-Terminal pose alignment는 이 비용 경로 밖에 있다.
++fail-safe hold한다. `false`이면 map을 요구하지 않고 정적 평가 없이 동작한다.
++Terminal pose alignment도 동일 입력 제약과 정적/동적 안전 검사를 거친다.
++
++실행 중 전환: `ros2 param set /dra_mppi_node static_cost.enabled true` 또는
++`false`. OFF는 정적 soft cost, 충돌 검사, 지도 freshness gate를 함께 끈다.
++동적 위험 검사는 이 스위치와 독립이다. 새 비용과 검증 범위는
++[2026-10-20 구현 보고서](docs/guide_only_2026-10-20.md)를 참고한다.
+ 
+ 새 전략의 제약 투영은 feasible target으로 향하는 선분 위에서 가속도를 제한하므로
+ 측정 입력이 feasible하면 box/wheel/rate를 동시에 지킨다. 측정 속도 자체가 이미
+@@ -51,9 +55,8 @@ YAML 파라미터 그룹:
+ 
+ - 공통: `mppi.dt`, horizon, temperature, Halton 설정, limits, cost,
+   dynamic_risk, static_cost.
+-- 기존 두 전략의 예산: `mppi.num_rollouts` (321).
++- standard 전용 예산: `mppi.num_rollouts` (321).
+ - standard 전용: `mppi.noise_std`.
+-- mode_conditioned 전용: `mppi.mode_*`.
+ - guide_conditioned 전용: `mppi.guide_*`.
+ - `traversability.*`: 정적 비용의 지도 topic, timeout, unknown 정책을 정한다.
+   지도 발행 시각뿐 아니라 `sensor_watermark`의 캡처 시각도 검사한다. 필요한 센서가
+@@ -128,7 +131,7 @@ Global Path + Odometry + 보행자 예측
+ | `/dra_mppi/reference_trajectory` | MPC가 추종할 10-step 전체 reference |
+ | `/dra_mppi/reference` | 첫 step reference |
+ | `/dra_mppi/selected_path` | 최종 선택 trajectory (`nav_msgs/Path`) |
+-| `/dra_mppi/rollouts` | Crab/Turn behavior와 Stop 후보, 선택 결과와 통계 (`MarkerArray`) |
++| `/dra_mppi/rollouts` | guide anchor·표본 궤적·최종 선택 궤적 (`MarkerArray`) |
+ | `/dra_mppi/predictions_used` | class whitelist를 통과해 위험 계산에 쓰는 예측 |
+ 
+ `publish_cmd_vel: false`가 기본이다. 실제 `/cmd_vel`은 하위 MPC 하나만 발행해야
+@@ -142,7 +145,7 @@ Goal Pose`의 화살표 방향도 함께 맞춘다. 위치 오차가 다시 0.15
+ 
+ 위치·yaw·측정 속도가 모두 허용 범위에 들어온 상태를 기본 3주기 연속 확인한 뒤
+ 정확한 요청 goal pose를 zero velocity로 고정한다. 이 terminal 정렬과 완료 판정은
+-`standard`, `mode_conditioned`, `guide_conditioned`에 공통으로 적용된다.
++`standard`, `guide_conditioned`에 공통으로 적용된다.
+ 
+ 완료 후 관성이나 외란으로 tolerance 밖으로 밀려도 planner를 다시 실행하지 않고
+ 같은 pose와 zero velocity reference를 계속 발행한다. 새 `/goal_pose`가 들어오고
+@@ -153,11 +156,9 @@ selected path와 rollout marker는 삭제한다.
+ 
+ ### 1. 제어 후보 생성
+ 
+-활성 `mode_conditioned` 전략은 `crab`, `turn`에 각각 160개를 배정한다. 각
+-behavior는 shifted nominal 1개, deterministic template 1개, Halton spline noise
+-후보 158개로 구성된다. 마지막 321번째 후보는 horizon 전체가 zero-control인 독립
+-Stop이며 어떤 MPPI weighted average에도 들어가지 않는다. Crab의 lateral noise와
+-Turn의 yaw-rate noise는 각 behavior 안에서 양수와 음수를 모두 탐색한다.
++`standard`는 shifted nominal, 감속 Stop, deterministic path guide와
++Halton spline noise 후보를 합쳐 `mppi.num_rollouts`개를 평가한다.
++`guide_conditioned`는 위에 설명한 5방향 ensemble과 독립 Stop을 사용한다.
+ 
+ Path guide는 현재 위치를 Global Path의 arc length에 투영하고, 매 step
+ `desired_speed × dt`만큼 앞의 목표점을 향한다. world-frame 목표속도를 현재 guide
+@@ -165,9 +166,8 @@ yaw 기준 body-frame `vx,vy`로 변환하고 path tangent를 향하는 `yaw_rat
+ 실제 Global Path 종점에서는 acceleration limit로 계산한 braking speed를 사용한다.
+ 
+ Guide도 다른 후보와 같은 제약과 모든 cost를 적용받는다. Global Path 위에 동적
+-장애물이 있으면 `C_risk`가 커져 다른 회피 후보가 선택된다. Tracking cost는 기존의
+-짧은 local path를 그대로 사용하고, guide 후보만 현재 위치 이후의 Global Path 전체를
+-받으므로 기존 cost 계산은 바뀌지 않는다.
++장애물이 있으면 `C_risk`가 커져 다른 회피 후보가 선택된다. 현재 공통 비용은
++실제 global goal과 연속 투영을 위해 전체 Global Path를 받는다.
+ 
+ ### 2. 메카넘 제약 적용
+ 
+@@ -205,66 +205,23 @@ yaw(t+1) = yaw(t) + yaw_rate dt
+ 
+ ### 4. 비용 계산
+ 
+-각 rollout의 총비용은 다음과 같다.
+-
+-```text
+-S = C_tracking + C_heading + C_speed + C_rotation
+-  + C_dynamic + C_static
+-```
+-
+-- `C_tracking`: 가장 가까운 경로 선분까지의 거리와 마지막 local goal 거리
+-- `C_heading`: 차체 yaw와 약 0.2 m 앞 경로 진행 방향의 차이
+-- `C_speed`: 경로 전진속도와 횡방향 복귀속도의 오차
+-- `C_rotation`: 큰 yaw rate 억제
+-- `C_dynamic`: 동적 장애물과의 collision probability
+-- `C_static`: traversability map의 정적 장애물 clearance soft/hard 비용
+-
+-Theta* waypoint는 0.10 m 간격의 점이지만 tracking distance는 점까지의 거리가
+-아니다. 모든 waypoint 쌍을 선분으로 보고 rollout 위치를 가장 가까운 선분에
+-투영한다. 따라서 두 waypoint 사이의 경로 위에 있어도 tracking error는 정확히 0이다.
+-
+-메카넘은 차체가 바라보는 방향과 다른 방향으로도 이동할 수 있으므로
+-`sqrt(vx^2 + vy^2)`만 원하는 속도와 비교하지 않는다. body-frame 속도를 world-frame으로
+-회전한 뒤, 가까운 경로 선분의 tangent/normal 방향으로 나눈다.
++`common_cost.common_costs`를 standard, mode, guide의 후보와 대표가 공유한다.
+ 
+-```text
+-v_forward = dot(v_world, path_tangent)
+-v_lateral = dot(v_world, path_normal)
+-e_cross   = dot(position - closest_path_point, path_normal)
+-
+-v_lateral_ref = clip(
+-    -cross_track_gain × e_cross,
+-    -max_cross_track_speed,
+-    +max_cross_track_speed
+-)
+-
+-C_speed = speed_weight × mean((v_forward - desired_speed)^2)
+-        + lateral_speed_weight × mean((v_lateral - v_lateral_ref)^2)
+-```
++- 경로: `w_e * mean(Huber(e/d_ref)) - w_p*(s_N-s_0)/ell_ref + J_goal`.
++  `cost.path_loss: quadratic`으로 거리 벌점만 비교할 수 있다.
++- Heading: `w_psi * mean(wrap(yaw-atan2(P(s+L)-P(s)))²)`.
++- Motion: 경로 접선 속도 오차, 법선 속도, yaw rate, 측정 body twist에서 시작한
++  입력 변화율의 정규화 제곱 평균. `lateral_speed_weight` 초기값은 0이다.
++- Static ON: `w_s * mean(max(0,1-clearance/d_safe)²)`와 swept footprint invalid mask.
++- Dynamic: `w_d * mean(CP) + w_h * count(CP > epsilon)` 및 대표의 별도 임계값 검사.
+ 
+-이 비용은 경로 위의 불필요한 옆걸음과 후진을 벌점 처리하지만, 경로에서 떨어졌을
+-때 경로 쪽으로 복귀하는 횡이동은 허용한다. 동적 장애물 회피 횡이동도 hard constraint가
+-아니라 cost trade-off로 남으므로 DRA-MPPI의 sampling과 risk-aware update는 바뀌지 않는다.
+-
+-관련 파라미터의 현재값은 다음과 같다.
+-
+-```yaml
+-cost.desired_speed: 0.75
+-cost.speed_weight: 1.0
+-cost.lateral_speed_weight: 2.0
+-cost.cross_track_gain: 1.5
+-cost.max_cross_track_speed: 0.20
+-```
+-
+-Heading error는 각도 wrap을 적용한다.
+-
+-```text
+-heading_error = atan2(sin(yaw-path_heading), cos(yaw-path_heading))
+-C_heading = heading_weight × mean(heading_error²)
+-```
+-
+-별도 control-effort와 smoothness 비용은 추가하지 않는다. `C_static`은
+-`static_cost.enabled`로 독립적으로 끄고 켤 수 있다.
++상태 비용은 `x_1..x_N`, 입력은 `u_0..u_(N-1)`이다. 속도 회전에는 rollout과
++일치하게 `x_0..x_(N-1)` yaw를 쓴다. 모든 가중치는 초기값이며 최적값이 아니다.
++경로 투영은 연속적인 양방향 호 길이 창을 사용해 자기 교차 분기로의 점프를
++제한한다. 후진 시 진행 좌표가 감소할 수 있다. 먼 local endpoint를 목표로
++벌점화하지 않고 전체 경로의 실제 끝점 근처에서만 terminal 거리 비용을 켠다.
++사용되지 않는 이전 비용 파라미터는 제거했다. 정적 충돌은 유한한 벌점 대신
++무한대 비용으로 제외한다.
+ 
+ ### 5. MPPI update
+ 
+@@ -278,51 +235,11 @@ U*    = sum(w_k × candidate_k)
+ `beta`는 `eta`가 5~10 사이가 되도록 조정되며 갱신값은 다음 planner 주기에
+ 사용한다. 선택된 `U*`는 한 step 이동해 다음 주기의 warm start가 된다.
+ 
+-### 6. Control-mode MPPI
+-
+-`mppi.strategy`로 두 optimiser를 선택한다.
+-
+-- `standard`: 위의 기존 단일 분포/전체 weighted average 방식을 그대로 사용한다.
+-- `mode_conditioned`: `Crab`과 `Turn`을 각각 하나의 behavior로 최적화하고,
+-  weighted average 밖에 독립 감속 Stop trajectory를 둔다.
+-
+-현재 YAML은 `mode_conditioned`를 사용하며 이동 후보를
+-`[160, 160]`으로 분배하고 Stop 1개를 더해 `K=321`로 실행한다. 모든
+-후보는 한 batch로 rollout하고 cost를 계산하지만, weight normalization과 control
+-update는 두 behavior 내부에서만 수행한다.
+-
+-```text
+-mode-conditioned sampling (160 × 2 + Stop = 321)
+-→ one batched rollout/cost pass
+-→ per-behavior rho/beta/weight/update (Stop 제외)
+-→ two U*_m + braking Stop in one final rollout/cost pass
+-→ hard-risk eligibility
+-→ switching penalty + hysteresis
+-→ one selected mode
+-```
+-
+-Crab은 진입 yaw를 유지하고 lateral `vy` noise의 양·음 방향을 모두 탐색한다.
+-Turn은 body `vy`를 억제하고 yaw-rate noise의 양·음 방향을 모두 탐색한다. 각
+-behavior 안에서는 좌우 후보가 함께 weighted average되며, 두 behavior의 최종
+-제어열과 감속 Stop을 직접 재평가한 뒤 하나만 고른다. 같은 cycle의 최종 risk 평가는 첫
+-321개 평가의 Monte Carlo sample과 obstacle density를 포함 범위 안에서 재사용한다.
+-
+-RViz의 `/dra_mppi/rollouts`에는 각 mode에서 weight가 높은 후보를 같은 수만큼
+-골라 표시한다. 후보 선의 색은 mode를, 투명도와 두께는 해당 mode의
+-`w_k / max(w_m)`를 나타낸다. 따라서 서로 다른 mode의 weight 크기를 잘못 직접
+-비교하지 않고, 각 mode 내부의 상대적 중요도를 볼 수 있다.
+-
+-| Mode | RViz 색 |
+-|---|---|
+-| `crab` | 청록 |
+-| `turn` | 자홍 |
+-| `stop` | 회색 |
++### 6. 전략별 최종 선택
+ 
+-각 head에서 정규화한 결과와 독립 Stop은 후보보다 굵은 선으로 모두
+-표시한다. 종점 라벨의 `sum(w)=1.000`, `max(w)`, `ESS`, 최종 재평가 비용 `J`로
+-정규화 상태와 선택 근거를 확인할 수 있다. 선택된 mode에는 `SELECTED`가 붙고,
+-그 trajectory는 주황색 굵은 선으로 한 번 더 강조된다. 같은 결과가
+-`/dra_mppi/selected_path`에도 발행된다.
++`standard`는 단일 분포의 weighted average를 다시 rollout하고 안전성을 평가한다.
++`guide_conditioned`는 guide별 대표와 독립 감속 Stop을 공통 비용으로 재평가한 뒤
++안전 후보 중 하나를 선택한다. 서로 다른 guide의 제어열을 평균하지 않는다.
+ 
+ ## 동적 장애물 충돌확률
+ 
+@@ -364,7 +281,7 @@ step에서 같은 정적 안전 원으로 사용한다. 또한 lifecycle과 meas
+ 
+ ### Adaptive Halton sampling
+ 
+-`standard`와 `mode_conditioned`는 각 timestep의 전체 rollout collision circle을
++`standard`는 각 timestep의 전체 rollout collision circle을
+ 덮는 직사각형을 사용한다. 면적이 `A_t`일 때 표본 수는 다음과 같다.
+ 
+ ```text
+@@ -392,10 +309,12 @@ thread 수를 1로 제한한다.
+ 각 장애물 density를 rollout collision circle에 먼저 적분한다.
+ 
+ ```text
+-P_o(C) ≈ pi × r² / N_inside × sum(p_o(sample inside C))
++P_o(C) ≈ area(B) / M × sum(1(sample in C) × p_o(sample))
+ ```
+ 
+-그다음 서로 다른 장애물의 확률을 식 (9)로 결합한다.
++표본은 모든 후보의 충돌 원을 덮는 공통 사각형 B에서 뽑는다. 내부 표본이
++0개이면 평가 불충분으로 해당 marginal을 1로 두어 안전 판정을 막는다.
++그다음 장애물 간 독립 가정 아래 확률을 식 (9)로 결합한다.
+ 
+ ```text
+ CP = 1 - product(1 - P_o(C))
+@@ -428,7 +347,7 @@ empty_circle_count      # 내부 sample이 없었던 collision circle 수
+ 수식과 sample은 그대로 두고 NumPy가 큰 배열을 한꺼번에 처리하게 해 계산시간을
+ 줄인다. timestep마다 계산영역과 `N_t`가 다르므로 20-step 반복은 유지한다.
+ 
+-## 계산시간 현황과 추가 확보 방법
++## 과거 계산시간 기록 (새 비용 검증에 사용하지 않음)
+ 
+ 아래 값은 6-mode였던 이전 `K=400`, `T=20` 기준을 개발 PC에서 측정한 역사적
+ baseline이다. 경로 80점, 장애물 10명의 합성 데이터로 OpenBLAS thread를 1개로
+@@ -509,9 +428,11 @@ Adaptive MC 영역은 모든 rollout을 감싸므로 guide나 control-mode 후
+ 
+ ## 현재 주의점
+ 
+-- Wheel projection과 acceleration constraint의 동시 만족은 아직 보장되지 않는다.
++- feasible 측정 입력에서 convex 선분 투영으로 box/wheel/rate를 함께 지킨다.
++  측정 입력 자체가 infeasible하면 초기 projection에서 wheel 제한을 우선한다.
+ - `/predictions`의 CV/CT process noise와 mean-sojourn time은 bag으로 보정해야 한다.
+-- Prediction이 없거나 timeout이면 `C_risk=0`이 된다.
++- fresh empty prediction은 무장애물이다. predictor 누락/timeout은 기본
++  `prediction_fail_safe: true`에서 hold한다.
+ - `static_cost.enabled: true`에서는 정적 obstacle soft/hard 비용이 포함되며,
+   fresh map이나 TF가 없으면 hold한다.
+ - 합성 benchmark가 아닌 실제 NUC 전체 stack 시간 측정이 필요하다.
+@@ -533,7 +454,7 @@ PYTHONPATH=planner/local_planner/DRA_MPPI \
+   pytest -q planner/local_planner/DRA_MPPI/test
+ ```
+ 
+-현재 unit test 결과는 `46 passed`다.
++현재 테스트 결과와 원시 pilot 자료는 위 구현 보고서에 기록한다.
+ 
+ ## 주요 파일
+ 
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/config/dra_mppi.yaml b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/config/dra_mppi.yaml
+index f39413f..a73805a 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/config/dra_mppi.yaml
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/config/dra_mppi.yaml
+@@ -34,7 +34,7 @@ dra_mppi_node:
+     cmd_vel_topic: /dra_mppi/cmd_vel
+     selected_path_topic: /dra_mppi/selected_path
+     rollouts_topic: /dra_mppi/rollouts
+-    # Flattened [guide, timestep] matrices. These retain the complete 500-rollout
++    # Flattened [guide, timestep] matrices. These retain the complete rollout
+     # MC geometry even though /dra_mppi/rollouts publishes only 32 RViz samples.
+     guide_mc_region_areas_topic: /dra_mppi/guide_mc_region_areas
+     guide_mc_sample_counts_topic: /dra_mppi/guide_mc_sample_counts
+@@ -44,6 +44,8 @@ dra_mppi_node:
+     publish_cmd_vel: false
+     # One planner callback advances the warm start by one mppi.dt step.
+     controller_frequency: 5.0
++    # Optional raw per-cycle wall-clock JSONL. Empty disables recording.
++    timing.jsonl_path: ''
+     odom_timeout: 0.25
+     transform_max_age: 0.5
+     prediction_timeout: 0.50
+@@ -69,8 +71,8 @@ dra_mppi_node:
+     visualization_rollouts: 32
+     robot_radius: 0.2
+ 
+-    # ── 전략 선택: 아래 세 전략의 전용 파라미터는 서로 독립 ──
+-    # standard / mode_conditioned / guide_conditioned
++    # ── 전략 선택: 아래 두 전략의 전용 파라미터는 서로 독립 ──
++    # standard / guide_conditioned
+     # strategy만 바꾸고 노드를 재시작하면 기존 전략·예산으로 복귀한다.
+     mppi.strategy: guide_conditioned
+ 
+@@ -88,42 +90,28 @@ dra_mppi_node:
+     mppi.halton_scramble: true
+     mppi.seed: 7
+ 
+-    # ── 기존 두 전략 공용: 총 rollout 예산 (guide_conditioned에서는 미사용) ──
+-    # mode_conditioned: crab + turn + braking Stop = 160 + 160 + 1.
++    # ── standard 전용: 총 rollout 예산 (guide_conditioned에서는 미사용) ──
+     mppi.num_rollouts: 321
+ 
+     # ── standard 전용 ──
+     mppi.noise_std: [0.15, 0.12, 0.45]
+ 
+-    # ── mode_conditioned 전용: Crab/Turn ──
+-    # Crab and Turn use 160 rollouts each. The remaining one brakes from the
+-    # measured velocity with limits.acceleration and stays outside the MPPI
+-    # weighted averages.
+-    mppi.mode_rollout_counts: [160, 160]
+-    mppi.mode_noise_std.crab: [0.12, 0.18, 0.10]
+-    mppi.mode_noise_std.turn: [0.12, 0.04, 0.55]
+-    # Re-anchor persistent per-mode warm starts to their semantic templates.
+-    mppi.mode_template_blend: 0.25
+-    mppi.mode_switch_penalty: 0.25
+-    mppi.mode_hysteresis: 0.10
+-
+     # ── guide_conditioned 전용: 로봇 기준 5방향 anchor ensemble ──
+-    # 이동 rollout만 500개; 최종 비교에 독립 Stop 1개를 추가한다.
++    # 이동 rollout만 100개; 최종 비교에 독립 Stop 1개를 추가한다.
+     # 정적 맵으로 guide를 제거하지 않고 5개 guide에 총 예산을 균등 분배한다.
+-    mppi.guide_num_rollouts: 500
++    mppi.guide_num_rollouts: 100
+     mppi.guide_angles_deg: [0.0, 45.0, 90.0, -45.0, -90.0]
+     mppi.guide_noise_std: [0.15, 0.12, 0.45]
+     mppi.guide_anchor_blend: 0.25
+     mppi.guide_switch_penalty: 0.25
+     mppi.guide_hysteresis: 0.10
++    mppi.guide_evaluation: split  # batch is the reproducible common-domain comparator
++    mppi.guide_timeout: 0.18  # seconds; drain workers then reject expired result
+ 
+     # 정적 비용의 입력 지도와 유효성 검사.
+     traversability.topic: /traversable_map
+     traversability.timeout: 1.0  # 지도 발행 주기 0.5초(2 Hz)보다 길게
+     traversability.unknown_is_obstacle: true
+-    # 이전 swept hard-pruning 설정과의 YAML 호환을 위해 남겨 둔다.
+-    # 새 static cost의 hard footprint에는 사용하지 않는다.
+-    traversability.clearance_margin: 0.02
+ 
+     # ── 공통: 축·가속도·wheel L1 제한 ──
+     limits.control_min: [-0.3750, -0.5625, -3.00]
+@@ -136,60 +124,52 @@ dra_mppi_node:
+ 
+     # ── 공통: Global Path 비용 (guide 도착·재합류 강제 비용 없음) ──
+     cost.desired_speed: 0.75
+-    cost.tracking_path_weight: 8.0
++    cost.tracking_path_weight: 64.0
+     cost.tracking_goal_weight: 24.0
+     cost.heading_weight: 3.0
+     cost.heading_lookahead: 0.20
+-    # Holonomic path-frame velocity cost. Forward progress tracks
+-    # desired_speed; lateral motion tracks only the velocity needed to remove
+-    # cross-track error instead of receiving the same reward as forward motion.
+-    cost.speed_weight: 1.0
+-    cost.lateral_speed_weight: 2.0
+-    cost.cross_track_gain: 1.5
+-    cost.max_cross_track_speed: 0.20
+-    cost.rotation_weight: 1.5
++    # Exact SI-unit mean-square / cosine / delta-input objective (2026-10-22).
++    # Weights multiply raw units directly; no hidden normalization or /dt.
++    cost.speed_weight: 1.78
++    cost.progress_weight: 8.0
++    cost.projection_window: 0.5
++    cost.goal_activation_distance: 0.5
++    cost.input_delta_weight: [0.5, 0.5, 0.055]
++    cost.rotation_weight: 0.167
+ 
+     # ── 정적 장애물 비용: /traversable_map distance field ──
+     # false이면 map/TF가 없어도 기존처럼 정적 비용 없이 동작한다.
+     # true이면 map이 없거나 stale/TF 오류일 때 fail-safe hold한다.
+     static_cost.enabled: true
+-    # footprint와 겹치면 hard penalty, 겹치지 않으면 clearance에 따라
+-    # soft_weight * exp(-clearance / decay)를 timestep별로 더한다.
+-    # hard footprint는 위 robot_radius를 사용하며 clearance_margin은 더하지 않는다.
++    # 런타임: ros2 param set /dra_mppi_node static_cost.enabled true (또는 false)
++    # true: swept footprint 충돌은 invalid, 근접 cost는 mean hinge-square.
++    # false: 정적 soft/hard 검사와 map freshness gate를 함께 끈다.
++    # decay는 d_safe[m]. 정적 충돌은 무한대 비용으로 제외한다.
+     static_cost.soft_weight: 8.0
+     static_cost.decay: 0.10
+-    static_cost.hard_penalty: 100000.0
+ 
+     # ── 공통: 사람 예측 기반 동적 충돌확률 ──
+-    # 제어 noise와 별개인 공간 MC 표본. standard/mode는 전체 배치,
++    # 제어 noise와 별개인 공간 MC 표본. standard는 전체 배치,
+     # guide_conditioned 1차 평가는 guide별 지역 배치를 사용한다.
+     dynamic_risk.mode: monte_carlo
+     dynamic_risk.soft_weight: 18.0
+     dynamic_risk.obstacle_radius: 0.25
+     dynamic_risk.minimum_sigma: 0.08
+-    dynamic_risk.mc_samples: 2048
+-    # false: fixed mc_samples + random uniform (legacy behavior)
+-    # true: clip(mc_sample_density * R_t area, min, max) + 2-D Halton
++    dynamic_risk.mc_samples: 4096
+     dynamic_risk.adaptive_halton_mc: true
+-    # K=400/T=20, 20-cycle straight-path test: A_max=16.581 m^2, so
+-    # 2048/A_max=123.51.
+-    # This keeps the largest observed region near the fixed baseline's N=2048.
+-    dynamic_risk.mc_sample_density: 124.0
+-    dynamic_risk.mc_samples_min: 512
+-    dynamic_risk.mc_samples_max: 4096
+-    # guide_conditioned first pass: one local spatial domain per 100-rollout
+-    # guide. Two persistent workers were faster than 4/5 on the Core 5 210H.
++    # Numerical sweep: density 2048 failed held-out maximum-error criterion.
++    # Density 4096 passed; limits never lower the requested density silently.
++    dynamic_risk.mc_sample_density: 4096.0
++    dynamic_risk.mc_samples_min: 4096
++    dynamic_risk.mc_samples_max: 131072
+     dynamic_risk.guide_parallel_workers: 2
+-    dynamic_risk.guide_mc_sample_density: 124.0
+-    dynamic_risk.guide_mc_samples_min: 128
+-    dynamic_risk.guide_mc_samples_max: 1024
+-    # The five weighted representatives and Stop are compared again with one
+-    # common MC batch so guide-local quadrature noise cannot decide the final
+-    # safety selection by itself. With only six trajectories, a 256 floor keeps
+-    # the common recost useful without erasing the local-batch speedup.
+-    dynamic_risk.final_mc_sample_density: 124.0
+-    dynamic_risk.final_mc_samples_min: 256
+-    dynamic_risk.final_mc_samples_max: 4096
++    dynamic_risk.guide_mc_sample_density: 4096.0
++    dynamic_risk.guide_mc_samples_min: 4096
++    dynamic_risk.guide_mc_samples_max: 131072
++    dynamic_risk.final_mc_sample_density: 4096.0
++    dynamic_risk.final_mc_samples_min: 4096
++    dynamic_risk.final_mc_samples_max: 131072
++    dynamic_risk.mc_reject_underresolved: true
+     dynamic_risk.hard_threshold: 0.05
+     dynamic_risk.hard_penalty: 100000.0
+     dynamic_risk.seed: 17
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/__init__.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/__init__.py
+index 945702b..9c37b59 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/__init__.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/__init__.py
+@@ -9,7 +9,6 @@ from .dynamic_risk import (
+     RiskEvaluation,
+ )
+ from .mppi_controller import (
+-    CONTROL_MODE_NAMES,
+     MppiConfig,
+     MppiController,
+     MppiCostTerms,
+@@ -21,7 +20,6 @@ __all__ = [
+     'HaltonSplineSampler',
+     'MonteCarloDiagnostics',
+     'MonteCarloJointCollisionProbability',
+-    'CONTROL_MODE_NAMES',
+     'MppiConfig',
+     'MppiController',
+     'MppiCostTerms',
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py
+index 75a4989..03bad3c 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py
+@@ -20,6 +20,7 @@ from rclpy.duration import Duration
+ from rclpy.node import Node
+ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+ from rclpy.time import Time
++from rcl_interfaces.msg import SetParametersResult
+ from std_msgs.msg import Float64MultiArray, Int32MultiArray, MultiArrayDimension
+ import tf2_ros
+ from visualization_msgs.msg import Marker, MarkerArray
+@@ -31,13 +32,13 @@ from .geometry import (
+     transform_points,
+     transform_states,
+ )
+-from .mppi_controller import CONTROL_MODE_NAMES, MppiConfig, MppiController
++from .mppi_controller import MppiConfig, MppiController
+ from .grid_costmap import DistanceField, GridMetadata
++from .cycle_timing import CycleRecorder
+ from .path_handler import (
+     build_terminal_pose_reference,
+     GoalCompletionLatch,
+     heading_error,
+-    select_local_path,
+ )
+ 
+ 
+@@ -428,6 +429,7 @@ class DraMppiNode(Node):
+             final_mc_samples_max=int(
+                 self._declare('dynamic_risk.final_mc_samples_max', 4096)
+             ),
++            mc_reject_underresolved=bool(self._declare('dynamic_risk.mc_reject_underresolved', True)),
+             hard_threshold=float(
+                 self._declare('dynamic_risk.hard_threshold', 0.05)
+             ),
+@@ -499,41 +501,14 @@ class DraMppiNode(Node):
+                 self._declare('cost.heading_lookahead', 0.20)
+             ),
+             speed_weight=float(self._declare('cost.speed_weight', 1.0)),
+-            lateral_speed_weight=float(
+-                self._declare('cost.lateral_speed_weight', 2.0)
+-            ),
+-            cross_track_gain=float(
+-                self._declare('cost.cross_track_gain', 1.5)
+-            ),
+-            max_cross_track_speed=float(
+-                self._declare('cost.max_cross_track_speed', 0.20)
+-            ),
++            progress_weight=float(self._declare('cost.progress_weight', 8.0)),
++            projection_window=float(self._declare('cost.projection_window', 0.5)),
++            goal_activation_distance=float(self._declare('cost.goal_activation_distance', 0.5)),
++            input_delta_weight=tuple(self._declare('cost.input_delta_weight', [0.5, 0.5, 0.055])),
+             rotation_weight=float(
+                 self._declare('cost.rotation_weight', 1.5)
+             ),
+             seed=int(self._declare('mppi.seed', 7)),
+-            mode_rollout_counts=tuple(
+-                self._declare('mppi.mode_rollout_counts', [0, 0])
+-            ),
+-            mode_noise_std=(
+-                tuple(self._declare(
+-                    'mppi.mode_noise_std.crab',
+-                    [0.12, 0.18, 0.10],
+-                )),
+-                tuple(self._declare(
+-                    'mppi.mode_noise_std.turn',
+-                    [0.12, 0.04, 0.55],
+-                )),
+-            ),
+-            mode_template_blend=float(
+-                self._declare('mppi.mode_template_blend', 0.25)
+-            ),
+-            mode_switch_penalty=float(
+-                self._declare('mppi.mode_switch_penalty', 0.25)
+-            ),
+-            mode_hysteresis=float(
+-                self._declare('mppi.mode_hysteresis', 0.10)
+-            ),
+             guide_num_rollouts=int(self._declare('mppi.guide_num_rollouts', 500)),
+             guide_angles_deg=tuple(self._declare(
+                 'mppi.guide_angles_deg', [0.0, 45.0, 90.0, -45.0, -90.0])),
+@@ -542,16 +517,14 @@ class DraMppiNode(Node):
+             guide_anchor_blend=float(self._declare('mppi.guide_anchor_blend', 0.25)),
+             guide_switch_penalty=float(self._declare('mppi.guide_switch_penalty', 0.25)),
+             guide_hysteresis=float(self._declare('mppi.guide_hysteresis', 0.10)),
+-            guide_clearance_margin=float(self._declare(
+-                'traversability.clearance_margin', 0.02)),
++            guide_evaluation=str(self._declare('mppi.guide_evaluation', 'split')),
++            guide_timeout=float(self._declare('mppi.guide_timeout', 0.18)),
+             static_cost_enabled=bool(self._declare(
+                 'static_cost.enabled', False)),
+             static_cost_soft_weight=float(self._declare(
+                 'static_cost.soft_weight', 8.0)),
+             static_cost_decay=float(self._declare(
+                 'static_cost.decay', 0.10)),
+-            static_cost_hard_penalty=float(self._declare(
+-                'static_cost.hard_penalty', 100000.0)),
+             static_cost_robot_radius=robot_radius,
+             dynamic_risk=dynamic_config,
+         )
+@@ -606,9 +579,8 @@ class DraMppiNode(Node):
+         latched_qos = QoSProfile(depth=1)
+         latched_qos.reliability = ReliabilityPolicy.RELIABLE
+         latched_qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
+-        if config.strategy == 'guide_conditioned' or config.static_cost_enabled:
+-            self.create_subscription(
+-                TraversableMap, traversable_topic, self._on_traversable_map, latched_qos)
++        self.create_subscription(
++            TraversableMap, traversable_topic, self._on_traversable_map, latched_qos)
+         self.create_subscription(Path, self.global_path_topic, self._on_path, latched_qos)
+         self.create_subscription(
+             PoseStamped,
+@@ -616,7 +588,7 @@ class DraMppiNode(Node):
+             self._on_goal_pose,
+             10,
+         )
+-        self.create_subscription(Odometry, self.odometry_topic, self._on_odometry, 20)
++        self.create_subscription(Odometry, self.odometry_topic, self._on_odometry, 1)
+         self.predictions_used_publisher = self.create_publisher(
+             MultiModalObjectPredictionArray,
+             self.predictions_used_topic,
+@@ -626,7 +598,7 @@ class DraMppiNode(Node):
+             MultiModalObjectPredictionArray,
+             self.predictions_topic,
+             self._on_predictions,
+-            10,
++            1,
+         )
+ 
+         self.reference_publisher = self.create_publisher(
+@@ -660,7 +632,15 @@ class DraMppiNode(Node):
+             self.guide_mc_sample_counts_topic,
+             10,
+         )
++        self.add_on_set_parameters_callback(self._validate_runtime_parameters)
++        self.add_post_set_parameters_callback(self._apply_runtime_parameters)
++        timing_file = str(self._declare('timing.jsonl_path', ''))
++        self._cycle_recorder = CycleRecorder(timing_file) if timing_file else None
++        self._last_reference_publish = None
++        self._cycle_index = 0
+         self.timer = self.create_timer(self.controller_period, self._control_cycle)
++        self._timing_wall_schedule = not self.get_parameter('use_sim_time').value
++        self._timer_expected = time.monotonic()+self.timer.time_until_next_call()/1e9
+         self.get_logger().info(
+             f'DRA-MPPI ready: strategy={config.strategy}, '
+             f'path={self.global_path_topic}, '
+@@ -673,7 +653,22 @@ class DraMppiNode(Node):
+     def _declare(self, name, default):
+         return self.declare_parameter(name, default).value
+ 
++    def _validate_runtime_parameters(self, parameters):
++        for parameter in parameters:
++            if parameter.name == 'static_cost.enabled' and type(parameter.value) is not bool:
++                return SetParametersResult(successful=False, reason='static_cost.enabled must be bool')
++        return SetParametersResult(successful=True)
++
++    def _apply_runtime_parameters(self, parameters):
++        for parameter in parameters:
++            if parameter.name == 'static_cost.enabled':
++                self.controller.config.static_cost_enabled = parameter.value
++                self.controller.reset()
++                self.get_logger().info(f'Static obstacle cost enabled={parameter.value}')
++
+     def destroy_node(self):
++        if getattr(self, '_cycle_recorder', None) is not None:
++            self._cycle_recorder.close()
+         self.controller.close()
+         return super().destroy_node()
+ 
+@@ -688,6 +683,8 @@ class DraMppiNode(Node):
+                 raise ValueError('missing or inconsistent traversability frame')
+             if not math.isfinite(message.inflation_radius) or message.inflation_radius < 0:
+                 raise ValueError('invalid traversability inflation radius')
++            if message.inflation_radius > 0:
++                raise ValueError('expected uninflated traversability map; refusing double inflation')
+             q = info.origin.orientation
+             metadata = GridMetadata(
+                 info.width, info.height, info.resolution,
+@@ -894,17 +891,94 @@ class DraMppiNode(Node):
+             )
+ 
+     def _control_cycle(self):
++        started = time.monotonic()
++        self._cycle_status = 'exception'
++        self._cycle_result = None
++        self._cycle_publish_interval_ms = None
++        self._cycle_reference_published = None
++        self._cycle_obstacles = self._cycle_modes = 0
++        self._cycle_error = ''
++        expected = getattr(self, '_timer_expected', started)
++        skipped = max(0, int((started-expected)/self.controller_period))
++        self._timer_expected = expected+(skipped+1)*self.controller_period
++        try:
++            DraMppiNode._run_control_cycle(self)
++        finally:
++            finished = time.monotonic()
++            recorder = getattr(self, '_cycle_recorder', None)
++            if recorder is not None:
++                result = self._cycle_result
++                record_started = time.monotonic()
++                row = {
++                    'cycle': self._cycle_index, 'started': started,
++                    'K': self.controller.config.guide_num_rollouts if self.controller.config.strategy == 'guide_conditioned' else self.controller.config.num_rollouts,
++                    'N': self.controller.config.horizon_steps, 'dt': self.controller.config.dt,
++                    'backend': self.controller.config.guide_evaluation,
++                    'workers': self.controller.config.dynamic_risk.guide_parallel_workers,
++                    'obstacles': self._cycle_obstacles, 'modes': self._cycle_modes,
++                    'failure_reason': self._cycle_error,
++                    'odom_receive_age_ms': 1000*(started-getattr(self, '_last_odom_monotonic', started)),
++                    'prediction_receive_age_ms': 1000*(started-getattr(self, '_last_prediction_monotonic', started)),
++                    'map_receive_age_ms': 1000*(started-getattr(self, '_traversable_received_at', started)),
++                    'reference_publish_ms': None if self._cycle_reference_published is None else 1000*(self._cycle_reference_published-started),
++                    'scheduled_response_ms': None if self._cycle_reference_published is None else 1000*(self._cycle_reference_published-expected),
++                    'stage_ms': None if result is None else result.stage_ms,
++                    'cost_raw': None if result is None else result.selected_cost_raw,
++                    'cost_weighted': None if result is None else result.selected_cost_weighted,
++
++                    'expected': expected, 'finished': finished,
++                    'schedule_source': ('monotonic_initial_timer_phase'
++                                        if self._timing_wall_schedule else 'sim_time_unmeasured'),
++                    'skipped_periods': skipped,
++                    'status': self._cycle_status,
++                    'callback_ms': 1000*(finished-started),
++                    'start_delay_ms': 1000*max(0., started-expected),
++                    'budget_overrun': finished-started > self.controller_period,
++                    'deadline_lateness_ms': 1000*max(
++                        0., finished-expected-self.controller_period),
++                    'publish_interval_ms': self._cycle_publish_interval_ms,
++                    'optimizer_ms': None if result is None else result.compute_time_ms,
++                    'static_ms': None if result is None else self.controller.static_time_ms,
++                    'primary_mc_ms': None if result is None else result.primary_risk_time_ms,
++                    'final_mc_ms': None if result is None else result.final_risk_time_ms,
++                    'representative_ms': None if result is None else self.controller.representative_time_ms,
++                    'selected': None if result is None else result.selected_mode,
++                    'max_step_cp': None if result is None else result.max_collision_probability,
++                    'static_enabled': self.controller.config.static_cost_enabled,
++                    'actual_primary_mc_samples': None if result is None else self.controller.risk_diagnostics.total_samples,
++                    'candidate_sample_comparisons': None if result is None else self.controller.risk_diagnostics.candidate_sample_comparisons,
++                    'underresolved_steps': None if result is None else self.controller.risk_diagnostics.underresolved_steps,
++                    'peak_pairwise_bytes_bound': None if result is None else self.controller.risk_diagnostics.peak_pairwise_bytes,
++                    'primary_empty_circles': None if result is None else self.controller.risk_diagnostics.empty_circle_count,
++                    'primary_clipped_marginals': None if result is None else self.controller.risk_diagnostics.clipped_marginal_count,
++                    'mc_samples': None if result is None or result.guide_mc_sample_counts is None
++                    else result.guide_mc_sample_counts.tolist(),
++                    'final_mc_samples': None if result is None or result.final_mc_sample_counts is None
++                    else result.final_mc_sample_counts.tolist(),
++                }
++                if not self._timing_wall_schedule:
++                    for key in ('expected', 'start_delay_ms', 'deadline_lateness_ms', 'skipped_periods'):
++                        row[key] = None
++                row['record_prepare_ms'] = 1000*(time.monotonic()-record_started)
++                recorder.record(row)
++            self._cycle_index = getattr(self, '_cycle_index', 0)+1
++
++    def _run_control_cycle(self):
+         cycle_started = time.perf_counter()
+         if self._goal_completion.completed:
++            self._cycle_status = 'completed_hold'
+             self._publish_stop(self._goal_completion.hold_state)
+             return
+         if self._goal_path_pending:
++            self._cycle_status = 'pending_path'
+             self._publish_stop()
+             return
+         if self._state is None or self._path_message is None:
++            self._cycle_status = 'missing_input'
+             self._publish_stop()
+             return
+         if time.monotonic() - self._last_odom_monotonic > self.odom_timeout:
++            self._cycle_status = 'stale_odom'
+             self.get_logger().warning(
+                 'Odometry is stale; publishing a hold reference.',
+                 throttle_duration_sec=2.0,
+@@ -915,11 +989,14 @@ class DraMppiNode(Node):
+         try:
+             global_path = self._path_in_planning_frame()
+             if global_path.shape[0] == 0:
++                self._cycle_status = 'empty_path'
+                 self._publish_stop()
+                 return
+             # Terminal XY/yaw alignment is motion too: apply the same input
+             # freshness gates before either terminal control or MPPI computation.
+             predictions = self._aligned_predictions()
++            self._cycle_obstacles = 0 if predictions is None else predictions.means.shape[0]
++            self._cycle_modes = 0 if predictions is None else int(np.count_nonzero(np.any(predictions.mode_weights > 0, axis=-1) if predictions.mode_weights.ndim == 3 else predictions.mode_weights > 0))
+             distance_field = None
+             source_to_grid = None
+             if self.controller.config.static_cost_enabled:
+@@ -985,6 +1062,7 @@ class DraMppiNode(Node):
+                         )
+                     self.controller.reset()
+                     self._aligning_goal_heading = False
++                    self._cycle_status = 'completed_hold'
+                     stamp = self.get_clock().now().to_msg()
+                     self._publish_stop(self._goal_completion.hold_state)
+                     self._clear_local_visualization(stamp)
+@@ -1008,6 +1086,21 @@ class DraMppiNode(Node):
+                     self.goal_heading_gain,
+                     self.controller.config.acceleration_limit,
+                 )
++                # Terminal translation/rotation uses the same hard constraints
++                # and collision evaluation as every optimizer representative.
++                from .mecanum_model import rollout
++                controls = self.controller._constrain_controls(
++                    alignment[None, :, 3:], self._current_control)
++                poses = rollout(self._state, controls, self.controller.config.dt)
++                static, _ = self.controller._static_obstacle_cost(
++                    self._state, poses, distance_field, source_to_grid)
++                risk = self.controller._evaluate_dynamic_risk(poses, predictions)
++                if (not np.isfinite(static[0]) or np.any(
++                        risk.collision_probability > self.controller.config.dynamic_risk.hard_threshold)):
++                    self._cycle_status = 'terminal_unsafe_hold'
++                    self._publish_stop()
++                    return
++                alignment = np.concatenate((poses[0], controls[0]), axis=1)
+                 stamp = self.get_clock().now().to_msg()
+                 self._publish_reference(
+                     alignment[0, :3],
+@@ -1018,33 +1111,22 @@ class DraMppiNode(Node):
+                 self._publish_selected_path(alignment[:, :3], stamp)
+                 self._clear_rollout_markers(stamp)
+                 self._active = True
++                self._cycle_status = 'terminal'
+                 return
+-            local_path = select_local_path(
+-                global_path,
+-                self._state[:2],
+-                lookahead_distance=self.path_lookahead,
+-                max_points=self.max_path_points,
+-            )
+-            # The tracking cost keeps its short local window, while the one
+-            # deterministic guide candidate receives the complete forward
+-            # portion of the global path for its full MPPI horizon.
+-            guide_path = select_local_path(
+-                global_path,
+-                self._state[:2],
+-                lookahead_distance=float('inf'),
+-                max_points=global_path.shape[0],
+-            )
++            # Continuous projection and goal gating need the actual global
++            # endpoint, not the end of a cropped local window.
+             result = self.controller.compute(
+                 self._state,
+-                local_path,
++                global_path,
+                 current_control=self._current_control,
+                 dynamic_predictions=predictions,
+                 visualization_rollouts=self.visualization_rollouts,
+-                guide_path=guide_path,
++                guide_path=global_path,
+                 distance_field=distance_field,
+                 source_to_grid=source_to_grid,
+             )
+         except TraversabilityUnavailable as exc:
++            self._cycle_status = 'stale_map'
+             self.get_logger().warning(
+                 f'Traversability unavailable; holding position: {exc}',
+                 throttle_duration_sec=1.0)
+@@ -1053,6 +1135,7 @@ class DraMppiNode(Node):
+             self._clear_rollout_markers(self.get_clock().now().to_msg())
+             return
+         except PredictionChainUnavailable as exc:
++            self._cycle_status = 'stale_prediction'
+             self.get_logger().warning(
+                 f'Prediction chain unavailable; holding position: {exc}',
+                 throttle_duration_sec=1.0,
+@@ -1061,6 +1144,9 @@ class DraMppiNode(Node):
+             self._publish_stop()
+             return
+         except Exception as exc:
++            self._cycle_status = 'timeout' if isinstance(exc, TimeoutError) else 'exception'
++            self._cycle_error = str(exc)
++            self.controller.reset()
+             self.get_logger().warning(
+                 f'DRA-MPPI cycle failed; holding position: {exc}',
+                 throttle_duration_sec=1.0,
+@@ -1068,6 +1154,15 @@ class DraMppiNode(Node):
+             self._publish_stop()
+             return
+ 
++        self._cycle_result = result
++        if time.monotonic()-self._last_odom_monotonic > self.odom_timeout:
++            self._cycle_status = 'expired_input'
++            self._cycle_error = 'odometry expired while planning; result discarded'
++            self.controller.reset()
++            self._publish_stop()
++            return
++        self._cycle_status = (result.safety_status if result.safety_status != 'ok'
++                              else 'stop' if result.selected_mode == 'stop' else 'normal')
+         stamp = self.get_clock().now().to_msg()
+         self._publish_reference(result.reference_state, result.control, stamp)
+         self._publish_reference_trajectory(result.reference_sequence, stamp)
+@@ -1095,7 +1190,7 @@ class DraMppiNode(Node):
+                 )
+                 final_risk = (
+                     f'+{result.final_risk_time_ms:.1f} ms final'
+-                    if result.strategy in ('mode_conditioned', 'guide_conditioned')
++                    if result.strategy == 'guide_conditioned'
+                     else ''
+                 )
+                 mc_summary = (
+@@ -1111,7 +1206,7 @@ class DraMppiNode(Node):
+                 )
+             risk_label = (
+                 'selected_cp'
+-                if result.strategy in ('mode_conditioned', 'guide_conditioned')
++                if result.strategy == 'guide_conditioned'
+                 else 'weighted_rollout_cp'
+             )
+             self.get_logger().info(
+@@ -1219,6 +1314,8 @@ class DraMppiNode(Node):
+                 self.get_clock().now()
+                 - Time.from_msg(message.header.stamp)
+             ).nanoseconds * 1e-9
++            if source_age < -0.1:
++                raise PredictionChainUnavailable('prediction timestamp is in the future')
+             source_age = max(source_age, 0.0)
+         else:
+             source_age = max(reception_age, 0.0)
+@@ -1403,6 +1500,11 @@ class DraMppiNode(Node):
+             reference.yaw_rate = float(state_control[5])
+             message.references.append(reference)
+         self.reference_trajectory_publisher.publish(message)
++        published = time.monotonic()
++        self._cycle_reference_published = published
++        previous = getattr(self, '_last_reference_publish', None)
++        self._cycle_publish_interval_ms = None if previous is None else 1000*(published-previous)
++        self._last_reference_publish = published
+ 
+     def _publish_stop(self, hold_state=None):
+         reference_state = self._state if hold_state is None else np.asarray(
+@@ -1491,12 +1593,7 @@ class DraMppiNode(Node):
+         clear.action = Marker.DELETEALL
+         array.markers.append(clear)
+ 
+-        mode_colors = (
+-            (0.00, 0.75, 0.90),  # crab
+-            (0.65, 0.25, 0.95),  # turn
+-            (0.75, 0.75, 0.75),  # stop
+-        )
+-        mode_names = result.candidate_names or CONTROL_MODE_NAMES
++        mode_names = result.candidate_names
+         guide_visualization = result.strategy == 'guide_conditioned'
+         if guide_visualization:
+             # Fixed colors make each robot-relative guide recognizable across
+@@ -1514,7 +1611,7 @@ class DraMppiNode(Node):
+                 for i in range(len(mode_names) - 1)
+             ) + ((0.75, 0.75, 0.75),)  # stop: selection data only
+         grouped_visualization = (
+-            result.strategy in ('mode_conditioned', 'guide_conditioned')
++            result.strategy == 'guide_conditioned'
+             and result.control_mode_ids is not None
+             and result.mode_trajectories is not None
+         )
+@@ -1551,11 +1648,7 @@ class DraMppiNode(Node):
+                     if peak > 0.0 else 0.0
+                 )
+                 visual_strength = math.sqrt(normalized_strength)
+-                marker.ns = (
+-                    f'guide_rollouts_{mode_names[mode_index]}'
+-                    if guide_visualization
+-                    else f'samples_{mode_names[mode_index]}'
+-                )
++                marker.ns = f'guide_rollouts_{mode_names[mode_index]}'
+                 marker.scale.x = 0.004 + 0.012 * visual_strength
+                 marker.color.r, marker.color.g, marker.color.b = color
+                 marker.color.a = 0.08 + 0.62 * visual_strength
+@@ -1572,65 +1665,6 @@ class DraMppiNode(Node):
+             ]
+             array.markers.append(marker)
+ 
+-        # The existing mode-conditioned strategy keeps its optimized behavior
+-        # trajectories and statistics. Guide-conditioned RViz intentionally
+-        # exposes only anchors, grouped rollouts, and the final selected path.
+-        if grouped_visualization and not guide_visualization:
+-            selected_mode_index = mode_names.index(result.selected_mode)
+-            for mode_index, trajectory in enumerate(result.mode_trajectories):
+-                color = mode_colors[mode_index]
+-                marker = Marker()
+-                marker.header.stamp = stamp
+-                marker.header.frame_id = self.planning_frame
+-                marker.ns = 'mode_trajectories'
+-                marker.id = mode_index
+-                marker.type = Marker.LINE_STRIP
+-                marker.action = Marker.ADD
+-                marker.scale.x = 0.030
+-                marker.color.r, marker.color.g, marker.color.b = color
+-                marker.color.a = 0.95
+-                marker.points = [
+-                    Point(x=float(state[0]), y=float(state[1]), z=0.045)
+-                    for state in trajectory
+-                ]
+-                array.markers.append(marker)
+-
+-                mode_mask = result.control_mode_ids == mode_index
+-                mode_weights = result.weights[mode_mask]
+-                label = Marker()
+-                label.header.stamp = stamp
+-                label.header.frame_id = self.planning_frame
+-                label.ns = 'mode_statistics'
+-                label.id = mode_index
+-                label.type = Marker.TEXT_VIEW_FACING
+-                label.action = Marker.ADD
+-                label.pose.position.x = float(trajectory[-1, 0]) + (
+-                    0.12 * math.cos(
+-                        mode_index * 2.0 * math.pi / len(mode_names)
+-                    )
+-                )
+-                label.pose.position.y = float(trajectory[-1, 1]) + (
+-                    0.12 * math.sin(
+-                        mode_index * 2.0 * math.pi / len(mode_names)
+-                    )
+-                )
+-                label.pose.position.z = 0.10
+-                label.pose.orientation.w = 1.0
+-                label.scale.z = 0.10
+-                label.color.r, label.color.g, label.color.b = color
+-                label.color.a = 1.0
+-                selected_prefix = (
+-                    'SELECTED ' if mode_index == selected_mode_index else ''
+-                )
+-                label.text = (
+-                    f'{selected_prefix}{mode_names[mode_index]}\n'
+-                    f'J={result.mode_final_costs[mode_index]:.2f} '
+-                    f'sum(w)={np.sum(mode_weights):.3f}\n'
+-                    f'max(w)={np.max(mode_weights, initial=0.0):.3f} '
+-                    f'ESS={result.mode_effective_sample_sizes[mode_index]:.1f}'
+-                )
+-                array.markers.append(label)
+-
+         if guide_visualization and result.guide_anchors is not None:
+             for g, trajectory in enumerate(result.guide_anchors):
+                 marker = Marker()
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dynamic_risk.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dynamic_risk.py
+index d586a09..37264dd 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dynamic_risk.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dynamic_risk.py
+@@ -1,6 +1,6 @@
+ """Monte Carlo joint collision probability for DRA-MPPI rollouts."""
+ 
+-from dataclasses import dataclass
++from dataclasses import dataclass, fields
+ import time
+ 
+ import numpy as np
+@@ -42,6 +42,10 @@ class PredictionSet:
+             raise ValueError('times must be finite and non-decreasing')
+         if not np.all(np.isfinite(means)) or not np.all(np.isfinite(covariances)):
+             raise ValueError('prediction values must be finite')
++        if (not np.allclose(covariances, np.swapaxes(covariances, -1, -2),
++                            atol=1e-10, rtol=1e-7)
++                or np.any(np.linalg.eigvalsh(covariances) < -1e-10)):
++            raise ValueError('prediction covariance must be symmetric positive semidefinite')
+ 
+         obstacle_count, mode_count = means.shape[:2]
+         if self.mode_weights is None:
+@@ -55,7 +59,7 @@ class PredictionSet:
+         if np.any(weights < 0.0) or not np.all(np.isfinite(weights)):
+             raise ValueError('mode_weights must be finite and non-negative')
+         totals = np.sum(weights, axis=1, keepdims=True)
+-        if obstacle_count and np.any(totals <= 0.0):
++        if obstacle_count and (np.any(totals <= 0.0) or not np.all(np.isfinite(totals))):
+             raise ValueError('each obstacle needs at least one positive mode weight')
+         if obstacle_count:
+             weights = weights / totals
+@@ -68,6 +72,11 @@ class PredictionSet:
+             if np.any(radii <= 0.0) or not np.all(np.isfinite(radii)):
+                 raise ValueError('obstacle_radii must be finite and positive')
+ 
++        means, covariances, times, weights = [np.array(a, copy=True) for a in (means, covariances, times, weights)]
++        radii = None if radii is None else np.array(radii, copy=True)
++        for array in (means, covariances, times, weights, radii):
++            if array is not None:
++                array.setflags(write=False)
+         object.__setattr__(self, 'means', means)
+         object.__setattr__(self, 'covariances', covariances)
+         object.__setattr__(self, 'times', times)
+@@ -100,11 +109,16 @@ class DynamicRiskConfig:
+     final_mc_sample_density: float = 124.0
+     final_mc_samples_min: int = 256
+     final_mc_samples_max: int = 4096
++    mc_reject_underresolved: bool = True
+     hard_threshold: float = 0.05
+     hard_penalty: float = 100000.0
+     seed: int = 17
+ 
+     def __post_init__(self):
++        for item in fields(self):
++            value = getattr(self, item.name)
++            if isinstance(value, (int, float)) and not np.isfinite(value):
++                raise ValueError(f'{item.name} must be finite')
+         if self.mode not in ('off', 'monte_carlo'):
+             raise ValueError('dynamic risk mode must be off or monte_carlo')
+         if self.soft_weight < 0.0 or self.hard_penalty < 0.0:
+@@ -171,6 +185,9 @@ class MonteCarloDiagnostics:
+     clipped_marginal_count: int
+     raw_marginal_minimum: float
+     raw_marginal_maximum: float
++    candidate_sample_comparisons: int = 0
++    underresolved_steps: int = 0
++    peak_pairwise_bytes: int = 0
+ 
+ 
+ class MonteCarloJointCollisionProbability:
+@@ -185,7 +202,9 @@ class MonteCarloJointCollisionProbability:
+         sample_density=2048.0,
+         min_samples=512,
+         max_samples=4096,
++        reject_underresolved=False,
+     ):
++        self.reject_underresolved = bool(reject_underresolved)
+         self.num_samples = int(num_samples)
+         self.minimum_sigma = float(minimum_sigma)
+         self.adaptive_halton = bool(adaptive_halton)
+@@ -260,6 +279,8 @@ class MonteCarloJointCollisionProbability:
+         points = np.asarray(positions, dtype=np.float64)
+         if points.ndim != 3 or points.shape[-1] != 2:
+             raise ValueError('positions must have shape (K, T, 2)')
++        if not np.all(np.isfinite(points)):
++            raise ValueError('positions must be finite')
+         rollout_count, horizon, _ = points.shape
+         if predictions is None or predictions.empty:
+             self._quadrature_cache = None
+@@ -280,7 +301,6 @@ class MonteCarloJointCollisionProbability:
+         result = np.zeros((rollout_count, horizon), dtype=np.float64)
+         region_areas = np.empty(horizon, dtype=np.float64)
+         sample_counts = np.empty(horizon, dtype=np.int64)
+-        circle_areas = np.pi * radii * radii
+         cached = self._quadrature_cache
+         can_reuse = bool(
+             reuse_last_samples
+@@ -299,6 +319,7 @@ class MonteCarloJointCollisionProbability:
+         cached_steps = [] if cache_samples else None
+         empty_circle_count = 0
+         clipped_marginal_count = 0
++        underresolved_steps = 0
+         raw_marginal_minimum = np.inf
+         raw_marginal_maximum = -np.inf
+         for step in range(horizon):
+@@ -316,6 +337,7 @@ class MonteCarloJointCollisionProbability:
+                 samples = cached_step['samples']
+                 obstacle_density = cached_step['obstacle_density']
+                 sample_count = samples.shape[0]
++                region_area = float(np.prod(cached_step['upper']-cached_step['lower']))
+             else:
+                 sample_count = self._sample_count(region_area)
+                 samples = self._draw_samples(lower, upper, sample_count)
+@@ -350,12 +372,11 @@ class MonteCarloJointCollisionProbability:
+                 counts = np.sum(inside, axis=1)
+                 empty_circle_count += int(np.count_nonzero(counts == 0))
+                 marginal_sums = inside @ obstacle_density.T
+-                raw_marginals = np.divide(
+-                    circle_areas[0] * marginal_sums,
+-                    counts[:, None],
+-                    out=raw_marginals,
+-                    where=counts[:, None] > 0,
+-                )
++                # Samples are uniform on the shared rectangle B, not C.
++                # Use area(B)/M * sum(1_C * density), never a conditional
++                # in-circle mean. No hits means insufficient evaluation.
++                raw_marginals = region_area/sample_count*marginal_sums
++                raw_marginals[counts == 0] = 1.0
+             else:
+                 # An obstacle's physical radius changes its integration disk.
+                 # Process one obstacle at a time to avoid a large (O,K,N) mask.
+@@ -364,13 +385,15 @@ class MonteCarloJointCollisionProbability:
+                     counts = np.sum(inside, axis=1)
+                     empty_circle_count += int(np.count_nonzero(counts == 0))
+                     marginal_sums = inside @ obstacle_density[obstacle]
+-                    raw_marginals[:, obstacle] = np.divide(
+-                        circle_areas[obstacle] * marginal_sums,
+-                        counts,
+-                        out=np.zeros(rollout_count, dtype=np.float64),
+-                        where=counts > 0,
+-                    )
+-
++                    raw_marginals[:, obstacle] = region_area/sample_count*marginal_sums
++                    raw_marginals[counts == 0, obstacle] = 1.0
++
++            if (self.reject_underresolved and self.adaptive_halton
++                    and sample_count+1e-9 < self.sample_density*region_area):
++                # Cap was reached: this evaluation has not met its density
++                # contract. Mark every candidate invalid for this time step.
++                raw_marginals[:] = 1.
++                underresolved_steps += 1
+             finite_marginals = raw_marginals[np.isfinite(raw_marginals)]
+             if finite_marginals.size:
+                 raw_marginal_minimum = min(
+@@ -397,9 +420,9 @@ class MonteCarloJointCollisionProbability:
+             # through diagnostics instead of silently hiding sampling error.
+             marginals = np.nan_to_num(
+                 raw_marginals,
+-                nan=0.0,
++                nan=1.0,
+                 posinf=1.0,
+-                neginf=0.0,
++                neginf=1.0,
+             )
+             marginals = np.clip(marginals, 0.0, 1.0)
+             joint_probability = 1.0 - np.prod(1.0 - marginals, axis=1)
+@@ -418,6 +441,9 @@ class MonteCarloJointCollisionProbability:
+             region_areas=region_areas,
+             sample_counts=sample_counts,
+             total_samples=int(np.sum(sample_counts)),
++            candidate_sample_comparisons=int(rollout_count*np.sum(sample_counts)),
++            underresolved_steps=underresolved_steps,
++            peak_pairwise_bytes=int(rollout_count*np.max(sample_counts)*8),
+             compute_time_ms=(time.perf_counter() - started) * 1000.0,
+             empty_circle_count=empty_circle_count,
+             clipped_marginal_count=clipped_marginal_count,
+@@ -479,17 +505,14 @@ class MonteCarloJointCollisionProbability:
+             inverse_covariances, density_normalizers = (
+                 self._gaussian_parameters(predictions)
+             )
+-        delta = (
+-            samples[None, None, :, :]
+-            - predictions.means[:, :, step, None, :]
+-        )
+-        mahalanobis = np.einsum(
+-            'omni,omij,omnj->omn',
+-            delta,
+-            inverse_covariances[:, :, step],
+-            delta,
+-            optimize=True,
+-        )
++        # Explicit 2-D quadratic form avoids generic einsum and a trailing
++        # dimension-2 displacement allocation. No PDF truncation/approximation.
++        dx = samples[None, None, :, 0]-predictions.means[:, :, step, None, 0]
++        dy = samples[None, None, :, 1]-predictions.means[:, :, step, None, 1]
++        inv = inverse_covariances[:, :, step]
++        mahalanobis = (inv[:, :, None, 0, 0]*dx*dx
++                       + (inv[:, :, None, 0, 1]+inv[:, :, None, 1, 0])*dx*dy
++                       + inv[:, :, None, 1, 1]*dy*dy)
+         mode_densities = (
+             density_normalizers[:, :, step, None]
+             * np.exp(-0.5 * np.maximum(mahalanobis, 0.0))
+@@ -546,7 +569,7 @@ def dynamic_risk_cost(
+         cache_samples=cache_samples,
+         reuse_last_samples=reuse_last_samples,
+     )
+-    soft_cost = config.soft_weight * np.sum(probability, axis=1)
++    soft_cost = config.soft_weight * np.mean(probability, axis=1)
+     hard_cost = config.hard_penalty * np.sum(
+         probability > config.hard_threshold,
+         axis=1,
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/grid_costmap.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/grid_costmap.py
+index 77cceea..22bf293 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/grid_costmap.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/grid_costmap.py
+@@ -25,7 +25,8 @@ class DistanceField:
+ 
+     def __init__(self, metadata, clearance, frame_id='map'):
+         self.metadata = metadata
+-        self.clearance = np.asarray(clearance, dtype=np.float64)
++        self.clearance = np.array(clearance, dtype=np.float64, copy=True)
++        self.clearance.setflags(write=False)
+         self.frame_id = frame_id
+         expected = (metadata.height, metadata.width)
+         if self.clearance.shape != expected:
+@@ -107,10 +108,9 @@ class DistanceField:
+         distance-field value swept from state ``t-1`` to state ``t`` (including
+         the measured initial position for ``t=0``).  Sampling at no more than
+         half a grid cell prevents a rollout step from jumping over a thin
+-        occupied region.  Unlike :meth:`trajectory_collisions`, this method
+-        does not add a conservative grid-diagonal padding; callers can keep the
+-        physical footprint as the hard boundary and express extra clearance as
+-        a soft cost.
++        occupied region. Grid-diagonal and half-sample padding give a
++        conservative centre-clearance lower bound, including the map boundary.
++        The caller subtracts the physical robot radius exactly once.
+         """
+         points = np.asarray(positions, dtype=np.float64)
+         if points.ndim != 3 or points.shape[-1] != 2:
+@@ -135,7 +135,30 @@ class DistanceField:
+             starts[:, :, None, :]
+             + delta[:, :, None, :] * fractions[None, None, :, None]
+         )
+-        return np.min(self.query(queries), axis=2)
++        meta = self.metadata
++        dx = queries[..., 0]-meta.origin_x
++        dy = queries[..., 1]-meta.origin_y
++        x = np.cos(meta.origin_yaw)*dx+np.sin(meta.origin_yaw)*dy
++        y = -np.sin(meta.origin_yaw)*dx+np.cos(meta.origin_yaw)*dy
++        boundary = np.minimum.reduce((
++            x, y, meta.width*meta.resolution-x, meta.height*meta.resolution-y))
++        clearance = np.minimum(
++            self.query(queries)-np.sqrt(2.)*meta.resolution, boundary)-spacing/2.
++        return np.maximum(0., np.min(clearance, axis=2))
++
++    def state_clearances(self, positions, source_to_grid=None):
++        """Conservative centre clearance at each future state, in metres."""
++        points = np.asarray(positions, dtype=float)
++        if source_to_grid is not None:
++            points = transform_points(points, source_to_grid)
++        meta = self.metadata
++        dx, dy = points[..., 0]-meta.origin_x, points[..., 1]-meta.origin_y
++        x = np.cos(meta.origin_yaw)*dx+np.sin(meta.origin_yaw)*dy
++        y = -np.sin(meta.origin_yaw)*dx+np.cos(meta.origin_yaw)*dy
++        boundary = np.minimum.reduce((x, y, meta.width*meta.resolution-x,
++                                      meta.height*meta.resolution-y))
++        return np.maximum(0., np.minimum(self.query(points)-np.sqrt(2.)*meta.resolution,
++                                        boundary))
+ 
+     def query(self, points, source_to_grid=None):
+         """Return clearance in metres for points, with outside cells set to zero."""
+@@ -162,22 +185,3 @@ class DistanceField:
+         result = np.zeros(values.shape[:-1], dtype=np.float64)
+         result[valid] = self.clearance[cell_y[valid], cell_x[valid]]
+         return result
+-
+-    def trajectory_cost(
+-        self,
+-        positions,
+-        source_to_grid,
+-        robot_radius,
+-        collision_penalty,
+-        clearance_weight,
+-        clearance_decay,
+-    ):
+-        """Return one accumulated static-obstacle cost per rollout."""
+-        clearance = self.query(positions, source_to_grid=source_to_grid)
+-        collision = clearance <= robot_radius
+-        margin = np.maximum(clearance - robot_radius, 0.0)
+-        soft_cost = clearance_weight * np.exp(
+-            -margin / max(clearance_decay, 1e-6)
+-        )
+-        step_cost = soft_cost + collision * collision_penalty
+-        return np.sum(step_cost, axis=1)
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/guide_conditioned.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/guide_conditioned.py
+index 375b918..beb8ff9 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/guide_conditioned.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/guide_conditioned.py
+@@ -8,7 +8,8 @@ Optional traversability-map costs are evaluated per rollout and again on the
+ final guide representatives and independent braking candidate.
+ """
+ 
+-from concurrent.futures import ThreadPoolExecutor
++from concurrent.futures import ThreadPoolExecutor, wait
++import copy
+ import time
+ 
+ import numpy as np
+@@ -55,12 +56,13 @@ class GuideConditionedOptimizer:
+         self._risk_executor = (
+             ThreadPoolExecutor(
+                 max_workers=self.risk_workers,
+-                thread_name_prefix='dra_mppi_guide_risk',
++                thread_name_prefix='dra_mppi_guide',
+             )
+             if self.risk_workers > 1 else None
+         )
+         self._guide_risk_estimators = [
+             MonteCarloJointCollisionProbability(
++                reject_underresolved=risk.mc_reject_underresolved,
+                 num_samples=risk.guide_mc_samples_min,
+                 minimum_sigma=risk.minimum_sigma,
+                 seed=risk.seed + 1009 + g,
+@@ -72,6 +74,7 @@ class GuideConditionedOptimizer:
+             for g in range(self.count)
+         ]
+         self._final_risk_estimator = MonteCarloJointCollisionProbability(
++            reject_underresolved=risk.mc_reject_underresolved,
+             num_samples=risk.final_mc_samples_min,
+             minimum_sigma=risk.minimum_sigma,
+             seed=risk.seed + 2003,
+@@ -92,29 +95,14 @@ class GuideConditionedOptimizer:
+         self.allocation_offset = 0
+ 
+     def constrain(self, controls, current):
+-        """Joint box/wheel/rate feasibility without altering legacy strategies.
++        """Joint box/wheel/rate feasibility shared with the standard strategy.
+ 
+         Both endpoints lie in the convex box/wheel polytope. Interpolate toward
+         each desired input just far enough to satisfy every acceleration bound.
+         If measured velocity is already infeasible, wheel feasibility wins on
+         the initial projection; a velocity-reference planner cannot undo it.
+         """
+-        c = self.controller
+-        values = np.clip(controls, c._control_min, c._control_max).copy()
+-        prev = c._project_wheel_limit(np.broadcast_to(
+-            np.clip(current, c._control_min, c._control_max),
+-            (values.shape[0], 3)).copy())
+-        max_delta = c._acceleration_limit * self.cfg.dt
+-        for t in range(values.shape[1]):
+-            target = c._project_wheel_limit(values[:, t])
+-            delta = target - prev
+-            fractions = np.divide(max_delta, np.abs(delta),
+-                                  out=np.full_like(delta, np.inf),
+-                                  where=np.abs(delta) > 1e-12)
+-            scale = np.minimum(1.0, np.min(fractions, axis=1))
+-            values[:, t] = prev + scale[:, None] * delta
+-            prev = values[:, t]
+-        return values
++        return self.controller._constrain_controls(controls, current)
+ 
+     def anchors(self, state, path, current, goal=None):
+         """Fixed world translation rays; yaw independently follows path tangent."""
+@@ -197,6 +185,9 @@ class GuideConditionedOptimizer:
+             region_areas=np.sum(areas, axis=0) if active else np.empty(0),
+             sample_counts=np.sum(samples, axis=0) if active else np.empty(0, dtype=np.int64),
+             total_samples=int(np.sum(samples)),
++            candidate_sample_comparisons=sum(d.candidate_sample_comparisons for d in diagnostics),
++            underresolved_steps=sum(d.underresolved_steps for d in diagnostics),
++            peak_pairwise_bytes=sum(d.peak_pairwise_bytes for d in diagnostics),
+             compute_time_ms=float(elapsed_ms),
+             empty_circle_count=sum(item.empty_circle_count for item in diagnostics),
+             clipped_marginal_count=sum(
+@@ -281,6 +272,59 @@ class GuideConditionedOptimizer:
+         c._risk_estimator.last_diagnostics = aggregate
+         return risk_cost, probabilities, aggregate, areas, samples
+ 
++    def _group(self, g, count, anchor, state, path, current, predictions,
++               field, transform, temperature, evaluate=True):
++        """One worker owns its sampler/cache and a private evaluation context."""
++        c = copy.copy(self.controller)
++        c.static_time_ms = 0.
++        center = anchor
++        if self.initialized[g]:
++            center = ((1-self.cfg.guide_anchor_blend)*self.nominals[g]
++                      + self.cfg.guide_anchor_blend*anchor)
++        controls = np.empty((count, self.cfg.horizon_steps, 3))
++        controls[0], controls[1] = center, anchor
++        controls[2:] = center+self.noise[g][:count-2]
++        tick = time.perf_counter()
++        controls = self.constrain(controls, current)
++        trajectories = rollout(state, controls, self.cfg.dt)
++        sampling_ms = (time.perf_counter()-tick)*1000.
++        if not evaluate:
++            return controls, trajectories
++        tick = time.perf_counter()
++        terms, risk = c._evaluate_rollouts(
++            state, path, controls, trajectories, predictions,
++            distance_field=field, source_to_grid=transform,
++            risk_estimator=self._guide_risk_estimators[g])
++        data = c._importance_weights(terms.total, temperature)
++        representative = None if data is None else np.sum(
++            data[3][:, None, None]*controls, axis=0)
++        return (controls, trajectories, terms, risk, data, representative,
++                c.static_time_ms, sampling_ms, (time.perf_counter()-tick)*1000.)
++
++    def _join_jobs(self, jobs, deadline):
++        """Drain every job before returning, including failure paths.
++
++        Python cannot kill running threads safely. Timeout rejects the result
++        and waits for outstanding jobs; it is not a hard real-time guarantee.
++        The next cycle never shares estimator state with an expired worker.
++        """
++        if self._risk_executor is None:
++            results = []
++            for job in jobs:
++                results.append(job())
++                if time.perf_counter() > deadline:
++                    raise TimeoutError('guide worker deadline exceeded (serial)')
++            return results
++        futures = [self._risk_executor.submit(job) for job in jobs]
++        done, pending = wait(futures, timeout=max(0., deadline-time.perf_counter()))
++        if pending:
++            for future in pending:
++                future.cancel()
++            wait(futures)
++            raise TimeoutError('guide worker deadline exceeded; workers drained')
++        # All tasks have finished even if an individual future raises.
++        return [future.result() for future in futures]
++
+     def compute(self, state, path, current, predictions, visual_count,
+                 field, transform, started, goal=None):
+         if not np.all(np.isfinite(np.r_[state, current, path.ravel()])):
+@@ -289,10 +333,8 @@ class GuideConditionedOptimizer:
+         anchors = self.anchors(state, path, current, goal)
+         anchor_paths = rollout(state, anchors, cfg.dt)
+ 
+-        # Every guide remains eligible. Static-map collision filtering used to
+-        # prune anchors, rollout samples and final representatives here, but it
+-        # also discarded useful short holonomic evasive motions. Dynamic-risk
+-        # filtering below remains active.
++        # Keep all directional proposals; common evaluation masks individual
++        # colliding samples when static_cost.enabled is true.
+         active = np.ones(self.count, dtype=bool)
+         counts = self.allocate(active)
+         # Body-relative IDs can change world direction after a large yaw jump.
+@@ -302,54 +344,62 @@ class GuideConditionedOptimizer:
+             self.previous = None
+         self.entry_yaw = float(state[2])
+         temperatures = self.temperatures.copy()
+-        controls = np.empty((int(counts.sum()), cfg.horizon_steps, 3))
++        # Immutable cycle inputs. ROS uses a mutually exclusive executor and
++        # map replacement, never in-place edits; compute has a non-reentry lock.
++        for array in (state, path, current):
++            array.setflags(write=False)
+         ids = np.repeat(np.arange(self.count), counts)
+-        slices, offset = [], 0
+-        for g, n in enumerate(counts):
+-            group = slice(offset, offset + n)
+-            slices.append(group)
+-            if n:
+-                center = anchors[g]
+-                if self.initialized[g]:
+-                    center = ((1 - cfg.guide_anchor_blend) * self.nominals[g]
+-                              + cfg.guide_anchor_blend * anchors[g])
+-                controls[offset] = center
+-                controls[offset + 1] = anchors[g]
+-                controls[offset + 2:offset + n] = center + self.noise[g][:n - 2]
+-            offset += n
+-        controls = self.constrain(controls, current)
+-        trajectories = rollout(state, controls, cfg.dt)
+-        if len(controls):
+-            # Geometry/static terms stay in one vectorized batch. Dynamic risk
+-            # alone is split into guide-local spatial domains.
+-            base_terms, _ = c._evaluate_rollouts(
+-                state, path, controls, trajectories, None,
+-                distance_field=field, source_to_grid=transform,
+-            )
+-            risk_cost, probabilities, primary_diagnostics, guide_areas, guide_samples = (
+-                self._evaluate_guide_risk(trajectories, slices, predictions)
+-            )
++        boundaries = np.r_[0, np.cumsum(counts)]
++        slices = [slice(boundaries[g], boundaries[g+1]) for g in range(self.count)]
++        stage_ms = {'anchor': (time.perf_counter()-started)*1000.}
++        primary_started = time.perf_counter()
++        split = cfg.guide_evaluation == 'split'
++        jobs = [lambda g=g: self._group(
++            g, counts[g], anchors[g], state, path, current, predictions,
++            field, transform, temperatures[g], evaluate=split)
++            for g in range(self.count)]
++        try:
++            evaluated = self._join_jobs(jobs, started+cfg.guide_timeout)
++        except Exception:
++            self.reset()
++            raise
++        controls = np.concatenate([v[0] for v in evaluated])
++        trajectories = np.concatenate([v[1] for v in evaluated])
++        if split:
++            def merge(name):
++                return np.concatenate([getattr(v[2], name) if getattr(v[2], name) is not None
++                                       else np.zeros(len(v[0])) for v in evaluated])
+             terms = MppiCostTerms(
+-                tracking=base_terms.tracking,
+-                heading=base_terms.heading,
+-                speed=base_terms.speed,
+-                rotation=base_terms.rotation,
+-                risk=risk_cost,
+-                static=base_terms.static,
+-            )
++                *(merge(name) for name in ('tracking', 'heading', 'speed', 'rotation', 'risk', 'static')),
++                raw={name: np.concatenate([v[2].raw[name] for v in evaluated])
++                     for name in (evaluated[0][2].raw or {})},
++                weighted={name: np.concatenate([v[2].weighted[name] for v in evaluated])
++                          for name in (evaluated[0][2].weighted or {})})
++            probabilities = np.concatenate([v[3].collision_probability for v in evaluated])
++            primary_diagnostics, guide_areas, guide_samples = self._aggregate_risk_diagnostics(
++                [e.last_diagnostics for e in self._guide_risk_estimators],
++                cfg.horizon_steps, sum(e.last_diagnostics.compute_time_ms
++                                      for e in self._guide_risk_estimators))
++            if predictions is None or predictions.empty or cfg.dynamic_risk.mode == 'off':
++                radius = cfg.dynamic_risk.robot_radius+cfg.dynamic_risk.obstacle_radius
++                for g, group in enumerate(slices):
++                    centers = trajectories[group, :, :2]
++                    guide_areas[g] = np.prod(np.ptp(centers, axis=0)+2*radius, axis=1)
++                    guide_samples[g] = [self._guide_risk_estimators[g]._sample_count(a)
++                                        for a in guide_areas[g]]
++            c.static_time_ms += sum(v[6] for v in evaluated)
++            stage_ms['worker_sampling_sum'] = sum(v[7] for v in evaluated)
++            stage_ms['worker_evaluation_sum'] = sum(v[8] for v in evaluated)
+         else:
+-            terms = MppiCostTerms(*(np.empty(0) for _ in range(6)))
+-            probabilities = np.empty((0, cfg.horizon_steps))
+-            for estimator in self._guide_risk_estimators:
+-                estimator.reset_diagnostics()
+-            primary_diagnostics, guide_areas, guide_samples = (
+-                self._aggregate_risk_diagnostics(
+-                    [e.last_diagnostics for e in self._guide_risk_estimators],
+-                    cfg.horizon_steps,
+-                    0.0,
+-                )
+-            )
+-            c._risk_estimator.last_diagnostics = primary_diagnostics
++            terms, risk = c._evaluate_rollouts(
++                state, path, controls, trajectories, predictions,
++                distance_field=field, source_to_grid=transform)
++            probabilities = risk.collision_probability
++            primary_diagnostics = c._risk_estimator.last_diagnostics
++            guide_areas = np.zeros((self.count, cfg.horizon_steps))
++            guide_samples = np.zeros((self.count, cfg.horizon_steps), dtype=int)
++        c._risk_estimator.last_diagnostics = primary_diagnostics
++        stage_ms['primary_wall'] = (time.perf_counter()-primary_started)*1000.
+         costs = terms.total
+         weights = np.zeros(len(controls))
+         representatives = anchors.copy()
+@@ -357,18 +407,17 @@ class GuideConditionedOptimizer:
+         ess, normalizers = np.zeros(self.count), np.zeros(self.count)
+         reasons = [''] * self.count
+         for g, group in enumerate(slices):
+-            if not counts[g]:
+-                continue
+-            data = c._importance_weights(costs[group], temperatures[g])
++            data = evaluated[g][4] if split else c._importance_weights(costs[group], temperatures[g])
+             if data is None:
+                 reasons[g] = 'all_samples_invalid'
+                 self.initialized[g] = False
+                 continue
+             w, normalizer = data[3:]
+             weights[group] = w
+-            representatives[g] = np.sum(w[:, None, None] * controls[group], axis=0)
++            representatives[g] = (evaluated[g][5] if split else
++                                   np.sum(w[:, None, None]*controls[group], axis=0))
+             valid[g] = True
+-            ess[g] = 1.0 / np.sum(w * w)
++            ess[g] = 1.0/np.sum(w*w)
+             normalizers[g] = normalizer
+             self.temperatures[g] = c._adapt_temperature(temperatures[g], normalizer)
+         representatives = self.constrain(representatives, current)
+@@ -379,16 +428,19 @@ class GuideConditionedOptimizer:
+         all_controls = np.concatenate((representatives,
+                                        stopping_control[None, ...]))
+         all_paths = rollout(state, all_controls, cfg.dt)
++        final_started = time.perf_counter()
+         final_terms, final_risk = c._evaluate_rollouts(
+             state, path, all_controls[final_ids], all_paths[final_ids], predictions,
+             distance_field=field, source_to_grid=transform,
+             risk_estimator=self._final_risk_estimator)
++        if time.perf_counter()-started > cfg.guide_timeout:
++            self.reset()
++            raise TimeoutError('guide cycle deadline exceeded after representative recheck')
+         final_diagnostics = self._final_risk_estimator.last_diagnostics
+         final_static = np.zeros(self.count + 1, dtype=bool)
+-        if cfg.static_cost_enabled:
+-            _, final_static_values = c._static_obstacle_cost(
+-                state, all_paths[final_ids], field, transform)
+-            final_static[final_ids] = final_static_values
++        if final_terms.static is not None:
++            final_static[final_ids] = np.isinf(final_terms.static)
++        c.representative_time_ms = (time.perf_counter()-final_started)*1000.
+         final_costs = np.full(self.count + 1, np.inf)
+         final_costs[final_ids] = final_terms.total
+         final_static_costs = np.full(self.count + 1, np.inf)
+@@ -498,4 +550,10 @@ class GuideConditionedOptimizer:
+             guide_mc_sample_counts=guide_samples,
+             final_mc_region_areas=final_diagnostics.region_areas.copy(),
+             final_mc_sample_counts=final_diagnostics.sample_counts.copy(),
++            selected_cost_raw={name: float(value[np.flatnonzero(final_ids == selected)[0]])
++                               for name, value in (final_terms.raw or {}).items()},
++            selected_cost_weighted={name: float(value[np.flatnonzero(final_ids == selected)[0]])
++                                    for name, value in (final_terms.weighted or {}).items()},
++            stage_ms=stage_ms,
++
+         )
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/mppi_controller.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/mppi_controller.py
+index 002a1dd..126cc0d 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/mppi_controller.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/mppi_controller.py
+@@ -2,10 +2,12 @@
+ 
+ from dataclasses import dataclass, field
+ import time
++import threading
+ 
+ import numpy as np
+ 
+ from .control_sampling import HaltonSplineSampler
++from .common_cost import common_costs, project_path
+ from .dynamic_risk import (
+     DynamicRiskConfig,
+     MonteCarloJointCollisionProbability,
+@@ -15,18 +17,9 @@ from .geometry import wrap_angle
+ from .mecanum_model import rollout
+ 
+ 
+-OPTIMIZED_MODE_NAMES = (
+-    'crab',
+-    'turn',
+-)
+-CONTROL_MODE_NAMES = (*OPTIMIZED_MODE_NAMES, 'stop')
+-OPTIMIZED_MODE_COUNT = len(OPTIMIZED_MODE_NAMES)
+-STOP_MODE_INDEX = OPTIMIZED_MODE_COUNT
+-
+-
+ @dataclass
+ class MppiConfig:
+-    """Numerical, motion-limit, and paper cost parameters for MPPI."""
++    """Numerical, motion-limit, and shared application cost parameters."""
+ 
+     dt: float = 0.1
+     horizon_steps: int = 30
+@@ -53,36 +46,26 @@ class MppiConfig:
+     tracking_goal_weight: float = 24.0
+     heading_weight: float = 8.0
+     heading_lookahead: float = 0.20
+-    # ``speed_weight`` acts on forward progress along the path.  A separate
+-    # lateral term is required for a holonomic base: |[vx, vy]| alone gives
+-    # sideways and backwards motion the same reward as forward motion.
+-    speed_weight: float = 1.0
+-    lateral_speed_weight: float = 2.0
+-    cross_track_gain: float = 1.5
+-    max_cross_track_speed: float = 0.20
++    speed_weight: float = 1.78
++    progress_weight: float = 8.0
++    projection_window: float = 0.5
++    goal_activation_distance: float = 0.5
++    input_delta_weight: tuple = (0.5, 0.5, 0.055)
+     rotation_weight: float = 1.5
+     seed: int = 7
+     strategy: str = 'standard'
+-    mode_rollout_counts: tuple = ()
+-    mode_noise_std: tuple = (
+-        (0.12, 0.18, 0.10),
+-        (0.12, 0.04, 0.55),
+-    )
+-    mode_template_blend: float = 0.25
+-    mode_switch_penalty: float = 0.25
+-    mode_hysteresis: float = 0.10
+-    # Independent moving-sample budget; legacy num_rollouts keeps its meaning.
++    # Independent moving-sample budget; standard uses num_rollouts.
+     guide_num_rollouts: int = 500
+     guide_angles_deg: tuple = (0.0, 45.0, 90.0, -45.0, -90.0)
+     guide_noise_std: tuple = (0.15, 0.12, 0.45)
+     guide_anchor_blend: float = 0.25
+     guide_switch_penalty: float = 0.25
+     guide_hysteresis: float = 0.10
+-    guide_clearance_margin: float = 0.02
++    guide_evaluation: str = 'split'
++    guide_timeout: float = 0.18
+     static_cost_enabled: bool = False
+     static_cost_soft_weight: float = 8.0
+     static_cost_decay: float = 0.10
+-    static_cost_hard_penalty: float = 100000.0
+     static_cost_robot_radius: float = 0.20
+     dynamic_risk: DynamicRiskConfig = field(default_factory=DynamicRiskConfig)
+ 
+@@ -97,6 +80,8 @@ class MppiCostTerms:
+     rotation: np.ndarray
+     risk: np.ndarray
+     static: np.ndarray = None
++    raw: dict = None
++    weighted: dict = None
+ 
+     @property
+     def total(self):
+@@ -151,7 +136,7 @@ class MppiResult:
+     sampled_rollout_indices: np.ndarray = None
+     primary_risk_time_ms: float = 0.0
+     final_risk_time_ms: float = 0.0
+-    # Ensemble labels are carried by the result, not the legacy mode constants.
++    # Guide ensemble labels, including the independent Stop candidate.
+     candidate_names: tuple = ()
+     guide_anchors: np.ndarray = None
+     guide_active_mask: np.ndarray = None
+@@ -164,11 +149,9 @@ class MppiResult:
+     guide_mc_sample_counts: np.ndarray = None
+     final_mc_region_areas: np.ndarray = None
+     final_mc_sample_counts: np.ndarray = None
+-
+-    @property
+-    def max_dynamic_risk(self):
+-        """Compatibility name; the value is now an actual probability."""
+-        return self.max_collision_probability
++    selected_cost_raw: dict = None
++    selected_cost_weighted: dict = None
++    stage_ms: dict = None
+ 
+ 
+ class MppiController:
+@@ -176,12 +159,14 @@ class MppiController:
+ 
+     def __init__(self, config=None):
+         self.config = config or MppiConfig()
+-        if self.config.horizon_steps < 1 or self.config.num_rollouts < 4:
++        if self.config.horizon_steps < 1 or (
++            self.config.strategy == 'standard' and self.config.num_rollouts < 4
++        ):
+             raise ValueError('horizon_steps >= 1 and num_rollouts >= 4 are required')
+         if self.config.dt <= 0.0 or self.config.temperature <= 0.0:
+             raise ValueError('dt and temperature must be positive')
+         if self.config.strategy not in (
+-            'standard', 'mode_conditioned', 'guide_conditioned'
++            'standard', 'guide_conditioned'
+         ):
+             raise ValueError('unknown MPPI strategy')
+         if not (
+@@ -194,6 +179,23 @@ class MppiController:
+         if self.config.temperature_increase_factor <= 1.0:
+             raise ValueError('temperature_increase_factor must exceed 1')
+         self._nominal = np.zeros((self.config.horizon_steps, 3), dtype=np.float64)
++        self._evaluation_current = np.zeros(3)
++        self._projection_progress = None
++        self._projection_path = None
++        self._projection_position = None
++        self.static_time_ms = 0.0
++        self.representative_time_ms = 0.0
++        self._compute_lock = threading.Lock()
++        if self.config.guide_evaluation not in ('batch', 'split'):
++            raise ValueError('guide_evaluation must be batch or split')
++        if not np.isfinite(self.config.guide_timeout) or self.config.guide_timeout <= 0:
++            raise ValueError('guide_timeout must be finite and positive')
++        for name in ('projection_window', 'goal_activation_distance', 'heading_lookahead'):
++            if not np.isfinite(getattr(self.config, name)) or getattr(self.config, name) <= 0:
++                raise ValueError(f'{name} must be finite and positive')
++        value = np.asarray(self.config.input_delta_weight)
++        if value.shape != (3,) or not np.all(np.isfinite(value)) or np.any(value < 0):
++            raise ValueError('invalid input_delta_weight')
+         self._temperature = float(self.config.temperature)
+         self._control_min = np.asarray(self.config.control_min, dtype=np.float64)
+         self._control_max = np.asarray(self.config.control_max, dtype=np.float64)
+@@ -221,85 +223,31 @@ class MppiController:
+             raise ValueError('heading_lookahead must be positive')
+         if self.config.speed_weight < 0.0:
+             raise ValueError('speed_weight must be non-negative')
+-        if self.config.lateral_speed_weight < 0.0:
+-            raise ValueError('lateral_speed_weight must be non-negative')
+-        if self.config.cross_track_gain < 0.0:
+-            raise ValueError('cross_track_gain must be non-negative')
+-        if self.config.max_cross_track_speed < 0.0:
+-            raise ValueError('max_cross_track_speed must be non-negative')
+         if self.config.static_cost_soft_weight < 0.0:
+             raise ValueError('static_cost_soft_weight must be non-negative')
+         if self.config.static_cost_decay <= 0.0:
+             raise ValueError('static_cost_decay must be positive')
+-        if self.config.static_cost_hard_penalty < 0.0:
+-            raise ValueError('static_cost_hard_penalty must be non-negative')
+         if self.config.static_cost_robot_radius < 0.0:
+             raise ValueError('static_cost_robot_radius must be non-negative')
+-        self._mode_noise_std = np.asarray(
+-            self.config.mode_noise_std,
+-            dtype=np.float64,
+-        )
+-        if self._mode_noise_std.shape != (OPTIMIZED_MODE_COUNT, 3):
+-            raise ValueError('mode_noise_std must have shape (2, 3)')
+-        if np.any(self._mode_noise_std < 0.0):
+-            raise ValueError('mode_noise_std values must be non-negative')
+-        if not 0.0 <= self.config.mode_template_blend <= 1.0:
+-            raise ValueError('mode_template_blend must be in [0, 1]')
+-        if (
+-            self.config.mode_switch_penalty < 0.0
+-            or self.config.mode_hysteresis < 0.0
+-        ):
+-            raise ValueError('mode switching costs must be non-negative')
+-
+-        sampler = HaltonSplineSampler(
+-            horizon_steps=self.config.horizon_steps,
+-            control_dimension=3,
+-            knot_points=self.config.spline_knots,
+-            noise_std=self.config.noise_std,
+-            scramble=self.config.halton_scramble,
+-            seed=self.config.seed,
+-        )
+-        # The same low-discrepancy basis is reused each cycle around the
+-        # shifted nominal sequence, as in the reference DRA-MPPI structure.
+-        self._sample_noise = sampler.sample(self.config.num_rollouts - 3)
+-        self._mode_rollout_counts = np.empty(0, dtype=np.int64)
+-        self._mode_sample_noise = []
+-        if self.config.strategy == 'mode_conditioned':
+-            self._mode_rollout_counts = self._resolve_mode_rollout_counts()
+-            mode_noise_count = int(np.sum(self._mode_rollout_counts - 2))
+-            mode_sampler = HaltonSplineSampler(
++        self._sample_noise = None
++        if self.config.strategy == 'standard':
++            sampler = HaltonSplineSampler(
+                 horizon_steps=self.config.horizon_steps,
+                 control_dimension=3,
+                 knot_points=self.config.spline_knots,
+-                noise_std=(1.0, 1.0, 1.0),
++                noise_std=self.config.noise_std,
+                 scramble=self.config.halton_scramble,
+-                seed=self.config.seed + 1,
++                seed=self.config.seed,
+             )
+-            unit_noise = mode_sampler.sample(mode_noise_count)
+-            noise_offset = 0
+-            for mode_index, count in enumerate(self._mode_rollout_counts):
+-                sample_count = int(count - 2)
+-                samples = unit_noise[noise_offset:noise_offset + sample_count]
+-                self._mode_sample_noise.append(
+-                    samples * self._mode_noise_std[mode_index]
+-                )
+-                noise_offset += sample_count
+-        self._mode_nominals = np.zeros(
+-            (OPTIMIZED_MODE_COUNT, self.config.horizon_steps, 3),
+-            dtype=np.float64,
+-        )
+-        self._mode_temperatures = np.full(
+-            OPTIMIZED_MODE_COUNT,
+-            float(self.config.temperature),
+-            dtype=np.float64,
+-        )
+-        self._mode_initialized = False
+-        self._previous_mode = None
++            # The same low-discrepancy basis is reused each cycle around the
++            # shifted nominal sequence, as in the reference DRA-MPPI structure.
++            self._sample_noise = sampler.sample(self.config.num_rollouts - 3)
+         self._guide_optimizer = None
+         if self.config.strategy == 'guide_conditioned':
+             from .guide_conditioned import GuideConditionedOptimizer
+             self._guide_optimizer = GuideConditionedOptimizer(self)
+         self._risk_estimator = MonteCarloJointCollisionProbability(
++            reject_underresolved=self.config.dynamic_risk.mc_reject_underresolved,
+             num_samples=self.config.dynamic_risk.mc_samples,
+             minimum_sigma=self.config.dynamic_risk.minimum_sigma,
+             seed=self.config.dynamic_risk.seed,
+@@ -317,11 +265,10 @@ class MppiController:
+     def reset(self):
+         """Clear the warm-start control sequence."""
+         self._nominal.fill(0.0)
++        self._projection_progress = None
++        self._projection_path = None
++        self._projection_position = None
+         self._temperature = float(self.config.temperature)
+-        self._mode_nominals.fill(0.0)
+-        self._mode_temperatures.fill(float(self.config.temperature))
+-        self._mode_initialized = False
+-        self._previous_mode = None
+         if self._guide_optimizer is not None:
+             self._guide_optimizer.reset()
+ 
+@@ -330,33 +277,17 @@ class MppiController:
+         if self._guide_optimizer is not None:
+             self._guide_optimizer.shutdown()
+ 
+-    def _resolve_mode_rollout_counts(self):
+-        configured = np.asarray(
+-            self.config.mode_rollout_counts,
+-            dtype=np.int64,
+-        )
+-        if configured.size == 0 or (
+-            configured.shape == (OPTIMIZED_MODE_COUNT,)
+-            and np.all(configured == 0)
+-        ):
+-            base, remainder = divmod(
+-                self.config.num_rollouts - 1,
+-                OPTIMIZED_MODE_COUNT,
+-            )
+-            configured = np.full(OPTIMIZED_MODE_COUNT, base, dtype=np.int64)
+-            configured[:remainder] += 1
+-        if configured.shape != (OPTIMIZED_MODE_COUNT,):
+-            raise ValueError('mode_rollout_counts must contain two values')
+-        if np.any(configured < 2):
+-            raise ValueError('each control mode needs at least two rollouts')
+-        if int(np.sum(configured)) + 1 != self.config.num_rollouts:
+-            raise ValueError(
+-                'mode_rollout_counts plus one stop rollout must sum to '
+-                'num_rollouts'
+-            )
+-        return configured
+ 
+-    def compute(
++    def compute(self, *args, **kwargs):
++        # Single owner, including on exceptions/timeouts. Never overlap cycles.
++        if not self._compute_lock.acquire(blocking=False):
++            raise RuntimeError('planner cycle already running')
++        try:
++            return self._compute_impl(*args, **kwargs)
++        finally:
++            self._compute_lock.release()
++
++    def _compute_impl(
+         self,
+         state,
+         reference_path,
+@@ -369,14 +300,14 @@ class MppiController:
+     ):
+         """Optimise and return the next planar pose/velocity reference."""
+         started = time.perf_counter()
+-        state = np.asarray(state, dtype=np.float64)
+-        path = np.asarray(reference_path, dtype=np.float64)
++        state = np.array(state, dtype=np.float64, copy=True)
++        path = np.array(reference_path, dtype=np.float64, copy=True)
+         if state.shape != (3,):
+             raise ValueError('state must be [x, y, yaw]')
+         if path.ndim != 2 or path.shape[1] < 2 or path.shape[0] == 0:
+             raise ValueError('reference_path must contain at least one x/y point')
+         path = path[:, :2]
+-        guide = path if guide_path is None else np.asarray(
++        guide = path if guide_path is None else np.array(
+             guide_path,
+             dtype=np.float64,
+         )
+@@ -384,10 +315,28 @@ class MppiController:
+             raise ValueError('guide_path must contain at least one x/y point')
+         guide = guide[:, :2]
+         current = np.zeros(3, dtype=np.float64) if current_control is None else (
+-            np.asarray(current_control, dtype=np.float64)
++            np.array(current_control, dtype=np.float64, copy=True)
+         )
+         if current.shape != (3,):
+             raise ValueError('current_control must be [vx, vy, yaw_rate]')
++        if not np.all(np.isfinite(np.r_[state, current, path.ravel(), guide.ravel()])):
++            raise ValueError('controller inputs must be finite')
++        # Use the complete forward/global path for every strategy's objective;
++        # a cropped local endpoint is not the actual goal.
++        path = guide
++        self._evaluation_current = current.copy()
++        self.static_time_ms = 0.0
++        self.representative_time_ms = 0.0
++        same_path = (self._projection_path is not None
++                     and np.array_equal(path, self._projection_path))
++        window = self.config.projection_window
++        if same_path and self._projection_position is not None:
++            window = max(window, 2*np.linalg.norm(state[:2]-self._projection_position))
++        self._projection_progress = float(project_path(
++            state[None, None, :2], path, self.config.heading_lookahead, window,
++            self._projection_progress if same_path else None)[1][0, 0])
++        self._projection_path = path.copy()
++        self._projection_position = state[:2].copy()
+ 
+         if self.config.strategy == 'guide_conditioned':
+             return self._guide_optimizer.compute(
+@@ -395,18 +344,6 @@ class MppiController:
+                 visualization_rollouts, distance_field, source_to_grid, started,
+                 guide[-1],
+             )
+-        if self.config.strategy == 'mode_conditioned':
+-            return self._compute_mode_conditioned(
+-                state,
+-                path,
+-                guide,
+-                current,
+-                dynamic_predictions,
+-                visualization_rollouts,
+-                distance_field,
+-                source_to_grid,
+-                started,
+-            )
+         return self._compute_standard(
+             state,
+             path,
+@@ -457,6 +394,7 @@ class MppiController:
+             source_to_grid=source_to_grid,
+         )
+         costs = terms.total
++        primary_diagnostics = self._risk_estimator.last_diagnostics
+ 
+         weight_data = self._importance_weights(costs, self._temperature)
+         if weight_data is None:
+@@ -475,7 +413,18 @@ class MppiController:
+         # sequences, followed by input/rate projection.
+         updated = np.sum(weights[:, None, None] * controls, axis=0)
+         updated = self._constrain_controls(updated[None, ...], current)[0]
+-        selected_trajectory = rollout(state, updated, cfg.dt)
++        final_started = time.perf_counter()
++        final_controls = np.stack((updated, self._make_stopping_control(current)))
++        final_paths = rollout(state, final_controls, cfg.dt)
++        final_terms, final_risk = self._evaluate_rollouts(
++            state, path, final_controls, final_paths, dynamic_predictions,
++            distance_field=distance_field, source_to_grid=source_to_grid)
++        safe = (np.isfinite(final_terms.total)
++                & (final_risk.maximum_probability <= cfg.dynamic_risk.hard_threshold))
++        selected = 0 if safe[0] else 1
++        updated = final_controls[selected]
++        selected_trajectory = final_paths[selected]
++        self.representative_time_ms = (time.perf_counter()-final_started)*1000.
+         first_control = updated[0].copy()
+         first_state = selected_trajectory[0].copy()
+ 
+@@ -486,7 +435,6 @@ class MppiController:
+         visual_count = max(0, min(int(visualization_rollouts), cfg.num_rollouts))
+         indices = np.argsort(costs)[:visual_count]
+         elapsed_ms = (time.perf_counter() - started) * 1000.0
+-        maximum_probabilities = risk_evaluation.maximum_probability
+         return MppiResult(
+             control=first_control,
+             control_sequence=updated.copy(),
+@@ -504,10 +452,8 @@ class MppiController:
+             collision_probabilities=risk_evaluation.collision_probability,
+             # Avoid the IEEE 0 * inf -> NaN case when only a subset of
+             # rollouts has a finite cost and therefore a non-zero weight.
+-            cost=float(np.sum(weights[finite] * costs[finite])),
+-            max_collision_probability=float(
+-                np.sum(weights * maximum_probabilities)
+-            ),
++            cost=float(final_terms.total[selected]),
++            max_collision_probability=float(final_risk.maximum_probability[selected]),
+             effective_sample_size=float(1.0 / np.sum(weights * weights)),
+             temperature=float(temperature),
+             next_temperature=float(self._temperature),
+@@ -518,273 +464,17 @@ class MppiController:
+             maximum_weight=float(np.max(weights)),
+             compute_time_ms=elapsed_ms,
+             sampled_rollout_indices=indices.copy(),
++            safety_status='ok' if safe[selected] else 'no_safe_candidate_hold',
++            selected_mode='standard' if selected == 0 else 'stop',
++            selected_static_cost=float(final_terms.static[selected]),
+             primary_risk_time_ms=float(
+-                self._risk_estimator.last_diagnostics.compute_time_ms
++                primary_diagnostics.compute_time_ms
+             ),
+-            selected_static_cost=float(np.sum(
+-                weights[finite] * terms.static[finite]
+-            )),
++            final_risk_time_ms=self._risk_estimator.last_diagnostics.compute_time_ms,
++            selected_cost_raw={key: float(value[selected]) for key, value in final_terms.raw.items()},
++            selected_cost_weighted={key: float(value[selected]) for key, value in final_terms.weighted.items()},
+         )
+ 
+-    def _compute_mode_conditioned(
+-        self,
+-        state,
+-        path,
+-        guide,
+-        current,
+-        dynamic_predictions,
+-        visualization_rollouts,
+-        distance_field,
+-        source_to_grid,
+-        started,
+-    ):
+-        """Optimise Crab and Turn behaviors plus one braking stop candidate."""
+-        cfg = self.config
+-        guide_controls = self._make_path_guide(state, guide, current)
+-        templates = self._make_mode_templates(state, guide_controls, current)
+-        if self._mode_initialized:
+-            blend = float(cfg.mode_template_blend)
+-            centers = (
+-                (1.0 - blend) * self._mode_nominals
+-                + blend * templates
+-            )
+-            centers = self._constrain_controls(centers, current)
+-        else:
+-            centers = templates.copy()
+-
+-        controls = np.empty(
+-            (cfg.num_rollouts, cfg.horizon_steps, 3),
+-            dtype=np.float64,
+-        )
+-        mode_ids = np.empty(cfg.num_rollouts, dtype=np.int8)
+-        mode_slices = []
+-        offset = 0
+-        for mode_index, count_value in enumerate(self._mode_rollout_counts):
+-            count = int(count_value)
+-            mode_slice = slice(offset, offset + count)
+-            mode_slices.append(mode_slice)
+-            mode_ids[mode_slice] = mode_index
+-            controls[offset] = centers[mode_index]
+-            controls[offset + 1] = templates[mode_index]
+-            controls[offset + 2:offset + count] = (
+-                centers[mode_index][None, ...]
+-                + self._mode_sample_noise[mode_index]
+-            )
+-            offset += count
+-
+-        stop_rollout_index = offset
+-        if stop_rollout_index != cfg.num_rollouts - 1:
+-            raise RuntimeError('mode rollout allocation did not reserve one stop')
+-        mode_ids[stop_rollout_index] = STOP_MODE_INDEX
+-        stopping_control = self._make_stopping_control(current)
+-        controls[stop_rollout_index] = stopping_control
+-        controls = self._constrain_controls(controls, current)
+-        # Stop is a selectable trajectory, not a sample in any MPPI average.
+-        # Preserve its deterministic braking profile after batch projection.
+-        controls[stop_rollout_index] = stopping_control
+-        trajectories = rollout(state, controls, cfg.dt)
+-        terms, risk_evaluation = self._evaluate_rollouts(
+-            state,
+-            path,
+-            controls,
+-            trajectories,
+-            dynamic_predictions,
+-            distance_field=distance_field,
+-            source_to_grid=source_to_grid,
+-            cache_risk_samples=True,
+-        )
+-        primary_risk_diagnostics = self._risk_estimator.last_diagnostics
+-        costs = terms.total
+-        if not np.any(np.isfinite(costs)):
+-            self.reset()
+-            raise RuntimeError(
+-                'all mode-conditioned rollout costs are non-finite'
+-            )
+-
+-        weights = np.zeros(cfg.num_rollouts, dtype=np.float64)
+-        weights[stop_rollout_index] = 1.0
+-        updated_modes = templates.copy()
+-        mode_normalizers = np.zeros(OPTIMIZED_MODE_COUNT, dtype=np.float64)
+-        mode_effective_sizes = np.zeros(OPTIMIZED_MODE_COUNT, dtype=np.float64)
+-        mode_valid = np.zeros(OPTIMIZED_MODE_COUNT, dtype=bool)
+-        temperatures = self._mode_temperatures.copy()
+-        for mode_index, mode_slice in enumerate(mode_slices):
+-            weight_data = self._importance_weights(
+-                costs[mode_slice],
+-                temperatures[mode_index],
+-            )
+-            if weight_data is None:
+-                continue
+-            _, _, _, mode_weights, normalizer = weight_data
+-            mode_valid[mode_index] = True
+-            weights[mode_slice] = mode_weights
+-            mode_normalizers[mode_index] = normalizer
+-            mode_effective_sizes[mode_index] = float(
+-                1.0 / np.sum(mode_weights * mode_weights)
+-            )
+-            updated_modes[mode_index] = np.sum(
+-                mode_weights[:, None, None] * controls[mode_slice],
+-                axis=0,
+-            )
+-            self._mode_temperatures[mode_index] = self._adapt_temperature(
+-                temperatures[mode_index],
+-                normalizer,
+-            )
+-
+-        updated_modes = self._constrain_controls(updated_modes, current)
+-        stop_control = stopping_control[None, ...]
+-        final_controls = np.concatenate((updated_modes, stop_control), axis=0)
+-        final_trajectories = rollout(state, final_controls, cfg.dt)
+-        final_terms, final_risk = self._evaluate_rollouts(
+-            state,
+-            path,
+-            final_controls,
+-            final_trajectories,
+-            dynamic_predictions,
+-            distance_field=distance_field,
+-            source_to_grid=source_to_grid,
+-            reuse_risk_samples=True,
+-        )
+-        final_risk_diagnostics = self._risk_estimator.last_diagnostics
+-        # The public risk diagnostics continue to describe the expensive K-way
+-        # pass; the result separately exposes final-mode risk time.
+-        self._risk_estimator.last_diagnostics = primary_risk_diagnostics
+-        final_costs = final_terms.total
+-        final_finite = np.isfinite(final_costs)
+-        candidate_valid = np.concatenate((mode_valid, np.array([True])))
+-        if not np.any(final_finite & candidate_valid):
+-            self.reset()
+-            raise RuntimeError('all final control-mode costs are non-finite')
+-
+-        final_max_probabilities = final_risk.maximum_probability
+-        _, final_static_collisions = self._static_obstacle_cost(
+-            state,
+-            final_trajectories,
+-            distance_field,
+-            source_to_grid,
+-        )
+-        safe = (
+-            (final_max_probabilities <= cfg.dynamic_risk.hard_threshold)
+-            & ~final_static_collisions
+-        )
+-        valid_and_safe = final_finite & candidate_valid & safe
+-        eligible = (
+-            valid_and_safe
+-            if np.any(valid_and_safe)
+-            else final_finite & candidate_valid
+-        )
+-        selection_costs = final_costs.copy()
+-        selection_costs[~eligible] = np.inf
+-        if self._previous_mode is not None:
+-            selection_costs += self._mode_transition_penalties(
+-                self._previous_mode
+-            )
+-
+-        selected_mode = int(np.argmin(selection_costs))
+-        previous = self._previous_mode
+-        if (
+-            previous is not None
+-            and eligible[previous]
+-            and selected_mode != previous
+-        ):
+-            if (
+-                selection_costs[selected_mode] + cfg.mode_hysteresis
+-                >= final_costs[previous]
+-            ):
+-                selected_mode = previous
+-
+-        selected_control = final_controls[selected_mode]
+-        selected_trajectory = final_trajectories[selected_mode]
+-        first_control = selected_control[0].copy()
+-        first_state = selected_trajectory[0].copy()
+-
+-        self._mode_nominals[:, :-1] = updated_modes[:, 1:]
+-        self._mode_nominals[:, -1] = updated_modes[:, -1]
+-        self._mode_initialized = True
+-        self._previous_mode = selected_mode
+-
+-        indices = self._mode_visualization_indices(
+-            weights,
+-            mode_slices,
+-            visualization_rollouts,
+-            stop_rollout_index,
+-        )
+-        finite_costs = costs[np.isfinite(costs)]
+-        elapsed_ms = (time.perf_counter() - started) * 1000.0
+-        if selected_mode == STOP_MODE_INDEX:
+-            selected_weights = weights[stop_rollout_index:stop_rollout_index + 1]
+-            selected_effective_size = 1.0
+-            selected_temperature = 0.0
+-            selected_next_temperature = 0.0
+-            selected_normalizer = 1.0
+-        else:
+-            selected_slice = mode_slices[selected_mode]
+-            selected_weights = weights[selected_slice]
+-            selected_effective_size = mode_effective_sizes[selected_mode]
+-            selected_temperature = temperatures[selected_mode]
+-            selected_next_temperature = self._mode_temperatures[selected_mode]
+-            selected_normalizer = mode_normalizers[selected_mode]
+-        diagnostic_temperatures = np.concatenate((temperatures, np.array([0.0])))
+-        diagnostic_next_temperatures = np.concatenate((
+-            self._mode_temperatures,
+-            np.array([0.0]),
+-        ))
+-        diagnostic_effective_sizes = np.concatenate((
+-            mode_effective_sizes,
+-            np.array([1.0]),
+-        ))
+-        return MppiResult(
+-            control=first_control,
+-            control_sequence=selected_control.copy(),
+-            reference_state=first_state,
+-            reference_sequence=np.concatenate(
+-                (selected_trajectory, selected_control),
+-                axis=1,
+-            ),
+-            trajectory=selected_trajectory,
+-            sampled_controls=controls,
+-            sampled_rollouts=trajectories[indices],
+-            rollout_costs=costs,
+-            weights=weights,
+-            cost_terms=terms,
+-            collision_probabilities=risk_evaluation.collision_probability,
+-            cost=float(final_costs[selected_mode]),
+-            max_collision_probability=float(
+-                final_max_probabilities[selected_mode]
+-            ),
+-            effective_sample_size=float(selected_effective_size),
+-            temperature=float(selected_temperature),
+-            next_temperature=float(selected_next_temperature),
+-            weight_normalizer=float(selected_normalizer),
+-            minimum_cost=float(np.min(finite_costs)),
+-            maximum_cost=float(np.max(finite_costs)),
+-            minimum_weight=float(np.min(selected_weights)),
+-            maximum_weight=float(np.max(selected_weights)),
+-            compute_time_ms=elapsed_ms,
+-            strategy='mode_conditioned',
+-            selected_mode=CONTROL_MODE_NAMES[selected_mode],
+-            control_mode_ids=mode_ids,
+-            mode_control_sequences=final_controls.copy(),
+-            mode_trajectories=final_trajectories.copy(),
+-            mode_final_costs=final_costs.copy(),
+-            mode_selection_costs=selection_costs.copy(),
+-            mode_collision_probabilities=(
+-                final_risk.collision_probability.copy()
+-            ),
+-            mode_temperatures=diagnostic_temperatures,
+-            mode_next_temperatures=diagnostic_next_temperatures,
+-            mode_effective_sample_sizes=diagnostic_effective_sizes,
+-            mode_static_costs=final_terms.static.copy(),
+-            sampled_rollout_indices=indices.copy(),
+-            primary_risk_time_ms=float(
+-                primary_risk_diagnostics.compute_time_ms
+-            ),
+-            final_risk_time_ms=float(
+-                final_risk_diagnostics.compute_time_ms
+-            ),
+-            final_static_collisions=final_static_collisions.copy(),
+-            selected_static_cost=float(final_terms.static[selected_mode]),
+-        )
+ 
+     def _evaluate_rollouts(
+         self,
+@@ -799,20 +489,9 @@ class MppiController:
+         reuse_risk_samples=False,
+         risk_estimator=None,
+     ):
+-        path_geometry = self._nearest_path_geometry(trajectories, path)
+-        tracking_cost, heading_cost = self._path_costs_from_geometry(
+-            trajectories,
+-            path,
+-            path_geometry,
+-        )
+-        speed_cost = self._speed_cost(
+-            state,
+-            trajectories,
+-            controls,
+-            path,
+-            path_geometry,
+-        )
+-        rotation_cost = self._rotation_cost(controls)
++        tracking_cost, heading_cost, speed_cost, rotation_cost, raw, weighted = common_costs(
++            self.config, state, path, controls, trajectories,
++            self._evaluation_current, self._projection_progress, return_components=True)
+         risk_evaluation = self._evaluate_dynamic_risk(
+             trajectories,
+             dynamic_predictions,
+@@ -820,7 +499,7 @@ class MppiController:
+             cache_samples=cache_risk_samples,
+             reuse_last_samples=reuse_risk_samples,
+         )
+-        static_cost, _ = self._static_obstacle_cost(
++        static_cost, static_collision = self._static_obstacle_cost(
+             state,
+             trajectories,
+             distance_field,
+@@ -833,6 +512,13 @@ class MppiController:
+             rotation=rotation_cost,
+             risk=risk_evaluation.cost,
+             static=static_cost,
++            raw={**raw, 'dynamic_probability': np.mean(risk_evaluation.collision_probability, axis=1),
++                 'dynamic_exceedances': np.sum(risk_evaluation.collision_probability >
++                     self.config.dynamic_risk.hard_threshold, axis=1),
++                 'static': self._last_static_raw, 'static_collision': static_collision.astype(float)},
++            weighted={**weighted, 'dynamic_probability': self.config.dynamic_risk.soft_weight*np.mean(risk_evaluation.collision_probability, axis=1),
++                      'dynamic_exceedances': self.config.dynamic_risk.hard_penalty*np.sum(risk_evaluation.collision_probability > self.config.dynamic_risk.hard_threshold, axis=1),
++                      'static': static_cost},
+         ), risk_evaluation
+ 
+     def _evaluate_dynamic_risk(
+@@ -862,13 +548,12 @@ class MppiController:
+     ):
+         """Return per-rollout static cost and hard-collision flags.
+ 
+-        Static geometry is deterministic, so the soft term decays with physical
+-        footprint clearance while the hard term is applied when the swept
+-        footprint overlaps an occupied/unknown/out-of-map cell.  Safety margin
+-        is intentionally represented by the soft term rather than expanding
+-        the hard footprint in a narrow workspace.
++        The hinge-square mean uses a conservative footprint-clearance bound.
++        Swept disc collisions with occupied/unknown/out-of-map space are invalid
++        (infinite cost). Grid/sample padding covers the discrete distance query.
+         """
+         rollout_count = trajectories.shape[0]
++        self._last_static_raw = np.zeros(rollout_count)
+         if not self.config.static_cost_enabled:
+             return (
+                 np.zeros(rollout_count, dtype=np.float64),
+@@ -877,28 +562,25 @@ class MppiController:
+         if distance_field is None:
+             raise ValueError('static cost is enabled but no distance field was provided')
+ 
+-        map_clearance = distance_field.trajectory_clearances(
++        started = time.perf_counter()
++        map_clearance = distance_field.state_clearances(
+             trajectories[..., :2],
+-            np.asarray(state, dtype=np.float64)[:2],
+             source_to_grid=source_to_grid,
+         )
+         footprint_clearance = (
+             map_clearance - self.config.static_cost_robot_radius
+         )
+-        hard_steps = footprint_clearance <= 0.0
+-        hard_collision = np.any(hard_steps, axis=1)
+-        soft_cost = self.config.static_cost_soft_weight * np.sum(
+-            np.exp(
+-                -np.maximum(footprint_clearance, 0.0)
+-                / self.config.static_cost_decay
+-            ),
++        hard_collision = distance_field.trajectory_collisions(
++            trajectories[..., :2], np.asarray(state)[:2],
++            self.config.static_cost_robot_radius, source_to_grid=source_to_grid)
++        self._last_static_raw = np.mean(
++            np.maximum(0., 1.-footprint_clearance/self.config.static_cost_decay)**2,
+             axis=1,
+         )
+-        hard_cost = self.config.static_cost_hard_penalty * np.sum(
+-            hard_steps,
+-            axis=1,
+-        )
+-        return soft_cost + hard_cost, hard_collision
++        soft_cost = self.config.static_cost_soft_weight*self._last_static_raw
++        soft_cost[hard_collision] = np.inf
++        self.static_time_ms += (time.perf_counter()-started)*1000.
++        return soft_cost, hard_collision
+ 
+     def _importance_weights(self, costs, temperature):
+         finite = np.isfinite(costs)
+@@ -926,104 +608,21 @@ class MppiController:
+             return value * self.config.temperature_increase_factor
+         return value
+ 
+-    def _make_mode_templates(self, state, guide_controls, current):
+-        crab_controls = self._make_crab_guide(state, guide_controls, current)
+-        turn_controls = guide_controls.copy()
+-        turn_controls[:, 1] = 0.0
+-        turn_controls = self._constrain_controls(
+-            turn_controls[None, ...],
+-            current,
+-        )[0]
+-        return self._constrain_controls(
+-            np.stack((crab_controls, turn_controls)),
+-            current,
+-        )
+-
+-    def _make_crab_guide(self, state, guide_controls, current):
+-        """Keep entry yaw while reproducing the path guide's world velocity."""
+-        cfg = self.config
+-        guide_trajectory = rollout(state, guide_controls, cfg.dt)
+-        guide_yaw_before = np.concatenate((
+-            np.array([float(state[2])]),
+-            guide_trajectory[:-1, 2],
+-        ))
+-        guide_cos = np.cos(guide_yaw_before)
+-        guide_sin = np.sin(guide_yaw_before)
+-        guide_world_velocity = np.column_stack((
+-            guide_controls[:, 0] * guide_cos
+-            - guide_controls[:, 1] * guide_sin,
+-            guide_controls[:, 0] * guide_sin
+-            + guide_controls[:, 1] * guide_cos,
+-        ))
+-
+-        controls = np.zeros_like(guide_controls)
+-        crab_state = np.asarray(state, dtype=np.float64).copy()
+-        previous = np.asarray(current, dtype=np.float64).copy()
+-        hold_yaw = float(state[2])
+-        for step, world_velocity in enumerate(guide_world_velocity):
+-            cos_yaw = np.cos(crab_state[2])
+-            sin_yaw = np.sin(crab_state[2])
+-            raw = np.array((
+-                cos_yaw * world_velocity[0] + sin_yaw * world_velocity[1],
+-                -sin_yaw * world_velocity[0] + cos_yaw * world_velocity[1],
+-                float(wrap_angle(hold_yaw - crab_state[2])) / cfg.dt,
+-            ))
+-            control = self._constrain_controls(
+-                raw[None, None, :],
+-                previous,
+-            )[0, 0]
+-            controls[step] = control
+-            crab_state = rollout(crab_state, control[None, :], cfg.dt)[0]
+-            previous = control
+-        return controls
+-
+-    def _mode_transition_penalties(self, previous_mode):
+-        penalties = np.full(
+-            len(CONTROL_MODE_NAMES),
+-            float(self.config.mode_switch_penalty),
+-            dtype=np.float64,
+-        )
+-        penalties[int(previous_mode)] = 0.0
+-        # A stop must never become less eligible because the previous command
+-        # belonged to a moving head.
+-        penalties[STOP_MODE_INDEX] = 0.0
+-        return penalties
+-
+-    def _mode_visualization_indices(
+-        self,
+-        weights,
+-        mode_slices,
+-        visualization_rollouts,
+-        stop_rollout_index,
+-    ):
+-        visual_count = max(
+-            0,
+-            min(int(visualization_rollouts), self.config.num_rollouts),
+-        )
+-        if visual_count == 0:
+-            return np.empty(0, dtype=np.int64)
+-        moving_visual_count = max(0, visual_count - 1)
+-        base, remainder = divmod(moving_visual_count, OPTIMIZED_MODE_COUNT)
+-        selected = []
+-        for mode_index, mode_slice in enumerate(mode_slices):
+-            available = mode_slice.stop - mode_slice.start
+-            count = min(available, base + int(mode_index < remainder))
+-            if count == 0:
+-                continue
+-            local_order = np.argsort(weights[mode_slice])[::-1][:count]
+-            selected.extend((mode_slice.start + local_order).tolist())
+-        selected.append(int(stop_rollout_index))
+-        return np.asarray(selected, dtype=np.int64)
+ 
+     def _constrain_controls(self, controls, current_control):
+         values = np.clip(controls, self._control_min, self._control_max).copy()
+-        previous = np.broadcast_to(current_control, (values.shape[0], 3)).copy()
++        previous = self._project_wheel_limit(np.broadcast_to(
++            np.clip(current_control, self._control_min, self._control_max),
++            (values.shape[0], 3)).copy())
+         max_delta = self._acceleration_limit * self.config.dt
+         for step in range(values.shape[1]):
+-            delta = np.clip(values[:, step] - previous, -max_delta, max_delta)
+-            values[:, step] = self._project_wheel_limit(
+-                np.clip(previous + delta, self._control_min, self._control_max)
+-            )
++            target = self._project_wheel_limit(values[:, step])
++            delta = target - previous
++            fractions = np.divide(max_delta, np.abs(delta),
++                                  out=np.full_like(delta, np.inf),
++                                  where=np.abs(delta) > 1e-12)
++            scale = np.minimum(1., np.min(fractions, axis=1))
++            values[:, step] = previous + scale[:, None]*delta
+             previous = values[:, step]
+         return values
+ 
+@@ -1053,11 +652,10 @@ class MppiController:
+         drives. Scaling uniformly here keeps the command direction and matches
+         what the driver does when it saturates.
+ 
+-        This runs after the rate limit, so a projection can brake harder than
+-        ``acceleration_limit``. The motor limit is hard while the deceleration
+-        transient belongs to the downstream dynamics controller, so the
+-        projection wins. Scaling only shrinks toward zero, which the box always
+-        contains, so the box constraint still holds afterwards.
++        The constraint routine projects its target here before interpolating
++        from the previous feasible input to satisfy rate limits as well.
++        An initially infeasible measured input is projected first; only that
++        initial correction can exceed a rate limit.
+         """
+         load = (
+             np.abs(values[:, 0])
+@@ -1084,7 +682,7 @@ class MppiController:
+ 
+         controls = np.zeros((self.config.horizon_steps, 3), dtype=np.float64)
+         guide_state = np.asarray(state, dtype=np.float64).copy()
+-        previous = np.asarray(current_control, dtype=np.float64).copy()
++        previous = np.array(current_control, dtype=np.float64, copy=True).copy()
+         dt = self.config.dt
+ 
+         if points.shape[0] == 1:
+@@ -1228,40 +826,6 @@ class MppiController:
+         heading = float(np.arctan2(segments[segment, 1], segments[segment, 0]))
+         return target, heading
+ 
+-    def _tracking_cost(self, trajectories, path):
+-        nearest_squared, _ = self._nearest_path_data(trajectories, path)
+-        return self._tracking_cost_from_nearest(
+-            trajectories,
+-            path,
+-            nearest_squared,
+-        )
+-
+-    def _path_costs(self, trajectories, path):
+-        """Compute tracking and heading from one shared polyline projection."""
+-        geometry = self._nearest_path_geometry(trajectories, path)
+-        return self._path_costs_from_geometry(trajectories, path, geometry)
+-
+-    def _path_costs_from_geometry(self, trajectories, path, geometry):
+-        nearest_squared, nearest_indices, _, _ = geometry
+-        tracking = self._tracking_cost_from_nearest(
+-            trajectories,
+-            path,
+-            nearest_squared,
+-        )
+-        heading = self._heading_cost_from_nearest(
+-            trajectories,
+-            path,
+-            nearest_indices,
+-        )
+-        return tracking, heading
+-
+-    def _nearest_path_data(self, trajectories, path):
+-        """Return distance to the path polyline and the closest segment index."""
+-        nearest_squared, nearest_indices, _, _ = self._nearest_path_geometry(
+-            trajectories,
+-            path,
+-        )
+-        return nearest_squared, nearest_indices
+ 
+     def _nearest_path_geometry(self, trajectories, path):
+         """Project positions onto path segments.
+@@ -1332,132 +896,6 @@ class MppiController:
+             headings.reshape(query_shape),
+         )
+ 
+-    def _tracking_cost_from_nearest(
+-        self,
+-        trajectories,
+-        path,
+-        nearest_squared,
+-    ):
+-        path_cost = self.config.tracking_path_weight * np.mean(
+-            nearest_squared,
+-            axis=1,
+-        )
+-        goal_difference = trajectories[:, -1, :2] - path[-1]
+-        goal_cost = self.config.tracking_goal_weight * np.sum(
+-            goal_difference * goal_difference,
+-            axis=1,
+-        )
+-        return path_cost + goal_cost
+-
+-    def _speed_cost(self, state, trajectories, controls, path, geometry):
+-        """Penalize path-frame forward and lateral velocity errors.
+-
+-        The DRA-MPPI paper's unicycle cannot translate sideways.  This base is
+-        holonomic, so scalar speed magnitude would reward pure strafe or even
+-        reverse motion.  Instead, forward velocity tracks ``desired_speed`` and
+-        lateral velocity tracks a bounded cross-track correction velocity.
+-        """
+-        if path.shape[0] < 2 or not np.any(
+-            np.linalg.norm(np.diff(path, axis=0), axis=1) > 1e-9
+-        ):
+-            speed = np.linalg.norm(controls[..., :2], axis=-1)
+-            return self.config.speed_weight * np.mean(
+-                (speed - self.config.desired_speed) ** 2,
+-                axis=1,
+-            )
+-
+-        _, _, closest, path_headings = geometry
+-        rollout_count = controls.shape[0]
+-
+-        # Control u[t] is integrated with yaw[t], while trajectories[t] stores
+-        # yaw[t+1].  Shift the rollout yaws so the body-to-world rotation uses
+-        # exactly the orientation used by the motion model.
+-        yaw_before = np.concatenate((
+-            np.full((rollout_count, 1), float(state[2])),
+-            trajectories[:, :-1, 2],
+-        ), axis=1)
+-        cos_yaw = np.cos(yaw_before)
+-        sin_yaw = np.sin(yaw_before)
+-        vx_world = cos_yaw * controls[..., 0] - sin_yaw * controls[..., 1]
+-        vy_world = sin_yaw * controls[..., 0] + cos_yaw * controls[..., 1]
+-
+-        # The desired correction for u[t] must use the error at x[t], not at
+-        # x[t+1].  Reuse the rollout geometry shifted by one step and project
+-        # only the shared initial state separately.
+-        initial_geometry = self._nearest_path_geometry(
+-            np.asarray(state, dtype=np.float64)[None, None, :],
+-            path,
+-        )
+-        initial_closest = initial_geometry[2][0, 0]
+-        initial_heading = float(initial_geometry[3][0, 0])
+-        previous_closest = np.concatenate((
+-            np.broadcast_to(initial_closest, (rollout_count, 1, 2)),
+-            closest[:, :-1],
+-        ), axis=1)
+-        previous_headings = np.concatenate((
+-            np.full((rollout_count, 1), initial_heading),
+-            path_headings[:, :-1],
+-        ), axis=1)
+-        previous_positions = np.concatenate((
+-            np.broadcast_to(state[:2], (rollout_count, 1, 2)),
+-            trajectories[:, :-1, :2],
+-        ), axis=1)
+-
+-        tangent_x = np.cos(previous_headings)
+-        tangent_y = np.sin(previous_headings)
+-        normal_x = -tangent_y
+-        normal_y = tangent_x
+-        forward_velocity = vx_world * tangent_x + vy_world * tangent_y
+-        lateral_velocity = vx_world * normal_x + vy_world * normal_y
+-
+-        path_error = previous_positions - previous_closest
+-        cross_track_error = (
+-            path_error[..., 0] * normal_x
+-            + path_error[..., 1] * normal_y
+-        )
+-        desired_lateral = np.clip(
+-            -self.config.cross_track_gain * cross_track_error,
+-            -self.config.max_cross_track_speed,
+-            self.config.max_cross_track_speed,
+-        )
+-
+-        forward_cost = self.config.speed_weight * np.mean(
+-            (forward_velocity - self.config.desired_speed) ** 2,
+-            axis=1,
+-        )
+-        lateral_cost = self.config.lateral_speed_weight * np.mean(
+-            (lateral_velocity - desired_lateral) ** 2,
+-            axis=1,
+-        )
+-        return forward_cost + lateral_cost
+-
+-    def _heading_cost(self, trajectories, path):
+-        """Penalize yaw error from the forward tangent of the nearest path point."""
+-        if path.shape[0] < 2 or self.config.heading_weight == 0.0:
+-            return np.zeros(trajectories.shape[0], dtype=np.float64)
+-        _, nearest_indices = self._nearest_path_data(trajectories, path)
+-        return self._heading_cost_from_nearest(
+-            trajectories,
+-            path,
+-            nearest_indices,
+-        )
+-
+-    def _heading_cost_from_nearest(
+-        self,
+-        trajectories,
+-        path,
+-        nearest_indices,
+-    ):
+-        if path.shape[0] < 2 or self.config.heading_weight == 0.0:
+-            return np.zeros(trajectories.shape[0], dtype=np.float64)
+-        path_headings = self._path_headings(path)
+-        heading_error = trajectories[..., 2] - path_headings[nearest_indices]
+-        heading_error = np.arctan2(np.sin(heading_error), np.cos(heading_error))
+-        return self.config.heading_weight * np.mean(
+-            heading_error * heading_error,
+-            axis=1,
+-        )
+-
+     def _path_headings(self, path):
+         """Return a distance-lookahead tangent heading for every path point."""
+         segments = np.diff(path, axis=0)
+@@ -1499,9 +937,3 @@ class MppiController:
+             ]
+             tangents[index] = tangents[nearest_valid]
+         return np.arctan2(tangents[:, 1], tangents[:, 0])
+-
+-    def _rotation_cost(self, controls):
+-        return self.config.rotation_weight * np.mean(
+-            controls[..., 2] ** 2,
+-            axis=1,
+-        )
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/package.xml b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/package.xml
+index 0f3f45d..e313b12 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/package.xml
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/package.xml
+@@ -8,6 +8,7 @@
+   <license>MIT</license>
+ 
+   <depend>rclpy</depend>
++  <depend>rcl_interfaces</depend>
+   <depend>amr_interfaces</depend>
+   <depend>geometry_msgs</depend>
+   <depend>nav_msgs</depend>
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_configuration.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_configuration.py
+index 2c89cac..4435d84 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_configuration.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_configuration.py
+@@ -13,34 +13,20 @@ def test_controller_period_matches_one_mppi_warm_start_step():
+     assert controller_period == float(parameters['mppi.dt'])
+ 
+ 
+-def test_mode_conditioned_rollouts_keep_the_configured_total_budget():
+-    config_path = Path(__file__).parents[1] / 'config' / 'dra_mppi.yaml'
+-    parameters = yaml.safe_load(config_path.read_text())['dra_mppi_node'][
+-        'ros__parameters'
+-    ]
+-
+-    assert parameters['mppi.strategy'] in (
+-        'standard', 'mode_conditioned', 'guide_conditioned')
+-    assert parameters['mppi.mode_rollout_counts'] == [160, 160]
+-    assert sum(parameters['mppi.mode_rollout_counts']) + 1 == parameters[
+-        'mppi.num_rollouts'
+-    ]
+-
+-
+-def test_guide_budget_is_independent_of_legacy_behavior_budget():
++def test_guide_budget_is_independent_of_standard_budget():
+     config_path = Path(__file__).parents[1] / 'config' / 'dra_mppi.yaml'
+     p = yaml.safe_load(config_path.read_text())['dra_mppi_node']['ros__parameters']
+-    assert p['mppi.guide_num_rollouts'] == 500
++    assert p['mppi.guide_num_rollouts'] == 100
+     assert p['mppi.guide_angles_deg'] == [0.0, 45.0, 90.0, -45.0, -90.0]
+     assert p['mppi.num_rollouts'] == 321
+     assert p['traversability.unknown_is_obstacle'] is True
+     assert p['dynamic_risk.guide_parallel_workers'] == 2
+-    assert p['dynamic_risk.guide_mc_sample_density'] == 124.0
+-    assert p['dynamic_risk.guide_mc_samples_min'] == 128
+-    assert p['dynamic_risk.guide_mc_samples_max'] == 1024
+-    assert p['dynamic_risk.final_mc_sample_density'] == 124.0
+-    assert p['dynamic_risk.final_mc_samples_min'] == 256
+-    assert p['dynamic_risk.final_mc_samples_max'] == 4096
++    assert p['dynamic_risk.guide_mc_sample_density'] == 4096.0
++    assert p['dynamic_risk.guide_mc_samples_min'] == 4096
++    assert p['dynamic_risk.guide_mc_samples_max'] == 131072
++    assert p['dynamic_risk.final_mc_sample_density'] == 4096.0
++    assert p['dynamic_risk.final_mc_samples_min'] == 4096
++    assert p['dynamic_risk.final_mc_samples_max'] == 131072
+ 
+ 
+ def test_static_cost_is_explicitly_switchable():
+@@ -51,4 +37,3 @@ def test_static_cost_is_explicitly_switchable():
+     assert p['static_cost.enabled'] is True
+     assert p['static_cost.soft_weight'] >= 0.0
+     assert p['static_cost.decay'] > 0.0
+-    assert p['static_cost.hard_penalty'] > 0.0
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_dynamic_risk.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_dynamic_risk.py
+index c740303..622eeb5 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_dynamic_risk.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_dynamic_risk.py
+@@ -346,7 +346,7 @@ def test_soft_and_hard_costs_are_both_applied_to_joint_cp():
+     )
+     evaluation = dynamic_risk_cost(positions, predictions, config)
+     cp = evaluation.collision_probability[0]
+-    expected = 7.0 * np.sum(cp) + 1234.0 * np.sum(cp > 0.01)
++    expected = 7.0 * np.mean(cp) + 1234.0 * np.sum(cp > 0.01)
+ 
+     assert np.isclose(evaluation.cost[0], expected)
+ 
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_guide_conditioned.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_guide_conditioned.py
+index 9f26fa8..83da2ac 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_guide_conditioned.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_guide_conditioned.py
+@@ -155,7 +155,6 @@ def test_enabled_static_cost_penalizes_rollouts_without_pruning_guides():
+         static_cost_robot_radius=.2,
+         static_cost_soft_weight=8.,
+         static_cost_decay=.1,
+-        static_cost_hard_penalty=100000.,
+     )
+ 
+     r = compute(c, obstacles)
+@@ -189,7 +188,7 @@ def test_static_map_does_not_reject_weighted_representative(monkeypatch):
+     c = controller(guide_num_rollouts=4, guide_angles_deg=(45.,),
+                    horizon_steps=6, acceleration_limit=(100., 100., 100.),
+                    control_min=(-1., -1., -3.), control_max=(1., 1., 3.),
+-                   speed_limit_l1=1.5, guide_clearance_margin=0.,
++                   speed_limit_l1=1.5,
+                    dynamic_risk=DynamicRiskConfig(mode='off', robot_radius=.03))
+     left = np.array([[.6, .6, 0.]] * 3 + [[.6, -.6, 0.]] * 3)
+     right = left.copy()
+@@ -401,7 +400,7 @@ def test_static_map_does_not_reset_nominals():
+ 
+ 
+ def test_all_strategies_work_without_static_map():
+-    for strategy in ('guide_conditioned', 'standard', 'mode_conditioned'):
++    for strategy in ('guide_conditioned', 'standard'):
+         r = controller(strategy=strategy).compute(np.zeros(3), PATH)
+         assert r.strategy == strategy
+         expected = 500 if strategy == 'guide_conditioned' else 321
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_guide_node.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_guide_node.py
+index c01bf76..d4613e4 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_guide_node.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_guide_node.py
+@@ -13,6 +13,7 @@ from dra_mppi.mppi_controller import MppiConfig, MppiController
+ from dra_mppi.path_handler import GoalCompletionLatch
+ from geometry_msgs.msg import PoseStamped
+ from nav_msgs.msg import Path
++from rclpy.parameter import Parameter
+ import numpy as np
+ import pytest
+ 
+@@ -180,6 +181,38 @@ def test_enabled_static_cost_requires_a_fresh_map():
+     n._publish_reference.assert_not_called()
+ 
+ 
++def test_runtime_static_switch_updates_controller_and_keeps_dynamic_config():
++    n = node()
++    risk = n.controller.config.dynamic_risk
++    for enabled in (True, False):
++        params = [Parameter('static_cost.enabled', value=enabled)]
++        assert DraMppiNode._validate_runtime_parameters(n, params).successful
++        DraMppiNode._apply_runtime_parameters(n, params)
++        assert n.controller.config.static_cost_enabled is enabled
++        assert n.controller.config.dynamic_risk is risk
++    params = [Parameter('static_cost.enabled', value='false')]
++    assert not DraMppiNode._validate_runtime_parameters(n, params).successful
++
++
++@pytest.mark.parametrize('fault', ['receipt', 'sensor', 'header', 'inflation'])
++def test_enabled_static_switch_rejects_stale_or_inflated_map(fault):
++    n = node(static_cost_enabled=True)
++    m = map_message()
++    if fault == 'inflation':
++        m.inflation_radius = .2
++    DraMppiNode._on_traversable_map(n, m)
++    if fault == 'receipt':
++        n._traversable_received_at -= 2.
++    elif fault == 'sensor':
++        n._traversable_sensor_stamp_ns -= 2_000_000_000
++    elif fault == 'header':
++        n._traversable_stamp_ns -= 2_000_000_000
++    DraMppiNode._control_cycle(n)
++    n._publish_stop.assert_called_once()
++    n._publish_reference.assert_not_called()
++    n.controller.close()
++
++
+ def test_enabled_static_cost_uses_fresh_map_and_transform():
+     n = node(static_cost_enabled=True)
+     DraMppiNode._on_traversable_map(n, map_message())
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_mppi_controller.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_mppi_controller.py
+index 8215218..25fede1 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_mppi_controller.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/test/test_mppi_controller.py
+@@ -1,3 +1,4 @@
++import pytest
+ import numpy as np
+ 
+ import dra_mppi.mppi_controller as mppi_controller_module
+@@ -9,7 +10,6 @@ from dra_mppi.dynamic_risk import (
+ from dra_mppi.mecanum_model import rollout
+ from dra_mppi.grid_costmap import DistanceField, GridMetadata
+ from dra_mppi.mppi_controller import (
+-    CONTROL_MODE_NAMES,
+     MppiConfig,
+     MppiController,
+ )
+@@ -174,11 +174,11 @@ def test_nonfinite_rollout_gets_zero_weight_without_poisoning_result(monkeypatch
+     horizon_steps = 3
+ 
+     def risk_with_one_nonfinite_cost(trajectories, *_args, **_kwargs):
+-        costs = np.zeros(rollout_count)
++        costs = np.zeros(len(trajectories))
+         costs[0] = np.inf
+         return RiskEvaluation(
+             cost=costs,
+-            collision_probability=np.zeros((rollout_count, horizon_steps)),
++            collision_probability=np.zeros((len(trajectories), horizon_steps)),
+         )
+ 
+     monkeypatch.setattr(
+@@ -203,222 +203,7 @@ def test_nonfinite_rollout_gets_zero_weight_without_poisoning_result(monkeypatch
+     assert np.isfinite(result.cost)
+ 
+ 
+-def test_heading_cost_prefers_yaw_aligned_with_local_path_tangent():
+-    controller = MppiController(
+-        MppiConfig(
+-            horizon_steps=2,
+-            num_rollouts=8,
+-            heading_weight=8.0,
+-            dynamic_risk=DynamicRiskConfig(mode='off'),
+-        )
+-    )
+-    path = np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
+-    trajectories = np.array(
+-        [
+-            [[0.2, 0.0, 0.0], [0.4, 0.0, 0.0]],
+-            [[0.2, 0.0, np.pi / 2.0], [0.4, 0.0, np.pi / 2.0]],
+-            [[0.2, 0.0, 2.0 * np.pi - 0.01], [0.4, 0.0, -0.01]],
+-        ]
+-    )
+-
+-    costs = controller._heading_cost(trajectories, path)
+-
+-    assert np.isclose(costs[0], 0.0)
+-    assert costs[1] > 10.0
+-    assert costs[2] < 0.001
+-
+-
+-def test_path_heading_uses_distance_lookahead_across_a_corner():
+-    controller = MppiController(
+-        MppiConfig(
+-            horizon_steps=2,
+-            num_rollouts=8,
+-            heading_lookahead=0.20,
+-            dynamic_risk=DynamicRiskConfig(mode='off'),
+-        )
+-    )
+-    path = np.array([[0.0, 0.0], [0.10, 0.0], [0.10, 0.40]])
+-
+-    headings = controller._path_headings(path)
+-
+-    # From the first point, 0.20 m along the path is (0.10, 0.10), so the
+-    # smoothed chord heading is 45 degrees rather than the first segment's 0.
+-    assert np.isclose(headings[0], np.pi / 4.0)
+-    assert np.isclose(headings[1], np.pi / 2.0)
+-    assert np.isclose(headings[-1], np.pi / 2.0)
+-
+-
+-def test_path_geometry_projects_onto_continuous_segments():
+-    controller = MppiController(
+-        MppiConfig(
+-            horizon_steps=3,
+-            num_rollouts=8,
+-            dynamic_risk=DynamicRiskConfig(mode='off'),
+-        )
+-    )
+-    path = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]])
+-    trajectories = np.array([[
+-        [0.5, 0.0, 0.0],
+-        [1.0, 0.5, np.pi / 2.0],
+-        [0.5, 0.2, 0.0],
+-    ]])
+-
+-    squared, indices, closest, headings = controller._nearest_path_geometry(
+-        trajectories,
+-        path,
+-    )
+-
+-    assert np.allclose(squared, [[0.0, 0.0, 0.04]])
+-    assert np.array_equal(indices, [[0, 1, 0]])
+-    assert np.allclose(closest, [[[0.5, 0.0], [1.0, 0.5], [0.5, 0.0]]])
+-    assert np.allclose(headings, [[0.0, np.pi / 2.0, 0.0]])
+-
+-
+-def test_polyline_projection_ignores_repeated_zero_length_segments():
+-    controller = MppiController(
+-        MppiConfig(
+-            horizon_steps=2,
+-            num_rollouts=8,
+-            dynamic_risk=DynamicRiskConfig(mode='off'),
+-        )
+-    )
+-    path = np.array([
+-        [-1.0, 0.0],
+-        [-1.0, 0.0],
+-        [1.0, 0.0],
+-        [1.0, 1.0],
+-    ])
+-    trajectories = np.array([[
+-        [-1.0, 0.0, 0.0],
+-        [0.0, 0.5, 0.0],
+-    ]])
+-
+-    nearest_squared, nearest_indices, closest, _ = (
+-        controller._nearest_path_geometry(
+-            trajectories,
+-            path,
+-        )
+-    )
+-
+-    assert np.array_equal(nearest_indices, [[1, 1]])
+-    assert np.allclose(nearest_squared, [[0.0, 0.25]])
+-    assert np.allclose(closest, [[[-1.0, 0.0], [0.0, 0.0]]])
+-
+-
+-def test_sparse_waypoint_midpoint_has_zero_tracking_distance():
+-    controller = MppiController(
+-        MppiConfig(
+-            horizon_steps=2,
+-            num_rollouts=8,
+-            dynamic_risk=DynamicRiskConfig(mode='off'),
+-        )
+-    )
+-    path = np.array([[0.0, 0.0], [2.0, 0.0]])
+-    trajectories = np.array([[
+-        [0.5, 0.0, 0.0],
+-        [1.0, 0.0, 0.0],
+-    ]])
+-
+-    nearest_squared, _ = controller._nearest_path_data(
+-        trajectories,
+-        path,
+-    )
+-
+-    assert np.array_equal(nearest_squared, [[0.0, 0.0]])
+-
+-
+-def test_single_point_path_keeps_tracking_and_zero_heading_behavior():
+-    controller = MppiController(
+-        MppiConfig(
+-            horizon_steps=2,
+-            num_rollouts=8,
+-            heading_weight=3.0,
+-            dynamic_risk=DynamicRiskConfig(mode='off'),
+-        )
+-    )
+-    path = np.array([[1.0, -0.5]])
+-    trajectories = np.array([
+-        [[0.0, 0.0, 1.0], [0.5, -0.5, 2.0]],
+-        [[1.0, -0.5, -1.0], [1.0, -0.5, -2.0]],
+-    ])
+-
+-    tracking, heading = controller._path_costs(trajectories, path)
+-    expected_tracking = controller._tracking_cost(trajectories, path)
+-
+-    assert np.array_equal(tracking, expected_tracking)
+-    assert np.array_equal(heading, np.zeros(2))
+-
+-
+-def test_path_frame_speed_prefers_forward_over_strafe_and_reverse():
+-    controller = MppiController(
+-        MppiConfig(
+-            dt=0.2,
+-            horizon_steps=2,
+-            num_rollouts=8,
+-            desired_speed=0.5,
+-            speed_weight=1.0,
+-            lateral_speed_weight=2.0,
+-            cross_track_gain=0.0,
+-            dynamic_risk=DynamicRiskConfig(mode='off'),
+-        )
+-    )
+-    state = np.zeros(3)
+-    controls = np.array([
+-        [[0.5, 0.0, 0.0], [0.5, 0.0, 0.0]],
+-        [[0.0, 0.5, 0.0], [0.0, 0.5, 0.0]],
+-        [[-0.5, 0.0, 0.0], [-0.5, 0.0, 0.0]],
+-    ])
+-    trajectories = rollout(state, controls, controller.config.dt)
+-    path = np.array([[-2.0, 0.0], [2.0, 0.0]])
+-    geometry = controller._nearest_path_geometry(trajectories, path)
+-
+-    costs = controller._speed_cost(
+-        state,
+-        trajectories,
+-        controls,
+-        path,
+-        geometry,
+-    )
+-
+-    assert np.isclose(costs[0], 0.0)
+-    assert costs[0] < costs[1] < costs[2]
+-
+-
+-def test_path_frame_speed_rewards_lateral_motion_toward_path():
+-    controller = MppiController(
+-        MppiConfig(
+-            dt=0.2,
+-            horizon_steps=2,
+-            num_rollouts=8,
+-            desired_speed=0.3,
+-            speed_weight=1.0,
+-            lateral_speed_weight=2.0,
+-            cross_track_gain=1.0,
+-            max_cross_track_speed=0.2,
+-            dynamic_risk=DynamicRiskConfig(mode='off'),
+-        )
+-    )
+-    state = np.array([0.0, 0.1, 0.0])
+-    controls = np.array([
+-        [[0.3, -0.1, 0.0], [0.3, -0.1, 0.0]],
+-        [[0.3, 0.1, 0.0], [0.3, 0.1, 0.0]],
+-    ])
+-    trajectories = rollout(state, controls, controller.config.dt)
+-    path = np.array([[-1.0, 0.0], [2.0, 0.0]])
+-    geometry = controller._nearest_path_geometry(trajectories, path)
+-
+-    costs = controller._speed_cost(
+-        state,
+-        trajectories,
+-        controls,
+-        path,
+-        geometry,
+-    )
+-
+-    assert costs[0] < costs[1]
+-
+-
+-def test_compute_reuses_rollout_path_geometry_for_path_costs(monkeypatch):
++def test_standard_result_reports_recomputed_representative_cost():
+     controller = MppiController(
+         MppiConfig(
+             horizon_steps=5,
+@@ -427,24 +212,11 @@ def test_compute_reuses_rollout_path_geometry_for_path_costs(monkeypatch):
+         )
+     )
+     path = np.column_stack((np.linspace(0.0, 2.0, 20), np.zeros(20)))
+-    original = controller._nearest_path_geometry
+-    query_shapes = []
+-
+-    def counted_nearest_path_geometry(trajectories, reference_path):
+-        query_shapes.append(np.asarray(trajectories).shape[:-1])
+-        return original(trajectories, reference_path)
+-
+-    monkeypatch.setattr(
+-        controller,
+-        '_nearest_path_geometry',
+-        counted_nearest_path_geometry,
+-    )
+-
+-    controller.compute(np.zeros(3), path, np.zeros(3))
+-
+-    # One shared query supplies rollout tracking, heading and speed geometry;
+-    # only the common initial state needs one additional scalar projection.
+-    assert query_shapes == [(16, 5), (1, 1)]
++    result = controller.compute(np.zeros(3), path, np.zeros(3))
++    terms, _ = controller._evaluate_rollouts(
++        np.zeros(3), path, result.control_sequence[None],
++        result.trajectory[None], None)
++    assert np.isclose(result.cost, terms.total[0])
+ 
+ 
+ def _path_guide_controller(horizon_steps=20, num_rollouts=32):
+@@ -525,11 +297,12 @@ def test_path_guide_receives_the_same_risk_penalty_as_other_candidates(
+     horizon_steps = 5
+ 
+     def risk_rejecting_guide(trajectories, *_args, **_kwargs):
+-        costs = np.zeros(rollout_count)
+-        costs[2] = 1e9
++        costs = np.zeros(len(trajectories))
++        if len(costs) > 2:
++            costs[2] = 1e9
+         return RiskEvaluation(
+             cost=costs,
+-            collision_probability=np.zeros((rollout_count, horizon_steps)),
++            collision_probability=np.zeros((len(trajectories), horizon_steps)),
+         )
+ 
+     monkeypatch.setattr(
+@@ -590,234 +363,6 @@ def test_every_control_stays_inside_the_wheel_speed_polytope():
+         assert np.all(result.control_sequence <= np.array(config.control_max) + 1e-9)
+ 
+ 
+-def _mode_conditioned_controller(**overrides):
+-    values = {
+-        'strategy': 'mode_conditioned',
+-        'dt': 0.2,
+-        'horizon_steps': 12,
+-        'num_rollouts': 61,
+-        'desired_speed': 0.5,
+-        'control_min': (-0.375, -0.5625, -3.0),
+-        'control_max': (0.78, 0.5625, 3.0),
+-        'acceleration_limit': (2.25, 2.25, 6.75),
+-        'yaw_lever': 0.19835,
+-        'speed_limit_l1': 0.78,
+-        'dynamic_risk': DynamicRiskConfig(mode='off'),
+-    }
+-    values.update(overrides)
+-    return MppiController(MppiConfig(**values))
+-
+-
+-def test_mode_conditioned_update_keeps_total_budget_and_group_weights():
+-    controller = _mode_conditioned_controller()
+-    path = np.column_stack((np.linspace(0.0, 2.0, 30), np.zeros(30)))
+-
+-    result = controller.compute(np.zeros(3), path, np.zeros(3))
+-
+-    assert result.strategy == 'mode_conditioned'
+-    assert result.sampled_controls.shape == (61, 12, 3)
+-    assert result.control_mode_ids.shape == (61,)
+-    assert result.mode_control_sequences.shape == (3, 12, 3)
+-    assert result.mode_trajectories.shape == (3, 12, 3)
+-    assert result.mode_final_costs.shape == (3,)
+-    assert result.mode_collision_probabilities.shape == (3, 12)
+-    assert result.sampled_rollout_indices.shape == (40,)
+-    visualized_modes = result.control_mode_ids[result.sampled_rollout_indices]
+-    assert np.array_equal(
+-        np.bincount(visualized_modes, minlength=3),
+-        np.array([20, 19, 1]),
+-    )
+-    for mode_index in range(3):
+-        selected = result.control_mode_ids == mode_index
+-        expected_count = 1 if mode_index == 2 else 30
+-        assert np.count_nonzero(selected) == expected_count
+-        assert np.isclose(np.sum(result.weights[selected]), 1.0)
+-        visualized = result.sampled_rollout_indices[
+-            visualized_modes == mode_index
+-        ]
+-        hidden = np.setdiff1d(np.flatnonzero(selected), visualized)
+-        if hidden.size:
+-            assert np.min(result.weights[visualized]) >= np.max(
+-                result.weights[hidden]
+-            )
+-        expected = np.sum(
+-            result.weights[selected, None, None]
+-            * result.sampled_controls[selected],
+-            axis=0,
+-        )
+-        assert np.allclose(result.mode_control_sequences[mode_index], expected)
+-
+-
+-def test_mode_conditioned_controller_consumes_multimodal_predictions():
+-    horizon = 12
+-    risk_config = DynamicRiskConfig(
+-        mode='monte_carlo',
+-        robot_radius=0.20,
+-        obstacle_radius=0.25,
+-        mc_samples=4096,
+-        hard_threshold=0.05,
+-        seed=31,
+-    )
+-    controller = _mode_conditioned_controller(
+-        horizon_steps=horizon,
+-        dynamic_risk=risk_config,
+-    )
+-    means = np.zeros((1, 2, horizon, 2), dtype=np.float64)
+-    means[0, 1, :, 1] = 3.0
+-    covariances = np.broadcast_to(
+-        np.eye(2) * 0.01,
+-        (1, 2, horizon, 2, 2),
+-    ).copy()
+-    weights = np.empty((1, 2, horizon), dtype=np.float64)
+-    weights[:, 0, :] = 0.7
+-    weights[:, 1, :] = 0.3
+-    predictions = PredictionSet(
+-        means=means,
+-        covariances=covariances,
+-        times=np.arange(1, horizon + 1) * 0.2,
+-        mode_weights=weights,
+-        obstacle_radii=np.array([0.25]),
+-    )
+-    path = np.column_stack((np.linspace(0.0, 2.0, 30), np.zeros(30)))
+-
+-    result = controller.compute(
+-        np.zeros(3),
+-        path,
+-        np.zeros(3),
+-        dynamic_predictions=predictions,
+-    )
+-
+-    assert np.max(result.collision_probabilities) > 0.5
+-    assert np.any(result.cost_terms.risk > 0.0)
+-    assert np.max(result.mode_collision_probabilities) > 0.5
+-
+-
+-def test_mode_result_uses_one_recosted_mode_without_cross_mode_average():
+-    controller = _mode_conditioned_controller()
+-    path = np.column_stack((np.linspace(0.0, 2.0, 30), np.zeros(30)))
+-
+-    result = controller.compute(np.zeros(3), path, np.zeros(3))
+-    selected_index = CONTROL_MODE_NAMES.index(result.selected_mode)
+-
+-    assert np.array_equal(
+-        result.control_sequence,
+-        result.mode_control_sequences[selected_index],
+-    )
+-    assert np.array_equal(
+-        result.trajectory,
+-        result.mode_trajectories[selected_index],
+-    )
+-    assert result.cost == result.mode_final_costs[selected_index]
+-    assert np.array_equal(
+-        result.mode_trajectories,
+-        rollout(
+-            np.zeros(3),
+-            result.mode_control_sequences,
+-            controller.config.dt,
+-        ),
+-    )
+-
+-
+-def test_mode_templates_separate_lateral_and_yaw_dominant_maneuvers():
+-    controller = _mode_conditioned_controller()
+-    state = np.array([0.0, 0.0, 0.5])
+-    path = np.array([[0.0, 0.0], [3.0, 0.0]])
+-    guide = controller._make_path_guide(state, path, np.zeros(3))
+-
+-    templates = controller._make_mode_templates(
+-        state,
+-        guide,
+-        np.zeros(3),
+-    )
+-
+-    assert templates.shape == (2, 12, 3)
+-    assert np.max(np.abs(templates[0, :, 1])) > 0.0
+-    assert np.allclose(templates[0, :, 2], 0.0)
+-    assert np.allclose(templates[1, :, 1], 0.0)
+-    assert np.max(np.abs(templates[1, :, 2])) > 0.0
+-
+-
+-def test_mode_conditioned_stop_is_independent_and_not_averaged():
+-    controller = _mode_conditioned_controller()
+-    path = np.column_stack((np.linspace(0.0, 2.0, 30), np.zeros(30)))
+-
+-    result = controller.compute(np.zeros(3), path, np.zeros(3))
+-    stop_index = CONTROL_MODE_NAMES.index('stop')
+-    stop_rollouts = result.control_mode_ids == stop_index
+-
+-    assert np.count_nonzero(stop_rollouts) == 1
+-    assert np.all(result.sampled_controls[stop_rollouts] == 0.0)
+-    assert np.all(result.mode_control_sequences[stop_index] == 0.0)
+-    assert np.all(result.mode_trajectories[stop_index] == 0.0)
+-    assert result.weights[stop_rollouts][0] == 1.0
+-
+-
+-def test_mode_conditioned_stop_rollout_uses_braking_trajectory():
+-    controller = _mode_conditioned_controller(
+-        acceleration_limit=(0.5, 0.5, 1.0),
+-    )
+-    path = np.column_stack((np.linspace(0.0, 2.0, 30), np.zeros(30)))
+-    current = np.array([0.3, -0.1, 0.5])
+-
+-    result = controller.compute(np.zeros(3), path, current)
+-    stop_index = CONTROL_MODE_NAMES.index("stop")
+-    stopping = controller._make_stopping_control(current)
+-
+-    assert np.allclose(result.mode_control_sequences[stop_index], stopping)
+-    assert np.allclose(
+-        result.mode_trajectories[stop_index],
+-        rollout(np.zeros(3), stopping, controller.config.dt),
+-    )
+-    assert np.linalg.norm(result.mode_trajectories[stop_index, -1, :2]) > 0.0
+-
+-
+-def test_stop_wins_when_it_is_the_only_safe_final_candidate(monkeypatch):
+-    def risk_with_only_final_stop_safe(trajectories, *_args, **_kwargs):
+-        rollout_count, horizon = trajectories.shape[:2]
+-        probabilities = np.zeros((rollout_count, horizon))
+-        if rollout_count == len(CONTROL_MODE_NAMES):
+-            probabilities[:-1] = 1.0
+-        return RiskEvaluation(
+-            cost=np.zeros(rollout_count),
+-            collision_probability=probabilities,
+-        )
+-
+-    monkeypatch.setattr(
+-        mppi_controller_module,
+-        'dynamic_risk_cost',
+-        risk_with_only_final_stop_safe,
+-    )
+-    controller = _mode_conditioned_controller()
+-    path = np.column_stack((np.linspace(0.0, 2.0, 30), np.zeros(30)))
+-
+-    result = controller.compute(np.zeros(3), path, np.zeros(3))
+-
+-    assert result.selected_mode == 'stop'
+-    assert np.all(result.control_sequence == 0.0)
+-
+-
+-def test_behavior_noise_explores_both_lateral_and_yaw_directions():
+-    controller = _mode_conditioned_controller()
+-    crab_noise, turn_noise = controller._mode_sample_noise
+-
+-    assert np.min(crab_noise[..., 1]) < 0.0 < np.max(crab_noise[..., 1])
+-    assert np.min(turn_noise[..., 2]) < 0.0 < np.max(turn_noise[..., 2])
+-
+-
+-def test_behavior_switch_penalty_does_not_penalize_stop():
+-    controller = _mode_conditioned_controller()
+-
+-    penalties = controller._mode_transition_penalties(
+-        CONTROL_MODE_NAMES.index('crab')
+-    )
+-
+-    assert penalties[CONTROL_MODE_NAMES.index('crab')] == 0.0
+-    assert penalties[CONTROL_MODE_NAMES.index('turn')] == (
+-        controller.config.mode_switch_penalty
+-    )
+-    assert penalties[CONTROL_MODE_NAMES.index('stop')] == 0.0
+-
+-
+ def test_static_cost_toggle_and_hard_collision_penalty():
+     metadata = GridMetadata(80, 80, 0.05, -2.0, -2.0, 0.0)
+     occupancy = np.zeros((80, 80), dtype=np.int16)
+@@ -843,7 +388,6 @@ def test_static_cost_toggle_and_hard_collision_penalty():
+         static_cost_robot_radius=0.10,
+         static_cost_soft_weight=2.0,
+         static_cost_decay=0.10,
+-        static_cost_hard_penalty=100000.0,
+         dynamic_risk=DynamicRiskConfig(mode='off'),
+     ))
+     cost, collision = enabled._static_obstacle_cost(
+@@ -851,4 +395,99 @@ def test_static_cost_toggle_and_hard_collision_penalty():
+ 
+     assert collision.tolist() == [True, False]
+     assert cost[0] >= 100000.0
+-    assert 0.0 < cost[1] < cost[0]
++    assert cost[1] == 0.0  # outside the hinge's d_safe band
++
++
++def test_path_heading_uses_distance_lookahead_across_a_corner():
++    controller = MppiController(
++        MppiConfig(
++            horizon_steps=2,
++            num_rollouts=8,
++            heading_lookahead=0.20,
++            dynamic_risk=DynamicRiskConfig(mode='off'),
++        )
++    )
++    path = np.array([[0.0, 0.0], [0.10, 0.0], [0.10, 0.40]])
++
++    headings = controller._path_headings(path)
++
++    # From the first point, 0.20 m along the path is (0.10, 0.10), so the
++    # smoothed chord heading is 45 degrees rather than the first segment's 0.
++    assert np.isclose(headings[0], np.pi / 4.0)
++    assert np.isclose(headings[1], np.pi / 2.0)
++    assert np.isclose(headings[-1], np.pi / 2.0)
++
++
++def test_path_geometry_projects_onto_continuous_segments():
++    controller = MppiController(
++        MppiConfig(
++            horizon_steps=3,
++            num_rollouts=8,
++            dynamic_risk=DynamicRiskConfig(mode='off'),
++        )
++    )
++    path = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]])
++    trajectories = np.array([[
++        [0.5, 0.0, 0.0],
++        [1.0, 0.5, np.pi / 2.0],
++        [0.5, 0.2, 0.0],
++    ]])
++
++    squared, indices, closest, headings = controller._nearest_path_geometry(
++        trajectories,
++        path,
++    )
++
++    assert np.allclose(squared, [[0.0, 0.0, 0.04]])
++    assert np.array_equal(indices, [[0, 1, 0]])
++    assert np.allclose(closest, [[[0.5, 0.0], [1.0, 0.5], [0.5, 0.0]]])
++    assert np.allclose(headings, [[0.0, np.pi / 2.0, 0.0]])
++
++
++def test_polyline_projection_ignores_repeated_zero_length_segments():
++    controller = MppiController(
++        MppiConfig(
++            horizon_steps=2,
++            num_rollouts=8,
++            dynamic_risk=DynamicRiskConfig(mode='off'),
++        )
++    )
++    path = np.array([
++        [-1.0, 0.0],
++        [-1.0, 0.0],
++        [1.0, 0.0],
++        [1.0, 1.0],
++    ])
++    trajectories = np.array([[
++        [-1.0, 0.0, 0.0],
++        [0.0, 0.5, 0.0],
++    ]])
++
++    nearest_squared, nearest_indices, closest, _ = (
++        controller._nearest_path_geometry(
++            trajectories,
++            path,
++        )
++    )
++
++    assert np.array_equal(nearest_indices, [[1, 1]])
++    assert np.allclose(nearest_squared, [[0.0, 0.25]])
++    assert np.allclose(closest, [[[-1.0, 0.0], [0.0, 0.0]]])
++
++
++def test_removed_strategy_is_rejected():
++    with pytest.raises(ValueError, match='unknown MPPI strategy'):
++        MppiController(MppiConfig(strategy='mode_conditioned'))
++
++
++def test_guide_budget_does_not_depend_on_standard_sampler_settings():
++    controller = MppiController(MppiConfig(
++        strategy='guide_conditioned', horizon_steps=4,
++        guide_num_rollouts=20, num_rollouts=0, noise_std=(-1., -1., -1.),
++        dynamic_risk=DynamicRiskConfig(mode='off')))
++    try:
++        result = controller.compute(np.zeros(3), np.array([[0., 0.], [2., 0.]]))
++        assert result.sampled_controls.shape == (20, 4, 3)
++        assert np.isfinite(result.control).all()
++    finally:
++        controller.close()
+diff --git a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/benchmark_guide_conditioned.py b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/benchmark_guide_conditioned.py
+index fc4566a..7a0c034 100644
+--- a/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/benchmark_guide_conditioned.py
++++ b/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/benchmark_guide_conditioned.py
+@@ -38,11 +38,9 @@ def config_from_yaml():
+     values.update(
+         acceleration_limit=p['limits.acceleration'],
+         speed_limit_l1=p['limits.wheel_radius'] * p['limits.max_wheel_rad_per_sec'] * p['limits.load_budget'],
+-        guide_clearance_margin=p['traversability.clearance_margin'],
+         static_cost_enabled=p['static_cost.enabled'],
+         static_cost_soft_weight=p['static_cost.soft_weight'],
+         static_cost_decay=p['static_cost.decay'],
+-        static_cost_hard_penalty=p['static_cost.hard_penalty'],
+         static_cost_robot_radius=p['robot_radius'],
+         dynamic_risk=DynamicRiskConfig(**risk), strategy='guide_conditioned')
+     return MppiConfig(**values)
+diff --git a/src/amr_basic_stack/sensors/amr_base/amr_base/roboclaw_mecanum_node.py b/src/amr_basic_stack/sensors/amr_base/amr_base/roboclaw_mecanum_node.py
+index 8ac0237..372a0d4 100644
+--- a/src/amr_basic_stack/sensors/amr_base/amr_base/roboclaw_mecanum_node.py
++++ b/src/amr_basic_stack/sensors/amr_base/amr_base/roboclaw_mecanum_node.py
+@@ -423,6 +423,9 @@ class RoboClawMecanumNode(Node):
+         self.declare_parameter("speed_read_mode", "per_motor")   # per_motor | combined | encoder
+         self.declare_parameter("parallel_boards", False)
+         self.declare_parameter("serial_retries", 2)
++        # encoder_wheel_speeds 토픽: speed_read_mode 와 무관하게 엔코더 카운트 차분 속도를 따로 낸다.
++        # C++ 100 Hz MPC 가 쓴다 (1차 모델이 실제 바퀴 속도 기준). /measured_wheel_speeds·/odom 은 그대로.
++        self.declare_parameter("publish_encoder_speeds", True)
+ 
+         # ── /odom 공분산 ─────────────────────────────────────────────────
+         # 채우지 않으면 전부 0 으로 나간다. 0 공분산은 "이 측정에는 오차가 없다"는
+@@ -509,6 +512,7 @@ class RoboClawMecanumNode(Node):
+             raise ValueError("speed_read_mode must be 'per_motor', 'combined' or 'encoder'")
+         self.parallel_boards = bool(self.get_parameter("parallel_boards").value)
+         serial_retries = int(self.get_parameter("serial_retries").value)
++        self.publish_encoder_speeds = bool(self.get_parameter("publish_encoder_speeds").value)
+         if serial_retries < 1:
+             raise ValueError("serial_retries must be at least 1")
+ 
+@@ -584,6 +588,8 @@ class RoboClawMecanumNode(Node):
+         self.wheel_cmd_sub = self.create_subscription(
+             Float32MultiArray, "wheel_cmd", self.wheel_cmd_callback, 10)
+         self.wheel_pub = self.create_publisher(Float32MultiArray, "wheel_speeds", 10)
++        # [FL, FR, RL, RR] rad/s, 엔코더 카운트 차분 (publish_encoder_wheel_speeds)
++        self.encoder_wheel_pub = self.create_publisher(Float32MultiArray, "encoder_wheel_speeds", 10)
+         self.measured_wheel_pub = self.create_publisher(
+             Float32MultiArray,
+             "measured_wheel_speeds",
+@@ -744,6 +750,17 @@ class RoboClawMecanumNode(Node):
+             (left_m1, left_m2), (right_m1, right_m2) = self._on_both_boards(
+                 lambda: self.left_driver.read_motor_speeds(self.left_address),
+                 lambda: self.right_driver.read_motor_speeds(self.right_address))
++        if mode == 'encoder':
++            enc_qpps = (left_m1, left_m2, right_m1, right_m2)
++        elif getattr(self, 'publish_encoder_speeds', False):
++            (e_l1, e_l2), (e_r1, e_r2) = self._on_both_boards(
++                lambda: self.left_driver.read_motor_speeds_encoder(self.left_address),
++                lambda: self.right_driver.read_motor_speeds_encoder(self.right_address))
++            enc_qpps = (e_l1, e_l2, e_r1, e_r2)
++        else:
++            enc_qpps = None
++        if enc_qpps is not None:
++            self.publish_encoder_wheel_speeds(dict(zip(("left_m1", "left_m2", "right_m1", "right_m2"), enc_qpps)))
+         self.last_read_ms = (time.monotonic() - t_read) * 1e3
+         if hasattr(self, 'io_timing_pub'):
+             self.io_timing_pub.publish(Float32MultiArray(data=[
+@@ -796,6 +813,25 @@ class RoboClawMecanumNode(Node):
+             setattr(self.measured_qpps, wheel_name, logical_qpps)
+             setattr(self.measured_wheels, wheel_name, logical_rad_s)
+ 
++    def publish_encoder_wheel_speeds(self, output_qpps):
++        """엔코더 차분 속도를 논리 바퀴 순서 [FL, FR, RL, RR] rad/s 로 낸다.
++
++        한 바퀴라도 읽기 실패(첫 샘플 포함)거나 크기 게이트(feedback_max_wheel_rad_per_sec)를 넘으면 이번 주기는
++        내지 않는다 — 받는 쪽(C++ MPC)이 '새 측정 없음'으로 다루고 관측기는 예측만 한다.
++        변화율 게이트는 /measured_wheel_speeds 쪽에만 있다 (차분 잡음 1σ 0.35 rad/s 는 그 문턱보다 훨씬 작다).
++        """
++        values = []
++        for wheel_name in ("front_left", "front_right", "rear_left", "rear_right"):
++            qpps = output_qpps.get(self.motor_outputs[wheel_name])
++            if qpps is None:
++                return
++            rad_s = float(int(round(qpps * self.invert[wheel_name]))) / self.qpps_per_rad_per_sec
++            if not math.isfinite(rad_s) or abs(rad_s) > self.feedback_max_wheel:
++                return
++            values.append(rad_s)
++        if hasattr(self, 'encoder_wheel_pub'):
++            self.encoder_wheel_pub.publish(Float32MultiArray(data=values))
++
+     def report_feedback_health(self):
+         if self.feedback_report_period_s <= 0.0:
+             return
+diff --git a/src/amr_basic_stack/sensors/amr_base/test/test_io_modes.py b/src/amr_basic_stack/sensors/amr_base/test/test_io_modes.py
+index 16680be..153af31 100644
+--- a/src/amr_basic_stack/sensors/amr_base/test/test_io_modes.py
++++ b/src/amr_basic_stack/sensors/amr_base/test/test_io_modes.py
+@@ -89,6 +89,7 @@ def test_feedback_modes_give_same_wheel_speeds(node, mode, parallel):
+ 
+ def test_parallel_boards_halve_read_time(node):
+     attach_fake_boards(node, latency_min=0.002, latency_max=0.002)    # 트랜잭션 2 ms 고정
++    node.publish_encoder_speeds = False      # 병렬화만 본다 (켜면 보드당 GetEncoders 가 하나 더 붙는다)
+     times = {}
+     for parallel in (False, True):
+         node._board_pool = ThreadPoolExecutor(max_workers=2) if parallel else None
+@@ -138,7 +139,7 @@ def test_encoder_mode_first_sample_then_speed():
+     claw = wrapped(FakeRoboClaw(seed=3))
+     spin_up(claw, 128, 1500, -2500)
+     assert claw.read_motor_speeds_encoder(128) == (None, None)     # 짝이 없다
+-    time.sleep(0.01)
++    time.sleep(0.05)      # 가짜 보드는 카운트를 정수로 자른다 — 10 ms 면 15 counts 라 ±1 이 ±7 % (불안정했다)
+     v1, v2 = claw.read_motor_speeds_encoder(128)
+     assert v1 == pytest.approx(1500, rel=0.08) and v2 == pytest.approx(-2500, rel=0.08)
+     claw.set_motor_speeds(128, 0, 0)
+@@ -162,9 +163,41 @@ def test_encoder_mode_in_node(node):
+     spin_up(node.right_driver, node.right_address, 3000, -500)
+     node.read_encoder_feedback()                  # 첫 샘플 — 실패로 센다
+     assert node.feedback_failures['front_left'] == 1
+-    time.sleep(0.02)
++    time.sleep(0.05)
+     node.read_encoder_feedback()
+     w = node.measured_wheels
+     assert w.rear_left == pytest.approx(1000 / QPPS_PER_RAD, rel=0.08)
+     assert w.front_right == pytest.approx(3000 / QPPS_PER_RAD, rel=0.08)
+     assert w.rear_right == pytest.approx(-500 / QPPS_PER_RAD, rel=0.15)
++
++
++# ── encoder_wheel_speeds 토픽 (speed_read_mode 와 별개) ────────────────────
++def test_encoder_topic_alongside_per_motor(node):
++    from unittest.mock import Mock
++    attach_fake_boards(node)
++    node.encoder_wheel_pub = Mock()
++    assert node.speed_read_mode == 'per_motor' and node.publish_encoder_speeds is True
++    spin_up(node.left_driver, node.left_address, 1000, -2000, settle=0)
++    spin_up(node.right_driver, node.right_address, 3000, -500)
++    node.read_encoder_feedback()                      # 엔코더 첫 샘플 — 토픽 안 냄
++    node.encoder_wheel_pub.publish.assert_not_called()
++    time.sleep(0.05)
++    node.read_encoder_feedback()
++    fl, fr, rl, rr = node.encoder_wheel_pub.publish.call_args.args[0].data
++    assert fl == pytest.approx(-2000 / QPPS_PER_RAD, rel=0.08)   # FL = left_m2
++    assert fr == pytest.approx(3000 / QPPS_PER_RAD, rel=0.08)    # FR = right_m1
++    assert rl == pytest.approx(1000 / QPPS_PER_RAD, rel=0.08)    # RL = left_m1
++    assert rr == pytest.approx(-500 / QPPS_PER_RAD, rel=0.15)    # RR = right_m2
++    # 기존 토픽 값은 cmd 18 경로 그대로
++    assert node.measured_wheels.front_right == pytest.approx(3000 / QPPS_PER_RAD, rel=0.03)
++
++
++def test_encoder_topic_skips_cycle_with_failed_wheel(node):
++    from unittest.mock import Mock
++    node.encoder_wheel_pub = Mock()
++    node.qpps_per_rad_per_sec = QPPS_PER_RAD
++    node.publish_encoder_wheel_speeds({'left_m1': 100, 'left_m2': None, 'right_m1': 100, 'right_m2': 100})
++    node.publish_encoder_wheel_speeds({'left_m1': 100, 'left_m2': 100, 'right_m1': 10**7, 'right_m2': 100})   # 크기 게이트
++    node.encoder_wheel_pub.publish.assert_not_called()
++    node.publish_encoder_wheel_speeds({'left_m1': 210, 'left_m2': 420, 'right_m1': 630, 'right_m2': -210})
++    assert node.encoder_wheel_pub.publish.call_args.args[0].data == pytest.approx([2.0, 3.0, 1.0, -1.0], rel=0.01)

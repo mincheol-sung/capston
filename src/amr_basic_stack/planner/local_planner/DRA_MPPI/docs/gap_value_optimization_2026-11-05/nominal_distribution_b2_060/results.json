@@ -1,0 +1,86 @@
+{
+  "scene": "b2_060",
+  "nominal_all_zero": true,
+  "current_measured": [
+    -3.6763481169622064e-05,
+    2.282911686370499e-06,
+    0.0017906393899647923
+  ],
+  "groups": [
+    "nominal",
+    "G1",
+    "G2",
+    "G3"
+  ],
+  "counts": [
+    200,
+    167,
+    89,
+    44
+  ],
+  "all_sample_count": 500,
+  "nominal_sample_count": 200,
+  "nominal_primary_finite_count": 175,
+  "nominal_primary_rejected_count": 25,
+  "nominal_representative_endpoint": [
+    0.2532569226516276,
+    0.07171974302920568
+  ],
+  "nominal_representative_final_cost": 14.098735228631643,
+  "final_selected": "G1",
+  "final_cost": 1.9827055279197625,
+  "nominal_controls": [
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "reproduces_previous_final_trajectory": true,
+  "scope": "Same saved recorded scene, configuration and optimized seeds. New real MPPI replay; full sampled_controls rolled out, no visualization subsampling; includes rejected samples."
+}

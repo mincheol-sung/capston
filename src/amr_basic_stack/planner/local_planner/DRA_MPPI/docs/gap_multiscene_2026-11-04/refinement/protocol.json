@@ -1,0 +1,12 @@
+{
+  "stage": "Exploratory refinement after stage-one inspection; same evaluation bags, not new untouched validation.",
+  "motivation": "Stage-one peak-only representative lost a lower-cost direction in b2_084.",
+  "methods": [
+    "valley_direction_cost",
+    "valley_direction_gate"
+  ],
+  "directions": "For each existing valley interval: depth peak, angular midpoint, closest angle to the recorded path point at 1 m arc length. Deduplicate identical angle bins.",
+  "selection": "Choose the lowest existing common+static cost among collision-free, reachable, non-nominal-duplicate options; at most one seed per original interval. Then use the original cost or cost_gate selector.",
+  "fixed": "Same frozen source, snapshots, gap boundaries, reach limits, 500-rollout budget, MC settings and seeds as stage one.",
+  "source_sha256": "8228155680acb52f48b9e61786cc4d49d70146d106b77edbcbf48a5004a7a26a"
+}

@@ -1,0 +1,10 @@
+{
+  "cycles": 1792,
+  "optimized_candidates": 5254,
+  "gradient_checks": 18,
+  "runtime_unchanged": true,
+  "configuration_unchanged": true,
+  "allocation_excludes_reward": true,
+  "all_500_samples": true,
+  "all_safety_status_ok": true
+}

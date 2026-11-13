@@ -1,0 +1,82 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 0,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 50,
+  "callback_over_200ms_ratio": 0.5,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 166.10848783748224,
+    "p50": 167.30958444532007,
+    "p95": 270.9275240194984,
+    "p99": 271.7584826471284,
+    "max": 273.7768159713596
+  },
+  "backend": "split",
+  "workers": 1,
+  "frozen_nominal": true,
+  "statuses": {
+    "stale_odom": 50,
+    "expired_input": 50
+  },
+  "fallback_ratio": 1.0,
+  "deadline_miss_ratio": 0.5,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 132.93448705459014,
+    "p50": 130.21318649407476,
+    "p95": 270.72789809899405,
+    "p99": 271.46172298816964,
+    "max": 273.4889530111104
+  },
+  "normal_optimizer_ms": null,
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 33.17746804095805,
+    "p50": 30.24578047916293,
+    "p95": 71.54180272482336,
+    "p99": 72.18025942565875,
+    "max": 74.12926387041807
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 32.77776597766205,
+    "p50": 29.921953543089323,
+    "p95": 70.93145813560112,
+    "p99": 71.76250940887257,
+    "max": 73.78159901127218
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 199.99427139991894,
+    "p50": 197.27907655760646,
+    "p95": 404.2984375380911,
+    "p99": 406.94281495641917,
+    "max": 407.94807206839323
+  },
+  "receive_interval_ms": {
+    "count": 101,
+    "mean": 201.95854835599513,
+    "p50": 389.8697220720351,
+    "p95": 404.34878319501877,
+    "p99": 407.03164017759264,
+    "max": 408.22361898608506
+  },
+  "receive_count_in_window": 101,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 10,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

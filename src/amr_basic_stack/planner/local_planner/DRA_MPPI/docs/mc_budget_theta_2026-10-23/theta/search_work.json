@@ -1,0 +1,98 @@
+[
+  {
+    "map": "smoc_lab",
+    "requested_distance": 3.0,
+    "straight_distance": 3.0,
+    "environment": "saved_map",
+    "path_nodes": 2,
+    "path_length_m": 3.0,
+    "expansions": 60,
+    "los_calls": 421,
+    "los_cells": 12880,
+    "neighbor_cells": 480
+  },
+  {
+    "map": "smoc_lab",
+    "requested_distance": 3.0,
+    "straight_distance": 3.0,
+    "environment": "obstacle_free_control",
+    "path_nodes": 2,
+    "path_length_m": 3.0,
+    "expansions": 60,
+    "los_calls": 421,
+    "los_cells": 12880,
+    "neighbor_cells": 480
+  },
+  {
+    "map": "smoc_lab",
+    "requested_distance": 8.0,
+    "straight_distance": 6.890936075744716,
+    "environment": "saved_map",
+    "path_nodes": 7,
+    "path_length_m": 7.948443130083417,
+    "expansions": 4304,
+    "los_calls": 15916,
+    "los_cells": 407384,
+    "neighbor_cells": 34432
+  },
+  {
+    "map": "smoc_lab",
+    "requested_distance": 8.0,
+    "straight_distance": 6.890936075744716,
+    "environment": "obstacle_free_control",
+    "path_nodes": 2,
+    "path_length_m": 6.890936075744718,
+    "expansions": 279,
+    "los_calls": 1541,
+    "los_cells": 106698,
+    "neighbor_cells": 2232
+  },
+  {
+    "map": "test_imu_scan",
+    "requested_distance": 3.0,
+    "straight_distance": 3.0,
+    "environment": "saved_map",
+    "path_nodes": 2,
+    "path_length_m": 3.0,
+    "expansions": 60,
+    "los_calls": 421,
+    "los_cells": 12880,
+    "neighbor_cells": 480
+  },
+  {
+    "map": "test_imu_scan",
+    "requested_distance": 3.0,
+    "straight_distance": 3.0,
+    "environment": "obstacle_free_control",
+    "path_nodes": 2,
+    "path_length_m": 3.0,
+    "expansions": 60,
+    "los_calls": 421,
+    "los_cells": 12880,
+    "neighbor_cells": 480
+  },
+  {
+    "map": "test_imu_scan",
+    "requested_distance": 8.0,
+    "straight_distance": 6.835202996254026,
+    "environment": "saved_map",
+    "path_nodes": 7,
+    "path_length_m": 8.072182883911392,
+    "expansions": 4940,
+    "los_calls": 17691,
+    "los_cells": 468893,
+    "neighbor_cells": 39520
+  },
+  {
+    "map": "test_imu_scan",
+    "requested_distance": 8.0,
+    "straight_distance": 6.835202996254026,
+    "environment": "obstacle_free_control",
+    "path_nodes": 2,
+    "path_length_m": 6.835202996254025,
+    "expansions": 448,
+    "los_calls": 2223,
+    "los_cells": 144121,
+    "neighbor_cells": 3584
+  }
+]

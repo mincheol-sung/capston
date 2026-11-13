@@ -1,0 +1,306 @@
+[
+  {
+    "scene": "b1_019",
+    "bag": "mpc_chain_20260923_113151",
+    "offset": 44.799365019,
+    "record_ns": 1790130756950867622,
+    "epoch": 1790130756.933849,
+    "map_age": 0.44414305686950684,
+    "reference_age": 0.05678224563598633,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 35.917343106120825,
+    "prediction_align_ms": 98.89272227883339,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_113151_0.mcap",
+        "size_bytes": 2879914416
+      }
+    ]
+  },
+  {
+    "scene": "b1_030",
+    "bag": "mpc_chain_20260923_113151",
+    "offset": 67.679114341,
+    "record_ns": 1790130779830616944,
+    "epoch": 1790130779.8129575,
+    "map_age": 0.32399725914001465,
+    "reference_age": 0.09169960021972656,
+    "predictions": 2,
+    "matches_prior_cache": null,
+    "raw_prepare_ms": 35.868756007403135,
+    "prediction_align_ms": 0.8320407941937447,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_113151_0.mcap",
+        "size_bytes": 2879914416
+      }
+    ]
+  },
+  {
+    "scene": "b1_037",
+    "bag": "mpc_chain_20260923_113151",
+    "offset": 82.166830972,
+    "record_ns": 1790130794318333575,
+    "epoch": 1790130794.3118289,
+    "map_age": 0.3153660297393799,
+    "reference_age": 0.031011343002319336,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 37.848124746233225,
+    "prediction_align_ms": 0.24552922695875168,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_113151_0.mcap",
+        "size_bytes": 2879914416
+      }
+    ]
+  },
+  {
+    "scene": "b1_066",
+    "bag": "mpc_chain_20260923_113151",
+    "offset": 142.401063614,
+    "record_ns": 1790130854552566217,
+    "epoch": 1790130854.5320501,
+    "map_age": 0.04371500015258789,
+    "reference_age": 0.05726766586303711,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 97.53041993826628,
+    "prediction_align_ms": 0.24991808459162712,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_113151_0.mcap",
+        "size_bytes": 2879914416
+      }
+    ]
+  },
+  {
+    "scene": "b1_088",
+    "bag": "mpc_chain_20260923_113151",
+    "offset": 188.247981024,
+    "record_ns": 1790130900399483627,
+    "epoch": 1790130900.3938296,
+    "map_age": 0.4030747413635254,
+    "reference_age": 0.13190460205078125,
+    "predictions": 1,
+    "matches_prior_cache": null,
+    "raw_prepare_ms": 45.079221948981285,
+    "prediction_align_ms": 0.6622429937124252,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_113151_0.mcap",
+        "size_bytes": 2879914416
+      }
+    ]
+  },
+  {
+    "scene": "b0_001",
+    "bag": "mpc_chain_20260923_135325",
+    "offset": 7.167112924,
+    "record_ns": 1790139212754308701,
+    "epoch": 1790139212.7382145,
+    "map_age": 0.4376676082611084,
+    "reference_age": 0.10993695259094238,
+    "predictions": 2,
+    "matches_prior_cache": null,
+    "raw_prepare_ms": 31.043928116559982,
+    "prediction_align_ms": 0.8842227980494499,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135325_0.mcap",
+        "size_bytes": 1476279946
+      }
+    ]
+  },
+  {
+    "scene": "b0_024",
+    "bag": "mpc_chain_20260923_135325",
+    "offset": 55.012188979,
+    "record_ns": 1790139260599384756,
+    "epoch": 1790139260.5784206,
+    "map_age": 0.2785611152648926,
+    "reference_age": 0.009605646133422852,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 34.46471504867077,
+    "prediction_align_ms": 0.2537430264055729,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135325_0.mcap",
+        "size_bytes": 1476279946
+      }
+    ]
+  },
+  {
+    "scene": "b0_027",
+    "bag": "mpc_chain_20260923_135325",
+    "offset": 61.203730599000004,
+    "record_ns": 1790139266790926376,
+    "epoch": 1790139266.778089,
+    "map_age": 0.48470568656921387,
+    "reference_age": 0.16784453392028809,
+    "predictions": 4,
+    "matches_prior_cache": null,
+    "raw_prepare_ms": 36.32702399045229,
+    "prediction_align_ms": 1.1564628221094608,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135325_0.mcap",
+        "size_bytes": 1476279946
+      }
+    ]
+  },
+  {
+    "scene": "b0_039",
+    "bag": "mpc_chain_20260923_135325",
+    "offset": 85.777806165,
+    "record_ns": 1790139291365001942,
+    "epoch": 1790139291.359255,
+    "map_age": 0.06472587585449219,
+    "reference_age": 0.2147376537322998,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 37.26850217208266,
+    "prediction_align_ms": 0.2442547120153904,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135325_0.mcap",
+        "size_bytes": 1476279946
+      }
+    ]
+  },
+  {
+    "scene": "b0_052",
+    "bag": "mpc_chain_20260923_135325",
+    "offset": 112.738106529,
+    "record_ns": 1790139318325302306,
+    "epoch": 1790139318.3200345,
+    "map_age": 0.026584148406982422,
+    "reference_age": 0.16243529319763184,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 40.220612194389105,
+    "prediction_align_ms": 0.2506398595869541,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135325_0.mcap",
+        "size_bytes": 1476279946
+      }
+    ]
+  },
+  {
+    "scene": "b2_051",
+    "bag": "mpc_chain_20260923_135606",
+    "offset": 110.645227417,
+    "record_ns": 1790139477715778383,
+    "epoch": 1790139477.7058747,
+    "map_age": 0.027168750762939453,
+    "reference_age": 0.18346405029296875,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 43.340555857867,
+    "prediction_align_ms": 0.27430709451436996,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135606_0.mcap",
+        "size_bytes": 4332357295
+      }
+    ]
+  },
+  {
+    "scene": "b2_060",
+    "bag": "mpc_chain_20260923_135606",
+    "offset": 129.334704732,
+    "record_ns": 1790139496405255698,
+    "epoch": 1790139496.3862689,
+    "map_age": 0.2096874713897705,
+    "reference_age": 0.0801076889038086,
+    "predictions": 3,
+    "matches_prior_cache": null,
+    "raw_prepare_ms": 43.26710710301995,
+    "prediction_align_ms": 0.9420830756425858,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135606_0.mcap",
+        "size_bytes": 4332357295
+      }
+    ]
+  },
+  {
+    "scene": "b2_079",
+    "bag": "mpc_chain_20260923_135606",
+    "offset": 168.707949484,
+    "record_ns": 1790139535778500450,
+    "epoch": 1790139535.767767,
+    "map_age": 0.08718490600585938,
+    "reference_age": 0.024923086166381836,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 47.903917729854584,
+    "prediction_align_ms": 0.24792784824967384,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135606_0.mcap",
+        "size_bytes": 4332357295
+      }
+    ]
+  },
+  {
+    "scene": "b2_100",
+    "bag": "mpc_chain_20260923_135606",
+    "offset": 212.27085457500002,
+    "record_ns": 1790139579341405541,
+    "epoch": 1790139579.3278341,
+    "map_age": 0.1467738151550293,
+    "reference_age": 0.002770662307739258,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 51.349959801882505,
+    "prediction_align_ms": 0.2520349808037281,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135606_0.mcap",
+        "size_bytes": 4332357295
+      }
+    ]
+  },
+  {
+    "scene": "b2_114",
+    "bag": "mpc_chain_20260923_135606",
+    "offset": 241.246920116,
+    "record_ns": 1790139608317471082,
+    "epoch": 1790139608.3076262,
+    "map_age": 0.12581467628479004,
+    "reference_age": 0.12711858749389648,
+    "predictions": 3,
+    "matches_prior_cache": null,
+    "raw_prepare_ms": 53.95187297835946,
+    "prediction_align_ms": 0.9259902872145176,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135606_0.mcap",
+        "size_bytes": 4332357295
+      }
+    ]
+  },
+  {
+    "scene": "b2_123",
+    "bag": "mpc_chain_20260923_135606",
+    "offset": 259.832802474,
+    "record_ns": 1790139626903353440,
+    "epoch": 1790139626.8889263,
+    "map_age": 0.19104719161987305,
+    "reference_age": 0.1823711395263672,
+    "predictions": 0,
+    "matches_prior_cache": true,
+    "raw_prepare_ms": 56.336593348532915,
+    "prediction_align_ms": 0.26014167815446854,
+    "bag_files": [
+      {
+        "name": "mpc_chain_20260923_135606_0.mcap",
+        "size_bytes": 4332357295
+      }
+    ]
+  }
+]

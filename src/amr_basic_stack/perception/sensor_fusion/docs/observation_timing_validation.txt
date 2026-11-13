@@ -1,0 +1,65 @@
+2026-11-01 / ROS 2 Jazzy / Python 3.12.3
+
+Build: 6 packages succeeded, separate /tmp build/install.
+amr_interfaces, amr_laser_tools, object_tracker, sensor_fusion,
+amr_perception_bringup, stack_master.
+Final source/launch/docs reinstall also succeeded.
+
+Selected functional regression suite:
+201 passed, 9 deselected in 2.06s.
+sensor_fusion/test, object_tracker/test, amr_laser_tools/test,
+amr_perception_bringup/test/test_semantic_launch.py, stack_master/test.
+Command: python3 -m pytest --import-mode=importlib -q -m 'not linter' ...
+ROS_DOMAIN_ID=91, ROS_LOCALHOST_ONLY=1, ROS_LOG_DIR=/tmp/amr_observation_roslog.
+
+Full colcon test-result (includes linters and CTest aggregation):
+287 tests, 0 errors, 8 failures, 4 skipped.
+Failures: test_flake8 and test_pep257 in each of:
+  amr_laser_tools, object_tracker, sensor_fusion, amr_perception_bringup.
+All functional tests passed, including stack_master launch expansion.
+Four skips are existing copyright skips.
+
+HEAD-only comparison copies, tested in /tmp/amr_observation_baseline:
+                         baseline flake8 count / final workspace count
+  amr_laser_tools                    5 / 5
+  object_tracker                    41 / 41
+  sensor_fusion                     25 / 11
+  amr_perception_bringup            119 / 235
+Bringup's workspace lint traverses an existing nested install copy as well as
+source; the HEAD-only copy has no generated install directory. Both already
+fail flake8/pep257. Generated user artifacts were not deleted or rewritten.
+Final new observation_time/test_observation_time/test_observation_contract/
+audit_observation_bag files have no remaining reported ament lint errors.
+
+Synthetic deskew (2000 beams, 100ms span, 10ms knots, 11 transform queries):
+  stationary:             1.209 ms, max error ~0 m
+  translation 0.8 m/s:    1.073 ms, max error ~0 m
+  0.6 m/s + 1.4 rad/s:    1.043 ms, max error 0.000009800 m
+  -2 rad/s, 0.4 m lever:  1.030 ms, max error 0.000020000 m
+These are synthetic math/lookup costs, not a hardware callback latency bound.
+
+Read-only bag audit, no topic publication:
+  /home/smoc/2026amr_ws/bags/mpc_chain_20260923_135325, first 10s
+  /scan_front:100, /scan_rear:100
+  positive increment:200, timing unknown:200
+  historical TF available:198, missing:2
+  image topics: none
+  50ms reference shift magnitude [p50,p95,max] in metres:
+  [0.00031358160931645087, 0.1966442768708187, 1.9422028900780866]
+  Magnitude is NOT accuracy improvement. Beam time and object truth unknown.
+
+Checks: Python compileall and git diff --check succeeded.
+No motors/driving launches executed; original bags and user planner edits preserved.
+
+Full logs (temporary local artifacts):
+  /tmp/amr_observation_build.txt
+  /tmp/amr_observation_final_install.txt
+  /tmp/amr_observation_pytest.txt
+  /tmp/amr_observation_benchmark.txt
+  /tmp/amr_observation_colcon_test.txt
+  /tmp/amr_observation_final_test.txt (last sensor_fusion/bringup rerun)
+  /tmp/amr_observation_test_result.txt
+
+Not verified: real-driver beam acquisition epoch, hardware motion accuracy,
+full RGB-D replay (images absent), moving-target ground truth, TF pose covariance,
+long-run real-time deadlines. See observation_timing.md for reproducible procedure.

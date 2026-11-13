@@ -1,0 +1,123 @@
+traversability_node:
+  ros__parameters:
+    # 좌표계·토픽
+    map_frame: map
+    base_frame: base_footprint
+    base_map_topic: /map
+    scan_topic: /scan
+    output_topic: /traversable_map
+    debug_grid_topic: /traversable_map_grid
+    publish_debug_grid: true
+
+    # D4. 격자 범위는 /map 에서 그대로 받으므로 전역 고정이다.
+    publish_frequency: 2.0
+
+    # D6. BLOCKED 관측 기억 유지 시간 [s]. 셀별 최종 관측 시각으로 판정한다.
+    #
+    # ★ "만료되면 UNKNOWN 으로 내려간다" 는 _memory 배열 수준에서만 맞다.
+    #   발행되는 격자는 encoding.compose 를 거치는데
+    #       np.where(memory != UNKNOWN, memory, base)
+    #   이므로 만료된 셀은 **기준 맵 값으로 대체**된다. trust_base_map_free 가
+    #   true 인 지금은 /map 이 free 인 자리면 FREE 로 나간다. 즉 만료는
+    #   "관측 증거를 버리고 기준 맵으로 되돌린다" 이지 "미확인으로 남긴다" 가
+    #   아니다. /map 이 점유인 자리는 BLOCKED 로 남으므로 진짜 벽은 지켜진다.
+    # FREE 의 만료는 free_memory_seconds 가 따로 정한다.
+    #
+    # 0 이하 = 만료 없음. free_memory_seconds 와 같은 규약이다. 해제는 오직
+    # 관측 증거(광선 관통)로만 하며, 그래서 "장애물을 기억하고 있다가 다시
+    # 그 자리를 봤을 때 없으면 지운다" 가 된다 — §6 의 "관측 손실만으로
+    # 안전하다고 판단하지 않음" 이 이 값에서 성립한다.
+    #
+    # 대가: 동적 물체가 두 센서 시야를 모두 벗어난 채로 사라지면 다시 그
+    # 자리를 관측할 때까지 잔상이 남는다. 잔상은 통로를 막는 쪽(false
+    # positive)이라 안전한 방향이지만, 좁은 통로에서는 우회가 늘 수 있다.
+    # 5.0 으로 되돌리면 예전처럼 5 초 뒤 UNKNOWN 으로 내려간다.
+    memory_seconds: 0.0
+
+    # 1단계(a): 기준 맵의 free 를 통과 가능으로 인정한다. 그 free 는 0.218 m
+    # 높이 LiDAR 평면에서 관측된 것이고 1단계의 traversability 정의가 바로 그
+    # 평면이다. 2단계에서 D455 z-band 투영이 들어와 정의가 넓어지면 false 로
+    # 뒤집는다 — 그때부터는 기준 맵 free 가 통과 가능의 근거가 못 된다.
+    trust_base_map_free: true
+
+    # D5. z-band. base_footprint 기준, z 축은 수직 위쪽(camera optical 의
+    # 전방 z 가 아니다). URDF 실측:
+    #   base_footprint -> base_link  0.04 m
+    #   base_link -> camera_link     0.092772 m   => 카메라 높이 0.1328 m
+    #   base_link -> laser_*_joint   0.177797 m   => LiDAR 마운트 0.2178 m
+    # z_min: 카메라 기준 -0.10 m 를 지면 기준으로 환산 (바닥면을 밴드에서 제외)
+    # z_max: 로봇 최고점(LiDAR 상단 ~0.258 m) + 여유 0.05 m
+    # 1단계에서는 투영에 쓰이지 않고 계약 필드로만 실린다.
+    z_min: 0.033
+    z_max: 0.31
+    height_frame: base_footprint
+
+    # 로봇 형상 팽창은 Planning 이 자기 footprint 로 한다. 인지 측은 안 한다.
+    inflation_radius: 0.0
+
+    # LaserScan 투영
+    scan_min_range: 0.15
+    scan_max_range: 8.0
+    # 서로 다른 스캔 N 개에서 맞은 셀만 장애물로 세운다.
+    scan_hit_threshold: 3
+
+    # ── 관측 기반 해제 (설계문서 §6) ─────────────────────────────────────
+    # LiDAR 광선이 관통한 셀을 통과 가능으로 세운다. 이게 없으면 traversable
+    # map 은 장애물을 더할 수만 있고 뺄 수 없다 — 초기 매핑 때 있던 팔레트를
+    # 치워도 격자에서 영원히 사라지지 않는다.
+    enable_clearing: true
+    # 서로 다른 스캔 N 개가 관통해야 해제한다. 노이즈 한 번으로 벽을 뚫지
+    # 않게 하는 안전장치다.
+    clear_hit_threshold: 3
+    # 빔을 N 개마다 하나씩만 써서 광선을 쏜다. 인접 빔이 거의 같은 셀을
+    # 지나므로 해제 품질은 크게 안 떨어지고 연산이 N 배 싸진다.
+    # 실측: 1600 빔 전체 + step 0.5×res 에서 13.0 ms, stride 2 면 약 6.5 ms.
+    clear_ray_stride: 2
+    # 광선 위 표본 간격 (resolution 배수). 크면 셀을 건너뛰어 해제가 성겨지는데,
+    # 해제를 덜 하는 쪽은 안전한 방향이다.
+    clear_step_ratio: 0.5
+    # 끝점 앞 N 셀에서 멈춘다. 끝점은 장애물 자신이므로 해제하면 안 되고,
+    # 측정 오차를 고려해 그 바로 앞도 남긴다.
+    clear_stop_margin: 1.0
+    # FREE 기억의 유효시간 [s]. 0 이하이면 만료시키지 않는다.
+    # 광선이 관통했다는 증거는 시간이 지나도 사라지지 않으며, 이 값이 기준
+    # 맵의 오래된 점유를 덮는 유일한 수단이다. 다시 막히면 그 셀에 hit 이
+    # 찍혀 BLOCKED 으로 덮이므로 영구 보존이 위험하지 않다.
+    free_memory_seconds: 0.0
+    # ── 재측위 처리 ──────────────────────────────────────────────────────
+    # /initialpose 는 "여기가 어디인지 다시 선언했다" 는 사건이다. RViz 의
+    # 2D Pose Estimate 와 amcl_bootstrap_node 둘 다 이 토픽으로 낸다.
+    # 받으면 누적 기억을 통째로 비운다 — free_memory_seconds 가 0(무한)이라
+    # 비우지 않으면 재측위 전에 잘못된 자세로 뚫은 FREE 셀이 영구히 남는다.
+    initialpose_topic: /initialpose
+    # 비운 뒤 이 시간 동안은 관측을 쌓지 않는다. set_initial_pose_node 가
+    # FinishTrajectory -> StartTrajectory -> ekf_carto set_pose 를 도는 데
+    # 실측 0.51 s 가 걸리고(2026-09-09), 그동안 오는 스캔은 아직 옛
+    # map->odom 으로 투영된다. 그 구간을 버리는 값이다.
+    relocalize_settle_seconds: 1.5
+
+    # ── D455 관측 기반 해제 (설계문서 §6) ────────────────────────────────
+    # 카메라 원점에서 z-band 끝점까지 광선을 쏘아 관통한 셀의 DEPTH 근거를
+    # 내린다. 이게 있어야 use_voxel_3d 와 enable_clearing 을 같이 켤 수 있다 —
+    # LiDAR 평면(0.2178 m) 광선은 이제 LiDAR 근거만 지우므로, 그보다 낮은
+    # 물체를 D455 가 세운 것을 덮어쓰지 않는다.
+    depth_enable_clearing: true
+    # 서로 다른 프레임 N 개가 관통해야 해제한다. depth_hit_threshold 와 같은
+    # 값으로 두면 표시와 해제의 증거 강도가 대칭이 된다.
+    depth_clear_hit_threshold: 2
+    # 밴드 점 N 개마다 하나씩만 광선으로 쓴다. D455 는 640x480 이라 방위당
+    # 광선이 LiDAR 보다 훨씬 촘촘하다 — 4 로도 셀 단위 해제 품질은 유지된다.
+    depth_clear_ray_stride: 4
+    depth_clear_step_ratio: 0.5
+    depth_clear_stop_margin: 1.0
+    # 광선 원점 프레임. URDF base_link -> camera_link xyz 0.11398 0 0.092772.
+    # base_footprint 를 쓰면 x 로 0.114 m(약 2.3 셀) 어긋난다.
+    camera_frame: camera_link
+
+    # 관측·기억·출력 개수를 N 초마다 찍는다. 0 이면 끈다.
+    # 실차에서 "왜 안 지워지지" 를 볼 때 2.0 정도로 켠다.
+    diagnostic_period: 2.0
+    scan_window_seconds: 1.0
+    tf_timeout: 0.20
+    # Cartographer map TF 가 스캔 stamp 보다 늦을 수 있다. 최신 변환을 쓴다.
+    scan_use_latest_tf: true

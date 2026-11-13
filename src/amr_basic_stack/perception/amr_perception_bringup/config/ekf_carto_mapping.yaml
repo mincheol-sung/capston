@@ -1,0 +1,131 @@
+# ekf_carto_mapping.yaml — map 레벨 EKF (매핑 모드)
+#
+# 역할: cartographer 의 /tracked_pose(절대 위치)와 연속 센서를 융합해
+#       map -> odom TF 를 발행한다. cartographer 자체는 publish_to_tf=false 라
+#       TF 를 내지 않는다.
+#
+# TF 계층 (2단 EKF 구성, nav2 규약)
+#   map --(이 필터)--> odom --(ekf.yaml 의 ekf_filter_node)--> base_link
+#
+# world_frame: map + odom_frame: odom 조합이면 robot_localization 은
+# map->odom 을 발행한다(map->base_link 가 아님). base_link 의 부모는 계속
+# 기존 odom EKF 가 소유하므로 TF 트리가 깨지지 않는다.
+#
+# ※ /odom 은 covariance 가 전부 0 으로 발행된다
+#   (roboclaw_mecanum_node 가 채우지 않음). 0 공분산은 "오차 없음" 선언이라
+#   필터가 과신하게 된다. 그래서 여기서는 위치(x,y)는 받지 않고 속도만 받는다.
+#   근본 해결은 roboclaw_mecanum_node 에서 실측 기반 covariance 를 채우는 것.
+
+ekf_carto:
+  ros__parameters:
+    # ★ ekf.yaml(ekf_filter_node) 의 frequency 와 같아야 한다. 다르면 이 노드가
+    #   map->odom = (map->base, 자기 상태) ∘ (odom->base, TF 조회)⁻¹
+    # 를 만들 때 묵은 odom->base 를 빼게 되고, 그 시차가 |v|·Δt 와 |wz|·Δt·r
+    # 만큼의 위치 오차로 map->odom 에 실린다. 2026-09-14 실측으로 측위 모드의
+    # map->odom 떨림(누적/순변위 비 156.2)의 55.3 % 가 이 시차였다.
+    # 자세한 근거는 ekf.yaml 의 frequency 주석에 있다. 한쪽만 바꾸지 말 것.
+    # (매핑 중에는 높은 주기가 필요 없지만, 짝을 맞추는 쪽이 우선이다.
+    #  robot_localization 의 15x15 EKF 는 50 Hz 에서도 부하가 미미하다.)
+    frequency: 50.0             # ekf.yaml 과 동일
+    sensor_timeout: 0.2
+    two_d_mode: true
+    publish_tf: true
+    publish_acceleration: false
+    transform_time_offset: 0.0
+
+    map_frame: map
+    odom_frame: odom
+    # URDF 루트가 base_footprint 이고 roboclaw 의 base_frame_id 도
+    # base_footprint 다. 여기를 base_link 로 두면 base_link 의 부모가
+    # odom 과 base_footprint 둘이 되어 TF 트리가 끊긴다.
+    base_link_frame: base_footprint
+    world_frame: map            # => map -> odom TF 발행
+
+    # ── 입력 1: 휠 오도메트리 (연속성 담당, 속도만) ──
+    # 메카넘이므로 vx·vy 를 모두 받는다. yaw/vyaw 는 롤러 슬립으로 부정확해 제외.
+    odom0: /odom
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  true,  false,
+                   false, false, false,
+                   false, false, false]
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 10
+
+    # ── 입력 2: cartographer pose (절대 위치 담당) ──
+    # pose_to_odom_node 가 /tracked_pose 를 base_link 기준으로 변환하고
+    # covariance 를 채워서 낸다. x, y, yaw 만 사용.
+    odom1: /tracked_pose/odom
+    odom1_config: [true,  true,  false,
+                   false, false, true,
+                   false, false, false,
+                   false, false, false,
+                   false, false, false]
+    odom1_differential: false
+    odom1_relative: false
+    odom1_queue_size: 10
+    # 매핑 중에는 루프클로저가 닫힐 때 pose 가 수 미터씩 정상적으로 점프한다.
+    # 임계값을 크게 잡아 그 보정을 버리지 않는다. (측위 모드에서는 조인다.)
+    odom1_pose_rejection_threshold: 100.0
+
+    # ── 입력: D455 IMU (yaw 각속도만) ──
+    # 원본 /camera/imu 가 아니라 imu_to_base_node 가 body 프레임으로 회전시킨
+    # 토픽을 쓴다. robot_localization 은 _config 배열을 센서 프레임 기준으로
+    # 해석한 뒤 회전시키므로, optical 프레임 원본에 vyaw 를 켜면 로봇의 vroll
+    # 로 옮겨가고 two_d_mode 가 그걸 0 으로 눌러 자이로가 통째로 버려진다.
+    # (증상: 정지 중에도 odom->base_footprint 가 계속 회전)
+    # D455 IMU 는 gyro+accel 만 제공하고 절대 자세가 없다(cov[0] = -1).
+    imu0: /imu/base_link
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 10
+    imu0_remove_gravitational_acceleration: true
+
+    # ── process_noise_covariance (Q) — 2026-09-09 추가 ──────────────────────
+    # 왜 필요한가: map→odom 은 이 필터가 직접 내는 값이 아니라 **두 필터의 차이**다.
+    #     map→odom = (map→base_footprint, 이 필터) ∘ (odom→base_footprint, ekf_filter_node)⁻¹
+    #   그런데 두 필터가 같은 원천을 먹는다 — odom0=/odom 의 vx,vy 와 imu0=/imu/base_link 의 vyaw.
+    #   같은 입력을 서로 다른 Q 로 적분하면 두 추정이 갈라지고, 그 차이가 통째로 map→odom 으로 나온다.
+    #
+    #   2026-09-03 커밋 bd66eac 이 Q 튜닝을 ekf.yaml 한 곳에만 넣었다. ekf_carto_*.yaml 셋은
+    #   기본값(vx,vy 0.025 / vyaw 0.02)으로 남아 아래 차이가 생겼다:
+    #       ekf.yaml     Q[vx,vy]=8.0   → vx 지연  60~70 ms   (ekf.yaml 주석의 실측표)
+    #       ekf_carto    Q[vx,vy]=0.025 → vx 지연 160 ms
+    #     = 두 필터 사이 약 100 ms 의 차등 지연.
+    #
+    #   2026-09-09 실측 (bags/mpc_chain_20260909_151007, check_localization.py):
+    #       정지·수렴 후   map→odom 떨림 0.06 cm / 0.007°,  5 cm 점프 0 회      ← 입력이 0 이라 차이도 0
+    #       주행 379~416s  떨림 46.3 cm, 2.54 m 가는 동안 누적 보정 39.5 m (15.5 m/m), 점프 122 회
+    #       회전 의존성    |wz| 0~0.05 → 1.73 cm,  0.15~0.3 → 2.87,  0.3~ → 5.16 cm
+    #     0.3 m/s × 100 ms = 3 cm 로 저회전 구간 실측 1.7 cm 와 자릿수가 맞는다.
+    #     "정지하면 멀쩡하고 움직이면 무너진다" 가 이 구조에서 나온다.
+    #
+    # 무엇을 맞췄나: **속도 축(vx, vy, vyaw) 셋만** ekf.yaml 과 같게 했다.
+    #   나머지는 robot_localization 기본값 그대로다 (/opt/ros/jazzy/share/robot_localization/params/ekf.yaml).
+    #   ekf.yaml 을 통째로 복사하지 않은 이유: 그쪽은 x,y,yaw 가 0.001 인데, 이 필터에는 ekf.yaml 에 없는
+    #   절대 pose 입력(odom1=/tracked_pose/odom)이 있다. 그 항을 낮추면 cartographer 보정을 받아들이는
+    #   속도까지 바뀌어 버린다 — 지금 고치려는 것과 무관한 변경이라 손대지 않는다.
+    #
+    # 순서: [x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az] 의 15x15
+    process_noise_covariance: [
+      0.050, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.050, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.060, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.030, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.030, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.060, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 8.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,   # <-- ekf.yaml 과 일치
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 8.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,   # <-- ekf.yaml 과 일치
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.040, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010, 0.000, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010, 0.000, 0.000, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.500, 0.000, 0.000, 0.000,   # <-- ekf.yaml 과 일치
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010, 0.000, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.010, 0.000,
+      0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.015]

@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1730" height="600" viewBox="0 0 1730 600" font-family="Noto Sans CJK KR, Noto Sans, sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4A5568"/>
+    </marker>
+    <style>
+      .node   { fill:#FFFFFF; stroke-width:2.5; rx:8; }
+      .nname  { font-family:"DejaVu Sans Mono", monospace; font-size:16px; font-weight:bold; fill:#1A202C; }
+      .nsub   { font-size:11.5px; fill:#4A5568; }
+      .topic  { font-family:"DejaVu Sans Mono", monospace; font-size:13px; fill:#1A202C; }
+      .tsub   { font-size:10.5px; fill:#718096; }
+      .pill   { fill:#FFFFFF; stroke-width:2; rx:18; }
+      .wire   { stroke:#4A5568; stroke-width:2; fill:none; marker-end:url(#ah); }
+      .title  { font-size:21px; font-weight:bold; fill:#1A202C; }
+      .stitle { font-size:12.5px; fill:#718096; }
+      .note   { font-size:11.5px; fill:#718096; }
+      .lgd    { font-size:12px; fill:#4A5568; }
+      .sensor { fill:#F7FAFC; stroke:#A0AEC0; stroke-width:2; rx:8; }
+    </style>
+  </defs>
+
+  <text class="title" x="25" y="32">sensor_fusion — late fusion 파이프라인</text>
+  <text class="stitle" x="25" y="52">카메라·라이다가 각자 독립 검출한 뒤 detection-to-detection association 으로 합친다. 색 = DetectedObject.source (RViz 마커 색과 동일)</text>
+
+  <!-- ============ col1 : 센서 토픽 ============ -->
+  <rect class="sensor" x="25" y="88" width="302" height="112"/>
+  <text class="topic" x="40" y="112" style="font-size:10px">/camera/color/image_raw</text>
+  <text class="topic" x="40" y="136" style="font-size:10px">/camera/aligned_depth_to_color/image_raw</text>
+  <text class="topic" x="40" y="160" style="font-size:10px">/camera/color/camera_info</text>
+  <text class="tsub"  x="40" y="184">RealSense D455 · align_depth=true · 15 Hz</text>
+
+  <rect class="sensor" x="25" y="352" width="290" height="70"/>
+  <text class="topic" x="40" y="380">/scan</text>
+  <text class="tsub"  x="40" y="400">base_scan · 720 bins @ 0.5° · 10 Hz</text>
+  <text class="tsub"  x="40" y="415">RPLIDAR S2 x2 (front+rear 병합)</text>
+
+  <!-- ============ col2 : 검출 노드 ============ -->
+  <rect class="node" x="355" y="96" width="248" height="96" stroke="#338CF2"/>
+  <text class="nname" x="369" y="122">rgbd_detection_node</text>
+  <text class="nsub"  x="369" y="144">YOLO11n (OpenVINO) 2D 검출</text>
+  <text class="nsub"  x="369" y="160">bbox 중앙 ROI 유효 depth 전부 역투영</text>
+  <text class="nsub"  x="369" y="176">→ base_link 변환 후 좌표별 median</text>
+
+  <rect class="node" x="355" y="330" width="248" height="96" stroke="#4DCC59"/>
+  <text class="nname" x="369" y="356">lidar_cluster_node</text>
+  <text class="nsub"  x="369" y="378">Adaptive Breakpoint Detector</text>
+  <text class="nsub"  x="369" y="394" font-family="DejaVu Sans Mono, monospace" font-size="10">D_max = r·sinΔφ/sin(λ−Δφ) + k·σ_r</text>
+  <text class="nsub"  x="369" y="410">→ cluster representative position</text>
+
+  <!-- ============ col3 : 단독 관측 토픽 ============ -->
+  <rect class="pill" x="643" y="118" width="196" height="52" stroke="#338CF2"/>
+  <text class="topic" x="657" y="140">/detections</text>
+  <text class="tsub"  x="657" y="157">source=0 CAMERA · base_link</text>
+
+  <rect class="pill" x="643" y="352" width="196" height="52" stroke="#4DCC59"/>
+  <text class="topic" x="657" y="374">/lidar_clusters</text>
+  <text class="tsub"  x="657" y="391">source=1 LIDAR · base_link</text>
+
+  <!-- ============ col4 : 융합 노드 ============ -->
+  <rect class="node" x="879" y="200" width="272" height="122" stroke="#F29926"/>
+  <text class="nname" x="893" y="226">camera_lidar_fusion_node</text>
+  <text class="nsub"  x="893" y="248">① yaw · 대표점 delta(d) 보정</text>
+  <text class="nsub"  x="893" y="266">② χ² gating (9.21) + Hungarian 배정</text>
+  <text class="nsub"  x="893" y="284">③ 공분산 가중 평균</text>
+  <text class="nsub"  x="893" y="302" font-family="DejaVu Sans Mono, monospace" font-size="10.5">   P = (Rc⁻¹ + Rl⁻¹)⁻¹ ,  R(d) = C2 실측</text>
+
+  <!-- ============ col5 : 융합 출력 ============ -->
+  <rect class="pill" x="1189" y="232" width="200" height="58" stroke="#F29926" stroke-width="2.5"/>
+  <text class="topic" x="1203" y="255">/detections_fused</text>
+  <text class="tsub"  x="1203" y="272">source 0 | 1 | 2 · base_link</text>
+  <text class="tsub"  x="1203" y="285">position_covariance 채움</text>
+
+  <!-- ============ col6 : 소비자 ============ -->
+  <rect class="node" x="1429" y="128" width="250" height="76" stroke="#4A5568"/>
+  <text class="nname" x="1443" y="154">object_tracker_node</text>
+  <text class="nsub"  x="1443" y="175">IMM(CV/CT) + NIS 게이팅</text>
+  <text class="nsub"  x="1443" y="192">→ /tracks (odom)</text>
+
+  <rect class="node" x="1429" y="330" width="250" height="76" stroke="#4A5568" stroke-dasharray="6 4"/>
+  <text class="nname" x="1443" y="356">detection_markers</text>
+  <text class="nsub"  x="1443" y="377">→ /detection_markers (RViz)</text>
+  <text class="nsub"  x="1443" y="394">source 별 색 구분 · 시각화 전용</text>
+
+  <!-- ============ 배선 ============ -->
+  <path class="wire" d="M 315 144 H 349"/>
+  <path class="wire" d="M 315 387 H 349"/>
+  <path class="wire" d="M 603 144 H 637"/>
+  <path class="wire" d="M 603 378 H 637"/>
+
+  <!-- /detections -> fusion -->
+  <path class="wire" d="M 839 144 H 858 V 240 H 873"/>
+  <!-- /lidar_clusters -> fusion -->
+  <path class="wire" d="M 839 378 H 858 V 282 H 873"/>
+
+  <!-- fusion -> fused -->
+  <path class="wire" d="M 1151 261 H 1183"/>
+
+  <!-- fused -> tracker / markers -->
+  <path class="wire" d="M 1389 261 H 1409 V 166 H 1423"/>
+  <path class="wire" d="M 1389 261 H 1409 V 368 H 1423"/>
+
+  <!-- ============ 범례 ============ -->
+  <rect x="25" y="470" width="14" height="14" rx="3" fill="#338CF2"/>
+  <text class="lgd" x="47" y="482">source=0 CAMERA — 라이다 스캔면(z=0.178 m) 위 물체·가림</text>
+  <rect x="470" y="470" width="14" height="14" rx="3" fill="#4DCC59"/>
+  <text class="lgd" x="492" y="482">source=1 LIDAR — 카메라 미검출 거리·미학습 클래스 (class 빈칸)</text>
+  <rect x="960" y="470" width="14" height="14" rx="3" fill="#F29926"/>
+  <text class="lgd" x="982" y="482">source=2 FUSED — 게이트를 통과해 짝지어진 관측</text>
+
+  <line x1="25" y1="504" x2="1705" y2="504" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text class="note" x="25" y="527">early fusion(라이다 점을 이미지에 투영)을 쓰지 않는 이유: RPLIDAR S2 는 2D 라 스캔 평면 한 줄만 이미지에 떨어진다. URDF+TF 로 두 관측이 이미 같은 frame 에 있으므로 late fusion 이 맞다.</text>
+  <text class="note" x="25" y="548">R(d) 는 극좌표에서 만들어 회전시킨 이방성 공분산 — J(θ)·diag(σ_r², σ_t²)·J(θ)ᵀ. 그 결과 4 m 에서 카메라 가중치가 반경 0.14 %, 방위 70.7 % 로 갈린다(“거리는 라이다, 방위는 카메라”가 식에서 나온다).</text>
+  <text class="note" x="25" y="569">/detections 를 순수 카메라 관측으로 남겨 두는 이유: measure_c.py 가 두 센서를 독립 관측으로 보고 σ 를 재는데, 융합 출력을 다시 재면 자기참조가 된다.</text>
+</svg>

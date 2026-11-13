@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-23",
+  "python": "3.12.3",
+  "numpy": "1.26.4",
+  "scipy": "1.11.4",
+  "sha256": {
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/check_mc_budget.py": "197f63a19010926def6f43868a71e617ac2347a0a91eeacdadba392adb543654",
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/validate_current_mc.py": "5ab26e8b6bfbaa5eb34403a85dd5a4f6b8a20146b9af964a89b2f83407d7e0f1",
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/validate_ros_pilot.py": "604c93218741894cbe26cd6846a4bd7130479b19df7fa30ce08a50683d122e42",
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dynamic_risk.py": "741dc9fa3b4b055b999e9828402b9f6e8b09c7389230c39ba2e14be1e170f664",
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/config/dra_mppi.yaml": "a4645684ee91ffa7d6f2dbfd32b8d17e4d085ef9ab9e1c7c502dcb3cdb2d590a",
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/global_planner/tools/check_theta_timing.py": "adde6e4911e65f42f50b0c52222a83807cbdd16fa6104b594289e0d6f912d1f2",
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/global_planner/global_planner/rviz_theta_star_node.py": "8d42069ff50d20a866c38180dc6181605564d51d107f143f30852715fdb4508a",
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/global_planner/global_planner/theta_star/theta_star.py": "c851c01f5522f4c841b36f88186762a24469317f7d3d245065804425d9028b02",
+    "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/global_planner/config/theta_star.yaml": "c5edb93f36317f5706c0de2ff2b282f48427d37f5ca2deb16ee5549f233588b6"
+  }
+}

@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+<!-- amr_basic (alpha) chassis.
+     base_link origin: robot centerline (y), mid front/rear axle (x), axle height (z).
+     The visual STL is exported in CAD assembly coordinates (mm); the mesh origin
+     offset below translates the assembly origin onto base_link:
+       assembly origin = (11.19, 218.80, 157.63) mm, derived from the front wheel
+       centers and the URDF joint positions. -->
+<xacro:property name="amr_wheel_radius" value="0.04" />
+<xacro:property name="amr_base_size_x" value="0.28584" />
+<xacro:property name="amr_base_size_y" value="0.18841" />
+<xacro:property name="amr_base_size_z" value="0.16701" />
+<!-- Chassis bounding-box center relative to base_link (from STL measurement) -->
+<xacro:property name="amr_base_center_x" value="0.00744" />
+<xacro:property name="amr_base_center_y" value="0.0" />
+<xacro:property name="amr_base_center_z" value="0.06539" />
+<xacro:property name="amr_base_mass" value="8.0" />
+
+<xacro:macro name="amr_basic_base" params="prefix">
+  <link name="${prefix}base_footprint"/>
+  <link name="${prefix}base_link">
+    <visual>
+        <geometry>
+            <mesh filename="package://amr_description/meshes/amr_basic/visual/base_link.stl"
+                  scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="body_gray">
+          <color rgba="0.35 0.38 0.40 1.0"/>
+        </material>
+        <origin xyz="-0.01119 -0.21880 -0.15763" rpy="0 0 0"/>
+    </visual>
+    <collision>
+        <geometry>
+            <box size="${amr_base_size_x} ${amr_base_size_y} ${amr_base_size_z}"/>
+        </geometry>
+        <origin xyz="${amr_base_center_x} ${amr_base_center_y} ${amr_base_center_z}" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+        <origin xyz="${amr_base_center_x} ${amr_base_center_y} ${amr_base_center_z}" rpy="0 0 0"/>
+        <mass value="${amr_base_mass}"/>
+        <inertia
+            ixx="${(1/12) * amr_base_mass * ((amr_base_size_y * amr_base_size_y) + (amr_base_size_z * amr_base_size_z))}" ixy="0.0" ixz="0.0"
+            iyy="${(1/12) * amr_base_mass * ((amr_base_size_x * amr_base_size_x) + (amr_base_size_z * amr_base_size_z))}" iyz="0.0"
+            izz="${(1/12) * amr_base_mass * ((amr_base_size_x * amr_base_size_x) + (amr_base_size_y * amr_base_size_y))}"/>
+    </inertial>
+  </link>
+  <gazebo reference="${prefix}base_link">
+    <visual>
+        <material>
+            <ambient>0.35 0.38 0.40 1</ambient>
+            <diffuse>0.35 0.38 0.40 1</diffuse>
+            <specular>0.35 0.38 0.40 1</specular>
+        </material>
+    </visual>
+  </gazebo>
+  <joint name="${prefix}base_joint" type="fixed">
+    <parent link="${prefix}base_footprint"/>
+    <child link="${prefix}base_link"/>
+    <origin xyz="0 0 ${amr_wheel_radius}" rpy="0 0 0"/>
+  </joint>
+</xacro:macro>
+</robot>

@@ -1,0 +1,72 @@
+{
+  "purpose": "Compare simple ranking proxies against existing common+static seed cost; separately test cost-weighted counts.",
+  "scene_count": 127,
+  "noise_seeds": [
+    7,
+    23
+  ],
+  "methods": [
+    "common",
+    "endpoint",
+    "free_area",
+    "novelty",
+    "common_weighted"
+  ],
+  "eligibility": {
+    "version": "disparity_midpoint_value_v1",
+    "status": "Initial development policy, evaluated on 10 snapshots; no production integration or MPPI validation",
+    "seed_per_gap": 1,
+    "midpoint": "ids[len(ids)//2] on circular ordered bins",
+    "full_circle": "No unique midpoint; use bearing to path point approximately 1m along remaining path",
+    "minimum_forward_displacement_m": 0.25,
+    "maximum_target_error_m": 0.35,
+    "nominal_duplicate_rms_lt_m": 0.22,
+    "nominal_duplicate_tail_lt_m": 0.3,
+    "disable_nominal_dedup_if_nominal_static_collision": true,
+    "selected_duplicate_rms_lt_m": 0.25,
+    "maximum_extra_guides": 3,
+    "cost": "Frozen existing common_costs + static soft cost",
+    "require_improvement_over_nominal": false,
+    "additional_dynamic_mc": false,
+    "dynamic_safety": "Original MPPI rollout and common final MC; not run in this experiment",
+    "rollout_budget": {
+      "total": 500,
+      "per_guide": 100,
+      "nominal": "500-100*g"
+    }
+  },
+  "partition": {
+    "adjacent_jump_m": 0.4,
+    "relative_jump": 0.12,
+    "side_window_beams": 3,
+    "side_median_jump_m": 0.4,
+    "side_spread_fraction": 0.35,
+    "minimum_cut_separation_deg": 20.0,
+    "minimum_region_bins": 6,
+    "geometry_window_bins": 5,
+    "geometry_jump_m": 0.25,
+    "maximum_projection_bins": 8,
+    "minimum_depth_m": 0.5,
+    "angle_step_deg": 1.0,
+    "max_depth_m": 2.0,
+    "body_radius_m": 0.2,
+    "extra_margin_m": 0.05,
+    "retry_extra_margin_m": 0.0,
+    "grid_resolution_m": 0.04,
+    "grid_padding_m": 0.05656854249492381,
+    "sweep_padding_m": 0.01
+  },
+  "scores": {
+    "common": "existing common_costs + static soft cost",
+    "endpoint": "squared terminal distance to global-path point about 1m ahead",
+    "free_area": "negative integral .5*d_free(theta)^2 dtheta over gap",
+    "novelty": "negative same-time positional RMS to nominal",
+    "common_weighted": "same common ranking; 50 min each plus softmax weighted remainder"
+  },
+  "fixed": "one midpoint seed/gap (full circle path-bearing exception), same feasibility/nominal/guide duplicate gates, max3, total500, 2 workers, existing MC/final recheck",
+  "allocation": "first four methods: nominal500-100g, guides100 each; fifth: nominal unchanged, guides50+weighted(50g)",
+  "cache": "identical seed IDs/counts/noise seed reuse one exact solver result; reused rows are not independent runtime measurements",
+  "runtime": "offline 10s timeout, warm scoring timer and solver compute only; no ROS full-stack timing",
+  "limitations": "same three bags; prior ten development scenes flagged; not independent closed-loop validation",
+  "source_sha256": "47546abcce9f5208b9e512cf1ba24becf3b841478505ef2100c58356a22531c0"
+}

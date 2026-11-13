@@ -1,0 +1,6 @@
+{
+  "motivation": "Inspecting the post-hoc collision gate alone cannot tell whether an unsafe centre can produce useful safe MPPI samples.",
+  "method": "common_extra_raw: append the common-only numerical optimum as an additional sampling centre in all10 scenes, irrespective of centre collision/nominal duplication. Keep up to2 best existing gap guides; total extra guides<=3, nominal gets500-100*extra_count. All original rollout and final safety checks remain enabled.",
+  "scope": "Same prespecified10 scenes and precomputed optimizers. No retuning. Two noise seeds7/23. Exploratory same-data comparison.",
+  "source_sha256": "e76f63618a3584e77e5f9326731e719e63dff760159fda7041c8451ad84b3246"
+}

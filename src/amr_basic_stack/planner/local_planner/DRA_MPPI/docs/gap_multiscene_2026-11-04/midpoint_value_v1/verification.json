@@ -1,0 +1,23 @@
+{
+  "status": "pass",
+  "synthetic_policy_checks": 7,
+  "real_scenes": 10,
+  "real_seeds": 27,
+  "checks": [
+    "recorded grid/depth match during extraction",
+    "finite cost components sum",
+    "control box",
+    "wheel L1",
+    "inter-step acceleration (steps 2..10)",
+    "selected motion/target/static predicates",
+    "pairwise selected RMS",
+    "500 planned rollouts",
+    "script hash"
+  ],
+  "not_tested": [
+    "closed-loop navigation",
+    "dynamic MC or MPPI improvement",
+    "full-stack 5Hz",
+    "temporal stability"
+  ]
+}

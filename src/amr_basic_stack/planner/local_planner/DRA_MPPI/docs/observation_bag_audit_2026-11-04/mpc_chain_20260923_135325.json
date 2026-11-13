@@ -1,0 +1,943 @@
+{
+  "bag": "/home/smoc/2026amr_ws/bags/mpc_chain_20260923_135325",
+  "duration_s": 128.132110287,
+  "selected_message_counts": {
+    "/lidar_clusters": 1279,
+    "/tf_static": 1,
+    "/global_path": 27,
+    "/odometry/filtered": 6385,
+    "/camera/color/camera_info": 1916,
+    "/detections_tracking": 1278,
+    "/detections_fused": 1278,
+    "/detections": 1903,
+    "/tracked_object_modes": 1262
+  },
+  "frame_counts": {
+    "/lidar_clusters": {
+      "base_link": 1279
+    },
+    "/global_path": {
+      "map": 27
+    },
+    "/odometry/filtered": {
+      "odom": 6385
+    },
+    "/camera/color/camera_info": {
+      "camera_color_optical_frame": 1916
+    },
+    "/detections_tracking": {
+      "base_link": 1278
+    },
+    "/detections_fused": {
+      "base_link": 1278
+    },
+    "/detections": {
+      "base_link": 1903
+    },
+    "/tracked_object_modes": {
+      "odom": 1262
+    }
+  },
+  "detections": {
+    "/detections": {
+      "objects": 2236,
+      "sources": {
+        "0": 2236
+      },
+      "classes": {
+        "person": 910,
+        "tv": 414,
+        "laptop": 17,
+        "suitcase": 41,
+        "backpack": 37,
+        "bench": 22,
+        "chair": 221,
+        "umbrella": 2,
+        "airplane": 426,
+        "oven": 11,
+        "refrigerator": 124,
+        "skateboard": 2,
+        "microwave": 2,
+        "mouse": 1,
+        "bottle": 1,
+        "sports ball": 2,
+        "traffic light": 3
+      },
+      "nonempty_messages": 1120,
+      "unique_header_stamps": 1903
+    },
+    "/lidar_clusters": {
+      "objects": 36830,
+      "sources": {
+        "1": 36830
+      },
+      "classes": {
+        "lidar_cluster": 36830
+      },
+      "nonempty_messages": 1279,
+      "unique_header_stamps": 1279
+    },
+    "/detections_fused": {
+      "objects": 1516,
+      "sources": {
+        "0": 1401,
+        "2": 115
+      },
+      "classes": {
+        "person": 609,
+        "tv": 281,
+        "laptop": 11,
+        "suitcase": 28,
+        "bench": 17,
+        "chair": 154,
+        "backpack": 24,
+        "umbrella": 1,
+        "airplane": 289,
+        "oven": 8,
+        "refrigerator": 84,
+        "skateboard": 2,
+        "microwave": 2,
+        "mouse": 1,
+        "bottle": 1,
+        "sports ball": 2,
+        "traffic light": 2
+      },
+      "nonempty_messages": 758,
+      "unique_header_stamps": 1278
+    },
+    "/detections_tracking": {
+      "objects": 38201,
+      "sources": {
+        "0": 1401,
+        "1": 36685,
+        "2": 115
+      },
+      "classes": {
+        "person": 609,
+        "tv": 281,
+        "lidar_cluster": 36685,
+        "laptop": 11,
+        "suitcase": 28,
+        "bench": 17,
+        "chair": 154,
+        "backpack": 24,
+        "umbrella": 1,
+        "airplane": 289,
+        "oven": 8,
+        "refrigerator": 84,
+        "skateboard": 2,
+        "microwave": 2,
+        "mouse": 1,
+        "bottle": 1,
+        "sports ball": 2,
+        "traffic light": 2
+      },
+      "nonempty_messages": 1278,
+      "unique_header_stamps": 1278
+    }
+  },
+  "image_topics": [],
+  "observation_target_topics": [],
+  "embedded_detection_schema_has_provenance": false,
+  "tracks": {
+    "counts": {
+      "object_samples": 56819,
+      "never_semantic_samples": 51069,
+      "last_source_lidar_samples": 54605,
+      "preliminary_lidar_information_need_samples": 28566
+    },
+    "sources": {
+      "1": 54605,
+      "0": 2094,
+      "2": 120
+    },
+    "classes": {
+      "": 51162,
+      "person": 685,
+      "tv": 756,
+      "laptop": 81,
+      "suitcase": 216,
+      "bench": 61,
+      "chair": 308,
+      "backpack": 479,
+      "umbrella": 25,
+      "airplane": 2494,
+      "oven": 104,
+      "refrigerator": 409,
+      "mouse": 39
+    },
+    "lifecycle": {
+      "1": 30263,
+      "2": 26556
+    },
+    "unique_ids": 1102,
+    "never_semantic_ids": 1056,
+    "last_source_lidar_ids": 1072,
+    "preliminary_lidar_information_need_ids": 1069,
+    "preliminary_lidar_information_need_frames": 1262,
+    "never_semantic_to_semantic_events": [
+      {
+        "track_id": 1149,
+        "time_s": 2.5021376609802246,
+        "first_unclassified_s": 1.3679769039154053,
+        "elapsed_s": 1.1341607570648193,
+        "class_name": "laptop",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1027,
+        "time_s": 5.170753002166748,
+        "first_unclassified_s": 0.09902548789978027,
+        "elapsed_s": 5.071727514266968,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1343,
+        "time_s": 6.171404123306274,
+        "first_unclassified_s": 5.5043041706085205,
+        "elapsed_s": 0.6670999526977539,
+        "class_name": "bench",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 978,
+        "time_s": 6.2381134033203125,
+        "first_unclassified_s": 0.09902548789978027,
+        "elapsed_s": 6.139087915420532,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 818,
+        "time_s": 6.571665048599243,
+        "first_unclassified_s": 0.09902548789978027,
+        "elapsed_s": 6.472639560699463,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1442,
+        "time_s": 6.971924066543579,
+        "first_unclassified_s": 6.171404123306274,
+        "elapsed_s": 0.8005199432373047,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 946,
+        "time_s": 7.038633584976196,
+        "first_unclassified_s": 0.09902548789978027,
+        "elapsed_s": 6.939608097076416,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1409,
+        "time_s": 8.039287328720093,
+        "first_unclassified_s": 5.9712746143341064,
+        "elapsed_s": 2.0680127143859863,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1564,
+        "time_s": 10.174214124679565,
+        "first_unclassified_s": 8.039287328720093,
+        "elapsed_s": 2.1349267959594727,
+        "class_name": "suitcase",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1645,
+        "time_s": 10.774637222290039,
+        "first_unclassified_s": 9.773925542831421,
+        "elapsed_s": 1.0007116794586182,
+        "class_name": "suitcase",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1772,
+        "time_s": 13.176369190216064,
+        "first_unclassified_s": 12.242309331893921,
+        "elapsed_s": 0.9340598583221436,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1859,
+        "time_s": 13.776796340942383,
+        "first_unclassified_s": 13.042929887771606,
+        "elapsed_s": 0.7338664531707764,
+        "class_name": "umbrella",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1935,
+        "time_s": 15.377912759780884,
+        "first_unclassified_s": 14.37721586227417,
+        "elapsed_s": 1.0006968975067139,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1457,
+        "time_s": 16.44531774520874,
+        "first_unclassified_s": 6.2381134033203125,
+        "elapsed_s": 10.207204341888428,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1664,
+        "time_s": 18.446727752685547,
+        "first_unclassified_s": 10.174214124679565,
+        "elapsed_s": 8.272513628005981,
+        "class_name": "oven",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1754,
+        "time_s": 18.980509996414185,
+        "first_unclassified_s": 12.042173862457275,
+        "elapsed_s": 6.938336133956909,
+        "class_name": "oven",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2170,
+        "time_s": 55.74031853675842,
+        "first_unclassified_s": 22.717838525772095,
+        "elapsed_s": 33.02248001098633,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2661,
+        "time_s": 55.74031853675842,
+        "first_unclassified_s": 53.80554938316345,
+        "elapsed_s": 1.9347691535949707,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1622,
+        "time_s": 55.94045424461365,
+        "first_unclassified_s": 9.640495300292969,
+        "elapsed_s": 46.29995894432068,
+        "class_name": "chair",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2284,
+        "time_s": 55.94045424461365,
+        "first_unclassified_s": 24.519010305404663,
+        "elapsed_s": 31.421443939208984,
+        "class_name": "backpack",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2924,
+        "time_s": 56.74114179611206,
+        "first_unclassified_s": 56.0071656703949,
+        "elapsed_s": 0.7339761257171631,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2944,
+        "time_s": 56.9413480758667,
+        "first_unclassified_s": 56.20730018615723,
+        "elapsed_s": 0.7340478897094727,
+        "class_name": "chair",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2989,
+        "time_s": 57.208292722702026,
+        "first_unclassified_s": 56.74114179611206,
+        "elapsed_s": 0.4671509265899658,
+        "class_name": "backpack",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2647,
+        "time_s": 57.608638286590576,
+        "first_unclassified_s": 53.00505471229553,
+        "elapsed_s": 4.603583574295044,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2922,
+        "time_s": 57.675360441207886,
+        "first_unclassified_s": 56.0071656703949,
+        "elapsed_s": 1.6681947708129883,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3223,
+        "time_s": 67.28384971618652,
+        "first_unclassified_s": 65.94994187355042,
+        "elapsed_s": 1.3339078426361084,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3693,
+        "time_s": 76.9575777053833,
+        "first_unclassified_s": 76.1570975780487,
+        "elapsed_s": 0.8004801273345947,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3814,
+        "time_s": 84.2990140914917,
+        "first_unclassified_s": 77.95805978775024,
+        "elapsed_s": 6.340954303741455,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4021,
+        "time_s": 85.76577544212341,
+        "first_unclassified_s": 83.76420259475708,
+        "elapsed_s": 2.001572847366333,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4065,
+        "time_s": 86.89904046058655,
+        "first_unclassified_s": 84.96582245826721,
+        "elapsed_s": 1.933218002319336,
+        "class_name": "airplane",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4076,
+        "time_s": 87.69898986816406,
+        "first_unclassified_s": 86.16574192047119,
+        "elapsed_s": 1.533247947692871,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4244,
+        "time_s": 91.23574185371399,
+        "first_unclassified_s": 90.76848649978638,
+        "elapsed_s": 0.4672553539276123,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3823,
+        "time_s": 91.56933331489563,
+        "first_unclassified_s": 78.15812706947327,
+        "elapsed_s": 13.411206245422363,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4226,
+        "time_s": 92.36964559555054,
+        "first_unclassified_s": 90.56825232505798,
+        "elapsed_s": 1.8013932704925537,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4248,
+        "time_s": 92.96985912322998,
+        "first_unclassified_s": 90.76848649978638,
+        "elapsed_s": 2.2013726234436035,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4251,
+        "time_s": 96.57070207595825,
+        "first_unclassified_s": 90.83523368835449,
+        "elapsed_s": 5.73546838760376,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4358,
+        "time_s": 97.03740859031677,
+        "first_unclassified_s": 95.83721208572388,
+        "elapsed_s": 1.2001965045928955,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4372,
+        "time_s": 102.04061365127563,
+        "first_unclassified_s": 95.97058057785034,
+        "elapsed_s": 6.070033073425293,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4558,
+        "time_s": 104.44180631637573,
+        "first_unclassified_s": 101.44037389755249,
+        "elapsed_s": 3.001432418823242,
+        "class_name": "airplane",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4539,
+        "time_s": 104.57551097869873,
+        "first_unclassified_s": 100.43998146057129,
+        "elapsed_s": 4.135529518127441,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4714,
+        "time_s": 106.24633264541626,
+        "first_unclassified_s": 105.24412631988525,
+        "elapsed_s": 1.0022063255310059,
+        "class_name": "airplane",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4652,
+        "time_s": 107.8476333618164,
+        "first_unclassified_s": 104.04146909713745,
+        "elapsed_s": 3.806164264678955,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4375,
+        "time_s": 108.04774403572083,
+        "first_unclassified_s": 95.97058057785034,
+        "elapsed_s": 12.077163457870483,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4619,
+        "time_s": 112.31672430038452,
+        "first_unclassified_s": 103.77466869354248,
+        "elapsed_s": 8.542055606842041,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4967,
+        "time_s": 115.3177342414856,
+        "first_unclassified_s": 113.2504186630249,
+        "elapsed_s": 2.0673155784606934,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4963,
+        "time_s": 116.11799359321594,
+        "first_unclassified_s": 113.0503466129303,
+        "elapsed_s": 3.0676469802856445,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5194,
+        "time_s": 121.7217047214508,
+        "first_unclassified_s": 120.92055940628052,
+        "elapsed_s": 0.8011453151702881,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5248,
+        "time_s": 124.05680465698242,
+        "first_unclassified_s": 121.65498566627502,
+        "elapsed_s": 2.4018189907073975,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      }
+    ],
+    "stale_to_fresh_tracker_events": [
+      {
+        "track_id": 1027,
+        "time_s": 7.1720521450042725,
+        "previous_age": 1.400909185409546,
+        "class_name": "tv",
+        "last_source": 0
+      },
+      {
+        "track_id": 1550,
+        "time_s": 9.240205526351929,
+        "previous_age": 1.5344595909118652,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 1333,
+        "time_s": 10.774637222290039,
+        "previous_age": 4.002834796905518,
+        "class_name": "tv",
+        "last_source": 0
+      },
+      {
+        "track_id": 1027,
+        "time_s": 12.242309331893921,
+        "previous_age": 4.60328221321106,
+        "class_name": "suitcase",
+        "last_source": 2
+      },
+      {
+        "track_id": 1409,
+        "time_s": 13.843509435653687,
+        "previous_age": 3.1355865001678467,
+        "class_name": "tv",
+        "last_source": 0
+      },
+      {
+        "track_id": 1564,
+        "time_s": 14.043649673461914,
+        "previous_age": 3.402439832687378,
+        "class_name": "suitcase",
+        "last_source": 0
+      },
+      {
+        "track_id": 1027,
+        "time_s": 14.443928956985474,
+        "previous_age": 2.134906530380249,
+        "class_name": "tv",
+        "last_source": 0
+      },
+      {
+        "track_id": 1645,
+        "time_s": 14.77749514579773,
+        "previous_age": 1.4009804725646973,
+        "class_name": "suitcase",
+        "last_source": 0
+      },
+      {
+        "track_id": 1564,
+        "time_s": 18.446727752685547,
+        "previous_age": 4.002789258956909,
+        "class_name": "backpack",
+        "last_source": 0
+      },
+      {
+        "track_id": 1645,
+        "time_s": 18.980509996414185,
+        "previous_age": 1.4677658081054688,
+        "class_name": "backpack",
+        "last_source": 0
+      },
+      {
+        "track_id": 1564,
+        "time_s": 20.649024486541748,
+        "previous_age": 1.9353902339935303,
+        "class_name": "backpack",
+        "last_source": 2
+      },
+      {
+        "track_id": 1664,
+        "time_s": 26.653563499450684,
+        "previous_age": 8.073424816131592,
+        "class_name": "oven",
+        "last_source": 2
+      },
+      {
+        "track_id": 1664,
+        "time_s": 41.73131442070007,
+        "previous_age": 1.467900037765503,
+        "class_name": "refrigerator",
+        "last_source": 2
+      },
+      {
+        "track_id": 1664,
+        "time_s": 45.600627183914185,
+        "previous_age": 1.5345008373260498,
+        "class_name": "refrigerator",
+        "last_source": 2
+      },
+      {
+        "track_id": 1664,
+        "time_s": 50.3369722366333,
+        "previous_age": 2.2011914253234863,
+        "class_name": "refrigerator",
+        "last_source": 2
+      },
+      {
+        "track_id": 1664,
+        "time_s": 53.605414628982544,
+        "previous_age": 1.133974313735962,
+        "class_name": "refrigerator",
+        "last_source": 2
+      },
+      {
+        "track_id": 2985,
+        "time_s": 58.60942339897156,
+        "previous_age": 1.6681241989135742,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 3382,
+        "time_s": 78.69222569465637,
+        "previous_age": 3.602989435195923,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4076,
+        "time_s": 90.56825232505798,
+        "previous_age": 2.4691262245178223,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4248,
+        "time_s": 94.17005276679993,
+        "previous_age": 1.0668549537658691,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4226,
+        "time_s": 95.97058057785034,
+        "previous_age": 1.0670063495635986,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4248,
+        "time_s": 96.83739471435547,
+        "previous_age": 1.8004474639892578,
+        "class_name": "airplane",
+        "last_source": 2
+      },
+      {
+        "track_id": 4248,
+        "time_s": 100.23972463607788,
+        "previous_age": 3.2022013664245605,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4226,
+        "time_s": 101.57376265525818,
+        "previous_age": 3.4025728702545166,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4248,
+        "time_s": 102.37406873703003,
+        "previous_age": 1.8674015998840332,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4226,
+        "time_s": 104.1748673915863,
+        "previous_age": 1.8674719333648682,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4503,
+        "time_s": 104.97666096687317,
+        "previous_age": 3.4025630950927734,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4503,
+        "time_s": 108.84830141067505,
+        "previous_age": 3.136606216430664,
+        "class_name": "airplane",
+        "last_source": 2
+      },
+      {
+        "track_id": 4714,
+        "time_s": 110.04913783073425,
+        "previous_age": 3.535752773284912,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4714,
+        "time_s": 115.11767888069153,
+        "previous_age": 1.3337459564208984,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4725,
+        "time_s": 115.51780080795288,
+        "previous_age": 8.20383620262146,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4619,
+        "time_s": 115.9179334640503,
+        "previous_age": 1.3337593078613281,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4963,
+        "time_s": 117.3187792301178,
+        "previous_age": 1.1340689659118652,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4619,
+        "time_s": 118.91923451423645,
+        "previous_age": 2.8012442588806152,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4963,
+        "time_s": 122.0553035736084,
+        "previous_age": 3.6694700717926025,
+        "class_name": "airplane",
+        "last_source": 2
+      },
+      {
+        "track_id": 5194,
+        "time_s": 123.52313089370728,
+        "previous_age": 1.734715461730957,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4963,
+        "time_s": 124.85740208625793,
+        "previous_age": 1.2675366401672363,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 5194,
+        "time_s": 125.05757212638855,
+        "previous_age": 1.0674481391906738,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 4963,
+        "time_s": 126.12511610984802,
+        "previous_age": 1.1342692375183105,
+        "class_name": "airplane",
+        "last_source": 0
+      },
+      {
+        "track_id": 5248,
+        "time_s": 126.52542686462402,
+        "previous_age": 1.6680457592010498,
+        "class_name": "airplane",
+        "last_source": 0
+      }
+    ]
+  },
+  "camera": {
+    "width": 640,
+    "height": 480,
+    "fx": 386.63519287109375,
+    "cx": 319.15692138671875,
+    "frame": "camera_color_optical_frame",
+    "horizontal_fov_deg": 79.22579933793044,
+    "note": "Pinhole estimate from recorded CameraInfo, not effective detection FOV"
+  },
+  "camera_static_transforms": [
+    {
+      "parent": "camera_link",
+      "child": "camera_color_frame",
+      "xyz": [
+        0.0,
+        -0.059,
+        0.0
+      ],
+      "xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "parent": "base_link",
+      "child": "camera_link",
+      "xyz": [
+        0.11398,
+        0.0475,
+        0.092772
+      ],
+      "xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "limitations": [
+    "Track IDs are recorded associations, not ground-truth identity.",
+    "semantic_age reset is not proof of a distinct camera exposure; legacy fusion can reuse detections.",
+    "Preliminary information-need gate excludes path relevance, turn feasibility, and occlusion.",
+    "No counterfactual heading or new camera views can be tested from fixed recorded observations.",
+    "No track-ID epoch reset inferred; events only compare adjacent samples within 0.5 s."
+  ]
+}

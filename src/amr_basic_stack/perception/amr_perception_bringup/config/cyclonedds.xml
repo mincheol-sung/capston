@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  CycloneDDS 튜닝 — 큰 이미지 메시지(RGB 1280x720 ≈ 2.7MB) 전달용.
+
+  2026-07-27: sensor_fusion에 /detections가 안 나오던 근본원인이 이것이었음.
+  camera_info(수백 B) 같은 작은 메시지는 전달되는데 image_raw(큰 메시지)만 드롭됨
+  -> CycloneDDS 기본 소켓 수신버퍼가 작아 조각난 큰 메시지가 유실.
+  SocketReceiveBufferSize를 키워 해결. 단, 리눅스 커널 net.core.rmem_max 가
+  이 요청값의 상한이므로 scripts/setup_nuc_system.sh 로 rmem_max 도 함께 올려야 함.
+
+  적용: 모든 ROS 프로세스에서 아래 환경변수 필요(발행자·구독자·CLI 도구 전부).
+    export CYCLONEDDS_URI=file://<이 파일 경로>
+  full_system.launch.py 는 이 값을 자동 설정한다(설치된 share 경로 사용).
+-->
+<CycloneDDS xmlns="https://cdds.io/config"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://cdds.io/config
+    https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <Domain Id="any">
+    <!-- Keep this in sync with stack_master/config/cyclonedds.xml. -->
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+    </Discovery>
+    <Internal>
+      <SocketReceiveBufferSize min="10MB"/>
+    </Internal>
+  </Domain>
+</CycloneDDS>

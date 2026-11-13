@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro"
+       xmlns:gz="http://gazebosim.org/schema"
+       name="amr_basic">
+
+    <xacro:property name="M_PI" value="3.1415926535897931" />
+
+    <xacro:arg name="robot_name" default="amr_basic"/>
+    <xacro:arg name="prefix" default=""/>
+    <xacro:arg name="use_gazebo" default="false"/>
+
+    <xacro:include filename="../mech/amr_basic_base.urdf.xacro"/>
+    <xacro:include filename="../mech/amr_basic_wheel.urdf.xacro"/>
+    <xacro:include filename="../sensors/rgbd_camera.urdf.xacro"/>
+    <xacro:include filename="../sensors/lidar.urdf.xacro"/>
+
+    <xacro:amr_basic_base prefix="$(arg prefix)"/>
+
+    <!-- Wheel visuals: only two physical wheel meshes exist (left/right mirror
+         pair, CAD assembly coordinates in mm). visual_xyz recenters each mesh
+         onto its wheel link origin. Mecanum chirality is invariant under a
+         180-deg yaw rotation, so the rear wheels reuse the OPPOSITE front mesh
+         rotated by pi (X-config: FL=RR type, FR=RL type). -->
+    <xacro:amr_basic_wheel
+      prefix="$(arg prefix)"
+      side="front_left"
+      x_reflect="1"
+      y_reflect="1"
+      roller_dir="1"
+      mesh_file="front_left_wheel.stl"
+      visual_xyz="-0.10611 -0.31871 -0.15711"
+      visual_rpy="0 0 0"/>
+
+    <xacro:amr_basic_wheel
+      prefix="$(arg prefix)"
+      side="front_right"
+      x_reflect="1"
+      y_reflect="-1"
+      roller_dir="-1"
+      mesh_file="front_right_wheel.stl"
+      visual_xyz="-0.10609 -0.11889 -0.15815"
+      visual_rpy="0 0 0"/>
+
+    <xacro:amr_basic_wheel
+      prefix="$(arg prefix)"
+      side="rear_left"
+      x_reflect="-1"
+      y_reflect="1"
+      roller_dir="-1"
+      mesh_file="front_right_wheel.stl"
+      visual_xyz="0.10609 0.11889 -0.15815"
+      visual_rpy="0 0 ${M_PI}"/>
+
+    <xacro:amr_basic_wheel
+      prefix="$(arg prefix)"
+      side="rear_right"
+      x_reflect="-1"
+      y_reflect="-1"
+      roller_dir="1"
+      mesh_file="front_left_wheel.stl"
+      visual_xyz="0.10611 0.31871 -0.15711"
+      visual_rpy="0 0 ${M_PI}"/>
+
+    <!-- Sensor frames: positions from amr_basic.urdf (relative to base_link
+         at axle height). Verified on the real robot: the front lidar is
+         mounted facing forward, and the rear lidar is mounted rotated
+         180 degrees relative to base_link. -->
+
+    <xacro:lidar_sensor
+      prefix="$(arg prefix)"
+      parent="base_link"
+      frame_id="laser_front"
+      xyz_offset="0.086291 -0.020494 0.177797"
+      rpy_offset="0 0 0"
+      mesh_xyz_offset="0 0 -0.00805"
+      mesh_rpy_offset="${-M_PI/2} 0 ${M_PI}"
+      topic_name="scan"/>
+
+    <xacro:lidar_sensor
+      prefix="$(arg prefix)"
+      parent="base_link"
+      frame_id="laser_rear"
+      xyz_offset="-0.091392 0.02052 0.177797"
+      rpy_offset="0 0 ${M_PI}"
+      mesh_xyz_offset="0 0 -0.00805"
+      mesh_rpy_offset="${-M_PI/2} 0 ${M_PI}"
+      topic_name="scan_rear"/>
+
+    <!-- 병합 스캔(/scan) 출력 프레임: base_link 중심, 라이다 장착 높이(0.177797).
+         dual_scan_merger의 target_frame으로 사용 → 병합 2D 스캔이 실제 라이다
+         높이에 표시되어 원본 앞/뒤 스캔과 Z가 일치. (2D SLAM엔 높이 무관하나
+         RViz 시각 정합 및 물리적 정확성 위해.) -->
+    <link name="$(arg prefix)base_scan"/>
+    <joint name="$(arg prefix)base_scan_joint" type="fixed">
+      <parent link="$(arg prefix)base_link"/>
+      <child link="$(arg prefix)base_scan"/>
+      <origin xyz="0 0 0.177797" rpy="0 0 0"/>
+    </joint>
+
+    <!-- camera_link = left IR imager (depth origin, Intel convention). The
+         mount position 0.11398/0/0.092772 was measured to the body center,
+         so the joint moves +0.0475 in y and the mesh compensates by -0.0475,
+         keeping the physical body where it was measured. -->
+    <xacro:rgbd_camera
+      prefix="$(arg prefix)"
+      camera_name="camera"
+      mesh_file="package://amr_description/meshes/intel_realsense/visual/d455.stl"
+      mesh_scale="0.001 0.001 0.001"
+      mesh_xyz_offset="0.00192 -0.0475 0"
+      mesh_rpy_offset="${M_PI/2} 0 ${M_PI/2}"
+      xyz_offset="0.11398 0.0475 0.092772"
+      rpy_offset="0 0 0"/>
+
+    <xacro:include filename="../control/gazebo_sim_ros2_control.urdf.xacro" />
+    <xacro:load_gazebo_sim_ros2_control_plugin
+      robot_name="$(arg robot_name)"
+      use_gazebo="$(arg use_gazebo)"/>
+
+    <xacro:include filename="../control/amr_basic_ros2_control.urdf.xacro" />
+    <xacro:amr_basic_ros2_control
+      prefix="$(arg prefix)"
+      use_gazebo="$(arg use_gazebo)"/>
+
+</robot>

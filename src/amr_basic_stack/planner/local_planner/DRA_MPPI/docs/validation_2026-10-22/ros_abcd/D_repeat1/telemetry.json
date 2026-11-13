@@ -1,0 +1,92 @@
+[
+  {
+    "time": 1531815.851726463,
+    "load": [
+      0.5771484375,
+      0.5498046875,
+      0.36279296875
+    ],
+    "rss_max_kib": 110872,
+    "threads": 13,
+    "thermal": {
+      "/sys/class/thermal/thermal_zone2/temp": "84000",
+      "/sys/class/thermal/thermal_zone0/temp": "-263200",
+      "/sys/class/thermal/thermal_zone3/temp": "56000",
+      "/sys/class/thermal/thermal_zone1/temp": "85000"
+    },
+    "frequency_khz": {
+      "/sys/devices/system/cpu/cpu11/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu9/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu5/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu3/cpufreq/scaling_cur_freq": "4579537",
+      "/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu10/cpufreq/scaling_cur_freq": "988930",
+      "/sys/devices/system/cpu/cpu8/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq": "2188885",
+      "/sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq": "400087",
+      "/sys/devices/system/cpu/cpu2/cpufreq/scaling_cur_freq": "4213947",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq": "4690115"
+    }
+  },
+  {
+    "time": 1531826.091527515,
+    "load": [
+      0.56201171875,
+      0.54833984375,
+      0.3642578125
+    ],
+    "rss_max_kib": 181364,
+    "threads": 18,
+    "thermal": {
+      "/sys/class/thermal/thermal_zone2/temp": "80000",
+      "/sys/class/thermal/thermal_zone0/temp": "-263200",
+      "/sys/class/thermal/thermal_zone3/temp": "57000",
+      "/sys/class/thermal/thermal_zone1/temp": "69000"
+    },
+    "frequency_khz": {
+      "/sys/devices/system/cpu/cpu11/cpufreq/scaling_cur_freq": "3554777",
+      "/sys/devices/system/cpu/cpu9/cpufreq/scaling_cur_freq": "2451649",
+      "/sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu5/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu3/cpufreq/scaling_cur_freq": "1468830",
+      "/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu10/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu8/cpufreq/scaling_cur_freq": "2945472",
+      "/sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq": "4564490",
+      "/sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq": "2242768",
+      "/sys/devices/system/cpu/cpu2/cpufreq/scaling_cur_freq": "1737454",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq": "4400859"
+    }
+  },
+  {
+    "time": 1531836.096483786,
+    "load": [
+      0.92431640625,
+      0.62890625,
+      0.392578125
+    ],
+    "rss_max_kib": 181364,
+    "threads": 18,
+    "thermal": {
+      "/sys/class/thermal/thermal_zone2/temp": "91000",
+      "/sys/class/thermal/thermal_zone0/temp": "-263200",
+      "/sys/class/thermal/thermal_zone3/temp": "58000",
+      "/sys/class/thermal/thermal_zone1/temp": "72000"
+    },
+    "frequency_khz": {
+      "/sys/devices/system/cpu/cpu11/cpufreq/scaling_cur_freq": "2441629",
+      "/sys/devices/system/cpu/cpu9/cpufreq/scaling_cur_freq": "1065810",
+      "/sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq": "400000",
+      "/sys/devices/system/cpu/cpu5/cpufreq/scaling_cur_freq": "4724033",
+      "/sys/devices/system/cpu/cpu3/cpufreq/scaling_cur_freq": "623904",
+      "/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq": "3758436",
+      "/sys/devices/system/cpu/cpu10/cpufreq/scaling_cur_freq": "1715601",
+      "/sys/devices/system/cpu/cpu8/cpufreq/scaling_cur_freq": "1277021",
+      "/sys/devices/system/cpu/cpu6/cpufreq/scaling_cur_freq": "4642904",
+      "/sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq": "4615183",
+      "/sys/devices/system/cpu/cpu2/cpufreq/scaling_cur_freq": "1411392",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq": "1785124"
+    }
+  }
+]

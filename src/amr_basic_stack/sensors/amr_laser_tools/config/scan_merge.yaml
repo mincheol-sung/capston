@@ -1,0 +1,45 @@
+dual_scan_merger:
+  ros__parameters:
+    input_topics: ["/scan_front", "/scan_rear"]
+
+    # 각 입력의 담당 방위각 섹터(base_link 기준, 도).
+    # [front_min, front_max, rear_min, rear_max]
+    # 앞/뒤 360° 라이다가 서로·차체를 인식하지 않도록 반원씩 분담(약간 겹침).
+    #   front = [-95, 95]  전방 반원(양옆 5° 여유)
+    #   rear  = [85, -85]  후방 반원(랩어라운드, 양옆 5° 겹침 → 측면 사각 방지)
+    # ※실제 값은 RViz에서 /scan 을 보며 상대 라이다/차체가 유령장애물로
+    #   찍히지 않는지 확인 후 미세조정할 것.
+    input_sectors_deg: [-95.0, 95.0, 85.0, -85.0]
+
+    target_frame: "base_scan"     # base_link 중심·라이다 높이(0.1778) 프레임(URDF). 병합스캔 Z 정합.
+    output_topic: "/scan"
+
+    angle_increment_deg: 0.5     # 출력 해상도 (720개 빈)
+    range_min: 0.15              # 이보다 가까운 반사(차체 등) 제거
+    range_max: 30.0              # RPLiDAR S2 최대거리
+    publish_rate_hz: 10.0        # 입력 라이다와 동일 주기(중복 스캔 발행 최소화)
+
+    # 한쪽 라이다가 멈췄을 때 마지막 scan을 영원히 재사용하지 않는다.
+    # 수신 후 경과 시간과 원본 scan stamp의 나이를 모두 검사한다.
+    max_scan_age_s: 0.25
+    # A missing front/rear sector must not look like a healthy 360-degree scan.
+    require_all_inputs: true
+
+    # 두 scan 시작 시각이 지나치게 다르면 한 장으로 섞지 않고 오래된 쪽을 제외한다.
+    # Cartographer는 아래 timing 보존 토픽 두 개를 직접 사용하므로 이 값은
+    # traversability/인지용 병합 /scan의 유령 장애물 방지용이다.
+    max_pair_skew_s: 0.05
+
+# Cartographer 전용: range만 섹터 마스킹하고 원본 frame/stamp/time_increment/
+# scan_time은 그대로 보존한다. 두 출력은 하나로 병합하지 않는다.
+front_cartographer_scan_filter:
+  ros__parameters:
+    target_frame: "base_scan"
+    sector_min_deg: -95.0
+    sector_max_deg: 95.0
+
+rear_cartographer_scan_filter:
+  ros__parameters:
+    target_frame: "base_scan"
+    sector_min_deg: 85.0
+    sector_max_deg: -85.0

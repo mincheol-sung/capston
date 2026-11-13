@@ -1,0 +1,288 @@
+{
+  "scene": "b2_100",
+  "source": "mpc_chain_20260923_135606",
+  "offset": 212.27085457500002,
+  "configuration": {
+    "dt": 0.2,
+    "horizon_steps": 10,
+    "num_rollouts": 321,
+    "temperature": 2.0,
+    "adaptive_temperature": true,
+    "temperature_eta_lower": 5.0,
+    "temperature_eta_upper": 10.0,
+    "temperature_decrease_factor": 0.9,
+    "temperature_increase_factor": 1.2,
+    "noise_std": [
+      0.15,
+      0.12,
+      0.45
+    ],
+    "spline_knots": 4,
+    "halton_scramble": true,
+    "control_min": [
+      -0.375,
+      -0.5625,
+      -3.0
+    ],
+    "control_max": [
+      0.78,
+      0.5625,
+      3.0
+    ],
+    "acceleration_limit": [
+      2.25,
+      2.25,
+      6.75
+    ],
+    "yaw_lever": 0.19835,
+    "speed_limit_l1": 0.78,
+    "desired_speed": 0.75,
+    "tracking_path_weight": 64.0,
+    "tracking_goal_weight": 24.0,
+    "heading_weight": 3.0,
+    "heading_lookahead": 0.2,
+    "speed_weight": 1.78,
+    "progress_weight": 8.0,
+    "projection_window": 0.5,
+    "goal_activation_distance": 0.5,
+    "input_delta_weight": [
+      0.5,
+      0.5,
+      0.055
+    ],
+    "observation_cost_enabled": false,
+    "observation_cost_weight": 3.0,
+    "observation_half_fov": 0.6108652381980153,
+    "observation_camera_offset": [
+      0.0,
+      0.0
+    ],
+    "observation_camera_yaw": 0.0,
+    "seed": 7,
+    "strategy": "gap",
+    "gap": {
+      "total_rollouts": 500,
+      "rollouts_per_guide": 100,
+      "max_guides": 3,
+      "timeout": 0.18,
+      "adjacent_jump_m": 0.4,
+      "relative_jump": 0.12,
+      "side_window_beams": 3,
+      "side_median_jump_m": 0.4,
+      "side_spread_fraction": 0.35,
+      "minimum_cut_separation_deg": 20.0,
+      "minimum_region_bins": 6,
+      "geometry_window_bins": 5,
+      "geometry_jump_m": 0.25,
+      "maximum_projection_bins": 8,
+      "minimum_depth_m": 0.5,
+      "max_depth_m": 2.0,
+      "radial_step_m": 0.02,
+      "extra_margin_m": 0.05,
+      "grid_resolution_m": 0.04,
+      "grid_extent_m": 4.0,
+      "min_displacement_m": 0.25,
+      "max_target_error_m": 0.35,
+      "nominal_rms_m": 0.22,
+      "nominal_tail_m": 0.3,
+      "guide_rms_m": 0.25,
+      "target_reserve_m": 0.1,
+      "reach_scale": 0.9,
+      "target_floor_m": 0.25,
+      "path_lookahead_m": 1.0
+    },
+    "guide_num_rollouts": 500,
+    "guide_angles_deg": [
+      0.0,
+      45.0,
+      90.0,
+      -45.0,
+      -90.0
+    ],
+    "guide_noise_std": [
+      0.15,
+      0.12,
+      0.45
+    ],
+    "guide_anchor_blend": 0.25,
+    "guide_switch_penalty": 0.25,
+    "guide_hysteresis": 0.1,
+    "guide_evaluation": "split",
+    "guide_timeout": 0.18,
+    "static_cost_enabled": true,
+    "static_cost_soft_weight": 8.0,
+    "static_cost_decay": 0.1,
+    "static_cost_robot_radius": 0.2,
+    "dynamic_risk": {
+      "mode": "monte_carlo",
+      "final_mode": "gaussian_disk",
+      "max_obstacles": 20,
+      "soft_weight": 18.0,
+      "robot_radius": 0.2,
+      "obstacle_radius": 0.25,
+      "minimum_sigma": 0.08,
+      "mc_samples": 2048,
+      "adaptive_halton_mc": true,
+      "mc_sample_density": 992.0,
+      "mc_samples_min": 4096,
+      "mc_samples_max": 32768,
+      "guide_parallel_workers": 2,
+      "guide_mc_sample_density": 992.0,
+      "guide_mc_samples_min": 1024,
+      "guide_mc_samples_max": 8192,
+      "final_mc_sample_density": 992.0,
+      "final_mc_samples_min": 2048,
+      "final_mc_samples_max": 32768,
+      "mc_reject_underresolved": true,
+      "hard_threshold": 0.05,
+      "hard_penalty": 100000.0,
+      "seed": 17
+    }
+  },
+  "current": [
+    -5.148074461009086e-05,
+    1.0271707812115722e-06,
+    4.186441238689131e-05
+  ],
+  "scope": "Conditional maximum straight-ray distance with fixed yaw-rate sequences; NOT free-yaw global reachability.",
+  "method": "360 linear programs per case, 10 speed variables; axis, acceleration and wheel-L1 constraints; maximize dt*sum(speed).",
+  "depth": "Recomputed using production fusion and directional_depth, exactly matches original cached strict_depth; capped at 2m.",
+  "combined": "min(D,d); all scaled control sequences independently checked for feasibility and straight-ray endpoints.",
+  "validation": "720 LP optima and 720 combined sequences satisfy all constraints and production rollout endpoint checks. All 720 combined paths pass production swept-body static collision checks.",
+  "sha256": {
+    "docs/gap_multiscene_2026-11-04/disparity_partition_10_scenes/data/b2_100.npz": "ef55cd9633939bc617f3daad6581a31e9e512125537e7e58cf2a53014a354126",
+    "docs/gap_implementation_flow_2026-11-05/results.json": "1f5531dbf9972a949dd3d3b365a90f9a27c02c1a58cb2da50b05954fa1da547d",
+    "docs/gap_implementation_flow_2026-11-05/replay_arrays.npz": "c3f3049c4cca863f8339a3321640e8a7af287f2d8fd220ebb869e3ce07756977",
+    "docs/gap_multiscene_2026-11-04/scene_audit.jsonl": "82de1f20e8e4389adf4174ac8977ef98a4c9ba7c58c0128ea27073ddbd34d92d"
+  },
+  "cases": {
+    "fixed_heading": {
+      "omega": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rows": [
+        {
+          "gap": "G1",
+          "angle_deg": -41,
+          "kinematic_m": 1.1057802036507889,
+          "space_depth_m": 0.52,
+          "combined_m": 0.52,
+          "limiting": "space"
+        },
+        {
+          "gap": "G2",
+          "angle_deg": 6,
+          "kinematic_m": 1.3679518786765301,
+          "space_depth_m": 0.68,
+          "combined_m": 0.68,
+          "limiting": "space"
+        },
+        {
+          "gap": "G3",
+          "angle_deg": 91,
+          "kinematic_m": 1.1026681471338577,
+          "space_depth_m": 0.6,
+          "combined_m": 0.6,
+          "limiting": "space"
+        },
+        {
+          "gap": "G4",
+          "angle_deg": 165,
+          "kinematic_m": 0.7764571353075623,
+          "space_depth_m": 2.0,
+          "combined_m": 0.7764571353075623,
+          "limiting": "kinematics"
+        },
+        {
+          "gap": "G5",
+          "angle_deg": -136,
+          "kinematic_m": 1.0426226932625091,
+          "space_depth_m": 1.48,
+          "combined_m": 1.0426226932625091,
+          "limiting": "kinematics"
+        },
+        {
+          "gap": "G6",
+          "angle_deg": -96,
+          "kinematic_m": 1.1085726716530317,
+          "space_depth_m": 0.6,
+          "combined_m": 0.6,
+          "limiting": "space"
+        }
+      ]
+    },
+    "recorded_nominal_yaw": {
+      "omega": [
+        -1.3365305017568125,
+        -1.9728643138747597,
+        -2.144966389854939,
+        -2.1444761386942783,
+        -2.0077629679502613,
+        -1.7977508608106938,
+        -1.109446039282761,
+        -0.408391686953264,
+        -0.1551840380317332,
+        -0.18296720621961235
+      ],
+      "rows": [
+        {
+          "gap": "G1",
+          "angle_deg": -41,
+          "kinematic_m": 0.8343231072459436,
+          "space_depth_m": 0.52,
+          "combined_m": 0.52,
+          "limiting": "space"
+        },
+        {
+          "gap": "G2",
+          "angle_deg": 6,
+          "kinematic_m": 0.7231493315117157,
+          "space_depth_m": 0.68,
+          "combined_m": 0.68,
+          "limiting": "space"
+        },
+        {
+          "gap": "G3",
+          "angle_deg": 91,
+          "kinematic_m": 0.7934904700229545,
+          "space_depth_m": 0.6,
+          "combined_m": 0.6,
+          "limiting": "space"
+        },
+        {
+          "gap": "G4",
+          "angle_deg": 165,
+          "kinematic_m": 0.7902791851679974,
+          "space_depth_m": 2.0,
+          "combined_m": 0.7902791851679974,
+          "limiting": "kinematics"
+        },
+        {
+          "gap": "G5",
+          "angle_deg": -136,
+          "kinematic_m": 0.8436103851607588,
+          "space_depth_m": 1.48,
+          "combined_m": 0.8436103851607588,
+          "limiting": "kinematics"
+        },
+        {
+          "gap": "G6",
+          "angle_deg": -96,
+          "kinematic_m": 0.790065619677857,
+          "space_depth_m": 0.6,
+          "combined_m": 0.6,
+          "limiting": "space"
+        }
+      ]
+    }
+  }
+}

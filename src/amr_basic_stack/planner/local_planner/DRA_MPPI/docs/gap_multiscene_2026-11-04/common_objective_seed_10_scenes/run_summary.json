@@ -1,0 +1,5 @@
+{
+  "scenes": 10,
+  "downstream_comparisons": 40,
+  "limitations": "Multi-start local best; diagnostic selection; offline snapshot only."
+}

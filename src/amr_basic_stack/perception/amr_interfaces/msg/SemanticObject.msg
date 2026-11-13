@@ -1,0 +1,17 @@
+string object_id
+int32 class_id
+string class_name
+string alias
+geometry_msgs/Point position
+geometry_msgs/Point box_center
+geometry_msgs/Vector3 extent
+geometry_msgs/Point32[] points
+float64[9] covariance
+builtin_interfaces/Time last_seen
+uint32 observation_count
+uint8 TENTATIVE=0
+uint8 CONFIRMED=1
+uint8 STALE=2
+uint8 MOVING=3
+uint8 status
+uint8 support_method

@@ -1,0 +1,79 @@
+# ── colcon 산출물 ───────────────────────────────────────────────
+build/
+install/
+log/
+
+# ── Python ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.colcon/
+
+# ── 도구 ───────────────────────────────────────────────────────
+.DS_Store
+.claude/
+.vscode/
+.idea/
+*.swp
+*~
+
+# ── 측정 데이터: 리포에 넣지 않는다 ──────────────────────────────
+# bags/ 는 2026-09 기준 23 GB. rosbag 은 원본을 별도 보관한다.
+bags/
+*.bag
+*.db3
+*.mcap
+
+# 실행 중 생성되는 로그·산출물 디렉토리
+logs/
+artifacts/
+velocity_logs/
+
+# 주행 로그 CSV (mpc_circle_node / mpc_tracking_node 가 실행 디렉터리에 남긴다)
+/fig8_*.csv
+/mpc_*.csv
+
+# ── 발표 자료 (원본은 Notion/Drive) ──────────────────────────────
+presentation/
+*.pptx
+/*.pdf
+/*.gv
+
+# ── 병합·편집 잔재 ──────────────────────────────────────────────
+*.orig
+*.rej
+*.bak
+
+# ── vendor ─────────────────────────────────────────────────────
+# 2026-09-15: octomap_server / octomap_rviz_plugins / spatio_temporal_voxel_layer 를
+# apt 정식 설치로 바꾸면서 vendor/ (일시적으로 perception/voxel/) 를 삭제했다.
+# 아래 패턴은 같은 임시 구조가 다시 생길 때를 위해 남겨 둔다.
+vendor/
+
+# ── colcon 산출물 (PC 빌드용 별칭 디렉터리) ──────────────────────
+build_pc/
+install_pc/
+log_pc/
+
+# ── GitHub 100MB 단일 파일 한도 초과 ────────────────────────────
+*.zip
+
+# ── DRA_MPPI 벤치마크 원본 데이터 (파일당 20~45MB, 합계 293MB) ──
+# 요약·분석 결과(md, 작은 csv/json)만 리포에 두고 원본은 로컬 보관한다.
+src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/**/candidate_raw.csv
+src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/**/accuracy_candidates_*.csv
+src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/**/domains_raw.csv
+src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/**/timing.csv
+src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/**/benchmark.json
+src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/**/partial.json
+src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/**/runs.json
+src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/**/validation.json
+
+# ── amr/ 문헌·녹음·영상·CAD 원본 (합계 179MB, 원본은 Notion/Drive) ──
+amr/**/*.pdf
+amr/**/*.m4a
+amr/**/*.mp4
+amr/**/*.mov
+amr/**/*.prt
+amr/**/*.prt.*

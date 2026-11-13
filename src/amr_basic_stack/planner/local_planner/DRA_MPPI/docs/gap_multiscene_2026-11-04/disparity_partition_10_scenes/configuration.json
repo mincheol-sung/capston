@@ -1,0 +1,88 @@
+{
+  "parameters": {
+    "adjacent_jump_m": 0.4,
+    "relative_jump": 0.12,
+    "side_window_beams": 3,
+    "side_median_jump_m": 0.4,
+    "side_spread_fraction": 0.35,
+    "minimum_cut_separation_deg": 20.0,
+    "minimum_region_bins": 6,
+    "geometry_window_bins": 5,
+    "geometry_jump_m": 0.25,
+    "maximum_projection_bins": 8,
+    "minimum_depth_m": 0.5,
+    "angle_step_deg": 1.0,
+    "max_depth_m": 2.0,
+    "body_radius_m": 0.2,
+    "extra_margin_m": 0.05,
+    "retry_extra_margin_m": 0.0,
+    "grid_resolution_m": 0.04,
+    "grid_padding_m": 0.05656854249492381,
+    "sweep_padding_m": 0.01
+  },
+  "scenes": [
+    {
+      "scene": "b0_024",
+      "bag": "mpc_chain_20260923_135325",
+      "offset": 55.012188979,
+      "record_ns": 1790139260599384756
+    },
+    {
+      "scene": "b0_039",
+      "bag": "mpc_chain_20260923_135325",
+      "offset": 85.777806165,
+      "record_ns": 1790139291365001942
+    },
+    {
+      "scene": "b0_052",
+      "bag": "mpc_chain_20260923_135325",
+      "offset": 112.738106529,
+      "record_ns": 1790139318325302306
+    },
+    {
+      "scene": "b1_019",
+      "bag": "mpc_chain_20260923_113151",
+      "offset": 44.799365019,
+      "record_ns": 1790130756950867622
+    },
+    {
+      "scene": "b1_037",
+      "bag": "mpc_chain_20260923_113151",
+      "offset": 82.166830972,
+      "record_ns": 1790130794318333575
+    },
+    {
+      "scene": "b1_066",
+      "bag": "mpc_chain_20260923_113151",
+      "offset": 142.401063614,
+      "record_ns": 1790130854552566217
+    },
+    {
+      "scene": "b2_051",
+      "bag": "mpc_chain_20260923_135606",
+      "offset": 110.645227417,
+      "record_ns": 1790139477715778383
+    },
+    {
+      "scene": "b2_079",
+      "bag": "mpc_chain_20260923_135606",
+      "offset": 168.707949484,
+      "record_ns": 1790139535778500450
+    },
+    {
+      "scene": "b2_100",
+      "bag": "mpc_chain_20260923_135606",
+      "offset": 212.27085457500002,
+      "record_ns": 1790139579341405541
+    },
+    {
+      "scene": "b2_123",
+      "bag": "mpc_chain_20260923_135606",
+      "offset": 259.832802474,
+      "record_ns": 1790139626903353440
+    }
+  ],
+  "selection": "Chronological accepted-scene quantiles: b0,b1 .2/.5/.8; b2 .1/.35/.65/.9; b1_088 excluded before selection.",
+  "status": "Experimental automatic disparity partition only; production v1 unchanged.",
+  "script_sha256": "dc2de6d9fe9e549bef55a5b14a2eff1366e3833b98ed3a5062d6de46f2c48622"
+}

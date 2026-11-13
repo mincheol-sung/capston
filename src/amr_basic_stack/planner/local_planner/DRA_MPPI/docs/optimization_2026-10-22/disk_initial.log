@@ -1,0 +1,4 @@
+isotropic 100 2 gaussian_disk mean/p99 18.2 18.7
+isotropic 500 2 gaussian_disk mean/p99 37.57 37.8
+anisotropic 100 2 gaussian_disk mean/p99 40.58 40.73
+anisotropic 500 2 gaussian_disk mean/p99 141.25 145.48

@@ -1,0 +1,23 @@
+{
+  "scenes": [
+    "b0_001",
+    "b0_029",
+    "b0_033",
+    "b0_034",
+    "b1_004",
+    "b1_037",
+    "b1_088",
+    "b2_083",
+    "b2_084",
+    "b2_133"
+  ],
+  "selection": "Ten diagnostic snapshots chosen before optimization: normal travel, stalled nominal, empty-gap margin/short/narrow cases, and initial-footprint-invalid case. Not representative success statistics.",
+  "objective": "Exactly frozen common_costs: weighted squared path/progress/terminal/heading/speed/delta x,y,omega residuals. No dynamic risk, static soft cost, or static invalidation in seed optimizer.",
+  "constraints": "N=10,dt=.2, control box, per-axis acceleration from the same projected initial input, all eight signed wheel L1 facets per time step; original nonlinear mecanum rollout.",
+  "solver": "SLSQP, central finite-difference batched gradient h=1e-5, ftol1e-8,maxiter250; starts nominal, braking, path guide, and up to3 selected gap seeds. Best feasible found; no global-optimality guarantee.",
+  "postcheck": "After seed generation evaluate static swept collision and recorded dynamic MC risk. Feasible controls are not equivalent to obstacle-safe paths.",
+  "downstream": "Baseline is all_options_hard_fallback. common_as_nominal: replace nominal only if the seed passes static check; unchanged guide counts. common_extra: append if static-clear, not nominal-duplicate (RMS<.22 AND tail<.30) and not gap-duplicate (RMS<.25); keep at most2 existing lowest seed-cost guides; total extra cap3. Dynamic risk always checked by final MPPI. Two noise seeds7/23, K500.",
+  "timing": "Offline multi-start reference solve; not budgeted for 5Hz. Single-start path-guide solve is timed separately, without claiming same quality.",
+  "sources": "Frozen previous experiment planner and YAML. common_cost.py SHA256 matches current implementation.",
+  "source_sha256": "f5a254b9fadb6cf11c43f233a0be3c24e5aeafe4a6e72a32c992d12cca92b5be"
+}

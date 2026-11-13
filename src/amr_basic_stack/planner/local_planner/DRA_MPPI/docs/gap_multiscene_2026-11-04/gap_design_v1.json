@@ -1,0 +1,87 @@
+{
+  "version": "gap_design_v1",
+  "date": "2026-11-04",
+  "status": "Implementation specification; not loaded by production node",
+  "reference_experiment": "all_options_hard_fallback",
+  "input": {
+    "source": "Time-aligned dual LiDAR with valid map supplementation",
+    "unknown_is_blocked": true,
+    "invalid_inputs_use_existing_failure_handling": true
+  },
+  "depth": {
+    "angle_step_deg": 1.0,
+    "grid_resolution_m": 0.04,
+    "robot_radius_m": 0.20,
+    "proposal_extra_margin_m": 0.05,
+    "grid_padding": "sqrt(2) * grid_resolution_m",
+    "sweep_padding_m": 0.01,
+    "max_distance_m": 2.0,
+    "distance_step_m": 0.02,
+    "minimum_gap_depth_m": 0.5,
+    "continuous_free_prefix_from_origin": true
+  },
+  "partition": {
+    "method": "Circular connected angular runs split at significant depth valleys",
+    "gaussian_sigma_bins": 2.0,
+    "peak_prominence_m": 0.25,
+    "peak_min_separation_bins": 20,
+    "minimum_gap_bins": 6,
+    "no_peak_fallback": "Maximum smoothed depth within the connected run",
+    "radial_copy_levels": []
+  },
+  "seed": {
+    "directions": ["depth_peak", "angular_midpoint", "path_bearing_clamped_to_gap_bins"],
+    "deduplicate_identical_bins": true,
+    "path_target_arc_m": 1.0,
+    "target_depth_reserve_m": 0.10,
+    "available_depth_floor_m": 0.10,
+    "projected_reach_scale": 0.90,
+    "target_distance_floor_m": 0.25,
+    "target_rule": "min(max(0.10, d_free-0.10), max(0.25, 0.90*projected_constrained_reach))",
+    "horizon_steps": 10,
+    "dt_s": 0.2,
+    "heading": "Existing path heading",
+    "limits": "Existing control box, acceleration and wheel L1 constraints"
+  },
+  "eligibility": {
+    "reject_static_swept_collision": true,
+    "max_target_error_m": 0.35,
+    "nominal_duplicate_rms_lt_m": 0.22,
+    "nominal_duplicate_tail_lt_m": 0.30,
+    "tail_steps": 3,
+    "nominal_duplicate_rule": "Both RMS and tail inequalities must hold",
+    "disable_nominal_dedup_when_nominal_static_invalid": true
+  },
+  "selection": {
+    "pool_all_direction_seeds": true,
+    "one_guide_per_gap_limit": false,
+    "rank": "Existing common_costs sum + existing static soft cost, ascending",
+    "selected_guide_duplicate_rms_lt_m": 0.25,
+    "max_extra_guides": 3,
+    "require_cost_improvement_over_nominal": false,
+    "separate_path_proximity_reward": false,
+    "distance_from_nominal_reward": false,
+    "forced_rear_guide": false,
+    "tie_order": ["gap_order", "angle_bin"],
+    "solver_order": "Deterministic candidate ID order, independent of cost rank"
+  },
+  "empty_gap": {
+    "retry_condition": "Raw geometric gap count == 0",
+    "retry_extra_margin_m": 0.0,
+    "retry_count": 1,
+    "preserve_other_geometry_and_safety_checks": true,
+    "retry_after_all_seeds_filtered": false,
+    "no_extra_guide_action": "Nominal-only 500 rollouts",
+    "no_final_safe_motion_action": "Existing Stop/hold evaluation"
+  },
+  "mppi": {
+    "moving_rollouts_total": 500,
+    "rollouts_per_extra_guide": 100,
+    "nominal_rollouts": "500 - 100 * selected_extra_guide_count",
+    "workers": 2,
+    "dynamic_and_final_safety": "Existing MC and common final recheck unchanged",
+    "common_objective_optimized_extra_seed": false,
+    "target_period_ms": 200,
+    "full_stack_deadline_verified": false
+  }
+}

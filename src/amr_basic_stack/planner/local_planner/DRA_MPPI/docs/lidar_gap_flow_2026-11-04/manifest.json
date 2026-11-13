@@ -1,0 +1,382 @@
+{
+  "source": {
+    "bag": "/home/smoc/2026amr_ws/bags/mpc_chain_20260923_135325",
+    "record_ns": 1790139216947971159,
+    "elapsed_s": 11.360775382,
+    "evaluation_epoch_s": 1790139216.9377682,
+    "pose_odom": [
+      0.033602025081932295,
+      1.1326706283609829,
+      1.2196617398188858
+    ],
+    "measured_body_velocity": [
+      0.02972991198774213,
+      -0.0016825908341224288,
+      -0.09400171343122096
+    ],
+    "reference_age_s": 0.126936674118042,
+    "map_age_s": 0.13183975219726562,
+    "scan_range_sha256": {
+      "/scan_front_carto": "ed26782a3bd30f2231101ca49524b5c5fa9cf0cb28c9d03b4ce74b9cd50acc52",
+      "/scan_rear_carto": "ad48c9eddcdccc027108f973ac32f1bc4209bda209625008e6725de2e890b745"
+    },
+    "topics": {
+      "/predictions": {
+        "record_ns": 1790139216921124236,
+        "header_s": 1790139216.6286855,
+        "frame": "odom"
+      },
+      "/traversable_map_grid": {
+        "record_ns": 1790139216811435527,
+        "header_s": 1790139216.8059285,
+        "frame": "map"
+      },
+      "/global_path": {
+        "record_ns": 1790139215984382619,
+        "header_s": 1790139215.9831848,
+        "frame": "map"
+      },
+      "/odometry/filtered": {
+        "record_ns": 1790139216940990213,
+        "header_s": 1790139216.9377682,
+        "frame": "odom"
+      },
+      "/scan_front_carto": {
+        "record_ns": 1790139216947971159,
+        "header_s": 1790139216.8474236,
+        "frame": "laser_front"
+      },
+      "/dra_mppi/predictions_used": {
+        "record_ns": 1790139216938502723,
+        "header_s": 1790139216.6286855,
+        "frame": "odom"
+      },
+      "/scan_rear_carto": {
+        "record_ns": 1790139216928026580,
+        "header_s": 1790139216.8253493,
+        "frame": "laser_rear"
+      },
+      "/dra_mppi/reference_trajectory": {
+        "record_ns": 1790139216811464814,
+        "header_s": 1790139216.8108315,
+        "frame": "odom"
+      }
+    },
+    "metadata_sha256": "95dd927546a8f29ff6522214667bc89ef379db955b1710937f7d7d0234076de7"
+  },
+  "parameters": {
+    "grid_resolution": 0.04,
+    "robot_radius": 0.2,
+    "gap_margin": 0.05,
+    "levels": [
+      0.5,
+      1.0,
+      1.5
+    ],
+    "minimum_width_deg": 6,
+    "direction_merge_deg": 12,
+    "duplicate_rms_m": 0.22,
+    "duplicate_tail_m": 0.3,
+    "reach_error_max_m": 0.35,
+    "min_score": 0.25,
+    "gap_pair_rms_m": 0.25,
+    "score_weights": [
+      0.4,
+      0.25,
+      0.2,
+      0.15
+    ],
+    "rollout_counts": [
+      200,
+      100,
+      100,
+      100
+    ],
+    "horizon_steps": 10,
+    "dt": 0.2,
+    "workers": 2,
+    "offline_timeout_s": 10.0
+  },
+  "gap_candidates": [
+    {
+      "level": 1.5,
+      "angle": -1.7627825445142729,
+      "width_deg": 31,
+      "target": [
+        -0.2862134930648172,
+        -1.472440775171496
+      ],
+      "id": "G1",
+      "rms_distance": 1.0982623119751682,
+      "tail_distance": 1.613131369463651,
+      "duplicate": false,
+      "collision": false,
+      "reach_error": 0.34545523041180465,
+      "clearance": 0.20161945393386121,
+      "progress_m": -0.3510143972563916,
+      "cross_track_m": 1.1543082958649467,
+      "features": [
+        0.0,
+        0.504048634834653,
+        1.0,
+        0.14604402527125895
+      ],
+      "score": 0.3479187624993521,
+      "reason": "채택"
+    },
+    {
+      "level": 1.5,
+      "angle": -0.17453292519943295,
+      "width_deg": 20,
+      "target": [
+        1.477211629518312,
+        -0.2604722665003955
+      ],
+      "id": "G2",
+      "rms_distance": 0.04124160893597083,
+      "tail_distance": 0.07010779587439005,
+      "duplicate": true,
+      "collision": false,
+      "reach_error": 0.2460607356901472,
+      "clearance": 0.20161945393386121,
+      "progress_m": 1.2119064393834134,
+      "cross_track_m": 0.29969862445290085,
+      "features": [
+        0.8079376262556089,
+        0.504048634834653,
+        0.05155201116996353,
+        0.6068353920876371
+      ],
+      "score": 0.5505229202580451,
+      "reason": "nominal 중복"
+    },
+    {
+      "level": 1.5,
+      "angle": 2.6878070480712677,
+      "width_deg": 78,
+      "target": [
+        -1.3481910694487507,
+        0.6575567201836159
+      ],
+      "id": "G3",
+      "rms_distance": 1.3403484818412708,
+      "tail_distance": 1.9395603062825415,
+      "duplicate": false,
+      "collision": false,
+      "reach_error": 0.559644081731067,
+      "clearance": 0.4134314575050762,
+      "progress_m": -0.7471414489523427,
+      "cross_track_m": 0.9693877371214216,
+      "features": [
+        0.0,
+        1.0,
+        1.0,
+        0.19876218313464908
+      ],
+      "score": 0.47981432747019737,
+      "reason": "도달 부족"
+    },
+    {
+      "level": 1.0,
+      "angle": -0.9948376736367679,
+      "width_deg": 119,
+      "target": [
+        0.5446390350150271,
+        -0.838670567945424
+      ],
+      "id": "G4",
+      "rms_distance": 0.5854849187301645,
+      "tail_distance": 0.8743676506495169,
+      "duplicate": false,
+      "collision": false,
+      "reach_error": 0.06702436927242843,
+      "clearance": 0.3240243799144122,
+      "progress_m": 0.4448966709030098,
+      "cross_track_m": 0.8151230307135645,
+      "features": [
+        0.29659778060200653,
+        0.8100609497860304,
+        0.7318561484127056,
+        0.2570361906059595
+      ],
+      "score": 0.5060810079607452,
+      "reason": "채택"
+    },
+    {
+      "level": 0.5,
+      "angle": 2.4085543677521746,
+      "width_deg": 132,
+      "target": [
+        -0.371572412738697,
+        0.3345653031794292
+      ],
+      "id": "G5",
+      "rms_distance": 1.1077199056098916,
+      "tail_distance": 1.5356096222983624,
+      "duplicate": false,
+      "collision": false,
+      "reach_error": 0.011482455711412305,
+      "clearance": 0.3955492717949501,
+      "progress_m": -0.3331588609326079,
+      "cross_track_m": 0.48526940192382234,
+      "features": [
+        0.0,
+        0.9888731794873752,
+        1.0,
+        0.44540008356558436
+      ],
+      "score": 0.5140283074066814,
+      "reason": "채택"
+    }
+  ],
+  "nominal_collision": false,
+  "selected_gaps": [
+    "G5",
+    "G4",
+    "G1"
+  ],
+  "final": {
+    "names": [
+      "nominal",
+      "G5",
+      "G4",
+      "G1",
+      "stop"
+    ],
+    "costs": [
+      2.4027509343143234,
+      23.512392168776906,
+      10.511415597976791,
+      39.07508246513712,
+      19.026250161667758
+    ],
+    "max_collision_probability": [
+      5.782793244257789e-09,
+      0.0,
+      3.524958103184872e-12,
+      0.0,
+      0.0
+    ],
+    "selected": "nominal",
+    "safety_status": "ok",
+    "finite_rollouts": 430,
+    "prediction_count": 2
+  },
+  "single_run_ms": {
+    "prepare_ms": 31.240677926689386,
+    "proposal_ms": 14.134664088487625,
+    "optimizer_ms": 87.04956294968724
+  },
+  "timing_scope": "One offline cold snapshot, not a 5 Hz or p99 validation. Preparation includes recorded-data alignment and grid construction; plotting and bag I/O excluded.",
+  "controller_config": {
+    "dt": 0.2,
+    "horizon_steps": 10,
+    "num_rollouts": 321,
+    "temperature": 2.0,
+    "adaptive_temperature": true,
+    "temperature_eta_lower": 5.0,
+    "temperature_eta_upper": 10.0,
+    "temperature_decrease_factor": 0.9,
+    "temperature_increase_factor": 1.2,
+    "noise_std": [
+      0.15,
+      0.12,
+      0.45
+    ],
+    "spline_knots": 4,
+    "halton_scramble": true,
+    "control_min": [
+      -0.375,
+      -0.5625,
+      -3.0
+    ],
+    "control_max": [
+      0.78,
+      0.5625,
+      3.0
+    ],
+    "acceleration_limit": [
+      2.25,
+      2.25,
+      6.75
+    ],
+    "yaw_lever": 0.19835,
+    "speed_limit_l1": 0.78,
+    "desired_speed": 0.75,
+    "tracking_path_weight": 64.0,
+    "tracking_goal_weight": 24.0,
+    "heading_weight": 3.0,
+    "heading_lookahead": 0.2,
+    "speed_weight": 1.78,
+    "progress_weight": 8.0,
+    "projection_window": 0.5,
+    "goal_activation_distance": 0.5,
+    "input_delta_weight": [
+      0.5,
+      0.5,
+      0.055
+    ],
+    "seed": 7,
+    "strategy": "guide_conditioned",
+    "guide_num_rollouts": 500,
+    "guide_angles_deg": [
+      0.0,
+      45.0,
+      90.0,
+      -45.0,
+      -90.0
+    ],
+    "guide_noise_std": [
+      0.15,
+      0.12,
+      0.45
+    ],
+    "guide_anchor_blend": 0.25,
+    "guide_switch_penalty": 0.25,
+    "guide_hysteresis": 0.1,
+    "guide_evaluation": "split",
+    "guide_timeout": 0.18,
+    "static_cost_enabled": true,
+    "static_cost_soft_weight": 8.0,
+    "static_cost_decay": 0.1,
+    "static_cost_robot_radius": 0.2,
+    "dynamic_risk": {
+      "mode": "monte_carlo",
+      "soft_weight": 18.0,
+      "robot_radius": 0.2,
+      "obstacle_radius": 0.25,
+      "minimum_sigma": 0.08,
+      "mc_samples": 2048,
+      "adaptive_halton_mc": true,
+      "mc_sample_density": 992.0,
+      "mc_samples_min": 4096,
+      "mc_samples_max": 32768,
+      "guide_parallel_workers": 2,
+      "guide_mc_sample_density": 992.0,
+      "guide_mc_samples_min": 1024,
+      "guide_mc_samples_max": 8192,
+      "final_mc_sample_density": 992.0,
+      "final_mc_samples_min": 2048,
+      "final_mc_samples_max": 32768,
+      "mc_reject_underresolved": true,
+      "hard_threshold": 0.05,
+      "hard_penalty": 100000.0,
+      "seed": 17
+    }
+  },
+  "deviations": [
+    "Recorded reference controls time-resampled; not recovered internal warm-start state.",
+    "Scan-derived static grid supplemented by recorded traversability grid; not the exact original live static-cost input.",
+    "Offline optimizer timeout 10 s, production timeout 0.18 s.",
+    "No persistent gap ID association or closed-loop replay in this single snapshot.",
+    "Geometry-only proposal score; MC risk is applied to every sampled and final trajectory."
+  ],
+  "sources_sha256": {
+    "tools/lidar_gap_flow_figures.py": "16021d61dfa41785fe61939b1e4c5920ee09ff672217f1013d40a6660fae9931",
+    "tools/render_lidar_gap_flow.py": "b8adb665cfb38dcb214287099d59e7dadd37fdbbb1b32a21b21452ed939682ca",
+    "config/dra_mppi.yaml": "51ba1f1c1a6b4008a87c1f4a9869ea61ff8c71160715b836f7747f212887d30b",
+    "dra_mppi/guide_conditioned.py": "8b16a3234ea34078f79caf3059c3f84e166030f58582e403e12a91917a5d8593",
+    "dra_mppi/mppi_controller.py": "b49a288576b60508f801e93e62317859880a53b034c7124b1420dfe6002449ce",
+    "dra_mppi/dynamic_risk.py": "741dc9fa3b4b055b999e9828402b9f6e8b09c7389230c39ba2e14be1e170f664"
+  }
+}

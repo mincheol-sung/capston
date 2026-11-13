@@ -1,0 +1,90 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 50,
+  "normal_optimizer_cycles": 50,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 0,
+  "callback_over_200ms_ratio": 0.0,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 50,
+    "mean": 139.03926065191627,
+    "p50": 138.85537080932409,
+    "p95": 143.03843900561333,
+    "p99": 146.14190784050152,
+    "max": 148.59643578529358
+  },
+  "backend": "split",
+  "workers": 2,
+  "frozen_nominal": false,
+  "statuses": {
+    "normal": 50
+  },
+  "fallback_ratio": 0.0,
+  "deadline_miss_ratio": 0.0,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 50,
+    "mean": 130.25061539839953,
+    "p50": 129.78150811977684,
+    "p95": 134.32343110907823,
+    "p99": 137.16255827108398,
+    "max": 139.55148914828897
+  },
+  "normal_optimizer_ms": {
+    "count": 50,
+    "mean": 125.75857470277697,
+    "p50": 125.38243643939495,
+    "p95": 129.44966471986845,
+    "p99": 130.44973520096391,
+    "max": 130.46993385069072
+  },
+  "start_delay_ms": {
+    "count": 50,
+    "mean": 10.789572768844664,
+    "p50": 10.469774948433042,
+    "p95": 11.924396723043174,
+    "p99": 18.3886026474647,
+    "max": 23.300795815885067
+  },
+  "deadline_lateness_ms": {
+    "count": 50,
+    "mean": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "publish_interval_ms": {
+    "count": 50,
+    "mean": 200.04053344018757,
+    "p50": 200.08690794929862,
+    "p95": 203.8127020583488,
+    "p99": 206.57138345064595,
+    "max": 208.39849510230124
+  },
+  "receive_interval_ms": {
+    "count": 50,
+    "mean": 200.03837275784463,
+    "p50": 200.03185386303812,
+    "p95": 205.03096726024523,
+    "p99": 206.15377004258335,
+    "max": 206.68157399632037
+  },
+  "receive_count_in_window": 50,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 60,
+    "dropped": 0,
+    "error": null
+  },
+  "covariance": "anisotropic",
+  "risk_mode": "monte_carlo",
+  "warmup_cycles": 10,
+  "obstacles": 20,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 500
+}

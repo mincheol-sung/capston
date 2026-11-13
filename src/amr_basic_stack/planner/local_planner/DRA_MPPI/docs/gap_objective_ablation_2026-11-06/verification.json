@@ -1,0 +1,20 @@
+{
+  "artifact_batches": 304,
+  "checked_sample_controls": 152000,
+  "trial_zero_nominal_prefix_exactly_paired": true,
+  "all_500_counts_and_control_limits": true,
+  "max_wheel_load": 0.7800000000000004,
+  "max_fraction_acceleration": 1.0000000000000002,
+  "run_count": 2432,
+  "unique_conditions": true,
+  "all_selected_existing_safety_checks_ok": true,
+  "max_selected_collision_probability": 1.877661359728222e-10,
+  "locked_source_hashes_unchanged": true,
+  "derivative_errors": {
+    "current": 3.3305724844723272e-09,
+    "smooth": 7.853882474928575e-13,
+    "smooth_heading": 3.9219960612513205e-11,
+    "guide_tracking": 3.7197294862345576e-09,
+    "linearized_common": 4.5097440781738385e-09
+  }
+}

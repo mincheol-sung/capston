@@ -1,0 +1,30 @@
+{
+  "source": "gap_v1_actual_flow/b1_088_actual_arrays.npz",
+  "method": "manual boundary rays specified by user, clockwise A-B-C-D",
+  "points_xy": [
+    [
+      2.0,
+      -0.5
+    ],
+    [
+      -0.4,
+      -2.0
+    ],
+    [
+      -2.0,
+      0.4
+    ],
+    [
+      0.0,
+      0.4
+    ]
+  ],
+  "unwrapped_angles_deg": [
+    -14.036243467926479,
+    -101.30993247402021,
+    -191.3099324740202,
+    -270.0
+  ],
+  "automatic_detection": false,
+  "mppi_rerun": false
+}

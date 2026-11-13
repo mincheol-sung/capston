@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-23",
+  "configuration_sha256": "5b434f3e0c5fe64df64e1018fafc166fc79a6be0c7ca513356bd2d98d159b8fc",
+  "installed_yaml_matches": true,
+  "mode": "monte_carlo",
+  "density": 992,
+  "guide_min": 1024,
+  "guide_max": 8192,
+  "final_min": 2048,
+  "final_max": 32768,
+  "configuration_tests": "3 passed",
+  "build": "passed",
+  "plot_source": "accuracy_candidates_x8.csv"
+}

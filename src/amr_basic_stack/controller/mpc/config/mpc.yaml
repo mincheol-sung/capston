@@ -1,0 +1,28 @@
+# mpc_tracking_node 배선 — 토픽과 로깅만.
+# ===================================================================
+# ★ 숫자(모델·제약·튜닝·타임아웃)는 이 파일에 없다. config/plant.yaml 이 유일한 출처이고
+#   노드가 그 값을 파라미터 기본값으로 쓴다. 여기서 굳이 덮어써야 할 때만 아래 예시처럼
+#   한 줄 추가하되, plant.yaml 과 갈라지지 않게 이유를 같이 적어라.
+#
+#   설계값을 바꾸려면 → config/plant.yaml
+#   실행마다 바꾸려면 → launch 인자 또는 --ros-args -p
+# ===================================================================
+mpc_tracking_node:
+  ros__parameters:
+    # 배선
+    reference_topic: /dra_mppi/reference_trajectory   # PlanarReferenceArray (10 Hz, dt 0.2 s × 20)
+    odom_topic: /odometry/filtered                    # 플래너(dra_mppi.yaml odometry_topic)와 같은
+                                                      # 원천이어야 오차 프레임이 맞는다.
+                                                      # 자기시험은 /odom (figure8.launch.py 가 덮어쓴다) —
+                                                      # model 의 θ 가 /odom 으로 식별됐다. README 참조.
+    # 단독 실행 기본값. autonomy.launch.py 에서는 /mpc/cmd_vel_raw 로 덮어쓰고
+    # keyboard_command_gate 가 실제 /cmd_vel 을 단독 소유한다.
+    cmd_vel_topic: /cmd_vel
+
+    # 디버그·로깅
+    publish_debug: true      # /mpc/reference_horizon (Path), /mpc/status
+    log_prefix: ""           # 비면 CSV 없음. 예: mpc_track → mpc_track_YYYYmmdd_HHMMSS.csv (cwd)
+
+    # ── 설계값 덮어쓰기 예시 (필요할 때만 주석 해제) ──
+    # q_yaw: 2.0             # 급회전에서 헤딩을 더 붙이고 싶을 때. 부하가 오른다.
+    # max_cmd_accel: [6.75, 6.75, 20.25]   # 더 민첩하게. 떨림이 늘어난다.

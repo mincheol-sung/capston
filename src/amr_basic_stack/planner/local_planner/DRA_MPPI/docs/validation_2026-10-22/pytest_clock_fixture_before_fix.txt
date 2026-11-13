@@ -1,0 +1,90 @@
+........................................................................ [ 40%]
+................................FF...................................... [ 81%]
+.................................                                        [100%]
+=================================== FAILURES ===================================
+______ test_prediction_source_time_and_horizon_fail_closed[10.2-2-future] ______
+
+stamp = 10.2, steps = 2, reason = 'future'
+
+    @pytest.mark.parametrize('stamp, steps, reason', [(10.2, 2, 'future'), (9.9, 5, 'horizon')])
+    def test_prediction_source_time_and_horizon_fail_closed(stamp, steps, reason):
+        import time
+        from amr_interfaces.msg import MultiModalObjectPredictionArray
+        from dra_mppi.dra_mppi_node import PredictionChainUnavailable
+        from test_prediction_filter import _filter, _quality_prediction
+    
+        message = MultiModalObjectPredictionArray(objects=[_quality_prediction()])
+        message.header.stamp = Time(seconds=stamp).to_msg()
+        n = NS(
+            _prediction_message=_filter(message), _last_prediction_monotonic=time.monotonic(),
+            prediction_timeout=.5, prediction_fail_safe=True, planning_frame='odom',
+            prediction_class_names=['person'], prediction_max_semantic_age=1.,
+            prediction_max_measurement_age=.5, prediction_require_confirmed=True,
+            get_clock=lambda: NS(now=lambda: Time(seconds=10.)),
+            _lookup_2d=lambda *args: (0., 0., 0.),
+            controller=NS(config=NS(horizon_steps=steps, dt=.1,
+                                   dynamic_risk=NS(obstacle_radius=.25))))
+        with pytest.raises(PredictionChainUnavailable, match=reason):
+>           DraMppiNode._aligned_predictions(n)
+
+planner/local_planner/DRA_MPPI/test/test_input_freshness.py:108: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py:1324: in _aligned_predictions
+    self.get_clock().now()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Time(nanoseconds=10000000000, clock_type=SYSTEM_TIME)
+other = Time(nanoseconds=10200000000, clock_type=ROS_TIME)
+
+    def __sub__(self, other: Union['Time', Duration]) -> Union['Time', Duration]:
+        if isinstance(other, Time):
+            if self.clock_type != other.clock_type:
+>               raise TypeError("Can't subtract times with different clock types")
+E               TypeError: Can't subtract times with different clock types
+
+/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/time.py:102: TypeError
+______ test_prediction_source_time_and_horizon_fail_closed[9.9-5-horizon] ______
+
+stamp = 9.9, steps = 5, reason = 'horizon'
+
+    @pytest.mark.parametrize('stamp, steps, reason', [(10.2, 2, 'future'), (9.9, 5, 'horizon')])
+    def test_prediction_source_time_and_horizon_fail_closed(stamp, steps, reason):
+        import time
+        from amr_interfaces.msg import MultiModalObjectPredictionArray
+        from dra_mppi.dra_mppi_node import PredictionChainUnavailable
+        from test_prediction_filter import _filter, _quality_prediction
+    
+        message = MultiModalObjectPredictionArray(objects=[_quality_prediction()])
+        message.header.stamp = Time(seconds=stamp).to_msg()
+        n = NS(
+            _prediction_message=_filter(message), _last_prediction_monotonic=time.monotonic(),
+            prediction_timeout=.5, prediction_fail_safe=True, planning_frame='odom',
+            prediction_class_names=['person'], prediction_max_semantic_age=1.,
+            prediction_max_measurement_age=.5, prediction_require_confirmed=True,
+            get_clock=lambda: NS(now=lambda: Time(seconds=10.)),
+            _lookup_2d=lambda *args: (0., 0., 0.),
+            controller=NS(config=NS(horizon_steps=steps, dt=.1,
+                                   dynamic_risk=NS(obstacle_radius=.25))))
+        with pytest.raises(PredictionChainUnavailable, match=reason):
+>           DraMppiNode._aligned_predictions(n)
+
+planner/local_planner/DRA_MPPI/test/test_input_freshness.py:108: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py:1324: in _aligned_predictions
+    self.get_clock().now()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = Time(nanoseconds=10000000000, clock_type=SYSTEM_TIME)
+other = Time(nanoseconds=9900000000, clock_type=ROS_TIME)
+
+    def __sub__(self, other: Union['Time', Duration]) -> Union['Time', Duration]:
+        if isinstance(other, Time):
+            if self.clock_type != other.clock_type:
+>               raise TypeError("Can't subtract times with different clock types")
+E               TypeError: Can't subtract times with different clock types
+
+/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/time.py:102: TypeError
+=========================== short test summary info ============================
+FAILED planner/local_planner/DRA_MPPI/test/test_input_freshness.py::test_prediction_source_time_and_horizon_fail_closed[10.2-2-future]
+FAILED planner/local_planner/DRA_MPPI/test/test_input_freshness.py::test_prediction_source_time_and_horizon_fail_closed[9.9-5-horizon]
+2 failed, 175 passed in 2.29s

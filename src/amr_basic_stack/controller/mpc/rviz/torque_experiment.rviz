@@ -1,0 +1,83 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 20
+      Reference Frame: map
+      Value: true
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Marker Scale: 0.5
+      Show Names: true
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: Figure8 path
+      Enabled: true
+      Color: 120; 120; 255
+      Line Style: Lines
+      Topic:
+        Value: /figure8/path
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: MPC reference horizon
+      Enabled: true
+      Color: 255; 170; 0
+      Line Style: Billboards
+      Line Width: 0.02
+      Topic:
+        Value: /torque_mpc/reference_horizon
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Odometry
+      Name: Ground truth
+      Enabled: true
+      Keep: 300
+      Position Tolerance: 0.02
+      Angle Tolerance: 0.1
+      Shape:
+        Value: Arrow
+        Color: 25; 255; 0
+        Shaft Length: 0.15
+        Shaft Radius: 0.01
+        Head Length: 0.05
+        Head Radius: 0.03
+      Topic:
+        Value: /sim/ground_truth
+        Depth: 5
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+  Global Options:
+    Fixed Frame: map
+    Background Color: 48; 48; 48
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Current View
+      Scale: 80
+      X: 0
+      Y: 0
+      Value: TopDownOrtho (rviz_default_plugins)
+Window Geometry:
+  Height: 800
+  Width: 1100

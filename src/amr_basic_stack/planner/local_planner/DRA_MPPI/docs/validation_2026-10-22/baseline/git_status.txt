@@ -1,0 +1,26 @@
+ M planner/local_planner/DRA_MPPI/README.md
+ M planner/local_planner/DRA_MPPI/config/dra_mppi.yaml
+ M planner/local_planner/DRA_MPPI/dra_mppi/__init__.py
+ M planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py
+ M planner/local_planner/DRA_MPPI/dra_mppi/dynamic_risk.py
+ M planner/local_planner/DRA_MPPI/dra_mppi/grid_costmap.py
+ M planner/local_planner/DRA_MPPI/dra_mppi/guide_conditioned.py
+ M planner/local_planner/DRA_MPPI/dra_mppi/mppi_controller.py
+ M planner/local_planner/DRA_MPPI/package.xml
+ M planner/local_planner/DRA_MPPI/test/test_configuration.py
+ M planner/local_planner/DRA_MPPI/test/test_dynamic_risk.py
+ M planner/local_planner/DRA_MPPI/test/test_guide_conditioned.py
+ M planner/local_planner/DRA_MPPI/test/test_guide_node.py
+ M planner/local_planner/DRA_MPPI/test/test_mppi_controller.py
+ M planner/local_planner/DRA_MPPI/tools/benchmark_guide_conditioned.py
+?? planner/local_planner/DRA_MPPI/docs/
+?? planner/local_planner/DRA_MPPI/dra_mppi/common_cost.py
+?? planner/local_planner/DRA_MPPI/dra_mppi/cycle_timing.py
+?? planner/local_planner/DRA_MPPI/test/test_common_cost.py
+?? planner/local_planner/DRA_MPPI/tools/validate_closed_loop.py
+?? planner/local_planner/DRA_MPPI/tools/validate_mc_accuracy.py
+?? planner/local_planner/DRA_MPPI/tools/validate_ros_pilot.py
+?? stack_master/scripts/capture_slam_video.py
+?? stack_master/scripts/prepare_slam_video_bag.py
+?? stack_master/scripts/render_slam_video.py
+?? ../amr_project.zip

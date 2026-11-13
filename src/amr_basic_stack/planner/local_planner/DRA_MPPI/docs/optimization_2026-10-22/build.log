@@ -1,0 +1,59 @@
+[0.181s] WARNING:colcon.colcon_core.package_selection:Some selected packages are already built in one or more underlay workspaces:
+	'dra_mppi' is in: /home/smoc/2026amr_ws/install/dra_mppi
+If a package in a merged underlay workspace is overridden and it installs headers, then all packages in the overlay must sort their include directories by workspace order. Failure to do so may result in build failures or undefined behavior at run time.
+If the overridden package is used by another package in any underlay, then the overriding package in the overlay must be API and ABI compatible or undefined behavior at run time may occur.
+
+If you understand the risks and want to override a package anyways, add the following to the command line:
+	--allow-overriding dra_mppi
+
+This may be promoted to an error in a future release of colcon-override-check.
+Starting >>> dra_mppi
+running egg_info
+writing ../../../../../build/dra_mppi/dra_mppi.egg-info/PKG-INFO
+writing dependency_links to ../../../../../build/dra_mppi/dra_mppi.egg-info/dependency_links.txt
+writing entry points to ../../../../../build/dra_mppi/dra_mppi.egg-info/entry_points.txt
+writing requirements to ../../../../../build/dra_mppi/dra_mppi.egg-info/requires.txt
+writing top-level names to ../../../../../build/dra_mppi/dra_mppi.egg-info/top_level.txt
+reading manifest file '../../../../../build/dra_mppi/dra_mppi.egg-info/SOURCES.txt'
+writing manifest file '../../../../../build/dra_mppi/dra_mppi.egg-info/SOURCES.txt'
+running build
+running build_py
+copying dra_mppi/mecanum_model.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/control_sampling.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/mppi_controller.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/common_cost.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/gaussian_disk.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/cycle_timing.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/grid_costmap.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/dra_mppi_node.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/guide_conditioned.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/__init__.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/geometry.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/dynamic_risk.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+copying dra_mppi/path_handler.py -> /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi
+running install
+running install_lib
+copying /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi/mppi_controller.py -> /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi
+copying /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi/gaussian_disk.py -> /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi
+copying /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi/dra_mppi_node.py -> /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi
+copying /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi/guide_conditioned.py -> /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi
+copying /home/smoc/2026amr_ws/build/dra_mppi/build/lib/dra_mppi/dynamic_risk.py -> /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi
+byte-compiling /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi/mppi_controller.py to mppi_controller.cpython-312.pyc
+byte-compiling /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi/gaussian_disk.py to gaussian_disk.cpython-312.pyc
+byte-compiling /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi/dra_mppi_node.py to dra_mppi_node.cpython-312.pyc
+byte-compiling /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi/guide_conditioned.py to guide_conditioned.cpython-312.pyc
+byte-compiling /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi/dynamic_risk.py to dynamic_risk.cpython-312.pyc
+running install_data
+copying resource/dra_mppi -> /home/smoc/2026amr_ws/install/dra_mppi/share/ament_index/resource_index/packages
+copying package.xml -> /home/smoc/2026amr_ws/install/dra_mppi/share/dra_mppi
+copying config/dra_mppi.yaml -> /home/smoc/2026amr_ws/install/dra_mppi/share/dra_mppi/config
+copying launch/dra_mppi.launch.py -> /home/smoc/2026amr_ws/install/dra_mppi/share/dra_mppi/launch
+running install_egg_info
+removing '/home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi-0.1.0-py3.12.egg-info' (and everything under it)
+Copying ../../../../../build/dra_mppi/dra_mppi.egg-info to /home/smoc/2026amr_ws/install/dra_mppi/lib/python3.12/site-packages/dra_mppi-0.1.0-py3.12.egg-info
+running install_scripts
+Installing dra_mppi_node script to /home/smoc/2026amr_ws/install/dra_mppi/lib/dra_mppi
+writing list of installed files to '/home/smoc/2026amr_ws/build/dra_mppi/install.log'
+Finished <<< dra_mppi [0.66s]
+
+Summary: 1 package finished [0.80s]

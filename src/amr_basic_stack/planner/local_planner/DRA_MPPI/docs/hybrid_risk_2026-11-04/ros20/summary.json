@@ -1,0 +1,92 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 100,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 0,
+  "callback_over_200ms_ratio": 0.0,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 118.73814597725868,
+    "p50": 118.66342928260565,
+    "p95": 123.44774522352964,
+    "p99": 126.1271581053734,
+    "max": 129.7390190884471
+  },
+  "backend": "split",
+  "workers": 2,
+  "frozen_nominal": false,
+  "statuses": {
+    "normal": 100
+  },
+  "fallback_ratio": 0.0,
+  "deadline_miss_ratio": 0.0,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 107.3520186310634,
+    "p50": 107.31388279236853,
+    "p95": 112.20176368951797,
+    "p99": 116.95343760773542,
+    "max": 121.08223419636488
+  },
+  "normal_optimizer_ms": {
+    "count": 100,
+    "mean": 102.88006726186723,
+    "p50": 102.80977911315858,
+    "p95": 107.53628336824477,
+    "p99": 109.61005413439125,
+    "max": 110.43146811425686
+  },
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 13.418144187889993,
+    "p50": 13.311411254107952,
+    "p95": 14.440421550534666,
+    "p99": 15.1575717516244,
+    "max": 25.804635137319565
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 199.9854417797178,
+    "p50": 200.65295929089189,
+    "p95": 205.76448740903288,
+    "p99": 210.4450201522559,
+    "max": 211.95515990257263
+  },
+  "receive_interval_ms": {
+    "count": 100,
+    "mean": 199.98537468723953,
+    "p50": 200.63516753725708,
+    "p95": 205.75691871345043,
+    "p99": 210.45307447668165,
+    "max": 211.8234159424901
+  },
+  "receive_count_in_window": 100,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "covariance": "anisotropic",
+  "risk_mode": "monte_carlo",
+  "final_risk_mode": "gaussian_disk",
+  "max_obstacles": 20,
+  "warmup_cycles": 10,
+  "obstacles": 20,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 500
+}

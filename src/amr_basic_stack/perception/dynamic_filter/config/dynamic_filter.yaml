@@ -1,0 +1,23 @@
+/**:
+  ros__parameters:
+    tracks_topic: /tracked_object_modes
+    filter_radius: 0.35
+    filter_policy: confirmed_person
+    mask_method: radius
+    # Bundled RPLIDAR has no verified beam epochs: pass through unchanged.
+    # Set ros/reversed only for a verified original-scan timing contract.
+    scan_timing_mode: unknown
+    # Initial engineering values, not latency measurements. See README.md.
+    max_extrapolation: 0.30
+    max_measurement_age: 0.30
+    # Keep aligned with object_tracker/config/tracker.yaml.
+    person_label_timeout: 1.0
+    history_duration: 2.0
+    history_size: 100
+    pending_queue_size: 5
+    tf_wait_timeout: 0.15
+    tf_cache_duration: 10.0
+    retry_period: 0.01
+    diagnostic_period: 1.0
+    max_scan_beams: 10000
+    max_tracks: 200

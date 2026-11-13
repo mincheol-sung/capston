@@ -1,0 +1,1809 @@
+{
+  "bag": "/home/smoc/2026amr_ws/bags/mpc_chain_20260923_135606",
+  "duration_s": 350.749485305,
+  "selected_message_counts": {
+    "/global_path": 56,
+    "/tf_static": 1,
+    "/odometry/filtered": 17527,
+    "/camera/color/camera_info": 5254,
+    "/tracked_object_modes": 3440,
+    "/detections": 5222,
+    "/lidar_clusters": 3506,
+    "/detections_fused": 3506,
+    "/detections_tracking": 3506
+  },
+  "frame_counts": {
+    "/global_path": {
+      "map": 56
+    },
+    "/odometry/filtered": {
+      "odom": 17527
+    },
+    "/camera/color/camera_info": {
+      "camera_color_optical_frame": 5254
+    },
+    "/tracked_object_modes": {
+      "odom": 3440
+    },
+    "/detections": {
+      "base_link": 5222
+    },
+    "/lidar_clusters": {
+      "base_link": 3506
+    },
+    "/detections_fused": {
+      "base_link": 3506
+    },
+    "/detections_tracking": {
+      "base_link": 3506
+    }
+  },
+  "detections": {
+    "/detections": {
+      "objects": 7573,
+      "sources": {
+        "0": 7573
+      },
+      "classes": {
+        "chair": 1742,
+        "tv": 1010,
+        "person": 2717,
+        "suitcase": 274,
+        "laptop": 142,
+        "refrigerator": 1278,
+        "toilet": 51,
+        "sink": 61,
+        "bench": 40,
+        "backpack": 34,
+        "handbag": 2,
+        "airplane": 38,
+        "traffic light": 4,
+        "skateboard": 86,
+        "oven": 1,
+        "bottle": 90,
+        "bird": 3
+      },
+      "nonempty_messages": 3694,
+      "unique_header_stamps": 5222
+    },
+    "/lidar_clusters": {
+      "objects": 115839,
+      "sources": {
+        "1": 115839
+      },
+      "classes": {
+        "lidar_cluster": 115839
+      },
+      "nonempty_messages": 3506,
+      "unique_header_stamps": 3506
+    },
+    "/detections_fused": {
+      "objects": 5084,
+      "sources": {
+        "0": 4845,
+        "2": 239
+      },
+      "classes": {
+        "chair": 1162,
+        "tv": 680,
+        "person": 1831,
+        "suitcase": 184,
+        "laptop": 94,
+        "refrigerator": 860,
+        "toilet": 33,
+        "sink": 40,
+        "bench": 28,
+        "backpack": 25,
+        "handbag": 1,
+        "airplane": 24,
+        "skateboard": 61,
+        "oven": 1,
+        "bottle": 56,
+        "bird": 3,
+        "traffic light": 1
+      },
+      "nonempty_messages": 2479,
+      "unique_header_stamps": 3506
+    },
+    "/detections_tracking": {
+      "objects": 120684,
+      "sources": {
+        "0": 4845,
+        "1": 115600,
+        "2": 239
+      },
+      "classes": {
+        "chair": 1162,
+        "lidar_cluster": 115600,
+        "tv": 680,
+        "person": 1831,
+        "suitcase": 184,
+        "laptop": 94,
+        "refrigerator": 860,
+        "toilet": 33,
+        "sink": 40,
+        "bench": 28,
+        "backpack": 25,
+        "handbag": 1,
+        "airplane": 24,
+        "skateboard": 61,
+        "oven": 1,
+        "bottle": 56,
+        "bird": 3,
+        "traffic light": 1
+      },
+      "nonempty_messages": 3506,
+      "unique_header_stamps": 3506
+    }
+  },
+  "image_topics": [],
+  "observation_target_topics": [],
+  "embedded_detection_schema_has_provenance": false,
+  "tracks": {
+    "counts": {
+      "object_samples": 163963,
+      "never_semantic_samples": 143899,
+      "last_source_lidar_samples": 156576,
+      "preliminary_lidar_information_need_samples": 93835
+    },
+    "sources": {
+      "0": 7119,
+      "1": 156576,
+      "2": 268
+    },
+    "classes": {
+      "chair": 8305,
+      "": 145169,
+      "tv": 1835,
+      "person": 2165,
+      "laptop": 698,
+      "refrigerator": 2736,
+      "sink": 112,
+      "toilet": 827,
+      "suitcase": 690,
+      "backpack": 352,
+      "handbag": 1,
+      "airplane": 398,
+      "bench": 166,
+      "skateboard": 315,
+      "bottle": 184,
+      "traffic light": 10
+    },
+    "lifecycle": {
+      "1": 98653,
+      "2": 65310
+    },
+    "unique_ids": 2500,
+    "never_semantic_ids": 2347,
+    "last_source_lidar_ids": 2424,
+    "preliminary_lidar_information_need_ids": 2405,
+    "preliminary_lidar_information_need_frames": 3438,
+    "never_semantic_to_semantic_events": [
+      {
+        "track_id": 51,
+        "time_s": 1.1059818267822266,
+        "first_unclassified_s": -0.009781122207641602,
+        "elapsed_s": 1.1157629489898682,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 157,
+        "time_s": 10.282222032546997,
+        "first_unclassified_s": 4.675941467285156,
+        "elapsed_s": 5.606280565261841,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 392,
+        "time_s": 10.4156494140625,
+        "first_unclassified_s": 9.614952564239502,
+        "elapsed_s": 0.800696849822998,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 487,
+        "time_s": 13.887001276016235,
+        "first_unclassified_s": 10.882646560668945,
+        "elapsed_s": 3.00435471534729,
+        "class_name": "toilet",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 616,
+        "time_s": 15.087943315505981,
+        "first_unclassified_s": 13.2850022315979,
+        "elapsed_s": 1.802941083908081,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 829,
+        "time_s": 17.89160680770874,
+        "first_unclassified_s": 17.024585485458374,
+        "elapsed_s": 0.8670213222503662,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 750,
+        "time_s": 18.291719675064087,
+        "first_unclassified_s": 15.488126039505005,
+        "elapsed_s": 2.803593635559082,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 612,
+        "time_s": 18.69181489944458,
+        "first_unclassified_s": 13.2850022315979,
+        "elapsed_s": 5.40681266784668,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 831,
+        "time_s": 18.758495330810547,
+        "first_unclassified_s": 17.024585485458374,
+        "elapsed_s": 1.7339098453521729,
+        "class_name": "laptop",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 683,
+        "time_s": 18.891854763031006,
+        "first_unclassified_s": 14.420986890792847,
+        "elapsed_s": 4.470867872238159,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 591,
+        "time_s": 21.092339515686035,
+        "first_unclassified_s": 12.683961868286133,
+        "elapsed_s": 8.408377647399902,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 738,
+        "time_s": 22.559359312057495,
+        "first_unclassified_s": 15.288036108016968,
+        "elapsed_s": 7.271323204040527,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 940,
+        "time_s": 22.959457397460938,
+        "first_unclassified_s": 19.158581733703613,
+        "elapsed_s": 3.800875663757324,
+        "class_name": "refrigerator",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 433,
+        "time_s": 23.09283685684204,
+        "first_unclassified_s": 10.082079410552979,
+        "elapsed_s": 13.010757446289062,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1100,
+        "time_s": 26.493834972381592,
+        "first_unclassified_s": 21.4924373626709,
+        "elapsed_s": 5.001397609710693,
+        "class_name": "sink",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1246,
+        "time_s": 26.827221155166626,
+        "first_unclassified_s": 23.759889841079712,
+        "elapsed_s": 3.067331314086914,
+        "class_name": "toilet",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1391,
+        "time_s": 28.760923385620117,
+        "first_unclassified_s": 27.09392738342285,
+        "elapsed_s": 1.6669960021972656,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 229,
+        "time_s": 29.094369888305664,
+        "first_unclassified_s": 7.078898668289185,
+        "elapsed_s": 22.01547122001648,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1413,
+        "time_s": 29.16114091873169,
+        "first_unclassified_s": 27.69405221939087,
+        "elapsed_s": 1.4670886993408203,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 213,
+        "time_s": 29.56179904937744,
+        "first_unclassified_s": 6.478467702865601,
+        "elapsed_s": 23.08333134651184,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1548,
+        "time_s": 39.572514057159424,
+        "first_unclassified_s": 36.96818661689758,
+        "elapsed_s": 2.604327440261841,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1640,
+        "time_s": 48.24338626861572,
+        "first_unclassified_s": 45.84224271774292,
+        "elapsed_s": 2.4011435508728027,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1658,
+        "time_s": 54.84793186187744,
+        "first_unclassified_s": 47.643102169036865,
+        "elapsed_s": 7.204829692840576,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1773,
+        "time_s": 60.45237183570862,
+        "first_unclassified_s": 57.58354067802429,
+        "elapsed_s": 2.868831157684326,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1761,
+        "time_s": 63.65689516067505,
+        "first_unclassified_s": 56.649561405181885,
+        "elapsed_s": 7.007333755493164,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1874,
+        "time_s": 67.13052797317505,
+        "first_unclassified_s": 66.12838077545166,
+        "elapsed_s": 1.0021471977233887,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1903,
+        "time_s": 69.93685722351074,
+        "first_unclassified_s": 69.13505339622498,
+        "elapsed_s": 0.8018038272857666,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1948,
+        "time_s": 75.08104586601257,
+        "first_unclassified_s": 73.47798800468445,
+        "elapsed_s": 1.603057861328125,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1966,
+        "time_s": 75.88241934776306,
+        "first_unclassified_s": 75.34817171096802,
+        "elapsed_s": 0.534247636795044,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1970,
+        "time_s": 77.15131425857544,
+        "first_unclassified_s": 75.74885869026184,
+        "elapsed_s": 1.4024555683135986,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1960,
+        "time_s": 83.62918424606323,
+        "first_unclassified_s": 74.74709415435791,
+        "elapsed_s": 8.882090091705322,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2095,
+        "time_s": 90.23868918418884,
+        "first_unclassified_s": 87.83530521392822,
+        "elapsed_s": 2.40338397026062,
+        "class_name": "chair",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2225,
+        "time_s": 93.37672662734985,
+        "first_unclassified_s": 92.8424825668335,
+        "elapsed_s": 0.5342440605163574,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 579,
+        "time_s": 93.84438347816467,
+        "first_unclassified_s": 12.483814716339111,
+        "elapsed_s": 81.36056876182556,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1234,
+        "time_s": 93.97800850868225,
+        "first_unclassified_s": 23.55977702140808,
+        "elapsed_s": 70.41823148727417,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 1452,
+        "time_s": 96.44837546348572,
+        "first_unclassified_s": 28.560887813568115,
+        "elapsed_s": 67.8874876499176,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2536,
+        "time_s": 98.05069494247437,
+        "first_unclassified_s": 95.0463318824768,
+        "elapsed_s": 3.0043630599975586,
+        "class_name": "suitcase",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2578,
+        "time_s": 98.25098514556885,
+        "first_unclassified_s": 95.64721059799194,
+        "elapsed_s": 2.6037745475769043,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2185,
+        "time_s": 98.71832633018494,
+        "first_unclassified_s": 92.57545590400696,
+        "elapsed_s": 6.1428704261779785,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2580,
+        "time_s": 99.11890053749084,
+        "first_unclassified_s": 95.64721059799194,
+        "elapsed_s": 3.4716899394989014,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2749,
+        "time_s": 103.32484149932861,
+        "first_unclassified_s": 99.71976017951965,
+        "elapsed_s": 3.60508131980896,
+        "class_name": "suitcase",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2815,
+        "time_s": 104.86029386520386,
+        "first_unclassified_s": 103.32484149932861,
+        "elapsed_s": 1.5354523658752441,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3099,
+        "time_s": 108.86607551574707,
+        "first_unclassified_s": 107.73108243942261,
+        "elapsed_s": 1.134993076324463,
+        "class_name": "handbag",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 2999,
+        "time_s": 109.66714549064636,
+        "first_unclassified_s": 106.72951483726501,
+        "elapsed_s": 2.9376306533813477,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3210,
+        "time_s": 112.33880972862244,
+        "first_unclassified_s": 110.53496503829956,
+        "elapsed_s": 1.803844690322876,
+        "class_name": "bench",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3255,
+        "time_s": 112.33880972862244,
+        "first_unclassified_s": 112.00483059883118,
+        "elapsed_s": 0.33397912979125977,
+        "class_name": "backpack",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3505,
+        "time_s": 119.7547836303711,
+        "first_unclassified_s": 119.15308880805969,
+        "elapsed_s": 0.6016948223114014,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3645,
+        "time_s": 121.0248601436615,
+        "first_unclassified_s": 120.35647249221802,
+        "elapsed_s": 0.6683876514434814,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3655,
+        "time_s": 121.2253806591034,
+        "first_unclassified_s": 120.42330813407898,
+        "elapsed_s": 0.8020725250244141,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3499,
+        "time_s": 121.42584013938904,
+        "first_unclassified_s": 119.01933360099792,
+        "elapsed_s": 2.4065065383911133,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3691,
+        "time_s": 121.62630200386047,
+        "first_unclassified_s": 121.0248601436615,
+        "elapsed_s": 0.6014418601989746,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3715,
+        "time_s": 121.62630200386047,
+        "first_unclassified_s": 121.42584013938904,
+        "elapsed_s": 0.20046186447143555,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3726,
+        "time_s": 121.82676863670349,
+        "first_unclassified_s": 121.55948114395142,
+        "elapsed_s": 0.2672874927520752,
+        "class_name": "person",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3431,
+        "time_s": 122.29453539848328,
+        "first_unclassified_s": 117.21355366706848,
+        "elapsed_s": 5.080981731414795,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3443,
+        "time_s": 122.829185962677,
+        "first_unclassified_s": 117.81554746627808,
+        "elapsed_s": 5.013638496398926,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3717,
+        "time_s": 126.96129584312439,
+        "first_unclassified_s": 121.42584013938904,
+        "elapsed_s": 5.535455703735352,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3896,
+        "time_s": 131.15959811210632,
+        "first_unclassified_s": 126.42834830284119,
+        "elapsed_s": 4.731249809265137,
+        "class_name": "laptop",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3898,
+        "time_s": 132.16047859191895,
+        "first_unclassified_s": 127.02790451049805,
+        "elapsed_s": 5.132574081420898,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4057,
+        "time_s": 132.16047859191895,
+        "first_unclassified_s": 131.62660574913025,
+        "elapsed_s": 0.5338728427886963,
+        "class_name": "laptop",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3694,
+        "time_s": 132.56046557426453,
+        "first_unclassified_s": 121.0248601436615,
+        "elapsed_s": 11.535605430603027,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3737,
+        "time_s": 132.82703304290771,
+        "first_unclassified_s": 121.75994634628296,
+        "elapsed_s": 11.067086696624756,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3901,
+        "time_s": 133.827490568161,
+        "first_unclassified_s": 127.62779593467712,
+        "elapsed_s": 6.199694633483887,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 3845,
+        "time_s": 133.89423251152039,
+        "first_unclassified_s": 123.36349606513977,
+        "elapsed_s": 10.530736446380615,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4056,
+        "time_s": 134.1612069606781,
+        "first_unclassified_s": 131.62660574913025,
+        "elapsed_s": 2.5346012115478516,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4008,
+        "time_s": 135.8302185535431,
+        "first_unclassified_s": 130.8264548778534,
+        "elapsed_s": 5.003763675689697,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4177,
+        "time_s": 135.8302185535431,
+        "first_unclassified_s": 134.1612069606781,
+        "elapsed_s": 1.6690115928649902,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4260,
+        "time_s": 136.03055047988892,
+        "first_unclassified_s": 135.89699459075928,
+        "elapsed_s": 0.13355588912963867,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4225,
+        "time_s": 136.83196377754211,
+        "first_unclassified_s": 135.56312441825867,
+        "elapsed_s": 1.2688393592834473,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4007,
+        "time_s": 136.89875602722168,
+        "first_unclassified_s": 130.8264548778534,
+        "elapsed_s": 6.072301149368286,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4282,
+        "time_s": 137.49992752075195,
+        "first_unclassified_s": 136.09732937812805,
+        "elapsed_s": 1.4025981426239014,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4244,
+        "time_s": 137.9007604122162,
+        "first_unclassified_s": 135.6966700553894,
+        "elapsed_s": 2.2040903568267822,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4281,
+        "time_s": 138.70264554023743,
+        "first_unclassified_s": 136.09732937812805,
+        "elapsed_s": 2.605316162109375,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4416,
+        "time_s": 139.03686475753784,
+        "first_unclassified_s": 138.70264554023743,
+        "elapsed_s": 0.33421921730041504,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4414,
+        "time_s": 139.4376413822174,
+        "first_unclassified_s": 138.70264554023743,
+        "elapsed_s": 0.7349958419799805,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4411,
+        "time_s": 139.50438332557678,
+        "first_unclassified_s": 138.70264554023743,
+        "elapsed_s": 0.8017377853393555,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4214,
+        "time_s": 139.7046091556549,
+        "first_unclassified_s": 135.42958402633667,
+        "elapsed_s": 4.275025129318237,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4578,
+        "time_s": 148.4482774734497,
+        "first_unclassified_s": 141.5069179534912,
+        "elapsed_s": 6.941359519958496,
+        "class_name": "airplane",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4666,
+        "time_s": 149.3159110546112,
+        "first_unclassified_s": 146.8464810848236,
+        "elapsed_s": 2.4694299697875977,
+        "class_name": "bench",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4950,
+        "time_s": 156.1235339641571,
+        "first_unclassified_s": 154.18828320503235,
+        "elapsed_s": 1.9352507591247559,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 4948,
+        "time_s": 160.59494471549988,
+        "first_unclassified_s": 154.1215522289276,
+        "elapsed_s": 6.473392486572266,
+        "class_name": "bench",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5287,
+        "time_s": 162.9973406791687,
+        "first_unclassified_s": 161.39574575424194,
+        "elapsed_s": 1.6015949249267578,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5143,
+        "time_s": 163.39773845672607,
+        "first_unclassified_s": 158.7931146621704,
+        "elapsed_s": 4.604623794555664,
+        "class_name": "skateboard",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5360,
+        "time_s": 165.80043816566467,
+        "first_unclassified_s": 164.26526308059692,
+        "elapsed_s": 1.535175085067749,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5304,
+        "time_s": 166.06753373146057,
+        "first_unclassified_s": 162.26327466964722,
+        "elapsed_s": 3.8042590618133545,
+        "class_name": "skateboard",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5369,
+        "time_s": 166.40134835243225,
+        "first_unclassified_s": 164.46546530723572,
+        "elapsed_s": 1.9358830451965332,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5372,
+        "time_s": 166.40134835243225,
+        "first_unclassified_s": 164.59893202781677,
+        "elapsed_s": 1.8024163246154785,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5477,
+        "time_s": 169.00419354438782,
+        "first_unclassified_s": 166.53484630584717,
+        "elapsed_s": 2.4693472385406494,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5592,
+        "time_s": 170.00520610809326,
+        "first_unclassified_s": 168.87072491645813,
+        "elapsed_s": 1.1344811916351318,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5718,
+        "time_s": 173.40865802764893,
+        "first_unclassified_s": 171.07295274734497,
+        "elapsed_s": 2.335705280303955,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5714,
+        "time_s": 173.60885977745056,
+        "first_unclassified_s": 171.07295274734497,
+        "elapsed_s": 2.535907030105591,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5971,
+        "time_s": 177.2124719619751,
+        "first_unclassified_s": 175.6108729839325,
+        "elapsed_s": 1.6015989780426025,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5906,
+        "time_s": 178.4804162979126,
+        "first_unclassified_s": 173.87579345703125,
+        "elapsed_s": 4.604622840881348,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5908,
+        "time_s": 178.61389565467834,
+        "first_unclassified_s": 173.87579345703125,
+        "elapsed_s": 4.738102197647095,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5961,
+        "time_s": 178.88085508346558,
+        "first_unclassified_s": 175.21047163009644,
+        "elapsed_s": 3.6703834533691406,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 5869,
+        "time_s": 179.68168306350708,
+        "first_unclassified_s": 173.2751908302307,
+        "elapsed_s": 6.406492233276367,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 6200,
+        "time_s": 183.68586564064026,
+        "first_unclassified_s": 178.88085508346558,
+        "elapsed_s": 4.805010557174683,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 6524,
+        "time_s": 185.22075772285461,
+        "first_unclassified_s": 183.48566317558289,
+        "elapsed_s": 1.7350945472717285,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 6198,
+        "time_s": 185.68811178207397,
+        "first_unclassified_s": 178.88085508346558,
+        "elapsed_s": 6.807256698608398,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 6655,
+        "time_s": 186.68940377235413,
+        "first_unclassified_s": 185.28750705718994,
+        "elapsed_s": 1.4018967151641846,
+        "class_name": "suitcase",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 6697,
+        "time_s": 189.29185318946838,
+        "first_unclassified_s": 188.49109840393066,
+        "elapsed_s": 0.8007547855377197,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 6702,
+        "time_s": 190.1593313217163,
+        "first_unclassified_s": 188.95820689201355,
+        "elapsed_s": 1.2011244297027588,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 6750,
+        "time_s": 194.36325216293335,
+        "first_unclassified_s": 193.56250715255737,
+        "elapsed_s": 0.8007450103759766,
+        "class_name": "refrigerator",
+        "last_source": 2,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 6948,
+        "time_s": 200.37130308151245,
+        "first_unclassified_s": 200.10446119308472,
+        "elapsed_s": 0.2668418884277344,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7146,
+        "time_s": 203.3737609386444,
+        "first_unclassified_s": 203.1735908985138,
+        "elapsed_s": 0.20017004013061523,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7127,
+        "time_s": 203.9075963497162,
+        "first_unclassified_s": 202.9734401702881,
+        "elapsed_s": 0.9341561794281006,
+        "class_name": "skateboard",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7114,
+        "time_s": 203.97432470321655,
+        "first_unclassified_s": 202.90672183036804,
+        "elapsed_s": 1.0676028728485107,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7192,
+        "time_s": 206.6428985595703,
+        "first_unclassified_s": 205.17523431777954,
+        "elapsed_s": 1.4676642417907715,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7060,
+        "time_s": 209.84502363204956,
+        "first_unclassified_s": 202.17279148101807,
+        "elapsed_s": 7.672232151031494,
+        "class_name": "backpack",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7845,
+        "time_s": 214.45024228096008,
+        "first_unclassified_s": 213.9831783771515,
+        "elapsed_s": 0.46706390380859375,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7858,
+        "time_s": 215.18500566482544,
+        "first_unclassified_s": 214.0498697757721,
+        "elapsed_s": 1.1351358890533447,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7007,
+        "time_s": 215.25181341171265,
+        "first_unclassified_s": 200.97170972824097,
+        "elapsed_s": 14.28010368347168,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7902,
+        "time_s": 217.45588970184326,
+        "first_unclassified_s": 214.45024228096008,
+        "elapsed_s": 3.0056474208831787,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 7131,
+        "time_s": 220.65811610221863,
+        "first_unclassified_s": 203.1068742275238,
+        "elapsed_s": 17.551241874694824,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8119,
+        "time_s": 222.7923719882965,
+        "first_unclassified_s": 220.79149460792542,
+        "elapsed_s": 2.0008773803710938,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8521,
+        "time_s": 225.659893989563,
+        "first_unclassified_s": 225.0597038269043,
+        "elapsed_s": 0.6001901626586914,
+        "class_name": "toilet",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8680,
+        "time_s": 232.13166618347168,
+        "first_unclassified_s": 230.86434602737427,
+        "elapsed_s": 1.267320156097412,
+        "class_name": "bottle",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8603,
+        "time_s": 232.46538043022156,
+        "first_unclassified_s": 227.32871198654175,
+        "elapsed_s": 5.13666844367981,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8674,
+        "time_s": 234.86863708496094,
+        "first_unclassified_s": 230.730943441391,
+        "elapsed_s": 4.137693643569946,
+        "class_name": "bottle",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8704,
+        "time_s": 239.34003925323486,
+        "first_unclassified_s": 231.53135633468628,
+        "elapsed_s": 7.808682918548584,
+        "class_name": "skateboard",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8778,
+        "time_s": 241.7441864013672,
+        "first_unclassified_s": 232.93298625946045,
+        "elapsed_s": 8.811200141906738,
+        "class_name": "laptop",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8772,
+        "time_s": 241.94430375099182,
+        "first_unclassified_s": 232.86617994308472,
+        "elapsed_s": 9.078123807907104,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 9073,
+        "time_s": 242.61138772964478,
+        "first_unclassified_s": 240.8770203590393,
+        "elapsed_s": 1.7343673706054688,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 9245,
+        "time_s": 246.74812078475952,
+        "first_unclassified_s": 244.4127595424652,
+        "elapsed_s": 2.3353612422943115,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 9088,
+        "time_s": 247.81534957885742,
+        "first_unclassified_s": 240.94372415542603,
+        "elapsed_s": 6.8716254234313965,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 9170,
+        "time_s": 249.21608090400696,
+        "first_unclassified_s": 241.67748022079468,
+        "elapsed_s": 7.53860068321228,
+        "class_name": "bottle",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 9266,
+        "time_s": 249.21608090400696,
+        "first_unclassified_s": 246.2144422531128,
+        "elapsed_s": 3.001638650894165,
+        "class_name": "chair",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8599,
+        "time_s": 249.34948086738586,
+        "first_unclassified_s": 227.2619273662567,
+        "elapsed_s": 22.08755350112915,
+        "class_name": "bottle",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 8033,
+        "time_s": 249.74970054626465,
+        "first_unclassified_s": 217.05493545532227,
+        "elapsed_s": 32.69476509094238,
+        "class_name": "bench",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 9268,
+        "time_s": 250.35000371932983,
+        "first_unclassified_s": 246.2144422531128,
+        "elapsed_s": 4.135561466217041,
+        "class_name": "bench",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 9805,
+        "time_s": 274.4382622241974,
+        "first_unclassified_s": 272.90293884277344,
+        "elapsed_s": 1.5353233814239502,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 9741,
+        "time_s": 274.70516705513,
+        "first_unclassified_s": 271.30115032196045,
+        "elapsed_s": 3.4040167331695557,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 10067,
+        "time_s": 280.5112075805664,
+        "first_unclassified_s": 275.5058853626251,
+        "elapsed_s": 5.005322217941284,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 10183,
+        "time_s": 280.7780907154083,
+        "first_unclassified_s": 280.1108853816986,
+        "elapsed_s": 0.6672053337097168,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 10239,
+        "time_s": 281.37857127189636,
+        "first_unclassified_s": 281.1116921901703,
+        "elapsed_s": 0.2668790817260742,
+        "class_name": "suitcase",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 10102,
+        "time_s": 282.11249804496765,
+        "first_unclassified_s": 276.039701461792,
+        "elapsed_s": 6.072796583175659,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 10251,
+        "time_s": 283.58052492141724,
+        "first_unclassified_s": 281.31185126304626,
+        "elapsed_s": 2.2686736583709717,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 10017,
+        "time_s": 284.7149877548218,
+        "first_unclassified_s": 275.0387990474701,
+        "elapsed_s": 9.676188707351685,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 10345,
+        "time_s": 286.78364777565,
+        "first_unclassified_s": 283.58052492141724,
+        "elapsed_s": 3.203122854232788,
+        "class_name": "person",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 10413,
+        "time_s": 288.38478779792786,
+        "first_unclassified_s": 285.5160710811615,
+        "elapsed_s": 2.8687167167663574,
+        "class_name": "tv",
+        "last_source": 0,
+        "semantic_age": 0.0
+      },
+      {
+        "track_id": 11002,
+        "time_s": 315.4078357219696,
+        "first_unclassified_s": 314.67393374443054,
+        "elapsed_s": 0.7339019775390625,
+        "class_name": "refrigerator",
+        "last_source": 0,
+        "semantic_age": 0.0
+      }
+    ],
+    "stale_to_fresh_tracker_events": [
+      {
+        "track_id": 612,
+        "time_s": 20.158808708190918,
+        "previous_age": 1.3336293697357178,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 1640,
+        "time_s": 56.24928569793701,
+        "previous_age": 7.80578875541687,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 1761,
+        "time_s": 82.2270896434784,
+        "previous_age": 18.503426551818848,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 2095,
+        "time_s": 92.57545590400696,
+        "previous_age": 2.203251361846924,
+        "class_name": "sink",
+        "last_source": 0
+      },
+      {
+        "track_id": 1246,
+        "time_s": 92.6422131061554,
+        "previous_age": 65.21480107307434,
+        "class_name": "toilet",
+        "last_source": 0
+      },
+      {
+        "track_id": 2614,
+        "time_s": 98.51803731918335,
+        "previous_age": 2.002899169921875,
+        "class_name": "suitcase",
+        "last_source": 0
+      },
+      {
+        "track_id": 2562,
+        "time_s": 99.45271253585815,
+        "previous_age": 1.8025987148284912,
+        "class_name": "tv",
+        "last_source": 0
+      },
+      {
+        "track_id": 2580,
+        "time_s": 104.05919194221497,
+        "previous_age": 1.4019553661346436,
+        "class_name": "suitcase",
+        "last_source": 0
+      },
+      {
+        "track_id": 2848,
+        "time_s": 105.72814750671387,
+        "previous_age": 1.9359922409057617,
+        "class_name": "backpack",
+        "last_source": 2
+      },
+      {
+        "track_id": 2918,
+        "time_s": 106.26220965385437,
+        "previous_age": 1.468672752380371,
+        "class_name": "suitcase",
+        "last_source": 2
+      },
+      {
+        "track_id": 2848,
+        "time_s": 107.33040356636047,
+        "previous_age": 1.5354762077331543,
+        "class_name": "suitcase",
+        "last_source": 0
+      },
+      {
+        "track_id": 2185,
+        "time_s": 108.13175964355469,
+        "previous_age": 4.406349182128906,
+        "class_name": "tv",
+        "last_source": 0
+      },
+      {
+        "track_id": 3099,
+        "time_s": 110.86873865127563,
+        "previous_age": 1.4018633365631104,
+        "class_name": "suitcase",
+        "last_source": 0
+      },
+      {
+        "track_id": 3704,
+        "time_s": 123.23021626472473,
+        "previous_age": 1.9379758834838867,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 3713,
+        "time_s": 123.43013381958008,
+        "previous_age": 1.2026097774505615,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 3691,
+        "time_s": 123.82991647720337,
+        "previous_age": 2.0037312507629395,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 3713,
+        "time_s": 125.16255450248718,
+        "previous_age": 1.4659008979797363,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 3713,
+        "time_s": 126.56159734725952,
+        "previous_age": 1.1991674900054932,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 3715,
+        "time_s": 128.76094222068787,
+        "previous_age": 2.3992254734039307,
+        "class_name": "chair",
+        "last_source": 2
+      },
+      {
+        "track_id": 3715,
+        "time_s": 131.02634572982788,
+        "previous_age": 1.3326218128204346,
+        "class_name": "chair",
+        "last_source": 2
+      },
+      {
+        "track_id": 3431,
+        "time_s": 132.62711024284363,
+        "previous_age": 1.1340560913085938,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 3717,
+        "time_s": 132.960307598114,
+        "previous_age": 1.6674349308013916,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 3431,
+        "time_s": 134.1612069606781,
+        "previous_age": 1.400609016418457,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 3715,
+        "time_s": 134.42820477485657,
+        "previous_age": 3.2683565616607666,
+        "class_name": "chair",
+        "last_source": 2
+      },
+      {
+        "track_id": 3993,
+        "time_s": 137.0323441028595,
+        "previous_age": 1.669475793838501,
+        "class_name": "tv",
+        "last_source": 0
+      },
+      {
+        "track_id": 4057,
+        "time_s": 137.23273634910583,
+        "previous_age": 4.938662528991699,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 4008,
+        "time_s": 137.83395099639893,
+        "previous_age": 1.8701179027557373,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 5869,
+        "time_s": 181.68371987342834,
+        "previous_age": 1.1345114707946777,
+        "class_name": "skateboard",
+        "last_source": 0
+      },
+      {
+        "track_id": 5906,
+        "time_s": 181.95070815086365,
+        "previous_age": 1.7351253032684326,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 6200,
+        "time_s": 188.15744972229004,
+        "previous_age": 1.0676708221435547,
+        "class_name": "refrigerator",
+        "last_source": 0
+      },
+      {
+        "track_id": 6655,
+        "time_s": 189.29185318946838,
+        "previous_age": 2.4689900875091553,
+        "class_name": "backpack",
+        "last_source": 2
+      },
+      {
+        "track_id": 6200,
+        "time_s": 196.5654091835022,
+        "previous_age": 2.202153444290161,
+        "class_name": "refrigerator",
+        "last_source": 2
+      },
+      {
+        "track_id": 6750,
+        "time_s": 197.69989252090454,
+        "previous_age": 1.0677595138549805,
+        "class_name": "refrigerator",
+        "last_source": 2
+      },
+      {
+        "track_id": 6750,
+        "time_s": 200.50472950935364,
+        "previous_age": 2.471222400665283,
+        "class_name": "refrigerator",
+        "last_source": 0
+      },
+      {
+        "track_id": 6655,
+        "time_s": 201.70566058158875,
+        "previous_age": 12.213613271713257,
+        "class_name": "suitcase",
+        "last_source": 0
+      },
+      {
+        "track_id": 6655,
+        "time_s": 203.9075963497162,
+        "previous_age": 1.200967788696289,
+        "class_name": "backpack",
+        "last_source": 0
+      },
+      {
+        "track_id": 7098,
+        "time_s": 204.7082486152649,
+        "previous_age": 1.6013848781585693,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 7127,
+        "time_s": 208.5775182247162,
+        "previous_age": 4.536496877670288,
+        "class_name": "chair",
+        "last_source": 0
+      },
+      {
+        "track_id": 8674,
+        "time_s": 238.47262597084045,
+        "previous_age": 3.4705445766448975,
+        "class_name": "bottle",
+        "last_source": 0
+      },
+      {
+        "track_id": 9018,
+        "time_s": 241.8775987625122,
+        "previous_age": 1.267399549484253,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 9170,
+        "time_s": 250.55011630058289,
+        "previous_age": 1.2006275653839111,
+        "class_name": "traffic light",
+        "last_source": 0
+      },
+      {
+        "track_id": 10067,
+        "time_s": 282.512845993042,
+        "previous_age": 1.401129961013794,
+        "class_name": "person",
+        "last_source": 0
+      },
+      {
+        "track_id": 10239,
+        "time_s": 282.91323924064636,
+        "previous_age": 1.401202917098999,
+        "class_name": "suitcase",
+        "last_source": 0
+      },
+      {
+        "track_id": 10335,
+        "time_s": 293.79106855392456,
+        "previous_age": 1.3341538906097412,
+        "class_name": "suitcase",
+        "last_source": 2
+      },
+      {
+        "track_id": 10335,
+        "time_s": 298.9963676929474,
+        "previous_age": 1.0005221366882324,
+        "class_name": "suitcase",
+        "last_source": 2
+      }
+    ]
+  },
+  "camera": {
+    "width": 640,
+    "height": 480,
+    "fx": 386.8457336425781,
+    "cx": 319.15692138671875,
+    "frame": "camera_color_optical_frame",
+    "horizontal_fov_deg": 79.19515914947699,
+    "note": "Pinhole estimate from recorded CameraInfo, not effective detection FOV"
+  },
+  "camera_static_transforms": [
+    {
+      "parent": "camera_link",
+      "child": "camera_color_frame",
+      "xyz": [
+        0.0,
+        -0.059,
+        0.0
+      ],
+      "xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "parent": "base_link",
+      "child": "camera_link",
+      "xyz": [
+        0.11398,
+        0.0475,
+        0.092772
+      ],
+      "xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "limitations": [
+    "Track IDs are recorded associations, not ground-truth identity.",
+    "semantic_age reset is not proof of a distinct camera exposure; legacy fusion can reuse detections.",
+    "Preliminary information-need gate excludes path relevance, turn feasibility, and occlusion.",
+    "No counterfactual heading or new camera views can be tested from fixed recorded observations.",
+    "No track-ID epoch reset inferred; events only compare adjacent samples within 0.5 s."
+  ]
+}

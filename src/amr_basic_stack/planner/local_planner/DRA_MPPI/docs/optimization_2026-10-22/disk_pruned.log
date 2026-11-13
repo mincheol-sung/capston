@@ -1,0 +1,8 @@
+isotropic 100 2 gaussian_disk mean/p99 16.05 17.37
+isotropic 100 2 mc_high_final_disk mean/p99 182.19 185.3
+isotropic 500 2 gaussian_disk mean/p99 22.79 22.94
+isotropic 500 2 mc_high_final_disk mean/p99 322.04 323.7
+anisotropic 100 2 gaussian_disk mean/p99 22.41 24.08
+anisotropic 100 2 mc_high_final_disk mean/p99 164.97 166.64
+anisotropic 500 2 gaussian_disk mean/p99 55.56 56.38
+anisotropic 500 2 mc_high_final_disk mean/p99 324.63 333.89

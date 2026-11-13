@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>서보 신호 흐름 — 블록마다 펼치기</title>
+<style>
+:root{
+  --ground:#EFF2F1; --surface:#FFFFFF; --well:#E3E9E7; --line:#CFD9D5;
+  --ink:#16201D; --ink-2:#55635E; --ink-3:#87938D;
+  --accent:#0B6E5F; --accent-soft:#D6E8E3;
+  --gate:#9E5A15; --gate-soft:#F4E4CE; --gate-line:#D9AF7C;
+  --blue:#2B5C8A; --blue-soft:#D9E6F2;
+  --shadow:0 1px 2px rgba(22,32,29,.05), 0 8px 24px -16px rgba(22,32,29,.28);
+  --sans:"IBM Plex Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono:"IBM Plex Mono", "IBM Plex Sans KR", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F1513; --surface:#18211E; --well:#212B28; --line:#2E3A36;
+    --ink:#E3EAE7; --ink-2:#9BA9A3; --ink-3:#6A7873;
+    --accent:#57C3AC; --accent-soft:#12302A;
+    --gate:#DA9C52; --gate-soft:#2E220F; --gate-line:#6B4E27;
+    --blue:#7FB3E0; --blue-soft:#14273A;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0F1513; --surface:#18211E; --well:#212B28; --line:#2E3A36;
+  --ink:#E3EAE7; --ink-2:#9BA9A3; --ink-3:#6A7873;
+  --accent:#57C3AC; --accent-soft:#12302A;
+  --gate:#DA9C52; --gate-soft:#2E220F; --gate-line:#6B4E27;
+  --blue:#7FB3E0; --blue-soft:#14273A;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:56px 24px 100px}
+.kicker{font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+h1{margin:0 0 12px;font-size:clamp(28px,4.6vw,40px);font-weight:700;letter-spacing:-.022em;line-height:1.16;text-wrap:balance}
+.standfirst{margin:0;max-width:64ch;color:var(--ink-2);font-size:16.5px}
+section{margin-top:52px}
+h2{margin:0 0 6px;font-size:13px;font-weight:600;font-family:var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--accent)}
+h2 .n{color:var(--ink-3);margin-right:10px}
+p{margin:0 0 12px;max-width:66ch}
+p.lead{color:var(--ink-2);margin-bottom:16px}
+pre{margin:10px 0 16px;padding:15px 17px;background:var(--surface);border:1px solid var(--line);border-radius:4px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.62}
+code{font-family:var(--mono);font-size:.885em;background:var(--well);padding:1px 5px;border-radius:3px}
+figure{margin:18px 0 22px;background:var(--surface);border:1px solid var(--line);border-radius:4px;box-shadow:var(--shadow);overflow:hidden}
+.canvas{overflow-x:auto;padding:22px 20px 8px}
+figure svg{display:block;max-width:100%;height:auto;color:var(--ink)}
+figcaption{padding:12px 20px 14px;border-top:1px solid var(--line);background:var(--well);font-size:13.5px;color:var(--ink-2)}
+figcaption b{color:var(--ink);font-weight:600}
+.blk{fill:var(--surface)} .stk{stroke:currentColor;stroke-opacity:.55;fill:none}
+.wire{stroke:currentColor;stroke-opacity:.75;fill:none;stroke-width:1.5}
+.fb1{stroke:var(--gate);fill:none;stroke-width:1.8}
+.fb2{stroke:var(--blue);fill:none;stroke-width:1.8}
+.fb3{stroke:var(--accent);fill:none;stroke-width:1.8}
+.lbl{fill:currentColor;font-family:var(--sans);font-size:15px;font-weight:600}
+.sub{fill:currentColor;fill-opacity:.62;font-family:var(--mono);font-size:11.5px}
+.sig{fill:currentColor;fill-opacity:.85;font-family:var(--mono);font-size:13px;font-weight:500}
+.sigd{fill:currentColor;fill-opacity:.5;font-family:var(--mono);font-size:10px}
+.t1{fill:var(--gate);font-family:var(--mono);font-size:12.5px;font-weight:600}
+.t2{fill:var(--blue);font-family:var(--mono);font-size:12.5px;font-weight:600}
+.t3{fill:var(--accent);font-family:var(--mono);font-size:12.5px;font-weight:600}
+.encl{stroke:currentColor;stroke-opacity:.28;stroke-dasharray:5 4;fill:none}
+.gat{fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.5}
+.gatt{fill:var(--gate);font-family:var(--mono);font-size:11px;font-weight:600}
+.pm{fill:currentColor;fill-opacity:.7;font-family:var(--mono);font-size:12px;font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:6px 0 14px}
+.scroll{overflow-x:auto}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
+th{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
+td.sym{font-family:var(--mono)}
+td.num{font-family:var(--mono);text-align:right}
+tbody tr:last-child td{border-bottom:0}
+table.zebra tbody tr:nth-child(even){background:var(--well)}
+tr.grp td{background:var(--accent-soft);font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600;padding:5px 10px}
+.note{padding:14px 17px;border-radius:3px;background:var(--gate-soft);border:1px solid var(--gate-line);border-left:3px solid var(--gate);font-size:14.5px;margin:16px 0}
+.note.ok{background:var(--accent-soft);border-color:var(--accent);border-left-color:var(--accent)}
+.sw{display:inline-block;width:22px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:700px){.wrap{padding:38px 16px 70px}}
+.wrap{max-width:1100px;margin:0 auto;padding:32px 20px 60px}
+</style></head><body><div class="wrap">
+<h2><span class="n">02</span>전체 신호 흐름 — 블록마다 펼치기</h2>
+<p class="lead">위 줄이 제어기(mpc_node.py, 20 Hz), 아래 줄이 플랜트. 가로로 스크롤된다.</p>
+<figure>
+<div class="canvas">
+<svg viewBox="0 0 1200 540" role="img" aria-label="제어기(위 줄)와 플랜트(아래 줄)를 나눈 전체 신호 흐름도. 위 줄: 궤적 생성기, 오차 합산점, MPC, 적분기, 피드포워드 합산점, L1 클립. 아래 줄: 역기구학, 내부 합산점, PI, 모터, 타이어, 적분. cmd_vel이 위에서 아래로 내려가고, 오도메트리가 아래에서 위로 되먹임된다." style="min-width:900px">
+<defs><marker id="f1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor" fill-opacity=".8"/></marker>
+<marker id="fg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--gate)"/></marker>
+<marker id="fb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--blue)"/></marker>
+<marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker></defs>
+
+<!-- ═══ 위 줄: 제어기 ═══ -->
+<rect class="encl" x="88" y="8" width="560" height="190" rx="5"/>
+<text class="sub" x="368" y="214" text-anchor="middle" style="font-size:12px">제어기 — mpc_node.py, 20 Hz</text>
+
+<!-- 궤적 생성기 (⊕ 위) -->
+<rect class="blk stk" x="100" y="26" width="100" height="44" rx="3"/>
+<text class="lbl" x="150" y="45" text-anchor="middle">궤적 생성기</text>
+<text class="sub" x="150" y="61" text-anchor="middle">Ẋ_r = f(X_r, u_r)</text>
+<line class="wire" x1="150" y1="70" x2="150" y2="94" marker-end="url(#f1)"/>
+<text class="sig" x="160" y="86">X_r</text>
+
+<!-- 지평 + 피드포워드 상단 경로 -->
+<path class="wire" d="M200 40 L480 40"/>
+<path class="wire" d="M260 40 L260 82" marker-end="url(#f1)"/>
+<path class="wire" d="M480 40 L480 96" marker-end="url(#f1)"/>
+<text class="sig" x="300" y="34">X_r(k+i), u_r(k+i)  지평</text>
+<text class="sig" x="488" y="66">u_r</text>
+<text class="sub" x="488" y="80">피드포워드</text>
+
+<!-- ⊕1 -->
+<circle class="blk stk" cx="150" cy="110" r="13"/>
+<text class="pm" x="139" y="100">+</text><text class="pm" x="139" y="134">−</text>
+<line class="wire" x1="163" y1="110" x2="198" y2="110" marker-end="url(#f1)"/>
+<text class="sig" x="181" y="100" text-anchor="middle">X_e</text>
+
+<!-- MPC -->
+<rect class="blk stk" x="200" y="82" width="120" height="56" rx="3"/>
+<text class="lbl" x="260" y="105" text-anchor="middle">MPC</text>
+<text class="sub" x="260" y="123" text-anchor="middle">F, Φ → ΔU*</text>
+<line class="wire" x1="320" y1="110" x2="348" y2="110" marker-end="url(#f1)"/>
+<text class="sig" x="334" y="100" text-anchor="middle">Δu</text>
+
+<!-- 적분 -->
+<rect class="blk stk" x="350" y="82" width="90" height="56" rx="3"/>
+<text class="lbl" x="395" y="105" text-anchor="middle">1/(1−q⁻¹)</text>
+<text class="sub" x="395" y="123" text-anchor="middle">적분기</text>
+<line class="wire" x1="440" y1="110" x2="466" y2="110" marker-end="url(#f1)"/>
+<circle cx="455" cy="110" r="3.5" fill="var(--accent)"/>
+<text class="sig" x="453" y="100" text-anchor="middle">u_e</text>
+
+<!-- ⊕2 피드포워드 -->
+<circle class="blk stk" cx="480" cy="110" r="13"/>
+<text class="pm" x="469" y="100">+</text><text class="pm" x="469" y="134">−</text>
+<line class="wire" x1="493" y1="110" x2="518" y2="110" marker-end="url(#f1)"/>
+<text class="sig" x="506" y="100" text-anchor="middle">u</text>
+
+<!-- L1 클립 -->
+<rect class="blk stk" x="520" y="82" width="90" height="56" rx="3"/>
+<text class="lbl" x="565" y="105" text-anchor="middle">L1 클립</text>
+<text class="sub" x="565" y="123" text-anchor="middle">|v_x|+|v_y|+k|ω| ≤ 0.32</text>
+
+<!-- /cmd_vel: 오른쪽으로 나가 아래 줄 왼쪽으로 -->
+<path class="wire" d="M610 110 L680 110 L680 240 L60 240 L60 300" marker-end="url(#f1)"/>
+<text class="sig" x="690" y="116">/cmd_vel</text>
+<text class="sub" x="690" y="130">[v_x, v_y, ω_z]  20 Hz</text>
+
+<!-- ③ 증분 루프 (초록): u_e → z → MPC -->
+<path class="fb3" d="M455 110 L455 178 L290 178 L290 140" marker-end="url(#fa)"/>
+<text class="t3" x="372" y="172" text-anchor="middle">③  z = u_e(k−1)</text>
+
+<!-- ═══ 아래 줄: 플랜트 ═══ -->
+<rect class="encl" x="180" y="264" width="330" height="140" rx="5"/>
+<text class="sub" x="345" y="258" text-anchor="middle" style="font-size:12px">RoboClaw 펌웨어 + 모터 — 접근 불가</text>
+
+<!-- M⁻¹ -->
+<rect class="blk stk" x="60" y="300" width="90" height="56" rx="3"/>
+<text class="lbl" x="105" y="323" text-anchor="middle">M⁻¹</text>
+<text class="sub" x="105" y="341" text-anchor="middle">역기구학</text>
+<line class="wire" x1="150" y1="328" x2="182" y2="328" marker-end="url(#f1)"/>
+<text class="sig" x="166" y="318" text-anchor="middle">ω_cmd</text>
+<text class="sub" x="166" y="352" text-anchor="middle">×4</text>
+
+<!-- ⊕3 내부 -->
+<circle class="blk stk" cx="195" cy="328" r="13"/>
+<text class="pm" x="184" y="318">+</text><text class="pm" x="184" y="352">−</text>
+<line class="wire" x1="208" y1="328" x2="228" y2="328" marker-end="url(#f1)"/>
+<text class="sig" x="218" y="318" text-anchor="middle">e_i</text>
+
+<!-- PI -->
+<rect class="blk stk" x="230" y="300" width="80" height="56" rx="3"/>
+<text class="lbl" x="270" y="323" text-anchor="middle">PI</text>
+<text class="sub" x="270" y="341" text-anchor="middle">K_p + K_i/s</text>
+<line class="wire" x1="310" y1="328" x2="338" y2="328" marker-end="url(#f1)"/>
+<text class="sig" x="324" y="318" text-anchor="middle">PWM</text>
+
+<!-- 모터 -->
+<rect class="blk stk" x="340" y="300" width="100" height="56" rx="3"/>
+<text class="lbl" x="390" y="323" text-anchor="middle">모터</text>
+<text class="sub" x="390" y="341" text-anchor="middle">K_m /(τ_m s+1)</text>
+<line class="wire" x1="440" y1="328" x2="475" y2="328"/>
+<circle cx="475" cy="328" r="4.5" fill="currentColor"/>
+<text class="sig" x="475" y="316" text-anchor="middle">ω_i</text>
+<text class="sub" x="475" y="290" text-anchor="middle">실제 바퀴 각속도 ×4</text>
+<line class="wire" x1="475" y1="328" x2="518" y2="328" marker-end="url(#f1)"/>
+
+<!-- 타이어·바닥 -->
+<rect class="gat" x="520" y="300" width="110" height="56" rx="3"/>
+<text class="lbl" x="575" y="323" text-anchor="middle">타이어 · 바닥</text>
+<text class="gatt" x="575" y="341" text-anchor="middle">슬립 — 루프 밖</text>
+<line class="wire" x1="630" y1="328" x2="658" y2="328" marker-end="url(#f1)"/>
+<text class="sig" x="644" y="318" text-anchor="middle">v_real</text>
+
+<!-- ∫R(θ) -->
+<rect class="blk stk" x="660" y="300" width="90" height="56" rx="3"/>
+<text class="lbl" x="705" y="323" text-anchor="middle">∫ R(θ)</text>
+<text class="sub" x="705" y="341" text-anchor="middle">실제 적분</text>
+<line class="wire" x1="750" y1="328" x2="790" y2="328" marker-end="url(#f1)"/>
+<text class="sig" x="798" y="324">X_real</text>
+<text class="sub" x="798" y="340">실제 포즈 — 측정 없음</text>
+
+<!-- ① 내부 루프 (주황) -->
+<path class="fb1" d="M475 328 L475 390 L195 390 L195 341" marker-end="url(#fg)"/>
+<text class="t1" x="335" y="408" text-anchor="middle">①  내부 루프 — 엔코더 ω_i,  펌웨어 주기</text>
+
+<!-- ② 외부 루프 (파랑): ω_i → M → ∫R_odom → 위 줄 -->
+<circle cx="475" cy="390" r="4" fill="var(--gate)"/>
+<path class="fb2" d="M475 390 L475 460 L440 460" marker-end="url(#fb)"/>
+<rect class="blk" x="350" y="438" width="90" height="44" rx="3" stroke="var(--blue)" stroke-width="1.5"/>
+<text class="t2" x="395" y="456" text-anchor="middle">M</text>
+<text class="sub" x="395" y="472" text-anchor="middle">정기구학</text>
+<path class="fb2" d="M350 460 L310 460" marker-end="url(#fb)"/>
+<text class="t2" x="330" y="450" text-anchor="middle">v_odom</text>
+<rect class="blk" x="200" y="438" width="110" height="44" rx="3" stroke="var(--blue)" stroke-width="1.5"/>
+<text class="t2" x="255" y="456" text-anchor="middle">∫ R(θ_odom)</text>
+<text class="sub" x="255" y="472" text-anchor="middle">오도메트리 적분</text>
+<path class="fb2" d="M200 460 L28 460 L28 160 L236 160"/>
+<path class="fb2" d="M150 160 L150 123" marker-end="url(#fb)"/>
+<path class="fb2" d="M236 160 L236 138" marker-end="url(#fb)"/>
+<text class="t2" x="40" y="452">/odom  50 Hz</text>
+<text class="t2" x="36" y="300" transform="rotate(-90 36 300)" text-anchor="middle">②  외부 루프 — X_odom, v_odom</text>
+<text class="sub" x="150" y="152" text-anchor="end">X_odom →⊕</text>
+<text class="sub" x="242" y="152">v_odom → MPC (v_e)</text>
+
+<!-- 슬립 주석 -->
+<text class="gatt" x="575" y="378" text-anchor="middle">X_odom 은 ω_i 에서 갈라진다</text>
+<text class="gatt" x="575" y="392" text-anchor="middle">→ 여기는 어느 루프에도 안 들어감</text>
+
+<!-- 범례 -->
+<line class="fb1" x1="700" y1="440" x2="726" y2="440"/><text class="sig" x="732" y="444">① 내부 — 엔코더 → PI</text>
+<line class="fb2" x1="700" y1="462" x2="726" y2="462"/><text class="sig" x="732" y="466">② 외부 — 오도메트리 → MPC</text>
+<line class="fb3" x1="700" y1="484" x2="726" y2="484"/><text class="sig" x="732" y="488">③ 증분 — u_e(k−1) → MPC</text>
+<text class="sub" x="700" y="512">점선 상자 = 소프트웨어 경계 · 주황 블록 = 되먹임 밖의 유일한 요소</text>
+</svg>
+</div>
+<figcaption><b>위 줄이 제어기, 아래 줄이 플랜트.</b> <code>/cmd_vel</code> 이 위에서 아래로 내려가고, 오도메트리가 왼쪽 여백을 타고 위로 돌아온다. 루프 세 개가 서로 다른 것을 되먹인다 — ①은 바퀴 각속도(펌웨어), ②는 오도메트리 포즈(20 Hz), ③은 직전 입력(제어기 내부). 셋 다 <code>ω_i</code> 이전 또는 제어기 안에서 닫히므로 타이어·바닥은 어느 루프에도 속하지 않는다.</figcaption>
+</figure>
+</div></body></html>

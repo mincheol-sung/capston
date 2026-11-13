@@ -1,0 +1,90 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 39,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 77,
+  "callback_over_200ms_ratio": 0.77,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 268.0941057950258,
+    "p50": 272.3301009973511,
+    "p95": 437.2926887241192,
+    "p99": 461.6921352897771,
+    "max": 470.9550535771996
+  },
+  "backend": "split",
+  "workers": 5,
+  "frozen_nominal": true,
+  "statuses": {
+    "normal": 39,
+    "expired_input": 38,
+    "stale_odom": 23
+  },
+  "fallback_ratio": 0.61,
+  "deadline_miss_ratio": 0.81,
+  "skipped_periods": 9,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 183.92643368104473,
+    "p50": 234.7284349380061,
+    "p95": 246.6305480338633,
+    "p99": 274.6758639137261,
+    "max": 285.5501000303775
+  },
+  "normal_optimizer_ms": {
+    "count": 39,
+    "mean": 232.72547034475093,
+    "p50": 232.24709392525256,
+    "p95": 238.6156963184476,
+    "p99": 238.7436412088573,
+    "max": 238.76535100862384
+  },
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 85.14062402304262,
+    "p50": 78.13221821561456,
+    "p95": 214.31248200824484,
+    "p99": 239.36767542967573,
+    "max": 239.6256464999169
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 90.70964289549738,
+    "p50": 72.33496191911398,
+    "p95": 237.30051341699436,
+    "p99": 263.9325851621107,
+    "max": 273.12748059630394
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 217.36603496130556,
+    "p50": 242.74983839131892,
+    "p95": 400.8200815296732,
+    "p99": 427.09912048419943,
+    "max": 432.8027539886534
+  },
+  "receive_interval_ms": {
+    "count": 100,
+    "mean": 217.36476260935888,
+    "p50": 242.9156870348379,
+    "p95": 401.1136131826788,
+    "p99": 427.2267013648525,
+    "max": 432.72331403568387
+  },
+  "receive_count_in_window": 100,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 10,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

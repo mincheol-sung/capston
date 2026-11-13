@@ -1,0 +1,2 @@
+"""Theta* global planner implementation."""
+

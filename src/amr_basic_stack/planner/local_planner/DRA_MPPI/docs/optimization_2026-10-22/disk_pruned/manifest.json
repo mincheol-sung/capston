@@ -1,0 +1,33 @@
+{
+  "args": {
+    "output": "docs/optimization_2026-10-22/disk_pruned",
+    "profiles": [
+      "gaussian_disk",
+      "mc_high_final_disk"
+    ],
+    "rollouts": [
+      100,
+      500
+    ],
+    "iterations": 5,
+    "workers": [
+      2
+    ]
+  },
+  "scope": "kernel only; fixed identical candidates; fresh process recommended for controlled comparisons",
+  "source_sha256": {
+    "mecanum_model.py": "d5f4956b1091da947dfb9c69db1eabe3ea89cb82d1fc12be96ed2d32330527b2",
+    "control_sampling.py": "a3639dcfd913317161e145487c1442ad0da1207861debcadba38693d1d9deed0",
+    "mppi_controller.py": "8e84e8fd7a3c77799dd9265665afeb1af1d4c2c60e6480d1666ba0d49c00e61c",
+    "common_cost.py": "d752826288490cc47acf1d25be0908b1af6bf3b620c90255f41f0ba8dc4048de",
+    "gaussian_disk.py": "8a9a9249f01a52258e41473f496e6863620615c1fb9cfb47c4ca382d020e350b",
+    "cycle_timing.py": "a6ce143abea345cf7acdf2cce98dc5d46a84018c935769e2daef5fd1ab6d2632",
+    "grid_costmap.py": "a9ce969643f4d65124b46813febe4ca3948ad946f2b00b9729aeb3d789ed00f7",
+    "dra_mppi_node.py": "2202f416630e0935a71fa92f7f1cc9371e9836b2ae39567f450777c7edf32dbd",
+    "guide_conditioned.py": "e9fb78c76463c338f6f8b930b88b30bb0e12aa2efc65f94c45b8d8c375f09f03",
+    "__init__.py": "1e19bc73547d4d52405563876be7076ce7792da8855806ce9dedb7cdc9817b4c",
+    "geometry.py": "ebb537f3199815b233aad3b5e5e5554df27fb27ad281300ac16e0305c4add4b2",
+    "dynamic_risk.py": "741dc9fa3b4b055b999e9828402b9f6e8b09c7389230c39ba2e14be1e170f664",
+    "path_handler.py": "0a6f767cb9cf3d31fe98f040be1b0dc046f4919e7c32202894e7cbb2492dba37"
+  }
+}

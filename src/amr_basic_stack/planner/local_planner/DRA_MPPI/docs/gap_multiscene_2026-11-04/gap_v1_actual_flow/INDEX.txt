@@ -1,0 +1,31 @@
+확정 Gap v1 실제 LiDAR 상세 flow
+
+00_full_flow.png: 주 장면 전체 흐름 6개 패널
+00_all_18_steps.png: 상세 PNG 18장의 전체 모음
+주 장면: b1_088, bag mpc_chain_20260923_113151 +188.247981 s
+주 장면 확정 v1 결과: G1/G2 공간 구간에서 6개 seed 생성; B(-160), C(-55), F(-11) 선택.
+이전 gap당 대표 하나 방식과 다르다. 공통 비용 별도 최적화 seed는 포함하지 않는다.
+실제 입력/seed 비용/최종 결과를 frozen 이전 실험과 대조했다. 실제 주행 실행이나 full-stack 5Hz 검증이 아니다.
+solver timeout은 모든 오프라인 결과를 확보하기 위한10초이며 운영 deadline 설정으로 쓰면 안 된다.
+
+01_lidar_observations.png
+02_grid_and_clearance.png
+03_nominal_and_path.png
+04_directional_depth.png
+05_actual_gap_boundaries.png
+06_six_direction_seeds.png
+07_reachable_targets.png
+08_control_sequences_and_limits.png
+09_feasibility_and_nominal_dedup.png
+10_actual_cost_components.png
+11_pairwise_novelty_and_decisions.png
+12_selected_seeds_and_budget.png
+13_all_actual_rollouts.png
+14_common_recheck_and_selection.png
+15_final_controls_and_trajectory.png
+16_real_filter_rejections.png
+17_empty_gap_margin_retry.png
+18_no_gap_and_no_safe_candidate.png
+
+수치: manifest.json / *_actual_arrays.npz
+실행: ROS Jazzy와 workspace setup을 source한 뒤 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 /usr/bin/python3 tools/render_gap_v1_detailed_flow.py

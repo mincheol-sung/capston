@@ -1,0 +1,43 @@
+{
+  "scenes": 16,
+  "dynamic_scenes": 6,
+  "candidate_directions": 51,
+  "both_solvers_converged": 46,
+  "reasons": {
+    "capacity": 5,
+    "duplicate_nominal": 5,
+    "selected": 35,
+    "solver_failure": 5,
+    "static_collision": 1
+  },
+  "safety_statuses": {
+    "baseline": {
+      "ok": 192
+    },
+    "value": {
+      "ok": 192
+    }
+  },
+  "timing": {
+    "baseline": {
+      "n": 192,
+      "mean": 82.5932532849644,
+      "p50": 66.38389942236245,
+      "p95": 134.90111033897847,
+      "p99": 145.54758665151894,
+      "maximum": 147.94564619660378,
+      "over_180": 0,
+      "over_200": 0
+    },
+    "value": {
+      "n": 192,
+      "mean": 116.84287999620817,
+      "p50": 115.6273721717298,
+      "p95": 171.79371176753193,
+      "p99": 178.5764854773879,
+      "maximum": 182.9609959386289,
+      "over_180": 2,
+      "over_200": 0
+    }
+  }
+}

@@ -1,0 +1,1232 @@
+{
+  "design": "gap_design_v1",
+  "source_spec_sha256": "f43b128c1909000563a8527ca9e879faa0e5d6cef02901d4a7c504b7570d7379",
+  "script_sha256": "7bb0f39692333ef1ae0cd7d0eda08caf6e697901f84a7bba5d85242abeb7f904",
+  "method": "all_options_hard_fallback",
+  "noise_seed": 7,
+  "figures": [
+    "01_lidar_observations.png",
+    "02_grid_and_clearance.png",
+    "03_nominal_and_path.png",
+    "04_directional_depth.png",
+    "05_actual_gap_boundaries.png",
+    "06_six_direction_seeds.png",
+    "07_reachable_targets.png",
+    "08_control_sequences_and_limits.png",
+    "09_feasibility_and_nominal_dedup.png",
+    "10_actual_cost_components.png",
+    "11_pairwise_novelty_and_decisions.png",
+    "12_selected_seeds_and_budget.png",
+    "13_all_actual_rollouts.png",
+    "14_common_recheck_and_selection.png",
+    "15_final_controls_and_trajectory.png",
+    "16_real_filter_rejections.png",
+    "17_empty_gap_margin_retry.png",
+    "18_no_gap_and_no_safe_candidate.png"
+  ],
+  "scenes": {
+    "b0_029": {
+      "bag": "mpc_chain_20260923_135325",
+      "offset": 65.29940852200001,
+      "record_ns": 1790139270886604299,
+      "fallback": true,
+      "strict_gap_count": 0,
+      "gap_count": 1,
+      "options": [
+        {
+          "id": "valley_00_dir_340",
+          "gap": 0,
+          "angle": 2.792526803190927,
+          "index": 340,
+          "target": [
+            -0.6522447927484828,
+            0.237397690015576
+          ],
+          "target_distance": 0.6941044106560934,
+          "rms": 0.975691077520345,
+          "tail": 1.4143150942371634,
+          "reach_error": 0.06321876870073945,
+          "collision": false,
+          "progress_proxy": -0.5828659717643797,
+          "rear_body": true,
+          "cheap_cost": 33.46472653943431,
+          "reason": "duplicate_gap",
+          "label": "A",
+          "color": "#b46082",
+          "available_depth": 1.9,
+          "projected_reach": 0.7712271229512149,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 12.794543414220188,
+            "terminal": 0.0,
+            "heading": 9.830248437245638e-05,
+            "progress": 18.0,
+            "speed": 1.9661975191343373,
+            "delta_x": 0.021129617363576148,
+            "delta_y": 0.0026303379370709733,
+            "delta_omega": 0.00010103472279939634,
+            "static": 0.6800263135719709
+          }
+        },
+        {
+          "id": "valley_00_dir_004",
+          "gap": 0,
+          "angle": -3.07177948351002,
+          "index": 4,
+          "target": [
+            -0.594906242056358,
+            -0.04159989691229557
+          ],
+          "target_distance": 0.5963589424673128,
+          "rms": 0.9216379361482276,
+          "tail": 1.3356586355477242,
+          "reach_error": 0.047344643730404125,
+          "collision": false,
+          "progress_proxy": -0.5484833878956024,
+          "rear_body": true,
+          "cheap_cost": 28.899000538427124,
+          "reason": "selected",
+          "label": "B",
+          "color": "#8d56b1",
+          "available_depth": 1.66,
+          "projected_reach": 0.6626210471859031,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 8.60087158914244,
+            "terminal": 0.0,
+            "heading": 9.830248437245638e-05,
+            "progress": 18.0,
+            "speed": 1.905334019636235,
+            "delta_x": 0.02126845899881599,
+            "delta_y": 5.198242734309686e-05,
+            "delta_omega": 0.00010103472279939634,
+            "static": 0.3712751510151184
+          }
+        },
+        {
+          "id": "valley_00_dir_076",
+          "gap": 0,
+          "angle": -1.8151424220741028,
+          "index": 76,
+          "target": [
+            -0.08947370684226662,
+            -0.3588594374557385
+          ],
+          "target_distance": 0.3698454272627214,
+          "rms": 0.6545008244616605,
+          "tail": 0.9187710000858541,
+          "reach_error": 0.007754380718853092,
+          "collision": false,
+          "progress_proxy": -0.09642621899104299,
+          "rear_body": true,
+          "cheap_cost": 23.107941042345793,
+          "reason": "selected",
+          "label": "C",
+          "color": "#cf8827",
+          "available_depth": 0.42000000000000004,
+          "projected_reach": 0.41093936362524597,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 3.7884428487789763,
+            "terminal": 0.0,
+            "heading": 4.294813249627903e-05,
+            "progress": 18.0,
+            "speed": 1.1416964070040876,
+            "delta_x": 0.013616317679380171,
+            "delta_y": 0.008041152023453693,
+            "delta_omega": 0.00010312711177078238,
+            "static": 0.15599824161562764
+          }
+        }
+      ],
+      "selection_trace": [
+        {
+          "label": "C",
+          "cost": 23.107941042345793,
+          "reason": "selected",
+          "distances": []
+        },
+        {
+          "label": "B",
+          "cost": 28.899000538427124,
+          "reason": "selected",
+          "distances": [
+            [
+              "C",
+              0.3903621129697655
+            ]
+          ]
+        },
+        {
+          "label": "A",
+          "cost": 33.46472653943431,
+          "reason": "duplicate_gap",
+          "distances": [
+            [
+              "C",
+              0.5580437565946028
+            ],
+            [
+              "B",
+              0.20770325839212292
+            ]
+          ]
+        }
+      ],
+      "selected": [
+        "B",
+        "C"
+      ],
+      "solver_counts": [
+        300,
+        100,
+        100
+      ],
+      "final_names": [
+        "nominal",
+        "valley_00_dir_004",
+        "valley_00_dir_076",
+        "stop"
+      ],
+      "final_costs": [
+        null,
+        24.006787602957544,
+        21.52936499823881,
+        22.756927144990495
+      ],
+      "final_probability": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "final_static_collisions": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "status": "ok",
+      "selected_mode": "valley_00_dir_076",
+      "validation": "Input grid/depth/path and final cost/trajectory matched frozen previous experiment."
+    },
+    "b0_033": {
+      "bag": "mpc_chain_20260923_135325",
+      "offset": 73.490917795,
+      "record_ns": 1790139279078113572,
+      "fallback": true,
+      "strict_gap_count": 0,
+      "gap_count": 0,
+      "options": [],
+      "selection_trace": [],
+      "selected": [],
+      "solver_counts": [
+        500
+      ],
+      "final_names": [
+        "nominal",
+        "stop"
+      ],
+      "final_costs": [
+        null,
+        null
+      ],
+      "final_probability": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "final_static_collisions": [
+        false,
+        true
+      ],
+      "status": "no_safe_candidate_hold",
+      "selected_mode": "stop",
+      "validation": "Input grid/depth/path and final cost/trajectory matched frozen previous experiment."
+    },
+    "b1_004": {
+      "bag": "mpc_chain_20260923_113151",
+      "offset": 13.43068949,
+      "record_ns": 1790130725582192093,
+      "fallback": false,
+      "strict_gap_count": 3,
+      "gap_count": 3,
+      "options": [
+        {
+          "id": "valley_00_dir_184",
+          "gap": 0,
+          "angle": 0.06981317007977318,
+          "index": 184,
+          "target": [
+            1.287294593738677,
+            0.09001640697226211
+          ],
+          "target_distance": 1.2904380359370309,
+          "rms": 0.0689389906911505,
+          "tail": 0.09382539135989108,
+          "reach_error": 0.08507327376734004,
+          "collision": false,
+          "progress_proxy": 1.2003315571007687,
+          "rear_body": false,
+          "cheap_cost": 2.6283068921110626,
+          "reason": "duplicate_nominal",
+          "label": "A",
+          "color": "#b46082",
+          "available_depth": 1.9,
+          "projected_reach": 1.4338200399300343,
+          "nominal_duplicate": true,
+          "components": {
+            "path_error": 1.8059389083445878,
+            "terminal": 0.0,
+            "heading": 1.9410564874231058e-07,
+            "progress": 0.7176638373954124,
+            "speed": 0.09978489881194468,
+            "delta_x": 0.0046578437521173875,
+            "delta_y": 6.86289255433261e-05,
+            "delta_omega": 0.00019258077580830952,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_00_dir_170",
+          "gap": 0,
+          "angle": -0.17453292519943295,
+          "index": 170,
+          "target": [
+            1.09803120485454,
+            -0.193612527075679
+          ],
+          "target_distance": 1.114970106090268,
+          "rms": 0.18508721808819203,
+          "tail": 0.28115514606306763,
+          "reach_error": 0.059373633673837044,
+          "collision": false,
+          "progress_proxy": 1.0432768101207714,
+          "rear_body": false,
+          "cheap_cost": 1.9899431064256237,
+          "reason": "duplicate_nominal",
+          "label": "B",
+          "color": "#8d56b1",
+          "available_depth": 1.3599999999999999,
+          "projected_reach": 1.238855673433631,
+          "nominal_duplicate": true,
+          "components": {
+            "path_error": 0.15098041297154993,
+            "terminal": 0.0,
+            "heading": 1.5846825690303727e-06,
+            "progress": 1.6690361382411791,
+            "speed": 0.16454720073629484,
+            "delta_x": 0.004069941656157961,
+            "delta_y": 0.001143733368638203,
+            "delta_omega": 0.00016409476923455454,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_00_dir_173",
+          "gap": 0,
+          "angle": -0.12217304763960307,
+          "index": 173,
+          "target": [
+            1.1295959492513477,
+            -0.13869694262652643
+          ],
+          "target_distance": 1.1380790176692475,
+          "rms": 0.1470612145461663,
+          "tail": 0.2232909996281863,
+          "reach_error": 0.057320437291137435,
+          "collision": false,
+          "progress_proxy": 1.0752977521184597,
+          "rear_body": false,
+          "cheap_cost": 1.723487598852724,
+          "reason": "duplicate_nominal",
+          "label": "C",
+          "color": "#cf8827",
+          "available_depth": 1.38,
+          "projected_reach": 1.2645322418547194,
+          "nominal_duplicate": true,
+          "components": {
+            "path_error": 0.10999291367495287,
+            "terminal": 0.0,
+            "heading": 7.547691573923553e-07,
+            "progress": 1.4428592667706617,
+            "speed": 0.16498175287234418,
+            "delta_x": 0.004774688668060642,
+            "delta_y": 0.0007015856645333546,
+            "delta_omega": 0.00017663643301411746,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_01_dir_248",
+          "gap": 1,
+          "angle": 1.1868238913561442,
+          "index": 248,
+          "target": [
+            0.39712551697480475,
+            0.9829201462204895
+          ],
+          "target_distance": 1.0601135269765283,
+          "rms": 0.8266521849847227,
+          "tail": 1.1973092547466464,
+          "reach_error": 0.0713695772624046,
+          "collision": false,
+          "progress_proxy": 0.3574633872451346,
+          "rear_body": false,
+          "cheap_cost": 43.838630954194,
+          "reason": "selected",
+          "label": "D",
+          "color": "#3898b2",
+          "available_depth": 1.9,
+          "projected_reach": 1.177903918862809,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 32.7766971092464,
+            "terminal": 0.0,
+            "heading": 3.916493208898717e-06,
+            "progress": 10.448262089108077,
+            "speed": 0.5909536922973201,
+            "delta_x": 0.009565201756726444,
+            "delta_y": 0.013004176991415619,
+            "delta_omega": 0.0001447683008612805,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_01_dir_271",
+          "gap": 1,
+          "angle": 1.5882496193148399,
+          "index": 271,
+          "target": [
+            -0.017071848348860923,
+            0.9780455368723879
+          ],
+          "target_distance": 0.9781945206358723,
+          "rms": 1.027717659367909,
+          "tail": 1.483601720830868,
+          "reach_error": 0.06792043767777332,
+          "collision": false,
+          "progress_proxy": -0.033664909428207296,
+          "rear_body": false,
+          "cheap_cost": 50.94783057730582,
+          "reason": "capacity",
+          "label": "E",
+          "color": "#7e8791",
+          "available_depth": 1.6199999999999999,
+          "projected_reach": 1.0868828007065248,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 31.807774706271324,
+            "terminal": 0.0,
+            "heading": 4.291608940213738e-05,
+            "progress": 18.052817429341726,
+            "speed": 1.0615485451042015,
+            "delta_x": 0.015234894850514514,
+            "delta_y": 0.010333210873236081,
+            "delta_omega": 7.887477542322547e-05,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_01_dir_206",
+          "gap": 1,
+          "angle": 0.4537856055185257,
+          "index": 206,
+          "target": [
+            0.842769310971546,
+            0.4110460576040195
+          ],
+          "target_distance": 0.9376667707598799,
+          "rms": 0.37596506355096954,
+          "tail": 0.5604020353419314,
+          "reach_error": 0.04834666467947772,
+          "collision": false,
+          "progress_proxy": 0.7907072459420941,
+          "rear_body": false,
+          "cheap_cost": 13.57794585825388,
+          "reason": "selected",
+          "label": "F",
+          "color": "#008d79",
+          "available_depth": 1.14,
+          "projected_reach": 1.0418519675109776,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 9.2767560768905,
+            "terminal": 0.0,
+            "heading": 7.216285301434551e-06,
+            "progress": 4.026177227853431,
+            "speed": 0.2676355770873709,
+            "delta_x": 0.004200452214923267,
+            "delta_y": 0.0030414323199974237,
+            "delta_omega": 0.0001278756023572352,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_02_dir_020",
+          "gap": 2,
+          "angle": -2.792526803190927,
+          "index": 20,
+          "target": [
+            -0.586922224114132,
+            -0.21362221940686124
+          ],
+          "target_distance": 0.6245895850743851,
+          "rms": 1.1539004103938713,
+          "tail": 1.6993703430230145,
+          "reach_error": 0.06583547256697804,
+          "collision": false,
+          "progress_proxy": -0.5168607773036566,
+          "rear_body": true,
+          "cheap_cost": 26.68568209532603,
+          "reason": "duplicate_gap",
+          "label": "G",
+          "color": "#b65845",
+          "available_depth": 1.9,
+          "projected_reach": 0.6939884278604279,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 6.61141322591767,
+            "terminal": 0.0,
+            "heading": 0.00011234147225167391,
+            "progress": 18.052817429341726,
+            "speed": 1.8739370860688724,
+            "delta_x": 0.022957302979353666,
+            "delta_y": 0.001484452160291193,
+            "delta_omega": 5.999158824706384e-05,
+            "static": 0.12290026579761715
+          }
+        },
+        {
+          "id": "valley_02_dir_004",
+          "gap": 2,
+          "angle": -3.07177948351002,
+          "index": 4,
+          "target": [
+            -0.530464788094638,
+            -0.03709371147974798
+          ],
+          "target_distance": 0.5317601290428158,
+          "rms": 1.1272805604880096,
+          "tail": 1.6547189390982042,
+          "reach_error": 0.04944202314454055,
+          "collision": false,
+          "progress_proxy": -0.4801297020364572,
+          "rear_body": true,
+          "cheap_cost": 25.84049306157693,
+          "reason": "selected",
+          "label": "H",
+          "color": "#89733f",
+          "available_depth": 0.74,
+          "projected_reach": 0.5908445878253509,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 5.956186761775504,
+            "terminal": 0.0,
+            "heading": 0.00011237244326160666,
+            "progress": 18.052817429341726,
+            "speed": 1.8082049884620903,
+            "delta_x": 0.022962468927117122,
+            "delta_y": 0.0001490490389856393,
+            "delta_omega": 5.999158824706384e-05,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_02_dir_032",
+          "gap": 2,
+          "angle": -2.5830872929516078,
+          "index": 32,
+          "target": [
+            -0.6410885717364735,
+            -0.4005966003374466
+          ],
+          "target_distance": 0.7559577984339017,
+          "rms": 1.1879058857220186,
+          "tail": 1.7487331679519265,
+          "reach_error": 0.0892088689989073,
+          "collision": true,
+          "progress_proxy": -0.5450461906398856,
+          "rear_body": true,
+          "cheap_cost": null,
+          "reason": "collision",
+          "label": "I",
+          "color": "#4a667d",
+          "available_depth": 1.9,
+          "projected_reach": 0.8399531093710018,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 9.115688932590299,
+            "terminal": 0.0,
+            "heading": 0.00011333723052073851,
+            "progress": 18.052817429341726,
+            "speed": 1.9244959362749023,
+            "delta_x": 0.02258056709169041,
+            "delta_y": 0.003470963797902063,
+            "delta_omega": 6.0084924589917245e-05,
+            "static": null
+          }
+        }
+      ],
+      "selection_trace": [
+        {
+          "label": "C",
+          "cost": 1.723487598852724,
+          "reason": "duplicate_nominal",
+          "distances": []
+        },
+        {
+          "label": "B",
+          "cost": 1.9899431064256237,
+          "reason": "duplicate_nominal",
+          "distances": []
+        },
+        {
+          "label": "A",
+          "cost": 2.6283068921110626,
+          "reason": "duplicate_nominal",
+          "distances": []
+        },
+        {
+          "label": "F",
+          "cost": 13.57794585825388,
+          "reason": "selected",
+          "distances": []
+        },
+        {
+          "label": "H",
+          "cost": 25.84049306157693,
+          "reason": "selected",
+          "distances": [
+            [
+              "F",
+              0.9183881237206172
+            ]
+          ]
+        },
+        {
+          "label": "G",
+          "cost": 26.68568209532603,
+          "reason": "duplicate_gap",
+          "distances": [
+            [
+              "F",
+              0.9813916416100167
+            ],
+            [
+              "H",
+              0.12935277831630704
+            ]
+          ]
+        },
+        {
+          "label": "D",
+          "cost": 43.838630954194,
+          "reason": "selected",
+          "distances": [
+            [
+              "F",
+              0.455665526220773
+            ],
+            [
+              "H",
+              0.8634572817571864
+            ]
+          ]
+        },
+        {
+          "label": "E",
+          "cost": 50.94783057730582,
+          "reason": "capacity",
+          "distances": [
+            [
+              "F",
+              0.6652158211520866
+            ],
+            [
+              "H",
+              0.7103444213994151
+            ],
+            [
+              "D",
+              0.2735855996416538
+            ]
+          ]
+        },
+        {
+          "label": "I",
+          "cost": null,
+          "reason": "collision",
+          "distances": [
+            [
+              "F",
+              1.0500598124334413
+            ],
+            [
+              "H",
+              0.25380231336586545
+            ],
+            [
+              "D",
+              1.0789000119476597
+            ]
+          ]
+        }
+      ],
+      "selected": [
+        "F",
+        "D",
+        "H"
+      ],
+      "solver_counts": [
+        200,
+        100,
+        100,
+        100
+      ],
+      "final_names": [
+        "nominal",
+        "valley_01_dir_206",
+        "valley_01_dir_248",
+        "valley_02_dir_004",
+        "stop"
+      ],
+      "final_costs": [
+        1.210743928949361,
+        5.780763142590172,
+        21.631593095249258,
+        21.919986417048122,
+        18.397010968145263
+      ],
+      "final_probability": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "final_static_collisions": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "status": "ok",
+      "selected_mode": "nominal",
+      "validation": "Input grid/depth/path and final cost/trajectory matched frozen previous experiment."
+    },
+    "b1_088": {
+      "bag": "mpc_chain_20260923_113151",
+      "offset": 188.247981024,
+      "record_ns": 1790130900399483627,
+      "fallback": false,
+      "strict_gap_count": 2,
+      "gap_count": 2,
+      "options": [
+        {
+          "id": "valley_00_dir_033",
+          "gap": 0,
+          "angle": -2.5656340004316642,
+          "index": 33,
+          "target": [
+            -0.6445199314501328,
+            -0.41855613745085546
+          ],
+          "target_distance": 0.7685019077622796,
+          "rms": 0.4717666056449647,
+          "tail": 0.6673271133245965,
+          "reach_error": 0.06697687905505414,
+          "collision": false,
+          "progress_proxy": -0.6276126072378737,
+          "rear_body": true,
+          "cheap_cost": 30.662118188293046,
+          "reason": "duplicate_gap",
+          "label": "A",
+          "color": "#b46082",
+          "available_depth": 1.9,
+          "projected_reach": 0.8538910086247551,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 10.212895700094593,
+            "terminal": 0.0,
+            "heading": 0.0014884009319092795,
+            "progress": 18.393031661126514,
+            "speed": 2.0339190346589353,
+            "delta_x": 0.016477849632396523,
+            "delta_y": 0.0026150543724615415,
+            "delta_omega": 0.0016904874762366058,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_00_dir_020",
+          "gap": 0,
+          "angle": -2.792526803190927,
+          "index": 20,
+          "target": [
+            -0.6196902041781044,
+            -0.22554878878717555
+          ],
+          "target_distance": 0.6594605411073984,
+          "rms": 0.40477015122697585,
+          "tail": 0.5773287540579504,
+          "reach_error": 0.05258088473565022,
+          "collision": false,
+          "progress_proxy": -0.5913804373294977,
+          "rear_body": true,
+          "cheap_cost": 30.252620219856762,
+          "reason": "selected",
+          "label": "B",
+          "color": "#8d56b1",
+          "available_depth": 1.9,
+          "projected_reach": 0.732733934563776,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 9.870484104172977,
+            "terminal": 0.0,
+            "heading": 0.0012805103683576394,
+            "progress": 18.393031661126514,
+            "speed": 1.9688079124234181,
+            "delta_x": 0.016419357368910294,
+            "delta_y": 0.0008831173672700155,
+            "delta_omega": 0.0017135570293149477,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_00_dir_125",
+          "gap": 0,
+          "angle": -0.9599310885968813,
+          "index": 125,
+          "target": [
+            0.5377717007736786,
+            -0.768017582542246
+          ],
+          "target_distance": 0.9375763484895779,
+          "rms": 0.6191725364355188,
+          "tail": 0.8520746075071562,
+          "reach_error": 0.054180473587530746,
+          "collision": false,
+          "progress_proxy": 0.411579716114895,
+          "rear_body": false,
+          "cheap_cost": 18.31653608059983,
+          "reason": "selected",
+          "label": "C",
+          "color": "#cf8827",
+          "available_depth": 1.16,
+          "projected_reach": 1.0417514983217533,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 8.28799053813974,
+            "terminal": 0.0,
+            "heading": 0.0004915222050013289,
+            "progress": 9.476555043524248,
+            "speed": 0.5404759216736086,
+            "delta_x": 0.0010962848647460665,
+            "delta_y": 0.007508918585286688,
+            "delta_omega": 0.0024178516071955767,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_01_dir_166",
+          "gap": 1,
+          "angle": -0.24434609527920614,
+          "index": 166,
+          "target": [
+            1.0175893030978014,
+            -0.2537135086559589
+          ],
+          "target_distance": 1.0487414048532586,
+          "rms": 0.679141396445247,
+          "tail": 0.9428196133487771,
+          "reach_error": 0.0668979735817778,
+          "collision": false,
+          "progress_proxy": 0.9134761573542628,
+          "rear_body": false,
+          "cheap_cost": 4.055916785807681,
+          "reason": "duplicate_gap",
+          "label": "D",
+          "color": "#3898b2",
+          "available_depth": 1.9,
+          "projected_reach": 1.1652682276147317,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 0.8751068366736245,
+            "terminal": 0.0,
+            "heading": 0.0047433450781548675,
+            "progress": 2.911472136804558,
+            "speed": 0.19942549859472503,
+            "delta_x": 0.0037388023705919133,
+            "delta_y": 0.0006826666089265949,
+            "delta_omega": 0.0036304324533676176,
+            "static": 0.05711706722373213
+          }
+        },
+        {
+          "id": "valley_01_dir_148",
+          "gap": 1,
+          "angle": -0.5585053606381855,
+          "index": 148,
+          "target": [
+            0.822025812252204,
+            -0.5136587365547731
+          ],
+          "target_distance": 0.9693150848139843,
+          "rms": 0.623673051188271,
+          "tail": 0.8692233938763639,
+          "reach_error": 0.0632158048027075,
+          "collision": false,
+          "progress_proxy": 0.699091254385183,
+          "rear_body": false,
+          "cheap_cost": 8.958688659831296,
+          "reason": "duplicate_gap",
+          "label": "E",
+          "color": "#7e8791",
+          "available_depth": 1.3,
+          "projected_reach": 1.077016760904427,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 3.1543708952482605,
+            "terminal": 0.0,
+            "heading": 0.003712028115313089,
+            "progress": 5.477920464126585,
+            "speed": 0.31499756086636554,
+            "delta_x": 0.0016606177267425865,
+            "delta_y": 0.0030117550623165942,
+            "delta_omega": 0.003015338685712175,
+            "static": 0.0
+          }
+        },
+        {
+          "id": "valley_01_dir_169",
+          "gap": 1,
+          "angle": -0.19198621771937624,
+          "index": 169,
+          "target": [
+            1.049225774305827,
+            -0.20394883036482872
+          ],
+          "target_distance": 1.0688638130626578,
+          "rms": 0.6914379066885964,
+          "tail": 0.958753010419633,
+          "reach_error": 0.06954366482717346,
+          "collision": false,
+          "progress_proxy": 0.9476364439386873,
+          "rear_body": false,
+          "cheap_cost": 3.628817751818028,
+          "reason": "selected",
+          "label": "F",
+          "color": "#008d79",
+          "available_depth": 1.9,
+          "projected_reach": 1.1876264589585086,
+          "nominal_duplicate": false,
+          "components": {
+            "path_error": 0.7075669732867086,
+            "terminal": 0.0,
+            "heading": 0.0024886579707348033,
+            "progress": 2.5510827644307175,
+            "speed": 0.18278233173659653,
+            "delta_x": 0.0038913299360457377,
+            "delta_y": 0.0005772893300114853,
+            "delta_omega": 0.0038795623654267366,
+            "static": 0.1765488427617868
+          }
+        }
+      ],
+      "selection_trace": [
+        {
+          "label": "F",
+          "cost": 3.628817751818028,
+          "reason": "selected",
+          "distances": []
+        },
+        {
+          "label": "D",
+          "cost": 4.055916785807681,
+          "reason": "duplicate_gap",
+          "distances": [
+            [
+              "F",
+              0.03802745602917832
+            ]
+          ]
+        },
+        {
+          "label": "E",
+          "cost": 8.958688659831296,
+          "reason": "duplicate_gap",
+          "distances": [
+            [
+              "F",
+              0.24881941327431664
+            ]
+          ]
+        },
+        {
+          "label": "C",
+          "cost": 18.31653608059983,
+          "reason": "selected",
+          "distances": [
+            [
+              "F",
+              0.48413470608938625
+            ]
+          ]
+        },
+        {
+          "label": "B",
+          "cost": 30.252620219856762,
+          "reason": "selected",
+          "distances": [
+            [
+              "F",
+              1.0496687994079006
+            ],
+            [
+              "C",
+              0.8101311305027643
+            ]
+          ]
+        },
+        {
+          "label": "A",
+          "cost": 30.662118188293046,
+          "reason": "duplicate_gap",
+          "distances": [
+            [
+              "F",
+              1.0583553089193907
+            ],
+            [
+              "C",
+              0.7604334119794028
+            ],
+            [
+              "B",
+              0.13444139263704596
+            ]
+          ]
+        }
+      ],
+      "selected": [
+        "B",
+        "C",
+        "F"
+      ],
+      "solver_counts": [
+        200,
+        100,
+        100,
+        100
+      ],
+      "final_names": [
+        "nominal",
+        "valley_00_dir_020",
+        "valley_00_dir_125",
+        "valley_01_dir_169",
+        "stop"
+      ],
+      "final_costs": [
+        16.660200627593298,
+        24.04186036664614,
+        8.633994085702595,
+        4.294154520414566,
+        22.131587729200373
+      ],
+      "final_probability": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "final_static_collisions": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "status": "ok",
+      "selected_mode": "valley_01_dir_169",
+      "validation": "Input grid/depth/path and final cost/trajectory matched frozen previous experiment."
+    }
+  }
+}

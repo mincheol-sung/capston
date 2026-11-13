@@ -1,0 +1,57 @@
+# 비교군 A (퓨어 퍼슛 + 바퀴별 PI) 설정 — pure_pursuit_node, wheel_pi_node 가 읽는다 (6단계, 2026-11-11)
+# ===================================================================
+# 쓰는 법:  ros2 launch amr_mpc torque_experiment.launch.py controller:=pure_pursuit
+#   기준열·상태·출력 경로·토크 상한·정지 규칙은 비교군 B 와 같다 (B 쪽 파일을 그대로 읽는다):
+#     토크 상한 τ̄ = τ_lim − τ_fric,max         → torque_plant.yaml motor·friction
+#     변화율 Δτ̄ = τ̄ × rate_fraction, 주기 Ts   → torque_mpc.yaml torque_limit·tuning
+#     기준열·상태 끊김 시간, hold 문턱             → torque_mpc.yaml safety·hold
+#   여기에는 A 만의 값(퓨어 퍼슛 기하, PI 게인)만 둔다.
+# --symlink-install 빌드라 고치면 다음 launch 에 바로 반영된다.
+# 오프라인으로 게인을 훑어볼 때:  /usr/bin/python3 tools/baseline_a_offline.py --sweep [--mu 0.3]
+# ===================================================================
+
+pure_pursuit:
+  # 룩어헤드 L_d = clamp(lookahead_time × |v_ref|, lookahead_min, lookahead_max)   — 속도에 비례
+  #   지금 트랙(3 × 1.5 m, 최소 곡률반경 0.31 m, 0.5 m/s)에서 L_d = 0.25 m.
+  #   오프라인 시뮬(참값 포즈, 2026-11-11): lookahead_time 0.3/0.5/0.8 → 추종 RMS 1.8/5.5/19.7 mm.
+  #   짧을수록 코너를 덜 자르지만 포즈 잡음 9 mm(추정기 수준)를 넣으면 0.3 s 는 최대 토크가 0.30 N·m 로 튄다
+  #   (0.5 s 는 0.15). κ = 2y/L² 라 잡음이 1/L² 로 커지기 때문. 0.5 s 로 둔다.
+  #   실제 트랙(최소 곡률반경 약 1 m, 1.0~1.5 m/s)에서는 L_d 0.5~0.6 m 가 되어 비율이 비슷하다.
+  lookahead_time: 0.5     # [s]
+  lookahead_min: 0.15     # [m] 저속에서 곡률이 튀지 않게
+  lookahead_max: 0.60     # [m]
+  # 진행 방향 시간 오차 보정 v = v_ref + k_along·e_along (근거: amr_mpc/baseline/pure_pursuit.py 머리주석).
+  #   0 이면 교과서 퓨어 퍼슛. 오프라인 시뮬에서 0 → 1 이면 추종 RMS 21 → 5.5 mm (뒤처짐이 대부분이었다), 3 이면 4.9.
+  #   크게 할수록 추정기 위치 잡음이 그대로 속도 명령 잡음이 된다 (k × 9 mm). 시정수 1 s 인 1.0 으로 둔다.
+  k_along: 1.0            # [1/s]
+  k_heading: 2.0          # [1/s] 제자리 회전 구간(8자 앞뒤 정렬) 헤딩 보정
+  rotate_speed: 0.02      # [m/s] |v_ref| 가 이보다 작으면 제자리 회전 구간
+  v_max: 1.0              # [m/s] 명령 상한 (기준 속도 + 보정)
+  w_max: 3.0              # [rad/s]
+  search_dt: 0.01         # [s] 룩어헤드 탐색 간격 (0.5 m/s 에서 5 mm, 사이는 원–선분 교점으로 보간)
+  search_horizon: 3.0     # [s] 기준열(4 s) 안
+
+wheel_pi:
+  # τ_i = K_p·e_i + K_i·∫e_i dt,  e_i = ω_ref,i − ω_i  [rad/s]
+  # 근거 (2026-11-11). 바퀴 하나가 보는 관성 = 차체를 바퀴 축으로 옮긴 값 (torque_plant.yaml, 무슬립 모델):
+  #   전진·옆걸음 모드 J = m r²/4        = 1.6e-3 kg·m²
+  #   회전 모드       J = I_z r²/(4k²)   = 6.1e-4 kg·m²   ← 가장 가볍다 = 가장 빨리 발진한다
+  #   (슬립 모델은 바퀴 관성 J_w 9.7e-4 가 더해져 무거워진다 → 더 안정)
+  #   교차 주파수 ω_c ≈ K_p/J. 루프 지연 = 한 틱(측정 → PI → torque_output → 게이트 → 플랜트) + ZOH 반 틱 ≈ 15 ms.
+  #   K_p 0.03 → 회전 모드 ω_c 49 rad/s, 지연 위상 42° → 위상 여유 약 45°. 전진 모드 ω_c 19 rad/s.
+  #   오프라인 시뮬: K_p 0.04 까지 안정, 0.08 이면 무슬립 플랜트에서 토크가 상한 ±1.3 으로 발진 (회전 모드).
+  #   K_i/K_p = 5 rad/s (PI 영점을 ω_c 의 1/4~1/10 에 — 위상을 거의 안 깎고 정상상태 오차를 없앤다).
+  #   K_i 를 0 으로 하면 추종 RMS 8~15 mm (K_p 0.04~0.02, 속도 오차가 남는다), 0.15 면 5~6 mm 로 퓨어 퍼슛 기하
+  #   오차가 바닥이 된다. K_i 를 K_p 의 25 배까지 올려도 나아지지 않는다 (오프라인 격자, tools/baseline_a_offline.py --sweep).
+  #   ROS 시뮬(추정기 잡음 1배, 3 × 1.5 m 8자 0.5 m/s): 참 추종 RMS 5.2 mm, 최대 토크 0.063 N·m (무슬립) /
+  #   μ 0.3 에서 5.2~7.2 mm, 0.085 N·m, 참 슬립률 RMS 0.022 — 발진·와인드업 없음 (stack_changelog 2026-11-11 (10)).
+  # ★ AK40-10 장착 뒤: 실제 J_w(To do 1절)와 엔코더 속도 잡음을 보고 다시 정한다. 잡음이 크면 K_p 를 낮춘다.
+  #   시뮬의 /wheel_states 는 잡음이 없다 — A 가 시뮬에서 유리한 이유 중 하나다.
+  kp: 0.03                # [N·m/(rad/s)]
+  ki: 0.15                # [N·m/rad]
+  # 토크 상한·변화율. -1 = 비교군 B 와 같게 (위 머리주석). 숫자를 주면 그 값 — 공정 비교 때는 -1 로 둔다.
+  tau_max_Nm: -1.0
+  rate_fraction: -1.0
+  # 퓨어 퍼슛 명령이 이만큼 [s] 안 오면 DAMPING + 적분 리셋. 퓨어 퍼슛은 정지를 결정하면 명령을 끊는다
+  #   (MPC 는 그 자리에서 바로 DAMPING 을 내는데, A 는 여기까지 더 걸린다 — 5 주기. 상태 주기 흔들림에 안 걸리는 최소).
+  cmd_timeout: 0.05

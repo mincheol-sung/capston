@@ -1,0 +1,166 @@
+2026-11-06: 운영 gap의 바퀴 한계 / LiDAR 적용 도달점·비용 분리
+
+구현한 동작
+
+기존에는 ReachProblem에 LiDAR 깊이를 처음부터 넣었다.
+이제 각 gap 중앙 방향마다 다음 순서로 별개의 문제를 푼다.
+
+1. LiDAR/장애물 없이 바퀴·축별 속도·가속도 한계로 최대 도달거리 D_g 계산.
+   목적함수는 -e_g^T p_N. heading 비용 없음, omega는 자유 최적화 변수.
+   현재 제어입력, 실제 비선형 메카넘 적분, 종단의 중앙 방향선 제약을 적용한다.
+   초기 제어열도 LiDAR 깊이나 해당 gap의 이전 seed에 의존하지 않도록 생성한다.
+
+2. q_wheel = D_g e_g에 도달하도록 현재 4항 비용을 최적화해 V_wheel 계산.
+   이 비교 경로가 실제 장애물을 통과할 수 있어도 wheel 비교 비용은 계산한다.
+   이 경로를 곧바로 실행 후보로 채택하지 않는다.
+
+3. rho_g = min(D_g,d_g), q_actual = rho_g e_g 설정.
+   LiDAR 제한이 없고 wheel 경로의 중간 깊이 조건도 만족하면 해/비용을 재사용한다.
+   LiDAR가 목표점을 줄이거나 중간 깊이 조건을 만족하지 않으면 같은 비용으로
+   실제 목표점까지의 문제를 다시 최적화한다. 결과는 U_actual, V_actual이다.
+
+4. U_actual의 제약 적용 후 swept footprint, gap 종단, 깊이, 이동량을 재검사한다.
+   통과한 실제 제어열을 같은 4항으로 재평가한 V_actual을 정렬·샘플 배분에 사용한다.
+   V_wheel은 비교용 진단값이다. 완료하지 못한 V_actual 대신 V_wheel을 사용하지 않는다.
+
+5. nominal과 최대 3개 gap에 총 500개 샘플을 배분한다.
+   최신 확인 내용인 '실제 목표점 비용이 낮은 곳에 더 배분'을 유지했다.
+   nominal 최소 100개, gap 최소 30개; 잔여 예산은 20% 균등 + 80% 비용 softmax.
+   앞서 별도 실험 후 제안한 완전 균등 잔여 배분으로 바꾸지는 않았다.
+   비용 기반 배분의 성능 우위가 검증되었다는 의미는 아니다.
+
+6. 기존 MPPI가 모든 500개 샘플을 평가하고 그룹별 대표를 만든다.
+   대표들을 다시 기존 정적·동적 비용/안전 기준으로 평가해 최종 대표를 선택한다.
+   이 evaluator 및 그룹 대표 생성·선택 코드는 이번 변경에서 수정하지 않았다.
+
+수식
+
+  D_g = max_U e_g^T p_N
+        subject to wheel/box/rate/kinematics and e_perp_g^T p_N = 0
+
+  V_wheel = min_U J_g(U), p_N approximately D_g e_g
+
+  rho_g = min(D_g,d_g)
+  V_actual = min_U J_g(U), p_N approximately rho_g e_g,
+             e_g^T p_t <= d_g at every step
+
+종단의 along 방향 허용 오차는 1cm, 최소 이동량은 0.25m.
+wheel 풀이의 유한 깊이 상한 T*Vmax는 모든 실현 가능한 경로를 포함하는
+물리적 상한이며, D_g를 T*Vmax로 대신 계산한 것이 아니다.
+||v_world||_2 = ||v_body||_2 <= |vx|+|vy| <= Vmax이므로 이 상한은
+LiDAR와 독립적이며 가능 경로를 불필요하게 줄이지 않는다.
+
+  J_g = 8 ||p_N - p_ref||^2
+      + 4 mean((e_perp_g^T p_t)^2)
+      + 3 mean((psi_t-psi_ref_t)^2)
+      + mean(delta_u_t^T diag(0.5,0.5,0.055) delta_u_t)
+
+두 가치 최적화의 p_ref/psi_ref/가중치는 동일하다.
+q_actual은 도달해야 할 점이고 p_ref는 공통 주행 평가 기준점이다.
+V_wheel=50, V_actual=80으로 나왔다면 샘플 배분 점수는 80이다.
+고정 목표점을 바꾸는 문제이므로 짧아질 때 비용이 항상 증가한다는 보장은 없다.
+SLSQP의 국소해이며 전역 최대 도달거리/최소 비용을 증명하지 않는다.
+
+시간 제한과 실패 처리
+
+기존 seed 준비/최적화 50ms, MPPI 100ms 예약, 전체 180ms 설정을 유지했다.
+세 문제 전체가 이 예산을 공유한다. 모든 gap을 매 주기 끝까지 푼다고 보장하지 않는다.
+시간 부족/미수렴/최적화 경로 충돌 시 사전 검증된 이전 seed 또는 규칙 seed를 사용한다.
+이 대체 seed의 실제 비용은 다시 계산하지만 최적 비용이라고 표시하지 않는다.
+wheel 값만 구한 뒤 actual 풀이가 중단되면 actual_value_cost는 null로 남는다.
+전체 cycle의 deadline을 초과하면 기존 방식대로 결과를 폐기한다.
+
+진단 토픽: /dra_mppi/gap_diagnostics
+
+  target_policy: wheel_then_lidar
+  allocation_policy: cost_softmax_with_reserves
+  value_model: four_term_gap
+  global_optimality_certified: false
+
+후보별:
+  wheel_distance_m                D_g
+  wheel_value_cost                바퀴 한계 목표점의 국소 최적 비용
+  actual_target_distance_m        min(D_g,d_g), 풀이 여부와 별도로 구분
+  actual_value_cost               실제 목표점의 비용, 미완료면 null
+  value_difference                V_actual - V_wheel, 미완료면 null
+  lidar_limited                   d_g < D_g 여부
+  actual_value_reused_from_wheel  같은 해/비용을 그대로 썼는지
+  wheel_trajectory_within_lidar_depth  중간 투영 깊이 조건도 만족하는지
+  wheel_reach_status / wheel_value_status / actual_value_status
+  optimization_stage             중단된 단계 또는 complete
+  cost                           후보 정렬/배분에 실제로 쓰는 점수
+  allocation_cost_source         optimized_actual / reused_seed / fallback_seed / none
+
+최적화 계산이 끝났더라도 collision 검사에서 탈락하면 해당 V_actual은 비교용으로
+남을 수 있다. 실제 채택 점수는 cost와 allocation_cost_source로 확인해야 한다.
+seed_source가 optimized인 경우 cost == actual_value_cost를 assert하여 검증했다.
+재사용 cycle에서 과거의 wheel/actual 최적값을 현재 cycle 값으로 복사하지 않는다.
+
+실제 기록 데이터 확인
+
+기존 원본 MCAP 추출 스냅샷 16장면(동적 예측 포함 6장면)을 사용했다.
+이번 작업은 저장된 실제 bag 스냅샷 재생이며 MCAP 재추출/ROS 주행은 하지 않았다.
+production_budget/validation.json: 기본 YAML의 시간 예산, 16장면 x 12회 = 192회.
+
+  정상 반환 / 전체         192 / 192
+  시간 초과 hold          0
+  평균                    112.277ms
+  p95                     155.664ms
+  최대                    172.742ms
+  200ms 초과              0
+  매회 샘플               500개
+
+  wheel 최대거리 완료     336개
+  wheel 비용 완료         299개
+  actual 비용 완료        255개
+    LiDAR로 짧아져 재풀이 113개
+    wheel 해/비용 재사용  142개
+
+선택된 gap seed의 출처(각 cycle의 여러 gap 합계):
+  이번 cycle 최적화       193개
+  이전 seed 재검증        151개
+  규칙 seed 재평가        116개
+
+전체 192회 정상 반환이 192회 모든 gap의 최적화 완료라는 뜻은 아니다.
+nominal은 위 gap seed 출처 개수에 포함하지 않았다.
+
+실제 b2_060, trial 0:
+  gap_01: D=1.498576m, 실제 목표=1.498576m
+          wheel 비용=3.054801, 실제 배분 비용=3.054801
+  gap_02: D=1.433765m, LiDAR 실제 목표=0.680000m
+          wheel 비용=1.291620, 실제 배분 비용=5.316540
+          seed_source=optimized, allocation_cost_source=optimized_actual
+정확한 부동소수 값/비용 항/배분 수는 b2_060_actual_values.json에 보관했다.
+
+full_stage_check/validation.json은 단계 자체를 더 폭넓게 확인하기 위해 실험 인자로만
+seed 예산 1000ms, cycle 예산 2000ms를 준 추가 16회다. 운영 YAML은 바꾸지 않았다.
+16회 정상, 51개 방향 중 45개 실제 목표점 최적화 완료, 6개 fallback.
+이 실행의 시간은 실시간 성능 근거로 사용하지 않는다.
+
+검증
+
+- pytest planner/local_planner/DRA_MPPI/test: 262 passed.
+- 새 테스트: LiDAR 깊이 변경에도 D_g/V_wheel 불변, 짧아진 점 실제 재풀이,
+  LiDAR 비제한 시 동일 비용 재사용, actual timeout 시 wheel 비용 오용 금지,
+  운영 경로에서 actual 값의 배분 연결 및 500개 예산 확인.
+- 기본 예산 192회에서 실제 목표거리=min(D_g,d_g), cost 출처/값 일치,
+  선택 경로의 정적 충돌 없음 및 동적 hard 기준 통과를 assert했다.
+- MPPI evaluator/대표 생성 관련 5파일의 변경 전후 SHA-256 동일.
+  evaluator_hashes.json에 기록.
+- colcon build --packages-select dra_mppi --symlink-install: 성공.
+- 실행 중인 로봇 노드 재시작이나 주행 명령은 수행하지 않았다.
+
+남는 범위
+
+저장 snapshot과 기록 nominal을 반복 사용하고 cache/worker를 유지한 검증이다.
+ROS/TF/deskew/발행 및 다른 노드 부하를 포함한 전체 5Hz나 폐루프 성공률은 보장하지 않는다.
+현재 제어 주기를 지키기 위한 fallback은 의도적인 동작이며 진단값으로 노출한다.
+
+재현
+
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 /usr/bin/python3 planner/local_planner/DRA_MPPI/tools/validate_gap_value_strategy.py --iterations 12 --output /tmp/gap_two_stage_replay
+
+ROS 환경에서 단위/통합 테스트:
+source /opt/ros/jazzy/setup.bash
+source /home/smoc/2026amr_ws/install/setup.bash
+PYTHONPATH="$PWD/planner/local_planner/DRA_MPPI:$PYTHONPATH" OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 /usr/bin/python3 -m pytest planner/local_planner/DRA_MPPI/test -q

@@ -1,0 +1,8 @@
+isotropic 100 2 mc_legacy mean/p99 25.07 26.97
+isotropic 100 2 mc_high mean/p99 232.21 235.98
+isotropic 500 2 mc_legacy mean/p99 29.28 29.73
+isotropic 500 2 mc_high mean/p99 388.12 393.71
+anisotropic 100 2 mc_legacy mean/p99 24.9 25.44
+anisotropic 100 2 mc_high mean/p99 223.33 225.49
+anisotropic 500 2 mc_legacy mean/p99 29.62 30.91
+anisotropic 500 2 mc_high mean/p99 383.62 389.67

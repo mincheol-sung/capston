@@ -1,0 +1,20 @@
+{
+  "accepted_snapshots": 127,
+  "logical_trials": 1270,
+  "actual_solver_runs": 588,
+  "checks": [
+    "recorded grid/depth/path reproduced for all snapshots",
+    "prior midpoint seed costs and selection reproduced in original 10 scenes",
+    "500 controls and expected per-group assignment in every solver run",
+    "final safe outputs satisfy existing MC threshold and static sweep check",
+    "all 1270 stored trajectories finite, shape10x3",
+    "identical cached inputs reproduce exact trajectory arrays",
+    "experiment source hash matches protocol"
+  ],
+  "limitations": [
+    "offline snapshots, not closed-loop driving",
+    "two noise seeds",
+    "same three bags reused",
+    "full-stack5Hz not measured"
+  ]
+}

@@ -1,0 +1,96 @@
+[WARN] [1793777521.690946679] [rcl]: ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled. Use ROS_AUTOMATIC_DISCOVERY_RANGE and ROS_STATIC_PEERS instead.
+[WARN] [1793777521.691015679] [rcl]: 'localhost_only' is enabled, 'automatic_discovery_range' and 'static_peers' will be ignored.
+[INFO] [1793777521.735489918] [dra_mppi_node]: wheel-speed limit: |vx|+|vy|+0.19835|yaw_rate| <= 0.780 m/s (0.040 m x 30.0 rad/s x 0.65 budget)
+[INFO] [1793777521.751043130] [dra_mppi_node]: DRA-MPPI ready: strategy=guide_conditioned, path=/guide_validation/global_path, odom=/guide_validation/odometry/filtered, predictions=/guide_validation/predictions, prediction_classes=['person'], reference_trajectory=/guide_validation/dra_mppi/reference_trajectory (odom frame)
+[INFO] [1793777522.568607138] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1793777522.767713143] [dra_mppi_node]: prediction obstacle budget exceeded: 21 > 20; no tracks discarded
+[INFO] [1793777523.046010447] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1793777523.546181024] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1793777523.767919665] [dra_mppi_node]: prediction obstacle budget exceeded: 21 > 20; no tracks discarded
+[INFO] [1793777524.066579337] [dra_mppi_node]: Received global path with 2 poses in odom
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 10,
+  "normal_optimizer_cycles": 0,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 0,
+  "callback_over_200ms_ratio": 0.0,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 10,
+    "mean": 17.758373264223337,
+    "p50": 17.80641172081232,
+    "p95": 18.474123300984502,
+    "p99": 18.54942531324923,
+    "max": 18.568250816315413
+  },
+  "backend": "split",
+  "workers": 2,
+  "frozen_nominal": false,
+  "statuses": {
+    "missing_input": 1,
+    "prediction_budget_hold": 9
+  },
+  "fallback_ratio": 1.0,
+  "deadline_miss_ratio": 0.0,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 10,
+    "mean": 2.8368066996335983,
+    "p50": 3.0764034017920494,
+    "p95": 3.3055766252800822,
+    "p99": 3.357518441043794,
+    "max": 3.370503894984722
+  },
+  "normal_optimizer_ms": null,
+  "start_delay_ms": {
+    "count": 10,
+    "mean": 15.014090994372964,
+    "p50": 14.889254234731197,
+    "p95": 15.879596676677465,
+    "p99": 16.122726183384657,
+    "max": 16.183508560061455
+  },
+  "deadline_lateness_ms": {
+    "count": 10,
+    "mean": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "publish_interval_ms": {
+    "count": 10,
+    "mean": 200.18830900080502,
+    "p50": 200.07864851504564,
+    "p95": 201.21615058742464,
+    "p99": 201.41517418436706,
+    "max": 201.46493008360267
+  },
+  "receive_interval_ms": {
+    "count": 10,
+    "mean": 200.1823551952839,
+    "p50": 200.1614961773157,
+    "p95": 201.2627563206479,
+    "p99": 201.56580788549036,
+    "max": 201.64157077670097
+  },
+  "receive_count_in_window": 10,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 13,
+    "dropped": 0,
+    "error": null
+  },
+  "covariance": "anisotropic",
+  "risk_mode": "monte_carlo",
+  "final_risk_mode": "gaussian_disk",
+  "max_obstacles": 20,
+  "warmup_cycles": 3,
+  "obstacles": 21,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 500
+}

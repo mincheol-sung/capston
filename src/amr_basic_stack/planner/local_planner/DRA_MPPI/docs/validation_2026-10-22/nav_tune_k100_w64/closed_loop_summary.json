@@ -1,0 +1,269 @@
+{
+  "scope": "kinematic synthetic suite; no MPC/actuators; timeout=10s for offline convergence",
+  "config": {
+    "dt": 0.2,
+    "horizon_steps": 10,
+    "num_rollouts": 321,
+    "temperature": 2.0,
+    "adaptive_temperature": true,
+    "temperature_eta_lower": 5.0,
+    "temperature_eta_upper": 10.0,
+    "temperature_decrease_factor": 0.9,
+    "temperature_increase_factor": 1.2,
+    "noise_std": [
+      0.15,
+      0.12,
+      0.45
+    ],
+    "spline_knots": 4,
+    "halton_scramble": true,
+    "control_min": [
+      -0.375,
+      -0.5625,
+      -3.0
+    ],
+    "control_max": [
+      0.78,
+      0.5625,
+      3.0
+    ],
+    "acceleration_limit": [
+      2.25,
+      2.25,
+      6.75
+    ],
+    "yaw_lever": 0.19835,
+    "speed_limit_l1": 0.78,
+    "desired_speed": 0.75,
+    "tracking_path_weight": 64.0,
+    "tracking_goal_weight": 24.0,
+    "heading_weight": 3.0,
+    "heading_lookahead": 0.2,
+    "speed_weight": 1.78,
+    "progress_weight": 8.0,
+    "projection_window": 0.5,
+    "goal_activation_distance": 0.5,
+    "input_delta_weight": [
+      0.5,
+      0.5,
+      0.055
+    ],
+    "rotation_weight": 0.167,
+    "seed": 7,
+    "strategy": "guide_conditioned",
+    "guide_num_rollouts": 100,
+    "guide_angles_deg": [
+      0.0,
+      45.0,
+      90.0,
+      -45.0,
+      -90.0
+    ],
+    "guide_noise_std": [
+      0.15,
+      0.12,
+      0.45
+    ],
+    "guide_anchor_blend": 0.25,
+    "guide_switch_penalty": 0.25,
+    "guide_hysteresis": 0.1,
+    "guide_evaluation": "split",
+    "guide_timeout": 10.0,
+    "static_cost_enabled": true,
+    "static_cost_soft_weight": 8.0,
+    "static_cost_decay": 0.1,
+    "static_cost_robot_radius": 0.2,
+    "dynamic_risk": {
+      "mode": "monte_carlo",
+      "soft_weight": 18.0,
+      "robot_radius": 0.2,
+      "obstacle_radius": 0.25,
+      "minimum_sigma": 0.08,
+      "mc_samples": 4096,
+      "adaptive_halton_mc": true,
+      "mc_sample_density": 4096.0,
+      "mc_samples_min": 4096,
+      "mc_samples_max": 131072,
+      "guide_parallel_workers": 2,
+      "guide_mc_sample_density": 4096.0,
+      "guide_mc_samples_min": 4096,
+      "guide_mc_samples_max": 131072,
+      "final_mc_sample_density": 4096.0,
+      "final_mc_samples_min": 4096,
+      "final_mc_samples_max": 131072,
+      "mc_reject_underresolved": true,
+      "hard_threshold": 0.05,
+      "hard_penalty": 100000.0,
+      "seed": 17
+    }
+  },
+  "primary_K": 100,
+  "final_candidates": {
+    "standard": 2,
+    "single_anchor": 2,
+    "guide": 6
+  },
+  "results": [
+    {
+      "environment": "open",
+      "method": "guide",
+      "seed": 3,
+      "success": true,
+      "collision": false,
+      "elapsed_sim_s": 3.8000000000000003,
+      "failure_inclusive_s": 3.8000000000000003,
+      "minimum_clearance_lower_bound": 2.9245292337884514,
+      "stop_time_s": 0.0,
+      "risk_exceed_steps": 0,
+      "exceptions": 0,
+      "guide_switches": 0,
+      "failure_reasons": {
+        "ok": 19
+      },
+      "mean_path_error_m": 0.026976510963247866,
+      "mean_heading_error_rad": 0.045270735832624205,
+      "final_speed_mps": 0.06976133839947372,
+      "mean_input_rate_squared": 0.3770419298726005,
+      "offline_optimizer_p99_ms": 12.787225903011858
+    },
+    {
+      "environment": "offpath",
+      "method": "guide",
+      "seed": 3,
+      "success": true,
+      "collision": false,
+      "elapsed_sim_s": 3.8000000000000003,
+      "failure_inclusive_s": 3.8000000000000003,
+      "minimum_clearance_lower_bound": 2.92625241573451,
+      "stop_time_s": 0.0,
+      "risk_exceed_steps": 0,
+      "exceptions": 0,
+      "guide_switches": 1,
+      "failure_reasons": {
+        "ok": 19
+      },
+      "mean_path_error_m": 0.18613879576499612,
+      "mean_heading_error_rad": 0.07331591480106547,
+      "final_speed_mps": 0.2570614471031119,
+      "mean_input_rate_squared": 0.9648555596440505,
+      "offline_optimizer_p99_ms": 14.946860545314848
+    },
+    {
+      "environment": "yaw_m70",
+      "method": "guide",
+      "seed": 3,
+      "success": true,
+      "collision": false,
+      "elapsed_sim_s": 4.800000000000001,
+      "failure_inclusive_s": 4.800000000000001,
+      "minimum_clearance_lower_bound": 2.9075458034520247,
+      "stop_time_s": 0.0,
+      "risk_exceed_steps": 0,
+      "exceptions": 0,
+      "guide_switches": 3,
+      "failure_reasons": {
+        "ok": 24
+      },
+      "mean_path_error_m": 0.021770948646350655,
+      "mean_heading_error_rad": 0.1433350195425405,
+      "final_speed_mps": 0.24306777245392336,
+      "mean_input_rate_squared": 2.945577355728886,
+      "offline_optimizer_p99_ms": 13.968583163805304
+    },
+    {
+      "environment": "yaw_p90",
+      "method": "guide",
+      "seed": 3,
+      "success": true,
+      "collision": false,
+      "elapsed_sim_s": 4.6000000000000005,
+      "failure_inclusive_s": 4.6000000000000005,
+      "minimum_clearance_lower_bound": 2.9178755236097604,
+      "stop_time_s": 0.0,
+      "risk_exceed_steps": 0,
+      "exceptions": 0,
+      "guide_switches": 4,
+      "failure_reasons": {
+        "ok": 23
+      },
+      "mean_path_error_m": 0.02583389811840203,
+      "mean_heading_error_rad": 0.18114555506583854,
+      "final_speed_mps": 0.12467760244594052,
+      "mean_input_rate_squared": 4.3403993524660445,
+      "offline_optimizer_p99_ms": 16.749464636668563
+    },
+    {
+      "environment": "yaw180",
+      "method": "guide",
+      "seed": 3,
+      "success": true,
+      "collision": false,
+      "elapsed_sim_s": 5.0,
+      "failure_inclusive_s": 5.0,
+      "minimum_clearance_lower_bound": 2.9319142855731446,
+      "stop_time_s": 0.0,
+      "risk_exceed_steps": 0,
+      "exceptions": 0,
+      "guide_switches": 3,
+      "failure_reasons": {
+        "ok": 25
+      },
+      "mean_path_error_m": 0.019756137438079753,
+      "mean_heading_error_rad": 0.5758170494423045,
+      "final_speed_mps": 0.1642963132518772,
+      "mean_input_rate_squared": 3.0070135350167932,
+      "offline_optimizer_p99_ms": 16.41622113063931
+    },
+    {
+      "environment": "curve",
+      "method": "guide",
+      "seed": 3,
+      "success": true,
+      "collision": false,
+      "elapsed_sim_s": 4.2,
+      "failure_inclusive_s": 4.2,
+      "minimum_clearance_lower_bound": 3.3500865276759466,
+      "stop_time_s": 0.0,
+      "risk_exceed_steps": 0,
+      "exceptions": 0,
+      "guide_switches": 0,
+      "failure_reasons": {
+        "ok": 21
+      },
+      "mean_path_error_m": 0.025422501164002364,
+      "mean_heading_error_rad": 0.0429721043986788,
+      "final_speed_mps": 0.22915178630735322,
+      "mean_input_rate_squared": 0.5106186147049769,
+      "offline_optimizer_p99_ms": 17.695008637383584
+    },
+    {
+      "environment": "detour",
+      "method": "guide",
+      "seed": 3,
+      "success": true,
+      "collision": false,
+      "elapsed_sim_s": 7.0,
+      "failure_inclusive_s": 7.0,
+      "minimum_clearance_lower_bound": 0.07034271247461898,
+      "stop_time_s": 0.0,
+      "risk_exceed_steps": 0,
+      "exceptions": 0,
+      "guide_switches": 6,
+      "failure_reasons": {
+        "ok": 35
+      },
+      "mean_path_error_m": 0.11515968109548137,
+      "mean_heading_error_rad": 0.2503811328579256,
+      "final_speed_mps": 0.3589784151545135,
+      "mean_input_rate_squared": 5.977537832296482,
+      "offline_optimizer_p99_ms": 16.850401740521185
+    }
+  ],
+  "independent_environment_count": 7,
+  "paired_environment_mean_time_difference_s": 4.742857142857143,
+  "exploratory_environment_bootstrap_95_ci_s": [
+    4.114285714285715,
+    5.571428571428571
+  ],
+  "limitations": "Hand-built scenes; seeds are repeats within environments. No time-budget matching, MPC dynamics, measured prediction error, perception load, or ROS deadline/physical collision relationship. Collision checks are discretized. Zero observed collisions is not a safety guarantee."
+}

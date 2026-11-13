@@ -1,0 +1,18 @@
+# Prefer a permanent object_id. Class/alias queries fail on ambiguity.
+string object_id
+string class_name
+string alias
+string near_object_id
+bool allow_search
+bool preview_only
+float32 timeout
+---
+bool success
+string status
+string message
+string object_id
+geometry_msgs/PoseStamped goal
+---
+string state
+string object_id
+geometry_msgs/PoseStamped goal

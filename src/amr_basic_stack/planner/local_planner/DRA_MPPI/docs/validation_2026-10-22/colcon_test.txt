@@ -1,0 +1,28 @@
+Starting >>> dra_mppi
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0
+cachedir: /home/smoc/2026amr_ws/build/dra_mppi/.pytest_cache
+rootdir: /home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI
+plugins: ament-lint-0.17.5, launch-testing-ros-0.26.13, launch-testing-3.4.12, ament-flake8-0.17.5, ament-xmllint-0.17.5, ament-copyright-0.17.5, ament-pep257-0.17.5, colcon-core-0.21.3, typeguard-4.1.5, cov-4.1.0
+collected 178 items
+
+test/test_common_cost.py ..............                                  [  7%]
+test/test_configuration.py ...                                           [  9%]
+test/test_control_sampling.py ..                                         [ 10%]
+test/test_dynamic_risk.py ..................                             [ 20%]
+test/test_grid_costmap.py ..                                             [ 21%]
+test/test_guide_conditioned.py ...........................               [ 37%]
+test/test_guide_node.py ..........................                       [ 51%]
+test/test_input_freshness.py ..............                              [ 59%]
+test/test_mecanum_model.py ..                                            [ 60%]
+test/test_mppi_controller.py ...................                         [ 71%]
+test/test_path_handler.py .......                                        [ 75%]
+test/test_prediction_filter.py ............................              [ 91%]
+test/test_requested_objective.py .............                           [ 98%]
+test/test_semantic_chain.py ...                                          [100%]
+
+----- generated xml file: /home/smoc/2026amr_ws/build/dra_mppi/pytest.xml ------
+============================= 178 passed in 2.18s ==============================
+Finished <<< dra_mppi [2.61s]
+
+Summary: 1 package finished [2.74s]

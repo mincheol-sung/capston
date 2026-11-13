@@ -1,0 +1,26 @@
+{
+  "created": "2026-10-26",
+  "updated": "2026-10-28",
+  "measurement_date": "2026-10-23",
+  "additional_measurement_dates": [
+    "2026-10-27"
+  ],
+  "pages": 11,
+  "figures_matched_repeats": 4,
+  "pdf": "docs/mc_probability_presentation_2026-10-26/MC_probability_comparison_1x_vs_8x.pdf",
+  "source_sha256": {
+    "docs/mc_budget_theta_2026-10-23/accuracy.json": "cbdcf51862698288cb24168590b695684899d0660d672411cb969e9593d02403",
+    "docs/mc_budget_theta_2026-10-23/timing.json": "670ce8d2daa819f8a10232a6338cd9121695db4e8d3ba197ac1862736841625d",
+    "docs/mc_budget_theta_2026-10-23/ros_x8/summary.json": "bf42846a139d7f2928b90bf792ab639047c06be19e987375a6c22feb5941ea57",
+    "docs/mc_budget_theta_2026-10-23/accuracy_candidates_x1.csv": "86b4e0e8d6ae59ce9e040c4df986d008417045482d553673b05898518ed5f18a",
+    "docs/mc_budget_theta_2026-10-23/accuracy_candidates_x8.csv": "dc75c3764f38a9714472efb5fffa913350c1c5531527202638ea494f2e45b874",
+    "dra_mppi/guide_conditioned.py": "38f135ecb61dd0f073f194948f6e6dd155d6755bdebc9a58132f8bdf4f3a1ccf",
+    "dra_mppi/dynamic_risk.py": "741dc9fa3b4b055b999e9828402b9f6e8b09c7389230c39ba2e14be1e170f664",
+    "config/dra_mppi.yaml": "5b434f3e0c5fe64df64e1018fafc166fc79a6be0c7ca513356bd2d98d159b8fc",
+    "docs/mc_reference_timing_2026-10-27/timing.json": "a8510f5f253c316bba33531a38a5cfd7feec7e15ecf9c7ed5b9a1dff75b4c482",
+    "docs/predictor_integration_comparison_2026-10-27/results.json": "b580ecb8c662d039999cd1a74f323a2b0e98dfc62221c69650316cd7290257ea",
+    "dra_mppi/gaussian_disk.py": "8a9a9249f01a52258e41473f496e6863620615c1fb9cfb47c4ca382d020e350b",
+    "tools/benchmark_mc_reference_time.py": "60a9aef1b72414117ab45fcdf17e1aa1b4d3e316b16bf1268a655fc597c5abcc",
+    "tools/benchmark_predictor_integration.py": "7ff758a11387388771d04815c0b9bf892a5fd883c1e5cabe87e7ee28498cee05"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "budget_multiplier": 8,
+  "density": 992,
+  "source": "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/docs/mc_budget_theta_2026-10-23/accuracy_candidates_x8.csv",
+  "candidate_repeats": 4,
+  "guide_count": 240000,
+  "final_count": 2880,
+  "display": "Reference/estimate 0..20%; guide display random subset up to20k; all false-safe points in reference range overlaid; errors use all values"
+}

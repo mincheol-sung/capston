@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>슬립 제어기 흐름</title>
+<style>
+:root{
+  --bg:#fbfaf7; --fg:#1f2328; --muted:#5b6470; --line:#d9dce1; --card:#ffffff;
+  --accent:#2f6fb3; --accent-bg:#e9f1fa; --warn:#a4452c; --warn-bg:#fbeee9;
+  --ok:#2d7a4b; --ok-bg:#e8f4ec; --code-bg:#f2f3f5;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16181c; --fg:#e6e8eb; --muted:#9aa3ad; --line:#30343b; --card:#1e2126;
+    --accent:#7fb0e6; --accent-bg:#1d2a3a; --warn:#f0a58f; --warn-bg:#3a2420;
+    --ok:#8fd1a7; --ok-bg:#1c3326; --code-bg:#262a30;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16181c; --fg:#e6e8eb; --muted:#9aa3ad; --line:#30343b; --card:#1e2126;
+  --accent:#7fb0e6; --accent-bg:#1d2a3a; --warn:#f0a58f; --warn-bg:#3a2420;
+  --ok:#8fd1a7; --ok-bg:#1c3326; --code-bg:#262a30;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+main{max-width:960px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:26px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 28px;font-size:14px}
+h2{font-size:20px;margin:44px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{font-size:16px;margin:26px 0 8px}
+p{margin:8px 0}
+code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code-bg);padding:1px 5px;border-radius:4px}
+pre{font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code-bg);
+  padding:12px 14px;border-radius:8px;overflow-x:auto;margin:10px 0}
+pre code{background:none;padding:0}
+.tbl{overflow-x:auto;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--code-bg);font-weight:600}
+.callout{border-left:4px solid var(--warn);background:var(--warn-bg);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+.callout.ok{border-color:var(--ok);background:var(--ok-bg)}
+.callout.info{border-color:var(--accent);background:var(--accent-bg)}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:10px;margin-right:6px}
+.tag.no{background:var(--warn-bg);color:var(--warn)}
+.tag.yes{background:var(--ok-bg);color:var(--ok)}
+/* block diagram */
+.flow{display:flex;flex-direction:column;gap:0;margin:14px 0}
+.blk{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:12px 14px}
+.blk h4{margin:0 0 6px;font-size:13px;letter-spacing:.06em;color:var(--accent)}
+.blk ul{margin:0;padding-left:18px}
+.blk li{margin:2px 0}
+.blk .x{color:var(--warn)}
+.arrow{text-align:center;color:var(--muted);font-size:18px;line-height:28px}
+.ctrl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.node{border:1px dashed var(--line);border-radius:8px;padding:8px 10px;font-size:13.5px}
+.node b{display:block;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.node.full{grid-column:1/-1}
+@media (max-width:640px){.ctrl{grid-template-columns:1fr}}
+.toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-size:14px}
+.toc ol{margin:4px 0;padding-left:20px}
+a{color:var(--accent)}
+footer{margin-top:48px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<h1>슬립 제어기 흐름</h1>
+<p class="sub">AK40-10 교체 후 2026amr_ws 스택 구조 · 스켈레톤 코드용 정리 · 2026-10-23<br>
+근거: <code>mapping_2d.lua</code>, <code>localization_2d.lua</code>, <code>base.yaml</code>, bag <code>mpc_chain_20260923_135325</code> 실측, 수치 검산 스크립트</p>
+
+<div class="toc"><ol start="0">
+<li><a href="#fix">채팅 내용 중 바로잡을 것</a></li>
+<li><a href="#flow">전체 흐름 (교체 후 목표 구조)</a></li>
+<li><a href="#nodes">노드별 스켈레톤 계약</a></li>
+<li><a href="#decide">코딩 전에 정할 것</a></li>
+<li><a href="#next">다음 행동</a></li>
+</ol></div>
+
+<!-- ============================================================ -->
+<h2 id="fix">0. 채팅 내용 중 바로잡을 것</h2>
+
+<h3>① "map→base_footprint 포즈 미분은 휠과 무관" <span class="tag no">틀림</span></h3>
+<pre><code>T_map_base = T_map_odom (ekf_carto ← cartographer) · T_odom_base (ekf_filter_node ← /odom 휠)</code></pre>
+<p>뒤쪽 <code>T_odom_base</code>가 휠 오도메트리로 만들어지므로 이 TF를 미분하면 휠 속도가 그대로 섞입니다. <code>/tracked_pose</code>를 직접 써도 현재 설정에서는 섞입니다.</p>
+<pre><code>mapping_2d.lua
+  use_odometry = true             (75행)  ← 휠 /odom 을 pose extrapolator 에 씀
+  use_imu_data = true             (102행)
+  use_pose_extrapolator = true    (69행)
+localization_2d.lua
+  pose_publish_period_sec = 1e-2  (30행)</code></pre>
+<div class="tbl"><table>
+<tr><th>토픽 (bag 실측)</th><th>주기</th></tr>
+<tr><td><code>/scan_front</code></td><td>10.0 Hz</td></tr>
+<tr><td><code>/scan_rear</code></td><td>9.99 Hz</td></tr>
+<tr><td><code>/tracked_pose</code></td><td>98.22 Hz ← scan보다 10배</td></tr>
+</table></div>
+<div class="callout">
+<code>/tracked_pose</code> 10개 중 9개는 scan matching이 아니라 extrapolator가 휠·IMU로 외삽한 값입니다. 채팅의 "cartographer 포즈 약 10 Hz"는 이 스택에 맞지 않습니다. 순수 LiDAR 속도가 필요하면 cartographer를 <code>use_odometry = false</code>로 바꾸거나, rf2o 같은 독립 LiDAR odometry를 두어야 합니다.
+</div>
+
+<h3>② "자기 자신과 비교하면 슬립이 과소추정" <span class="tag yes">방향은 맞음</span> 실제로는 더 나쁨</h3>
+<p>휠에서 구한 v = T_FWD·ω_meas를 기준으로 쓰면:</p>
+<pre><code>s = ω_meas − T⁻¹·T_FWD·ω_meas = (I − T⁻¹T_FWD)·ω_meas = n nᵀ·s_true,   n = [-1,-1,1,1]/2
+수치 확인: ‖(I − T⁻¹T_FWD) − n nᵀ‖ = 2.8e-16</code></pre>
+<p>슬립 4성분 중 null 방향 1개만 남습니다. FL만 30% 헛돌게 한 예:</p>
+<pre><code>진짜 s      [3.75, 0, 0, 0]
+자기비교 s  [0.94, 0.94, -0.94, -0.94]   ← 크기 1/4, 어느 바퀴인지 구분 불가</code></pre>
+
+<h3>③ "M·v̇ = (1/r)·Bᵀ·τ" <span class="tag no">v가 body frame이면 틀림</span></h3>
+<p>회전 좌표계에서는 ω × v 항이 필요합니다.</p>
+<pre><code>m (v̇x − ωz·vy) = Fx
+m (v̇y + ωz·vx) = Fy
+I_z ω̇z         = Mz           [Fx, Fy, Mz]ᵀ = (1/r)·Bᵀ·τ</code></pre>
+<p>검산 (m = 10 kg은 예시값): vx = 0.5 m/s, ωz = 1 rad/s로 body 속도를 일정하게 유지하려면 Fy = 5 N이 필요합니다. 채팅 식으로는 F = 0 → v̇ = 0이라 이 5 N을 설명하지 못합니다.</p>
+<div class="callout ok">F = Bᵀτ/r (일률 보존 τᵀω = Fᵀv) 자체는 맞습니다. 검산 오차 0.0.</div>
+
+<h3>④ 추가: 토크 모드의 "0 명령"은 정지가 아님</h3>
+<div class="callout">
+속도 모드의 [0,0,0,0]은 "바퀴를 멈춰라", 토크 모드의 τ = 0은 "힘을 빼라"입니다. 굴러가던 로봇은 마찰로 감속할 때까지 계속 굴러갑니다. 게이트 timeout·disarm 동작(감속 토크 / damping 모드 / 속도 0 명령 전환)을 새로 정해야 합니다.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="flow">1. 전체 흐름 (교체 후 목표 구조)</h2>
+<div class="flow">
+  <div class="blk"><h4>SENSORS (raw만)</h4><ul>
+    <li><code>ak40_can_node</code>: CAN ↔ 모터 4개</li>
+    <li>pub <code>/wheel_states</code> (JointState: position, velocity, effort × 4)</li>
+    <li>sub <code>/wheel_torque_cmd</code> (τ × 4, N·m)</li>
+    <li class="x">✗ <code>/odom</code> 발행 안 함</li>
+    <li>rplidar × 2, realsense: 지금 그대로</li></ul></div>
+  <div class="arrow">▼</div>
+  <div class="blk"><h4>PERCEPTION</h4><ul>
+    <li><code>scan_merger</code>, <code>scan_sector_filter</code>: 이쪽으로 이동 (팀 결정)</li>
+    <li>cartographer <code>use_odometry=false</code> → <code>/tracked_pose</code> (map 포즈)</li>
+    <li><code>body_velocity_estimator</code> → <code>/body_velocity</code> [vx, vy, ωz] body frame<br>
+      <span style="color:var(--muted)">LiDAR 10 Hz 포즈 + 모델로 100 Hz 보간 (2절 ④)</span></li>
+    <li>odom 프레임 출처: cartographer <code>provide_odom_frame</code> 또는 rf2o</li></ul></div>
+  <div class="arrow">▼</div>
+  <div class="blk"><h4>PLANNER (변경 없음)</h4><ul>
+    <li>Theta* → <code>/global_path</code> → DRA_MPPI (5 Hz) → <code>/dra_mppi/reference_trajectory</code></li></ul></div>
+  <div class="arrow">▼</div>
+  <div class="blk"><h4>CONTROLLER</h4>
+    <div class="ctrl">
+      <div class="node full"><b>torque_mpc_node</b>← reference, <code>/tracked_pose</code>, <code>/body_velocity</code><br>상태 [X, Y, ψ, vx, vy, ωz], 입력 τ(4) → <code>/torque_mpc/tau_nominal</code></div>
+      <div class="node"><b>slip_estimator</b>← <code>/body_velocity</code>, <code>/wheel_states</code><br>ω_nom = (1/r)·B·v, s = ω_meas − ω_nom → <code>/slip</code></div>
+      <div class="node"><b>slip_compensator</b>← <code>/slip</code> → <code>/slip/delta_tau</code><br>deadband, 포화, anti-windup</div>
+      <div class="node full"><b>torque_mixer</b>τ_nom + Δτ_slip → 클리핑 → <code>/wheel_torque_cmd_raw</code></div>
+      <div class="node full"><b>keyboard_command_gate</b>(command_type=wheels, forward_on_receive) → <code>/wheel_torque_cmd</code></div>
+    </div></div>
+  <div class="arrow">▼</div>
+  <div class="blk"><h4>ACTUATOR</h4><ul><li><code>ak40_can_node</code> → 모터 4개</li></ul></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="nodes">2. 노드별 스켈레톤 계약</h2>
+<div class="tbl"><table>
+<tr><th>노드</th><th>입력</th><th>출력</th><th>주기</th><th>기존 코드 재사용</th></tr>
+<tr><td><code>ak40_can_node</code></td><td><code>/wheel_torque_cmd</code></td><td><code>/wheel_states</code></td><td>≥100 Hz</td><td><code>roboclaw_mecanum_node</code>의 freshness·watchdog·glitch gate·부호 반전</td></tr>
+<tr><td><code>body_velocity_estimator</code></td><td><code>/tracked_pose</code> (+선택: τ, IMU)</td><td><code>/body_velocity</code></td><td>100 Hz 출력</td><td>신규</td></tr>
+<tr><td><code>slip_estimator</code></td><td><code>/body_velocity</code>, <code>/wheel_states</code></td><td><code>/slip</code></td><td>100 Hz (v는 10 Hz 갱신)</td><td>역기구학 B (<code>twist_to_wheels</code>와 같은 식)</td></tr>
+<tr><td><code>slip_compensator</code></td><td><code>/slip</code></td><td><code>/slip/delta_tau</code></td><td>slip과 같음</td><td>신규</td></tr>
+<tr><td><code>torque_mpc_node</code></td><td>reference, pose, velocity</td><td><code>/torque_mpc/tau_nominal</code></td><td>100 Hz</td><td><code>amr_mpc</code> QP 솔버, <code>core/reference.py</code> 보간, Wang 증강 형식</td></tr>
+<tr><td><code>torque_mixer</code></td><td>τ_nom, Δτ_slip</td><td><code>/wheel_torque_cmd_raw</code></td><td>MPC와 같음</td><td>신규</td></tr>
+<tr><td><code>keyboard_command_gate</code></td><td>raw</td><td><code>/wheel_torque_cmd</code></td><td>즉시 중계</td><td>그대로 (<code>_zero()</code> 의미만 재정의)</td></tr>
+</table></div>
+
+<h3>공통 역기구학 (base.yaml: r = 0.04, k = 0.19835)</h3>
+<pre><code>B = [[1, -1, -k],
+     [1,  1,  k],
+     [1,  1, -k],
+     [1, -1,  k]]        ω = (1/r)·B·v ,   F = (1/r)·Bᵀ·τ</code></pre>
+
+<h3>스켈레톤에서 바로 걸리는 것</h3>
+<div class="tbl"><table>
+<tr><th>#</th><th>항목</th><th>내용</th></tr>
+<tr><td>①</td><td>토픽 이름</td><td><code>/wheel_cmd</code>를 토크용으로 재사용 금지. 단위가 rad/s → N·m로 바뀌는데, 옛 드라이버가 떠 있으면 토크를 속도로 해석함</td></tr>
+<tr><td>②</td><td>변수명 충돌</td><td>증강 MPC 입력 Δτ_MPC(스텝 변화량) ≠ 보상기 출력 Δτ_slip(보정량)</td></tr>
+<tr><td>③</td><td>제약 여유</td><td>MPC 제약 |τ_i| ≤ τ_limit − Δτ_slip,max</td></tr>
+<tr><td>④</td><td>MPC 속도 상태 출처</td><td>채팅에서 빠진 부분. 보상기는 10 Hz여도 되지만 MPC는 10 ms마다 v가 필요함 (아래 표)</td></tr>
+</table></div>
+<div class="tbl"><table>
+<tr><th>④ 선택지</th><th>휠 정보 섞임</th><th>비고</th></tr>
+<tr><td>(a) LiDAR 10 Hz 포즈 + 토크 입력 모델 Kalman 예측</td><td>없음</td><td>모델이 틀리면(슬립 d) v도 틀림</td></tr>
+<tr><td>(b) (a) + IMU(ωz, 가속도) 융합</td><td>없음</td><td>IMU 사용은 허용 상태</td></tr>
+<tr><td>(c) LiDAR v를 다음 갱신까지 유지 (ZOH)</td><td>없음</td><td>최대 100 ms 늦은 상태로 제어</td></tr>
+</table></div>
+<div class="callout info">(a)/(b)를 쓸 때는 슬립용 v와 MPC용 v를 같은 추정기에서 받을지 분리할지도 정해야 합니다. 추정기 예측에 d = 0 가정이 들어가기 때문입니다.</div>
+
+<!-- ============================================================ -->
+<h2 id="decide">3. 코딩 전에 정할 것</h2>
+<div class="tbl"><table>
+<tr><th>#</th><th>결정</th><th>영향</th></tr>
+<tr><td>1</td><td>슬립용 v에 IMU가 간접적으로 섞여도 되나</td><td>cartographer 미분으로 충분한지, rf2o를 따로 둘지</td></tr>
+<tr><td>2</td><td>cartographer <code>use_odometry=false</code>의 측위 품질</td><td>bag replay로 먼저 검증 (09-28 accum 비교와 같은 방식)</td></tr>
+<tr><td>3</td><td>MPC 속도 상태 출처 (2절 ④ a/b/c)</td><td><code>body_velocity_estimator</code> 설계</td></tr>
+<tr><td>4</td><td>토크 모드 timeout·disarm 동작</td><td><code>keyboard_command_gate</code>의 <code>_zero()</code> 정의</td></tr>
+<tr><td>5</td><td>동역학 모델 항</td><td>ω × v (필수), 바퀴·로터 관성 J_w (10:1 기어면 반사관성이 클 수 있음), 마찰</td></tr>
+<tr><td>6</td><td>선형화 방식</td><td>기준 θ_r 주위(<code>kinematic_jacobians</code>처럼) vs body 오차좌표</td></tr>
+</table></div>
+
+<h3>교재 위치</h3>
+<div class="tbl"><table>
+<tr><th>개념</th><th>어디서</th></tr>
+<tr><td>ω × v 항 (회전 좌표계 Newton 법칙)</td><td>강체동역학의 transport theorem / Euler 방정식, Siegwart 이동로봇 교재 dynamics</td></tr>
+<tr><td>증강 MPC, 제약, 관측기</td><td>Liuping Wang, <i>MPC System Design and Implementation Using MATLAB</i> Ch.1–2, 4</td></tr>
+<tr><td>바퀴 슬립 비율</td><td>Rajamani, <i>Vehicle Dynamics and Control</i> tire slip 장</td></tr>
+<tr><td>메카넘 롤러 슬립</td><td><b>표준 교재 장 없음</b> — 논문 탐색 필요</td></tr>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="next">4. 다음 행동</h2>
+<ol>
+<li>2절 표의 노드 7개를 빈 껍데기로 만든다. 토픽 이름과 메시지 타입만 맞춰 <code>ros2 launch</code> 한 번으로 연결 확인.</li>
+<li>3절 결정 1~4를 정한다.</li>
+<li>결정 2 (cartographer 설정 변경)는 로봇 없이 NUC의 기존 bag으로 먼저 확인할 수 있다.</li>
+</ol>
+
+<footer>MPC 차원·슬립 잔차·일률 보존·ω×v 검산은 NUC에서 numpy로 실행한 결과입니다. AK40-10 CAN 프레임·MIT mode 세부사항은 확인하지 않았습니다 (CubeMars 데이터시트 확인 필요).</footer>
+</main>
+</body>
+</html>

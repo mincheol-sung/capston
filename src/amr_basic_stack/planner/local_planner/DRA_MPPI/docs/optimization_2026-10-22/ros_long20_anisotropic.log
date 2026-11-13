@@ -1,0 +1,859 @@
+[WARN] [1792662505.119866370] [rcl]: ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled. Use ROS_AUTOMATIC_DISCOVERY_RANGE and ROS_STATIC_PEERS instead.
+[WARN] [1792662505.119897373] [rcl]: 'localhost_only' is enabled, 'automatic_discovery_range' and 'static_peers' will be ignored.
+[INFO] [1792662505.165630123] [dra_mppi_node]: wheel-speed limit: |vx|+|vy|+0.19835|yaw_rate| <= 0.780 m/s (0.040 m x 30.0 rad/s x 0.65 budget)
+[INFO] [1792662505.181057378] [dra_mppi_node]: DRA-MPPI ready: strategy=guide_conditioned, path=/guide_validation/global_path, odom=/guide_validation/odometry/filtered, predictions=/guide_validation/predictions, prediction_classes=['person'], reference_trajectory=/guide_validation/dra_mppi/reference_trajectory (odom frame)
+[INFO] [1792662505.969319075] [dra_mppi_node]: Received global path with 2 poses in odom
+[WARN] [1792662505.990398302] [dra_mppi_node]: Traversability unavailable; holding position: no valid map
+[INFO] [1792662506.314683820] [dra_mppi_node]: MPPI[guide_+90] cycle=126.7 ms (optimizer=122.6 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 206.4+2.8 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662506.315385215] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662506.495853391] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662506.969417108] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662507.495736858] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662507.969824224] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662508.488645028] [dra_mppi_node]: MPPI[guide_+90] cycle=100.7 ms (optimizer=96.7 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 163.4+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662508.489350501] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662508.491093402] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662508.969465395] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662509.489178094] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662510.101556371] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662510.495989123] [dra_mppi_node]: MPPI[guide_+90] cycle=108.5 ms (optimizer=104.6 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 174.8+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662510.496666162] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662510.498318561] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662511.089903170] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662511.500461529] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662512.091188412] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662512.498829552] [dra_mppi_node]: MPPI[guide_+90] cycle=111.1 ms (optimizer=107.1 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 178.8+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662512.499492427] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662512.501158218] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662512.969382398] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662513.496200082] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662514.094911892] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662514.499274798] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662514.708006589] [dra_mppi_node]: MPPI[guide_+90] cycle=120.1 ms (optimizer=116.1 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 191.9+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662514.708666494] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662514.969451825] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662515.508215446] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662515.969698502] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662516.494934702] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662516.897869695] [dra_mppi_node]: MPPI[guide_+90] cycle=110.3 ms (optimizer=106.1 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 177.6+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662516.898533881] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662516.969562601] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662517.495254801] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662518.091596314] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662518.500096868] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662518.899710138] [dra_mppi_node]: MPPI[guide_+90] cycle=111.8 ms (optimizer=107.7 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 179.6+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662518.900395474] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662519.091922108] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662519.498904940] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662519.969579069] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662520.499025058] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662520.969476518] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662521.103935822] [dra_mppi_node]: MPPI[guide_+90] cycle=115.5 ms (optimizer=111.4 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 187.5+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662521.104626276] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662521.495732560] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662522.090200645] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662522.496573273] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662522.969551932] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662523.110006500] [dra_mppi_node]: MPPI[guide_+90] cycle=121.6 ms (optimizer=117.5 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 192.4+2.6 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662523.110693633] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662523.493378137] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662523.970387043] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662524.493711555] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662524.970353536] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662525.110153690] [dra_mppi_node]: MPPI[guide_+90] cycle=121.0 ms (optimizer=117.0 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 192.6+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662525.110810917] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662525.496582528] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662525.970303875] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662526.491829488] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662526.969448153] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662527.301143606] [dra_mppi_node]: MPPI[guide_+90] cycle=109.0 ms (optimizer=104.9 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 179.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662527.301850200] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662527.493064293] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662527.969560601] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662528.497267065] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662528.969541035] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662529.491939522] [dra_mppi_node]: MPPI[guide_+90] cycle=104.2 ms (optimizer=100.3 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 164.4+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662529.492609255] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662529.494218259] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662529.969333866] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662530.508328185] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662530.969437203] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662531.492856180] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662531.705768502] [dra_mppi_node]: MPPI[guide_+90] cycle=117.9 ms (optimizer=113.8 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 189.7+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662531.706459421] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662531.969524067] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662532.494484423] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662532.970439825] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662533.490852950] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662533.893509072] [dra_mppi_node]: MPPI[guide_+90] cycle=105.6 ms (optimizer=101.6 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.5+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662533.894175851] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662533.969413417] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662534.488348573] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662534.969610630] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662535.497485075] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662535.969740310] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662536.100421819] [dra_mppi_node]: MPPI[guide_+90] cycle=111.8 ms (optimizer=107.7 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 185.7+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662536.101098892] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662536.489913467] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662536.969475507] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662537.489287674] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662537.969474761] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662538.107108115] [dra_mppi_node]: MPPI[guide_+90] cycle=118.8 ms (optimizer=114.8 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 191.1+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662538.107777381] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662538.488601700] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662538.969335092] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662539.490951371] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662539.969778358] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662540.293417400] [dra_mppi_node]: MPPI[guide_+90] cycle=105.4 ms (optimizer=101.3 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.2+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662540.294134692] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662540.490846528] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662540.969449091] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662541.489559429] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662541.969354168] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662542.294722537] [dra_mppi_node]: MPPI[guide_+90] cycle=106.6 ms (optimizer=102.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.0+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662542.295421781] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662542.492031998] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662543.091746904] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662543.495738800] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662544.092840524] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662544.303614768] [dra_mppi_node]: MPPI[guide_+90] cycle=115.5 ms (optimizer=111.5 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 193.4+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662544.304295640] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662544.499506481] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662544.969334153] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662545.495987630] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662545.969322434] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662546.489703554] [dra_mppi_node]: MPPI[guide_+90] cycle=102.0 ms (optimizer=98.0 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 164.9+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662546.490426422] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662546.492288715] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662546.969536829] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662547.490763626] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662547.969636029] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662548.492952371] [dra_mppi_node]: MPPI[guide_+90] cycle=105.0 ms (optimizer=100.8 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 170.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662548.493648301] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662548.495404798] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662548.971580084] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662549.491956625] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662549.969463193] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662550.488646024] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662550.703445270] [dra_mppi_node]: MPPI[guide_+90] cycle=115.7 ms (optimizer=111.7 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 193.2+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662550.704153835] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662550.969505373] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662551.494369685] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662551.969403312] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662552.492653887] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662552.703935725] [dra_mppi_node]: MPPI[guide_+90] cycle=116.0 ms (optimizer=112.0 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 193.1+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662552.704625120] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662552.969431116] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662553.491543253] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662553.969539259] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662554.493330438] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662554.706235705] [dra_mppi_node]: MPPI[guide_+90] cycle=118.5 ms (optimizer=114.5 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 193.2+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662554.706938949] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662554.969468964] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662555.494335966] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662555.969735167] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662556.493627945] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662556.898407728] [dra_mppi_node]: MPPI[guide_+90] cycle=109.9 ms (optimizer=105.8 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 177.3+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662556.899109263] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662556.969724833] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662557.493453242] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662557.969755390] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662558.498146615] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662558.969257996] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662559.103971070] [dra_mppi_node]: MPPI[guide_+90] cycle=115.8 ms (optimizer=111.7 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 192.9+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662559.104633460] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662559.492804679] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662559.969729916] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662560.495655115] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662560.969453949] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662561.105653026] [dra_mppi_node]: MPPI[guide_+90] cycle=117.1 ms (optimizer=113.0 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 191.2+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662561.106425667] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662561.491134817] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662561.969464802] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662562.496524438] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662562.970604273] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662563.294456534] [dra_mppi_node]: MPPI[guide_+90] cycle=106.4 ms (optimizer=102.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 174.5+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662563.295114748] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662563.490602500] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662563.969862009] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662564.493132218] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662564.970640318] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662565.298501549] [dra_mppi_node]: MPPI[guide_+90] cycle=110.6 ms (optimizer=106.6 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 178.2+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662565.299184240] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662565.493846712] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662565.969724735] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662566.492717168] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662567.090497708] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662567.304880021] [dra_mppi_node]: MPPI[guide_+90] cycle=116.5 ms (optimizer=112.3 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 188.2+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662567.305579427] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662567.495440779] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662567.969795122] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662568.491414991] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662569.090509502] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662569.494671568] [dra_mppi_node]: MPPI[guide_+90] cycle=106.5 ms (optimizer=102.2 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 174.4+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662569.495359812] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662569.497107017] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662569.969648254] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662570.490404169] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662570.969588517] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662571.494899375] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662571.708107290] [dra_mppi_node]: MPPI[guide_+90] cycle=120.2 ms (optimizer=116.2 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 194.2+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662571.708795833] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662572.090810164] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662572.495256867] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662572.970696812] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662573.494868773] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662573.710065622] [dra_mppi_node]: MPPI[guide_+90] cycle=122.1 ms (optimizer=118.0 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 196.0+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662573.710753473] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662573.969623194] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662574.494463759] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662574.969290782] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662575.493964794] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662575.710991567] [dra_mppi_node]: MPPI[guide_+90] cycle=122.7 ms (optimizer=118.6 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 198.6+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662575.711683040] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662575.970487852] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662576.494360022] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662576.970390072] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662577.494801259] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662577.896478312] [dra_mppi_node]: MPPI[guide_+90] cycle=108.6 ms (optimizer=104.7 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 179.8+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662577.897135283] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662577.970451847] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662578.495276585] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662578.969421673] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662579.494247736] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662579.898365830] [dra_mppi_node]: MPPI[guide_+90] cycle=110.5 ms (optimizer=106.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 178.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662579.899019491] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662579.970599490] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662580.495957505] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662580.969379936] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662581.490959772] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662581.969816382] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662582.103260613] [dra_mppi_node]: MPPI[guide_+90] cycle=114.5 ms (optimizer=110.4 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 188.9+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662582.104002149] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662582.490585787] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662582.970667359] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662583.491024421] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662583.969810382] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662584.103600600] [dra_mppi_node]: MPPI[guide_+90] cycle=114.6 ms (optimizer=110.5 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 189.5+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662584.104315579] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662584.490327326] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662584.970704120] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662585.494270549] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662585.970685549] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662586.104994936] [dra_mppi_node]: MPPI[guide_+90] cycle=114.8 ms (optimizer=110.8 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 188.7+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662586.105704634] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662586.491133840] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662586.969717160] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662587.491888971] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662587.970631389] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662588.295738677] [dra_mppi_node]: MPPI[guide_+90] cycle=107.6 ms (optimizer=103.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 174.1+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662588.296411615] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662588.491025196] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662588.970663254] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662589.492319498] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662589.970410972] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662590.297892418] [dra_mppi_node]: MPPI[guide_+90] cycle=110.0 ms (optimizer=106.0 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 178.1+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662590.298559394] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662590.493035467] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662590.969383113] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662591.492851749] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662591.970687388] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662592.302724408] [dra_mppi_node]: MPPI[guide_+90] cycle=108.4 ms (optimizer=104.3 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 179.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662592.303473413] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662592.491569035] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662592.970684948] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662593.491700797] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662593.970700873] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662594.492026391] [dra_mppi_node]: MPPI[guide_+90] cycle=103.9 ms (optimizer=99.9 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 167.2+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662594.492692605] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662594.494273783] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662594.969731392] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662595.492657950] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662595.969667762] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662596.491490470] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662596.701413330] [dra_mppi_node]: MPPI[guide_+90] cycle=113.2 ms (optimizer=109.2 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 188.1+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662596.702120236] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662596.970601188] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662597.495169173] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662597.970464800] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662598.494513289] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662598.705541696] [dra_mppi_node]: MPPI[guide_+90] cycle=117.8 ms (optimizer=113.7 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 192.3+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662598.706259257] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662598.970406738] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662599.492679425] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662599.969520786] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662600.494233184] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662600.898493962] [dra_mppi_node]: MPPI[guide_+90] cycle=110.3 ms (optimizer=106.2 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 180.7+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662600.899191635] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662600.970722242] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662601.492086133] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662601.970709316] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662602.496383091] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662602.898807210] [dra_mppi_node]: MPPI[guide_+90] cycle=110.8 ms (optimizer=106.8 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 181.8+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662602.899503649] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662602.970362378] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662603.489607062] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662603.970533316] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662604.492993099] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662604.899000903] [dra_mppi_node]: MPPI[guide_+90] cycle=110.8 ms (optimizer=106.8 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 183.5+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662604.899693864] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662604.970650056] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662605.492850867] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662605.970601425] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662606.492867493] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662606.970474644] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662607.114785607] [dra_mppi_node]: MPPI[guide_+90] cycle=125.5 ms (optimizer=121.4 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 201.5+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662607.115450328] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662607.495785248] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662607.970400593] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662608.495298252] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662608.969564515] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662609.298532525] [dra_mppi_node]: MPPI[guide_+90] cycle=110.5 ms (optimizer=106.4 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 181.8+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662609.299214062] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662609.493003564] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662609.969801983] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662610.489111606] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662611.091464577] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662611.301892966] [dra_mppi_node]: MPPI[guide_+90] cycle=113.5 ms (optimizer=109.5 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 189.5+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662611.302594192] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662611.496863161] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662611.970653663] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662612.493569989] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662612.970478734] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662613.490975327] [dra_mppi_node]: MPPI[guide_+90] cycle=103.0 ms (optimizer=99.0 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 165.9+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662613.491635103] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662613.493249716] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662613.970399570] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662614.491340973] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662614.969486694] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662615.491453878] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662615.706314637] [dra_mppi_node]: MPPI[guide_+90] cycle=118.1 ms (optimizer=114.2 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 192.4+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662615.706979181] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662615.969767576] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662616.503858555] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662616.970583945] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662617.492768017] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662617.895865409] [dra_mppi_node]: MPPI[guide_+90] cycle=107.8 ms (optimizer=103.8 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 177.5+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662617.896546462] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662617.969475083] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662618.491914292] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662618.969509167] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662619.492724549] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662619.969304581] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662620.101560141] [dra_mppi_node]: MPPI[guide_+90] cycle=113.4 ms (optimizer=109.4 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 187.9+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662620.102274898] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662620.493083863] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662620.969503788] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662621.492802480] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662621.969503128] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662622.103484961] [dra_mppi_node]: MPPI[guide_+90] cycle=115.2 ms (optimizer=111.2 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 189.2+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662622.104175379] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662622.490508867] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662623.098692902] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662623.495086420] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662623.969669507] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662624.104262868] [dra_mppi_node]: MPPI[guide_+90] cycle=115.8 ms (optimizer=111.6 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 187.6+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662624.104954571] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662624.494864712] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662624.969448877] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662625.490556550] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662625.975258777] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662626.107353495] [dra_mppi_node]: MPPI[guide_+90] cycle=113.1 ms (optimizer=108.9 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 186.7+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662626.108046430] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662626.490628896] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662626.969493278] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662627.491094748] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662627.971670336] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662628.296355185] [dra_mppi_node]: MPPI[guide_+90] cycle=108.2 ms (optimizer=104.1 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 177.8+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662628.297052183] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662628.493163373] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662628.969463051] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662629.490473421] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662629.969484212] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662630.490239991] [dra_mppi_node]: MPPI[guide_+90] cycle=102.4 ms (optimizer=98.4 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 163.3+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662630.490909850] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662630.492611244] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662630.969420728] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662631.491227924] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662631.969607335] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662632.490734050] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662632.704376095] [dra_mppi_node]: MPPI[guide_+90] cycle=116.2 ms (optimizer=112.1 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 192.5+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662632.705056592] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662633.089914316] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662633.495741100] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662633.970499790] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662634.491920734] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662634.899265785] [dra_mppi_node]: MPPI[guide_+90] cycle=111.2 ms (optimizer=107.1 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 178.9+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662634.899934962] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662634.970490407] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662635.492777736] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662635.969347355] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662636.492313362] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662636.900558431] [dra_mppi_node]: MPPI[guide_+90] cycle=112.8 ms (optimizer=108.9 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 182.9+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662636.901248628] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662636.969459681] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662637.496446329] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662637.969426092] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662638.493516298] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662638.907773578] [dra_mppi_node]: MPPI[guide_+90] cycle=120.0 ms (optimizer=104.1 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 179.2+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662638.908461430] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662639.093988722] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662639.499959493] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662639.969454130] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662640.496142849] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662641.094805987] [dra_mppi_node]: MPPI[guide_+90] cycle=107.2 ms (optimizer=103.2 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 168.3+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662641.095488558] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662641.096940149] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662641.500235493] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662641.970476483] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662642.494222982] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662642.969514182] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662643.104837233] [dra_mppi_node]: MPPI[guide_+90] cycle=116.4 ms (optimizer=112.3 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 193.7+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662643.105512514] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662643.489197734] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662643.969594402] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662644.496469196] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662644.969429431] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662645.106957609] [dra_mppi_node]: MPPI[guide_+90] cycle=118.6 ms (optimizer=114.6 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 195.6+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662645.107653723] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662645.488629691] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662645.969384587] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662646.491261187] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662646.969406406] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662647.296024418] [dra_mppi_node]: MPPI[guide_+90] cycle=108.3 ms (optimizer=104.3 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 174.8+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662647.296663751] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662647.490223250] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662647.970397314] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662648.501775341] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662648.969725060] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662649.490452105] [dra_mppi_node]: MPPI[guide_+90] cycle=102.3 ms (optimizer=98.3 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 166.6+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662649.491172505] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662649.492929987] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662649.969794796] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662650.494710130] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662650.969782374] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662651.495443895] [dra_mppi_node]: MPPI[guide_+90] cycle=107.3 ms (optimizer=103.2 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 172.8+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662651.496100961] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662651.497751390] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662651.969716392] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662652.494437197] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662652.969432658] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662653.494310398] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662653.705563196] [dra_mppi_node]: MPPI[guide_+90] cycle=117.4 ms (optimizer=113.3 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 190.2+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662653.706261834] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662653.969599195] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662654.488987415] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662654.970423771] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662655.495094425] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662655.900536677] [dra_mppi_node]: MPPI[guide_+90] cycle=110.4 ms (optimizer=106.3 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 178.0+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662655.901239788] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662655.970572845] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662656.496217039] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662656.970538808] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662657.490274432] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662657.970460011] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662658.110345942] [dra_mppi_node]: MPPI[guide_+90] cycle=120.9 ms (optimizer=116.6 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 193.1+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662658.111091855] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662658.490898662] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662658.969714658] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662659.489329551] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662659.970478967] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662660.293523665] [dra_mppi_node]: MPPI[guide_+90] cycle=105.4 ms (optimizer=101.4 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.2+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662660.294213322] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662660.490185842] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662660.970600672] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662661.491049709] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662661.969565520] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662662.489716998] [dra_mppi_node]: MPPI[guide_+90] cycle=101.9 ms (optimizer=97.9 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 162.5+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662662.490405519] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662662.492114153] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662662.969492516] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662663.489330835] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662663.969700562] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662664.491944793] [dra_mppi_node]: MPPI[guide_+90] cycle=104.3 ms (optimizer=100.3 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 166.7+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662664.492608471] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662664.494441833] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662664.970610478] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662665.493470932] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662665.970653236] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662666.491093454] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662666.703987991] [dra_mppi_node]: MPPI[guide_+90] cycle=115.9 ms (optimizer=111.9 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 189.2+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662666.704646434] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662666.970606755] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662667.489962085] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662667.970260514] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662668.491176899] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662668.897986883] [dra_mppi_node]: MPPI[guide_+90] cycle=110.1 ms (optimizer=106.1 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 181.3+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662668.898666393] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662668.970490588] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662669.489136911] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662670.094324479] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662670.497523989] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662670.899191535] [dra_mppi_node]: MPPI[guide_+90] cycle=110.9 ms (optimizer=106.8 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 182.0+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662670.899888829] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662670.969464094] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662671.489187876] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662671.970534574] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662672.502549556] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662672.970716512] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662673.105113346] [dra_mppi_node]: MPPI[guide_+90] cycle=115.5 ms (optimizer=111.3 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 190.8+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662673.105792668] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662673.490767643] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662673.969337961] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662674.492301407] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662674.970687288] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662675.107611500] [dra_mppi_node]: MPPI[guide_+90] cycle=118.0 ms (optimizer=114.0 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 193.8+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662675.108353655] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662675.492328436] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662675.969530067] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662676.490302465] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662676.970428273] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662677.293533322] [dra_mppi_node]: MPPI[guide_+90] cycle=105.6 ms (optimizer=101.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.1+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662677.294227360] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662677.489483331] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662677.969460841] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662678.490904630] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662678.969538320] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662679.296023200] [dra_mppi_node]: MPPI[guide_+90] cycle=107.5 ms (optimizer=103.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.7+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662679.296710081] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662679.490735827] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662679.969698214] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662680.490776451] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662680.969703247] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662681.487745338] [dra_mppi_node]: MPPI[guide_+90] cycle=99.9 ms (optimizer=95.9 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 161.9+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662681.488430047] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662681.490172408] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662681.969326076] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662682.489522550] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662683.090401260] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662683.495118859] [dra_mppi_node]: MPPI[guide_+90] cycle=107.1 ms (optimizer=103.1 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 175.6+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662683.495807784] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662683.497454994] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662683.970542478] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662684.496089845] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662685.089703781] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662685.495918062] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662685.706304732] [dra_mppi_node]: MPPI[guide_+90] cycle=118.1 ms (optimizer=114.1 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 194.6+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662685.707026890] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662686.096104206] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662686.496047825] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662687.090657218] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662687.501496211] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662687.709726233] [dra_mppi_node]: MPPI[guide_+90] cycle=121.6 ms (optimizer=117.5 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 194.8+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662687.710379481] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662688.092170263] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662688.494182995] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662689.093730444] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662689.498736358] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662689.898266114] [dra_mppi_node]: MPPI[guide_+90] cycle=110.4 ms (optimizer=106.3 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 178.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662689.898924425] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662690.094657969] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662690.498777643] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662690.970450047] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662691.492880063] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662691.898762845] [dra_mppi_node]: MPPI[guide_+90] cycle=110.9 ms (optimizer=106.9 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 179.5+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662691.899435606] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662691.969752595] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662692.491918618] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662692.969717065] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662693.497335933] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662693.969754380] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662694.105034984] [dra_mppi_node]: MPPI[guide_+90] cycle=116.2 ms (optimizer=112.2 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 188.7+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662694.105736560] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662694.490889584] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662694.970199758] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662695.491079748] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662695.969679408] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662696.294181544] [dra_mppi_node]: MPPI[guide_+90] cycle=106.3 ms (optimizer=102.4 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 174.9+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662696.294844403] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662696.491903072] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662696.969679796] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662697.489665962] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662697.970619675] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662698.296124375] [dra_mppi_node]: MPPI[guide_+90] cycle=108.2 ms (optimizer=104.2 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.6+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662698.296782022] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662698.490428766] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662698.969733105] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662699.490220502] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662699.970624106] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662700.488665800] [dra_mppi_node]: MPPI[guide_+90] cycle=101.1 ms (optimizer=97.1 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 163.4+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662700.489346797] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662700.490982803] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662700.969461844] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662701.495528717] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662701.969729386] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662702.492860050] [dra_mppi_node]: MPPI[guide_+90] cycle=104.7 ms (optimizer=100.7 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 165.1+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662702.493540229] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662702.495218436] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662702.969699884] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662703.490367316] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662703.969515929] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662704.489614849] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662704.707098827] [dra_mppi_node]: MPPI[guide_+90] cycle=119.3 ms (optimizer=115.2 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 195.4+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662704.707762852] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662704.969633121] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662705.490106206] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662705.969346726] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662706.492860294] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662706.893381210] [dra_mppi_node]: MPPI[guide_+90] cycle=105.3 ms (optimizer=101.3 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 172.8+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662706.894060622] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662706.969684949] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662707.490209099] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662707.969382187] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662708.490037311] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662708.893711648] [dra_mppi_node]: MPPI[guide_+90] cycle=105.6 ms (optimizer=101.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.0+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662708.894394221] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662708.969702181] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662709.493042545] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662709.969648489] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662710.493322768] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662710.895337078] [dra_mppi_node]: MPPI[guide_+90] cycle=107.6 ms (optimizer=103.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 176.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662710.896032640] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662710.971011332] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662711.490473913] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662711.969484921] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662712.490717110] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662712.895822681] [dra_mppi_node]: MPPI[guide_+90] cycle=108.3 ms (optimizer=104.2 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 175.9+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662712.896486087] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662713.090476459] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662713.504039887] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662713.969780011] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662714.488847844] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662714.970711815] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662715.108767091] [dra_mppi_node]: MPPI[guide_+90] cycle=119.2 ms (optimizer=115.1 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 192.8+2.6 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662715.109450454] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662715.490471551] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662715.972423630] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662716.490407550] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662716.970501726] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662717.294709064] [dra_mppi_node]: MPPI[guide_+90] cycle=106.5 ms (optimizer=102.4 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 173.3+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662717.295373679] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662717.491427746] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662717.970635325] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662718.491174800] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662718.970604950] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662719.294838509] [dra_mppi_node]: MPPI[guide_+90] cycle=106.8 ms (optimizer=102.8 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 175.5+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662719.295494245] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662719.490510409] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662720.091903361] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662720.496925669] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662720.969529373] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662721.297383164] [dra_mppi_node]: MPPI[guide_+90] cycle=109.4 ms (optimizer=105.4 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 174.6+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662721.298027432] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662721.492218953] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662721.969660293] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662722.490586940] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662722.969724545] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662723.489722838] [dra_mppi_node]: MPPI[guide_+90] cycle=101.5 ms (optimizer=97.5 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 164.0+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662723.490401847] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662723.492259121] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662723.970339295] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662724.490452401] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662724.969725104] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662725.490270415] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662725.705427249] [dra_mppi_node]: MPPI[guide_+90] cycle=117.3 ms (optimizer=113.3 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 191.3+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662725.706083136] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662725.969517336] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662726.491542915] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662726.969941066] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662727.496570682] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662727.896057477] [dra_mppi_node]: MPPI[guide_+90] cycle=108.4 ms (optimizer=104.4 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 175.8+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662727.896742084] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662728.092237167] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662728.497725833] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662728.969327386] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662729.491393492] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662729.896356060] [dra_mppi_node]: MPPI[guide_+90] cycle=108.7 ms (optimizer=104.7 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 176.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662729.897029000] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662730.092831620] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662730.498809424] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662730.970422941] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662731.501689578] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662731.969383844] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662732.107118990] [dra_mppi_node]: MPPI[guide_+90] cycle=119.0 ms (optimizer=114.8 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 196.1+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662732.107818727] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662732.497657973] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662733.092350673] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662733.500452567] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662733.969744463] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662734.110577042] [dra_mppi_node]: MPPI[guide_+90] cycle=121.9 ms (optimizer=117.8 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 195.1+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662734.111308204] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662734.493024617] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662734.969711151] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662735.499172426] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662735.969753985] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662736.124410495] [dra_mppi_node]: MPPI[guide_+90] cycle=135.4 ms (optimizer=117.3 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 200.1+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662736.125111566] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662736.493882572] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662736.969626389] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662737.490557069] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662737.969375388] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662738.295814328] [dra_mppi_node]: MPPI[guide_+90] cycle=107.8 ms (optimizer=103.8 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 177.6+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662738.296510285] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662738.492580684] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662738.969414380] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662739.491631120] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662739.970129767] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662740.298528128] [dra_mppi_node]: MPPI[guide_+90] cycle=110.5 ms (optimizer=106.5 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 178.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662740.299179742] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662740.488941895] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662740.970627020] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662741.488797186] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662741.969608543] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662742.491850097] [dra_mppi_node]: MPPI[guide_+90] cycle=103.8 ms (optimizer=99.8 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 164.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662742.492505191] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662742.494167162] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662742.969346928] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662743.490914789] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662743.970695878] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662744.495362367] [dra_mppi_node]: MPPI[guide_+90] cycle=106.7 ms (optimizer=102.6 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 174.3+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662744.496073250] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662744.497771971] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662744.969452520] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662745.491166041] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662745.969454068] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662746.488590114] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662746.702987950] [dra_mppi_node]: MPPI[guide_+90] cycle=115.2 ms (optimizer=111.2 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 189.0+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662746.703669297] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662746.969358345] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662747.492004104] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662747.970378819] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662748.489558852] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662748.703918495] [dra_mppi_node]: MPPI[guide_+90] cycle=116.1 ms (optimizer=112.1 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 190.9+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662748.704616298] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662748.969736159] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662749.493025334] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662749.970659482] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662750.493179689] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662750.707208680] [dra_mppi_node]: MPPI[guide_+90] cycle=119.6 ms (optimizer=115.6 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 196.1+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662750.707883511] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662750.969535964] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662751.491559059] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662751.969595137] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662752.500565907] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662752.898181320] [dra_mppi_node]: MPPI[guide_+90] cycle=110.4 ms (optimizer=106.4 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 179.4+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662752.898827437] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662752.970364826] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662753.492081283] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662753.970233918] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662754.493862884] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662754.908554716] [dra_mppi_node]: MPPI[guide_+90] cycle=108.9 ms (optimizer=104.9 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 180.0+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662754.909240703] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662754.969443991] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662755.492843535] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662756.099808591] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662756.501244629] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662756.969506223] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662757.109998499] [dra_mppi_node]: MPPI[guide_+90] cycle=121.8 ms (optimizer=117.8 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 198.8+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662757.110673580] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662757.488409863] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662757.969547944] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662758.491993823] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662758.969409063] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662759.294534043] [dra_mppi_node]: MPPI[guide_+90] cycle=106.6 ms (optimizer=102.6 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 176.0+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662759.295202317] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662759.492682760] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662759.969503255] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662760.493626250] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662760.970657421] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662761.302338115] [dra_mppi_node]: MPPI[guide_+90] cycle=108.5 ms (optimizer=104.4 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 176.7+2.4 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662761.303013566] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662761.494547992] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662761.969593278] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662762.490411101] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662762.969363576] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662763.489985048] [dra_mppi_node]: MPPI[guide_+90] cycle=102.2 ms (optimizer=98.3 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 163.7+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662763.490649696] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662763.492323311] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662763.969456626] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662764.491996675] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662764.969576306] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662765.490208525] [dra_mppi_node]: MPPI[guide_+90] cycle=102.5 ms (optimizer=98.6 ms, budget=200.0 ms), cost=9.73, C_static=0.00, ESS=16.3, selected_cp=0.033, u=[-0.18, 0.17, 0.38], mc=per_guide_gaussian_disk 164.7+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662765.490863516] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', '', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662765.492507136] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662765.970513908] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662766.491095224] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662766.969505201] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662767.488469714] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662767.703582651] [dra_mppi_node]: MPPI[guide_+90] cycle=115.8 ms (optimizer=111.9 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 189.2+2.5 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662767.704257224] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662767.969527740] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662768.490689099] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662768.969720934] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662769.489846970] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662769.704786947] [dra_mppi_node]: MPPI[guide_+90] cycle=116.9 ms (optimizer=112.9 ms, budget=200.0 ms), cost=13.89, C_static=0.00, ESS=1.3, selected_cp=0.044, u=[-0.03, 0.34, 0.01], mc=per_guide_gaussian_disk 193.4+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662769.705461926] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', 'representative_dynamic_risk', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662769.970439433] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662770.491055863] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662770.969420714] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662771.491017327] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662771.895348073] [dra_mppi_node]: MPPI[guide_+90] cycle=107.2 ms (optimizer=103.2 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 177.2+2.2 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662771.896030094] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662771.969534160] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662772.491019942] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662772.969458535] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662773.492409761] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662773.900223069] [dra_mppi_node]: MPPI[guide_+90] cycle=112.3 ms (optimizer=108.3 ms, budget=200.0 ms), cost=11.02, C_static=0.00, ESS=13.1, selected_cp=0.033, u=[-0.18, 0.25, 0.19], mc=per_guide_gaussian_disk 185.2+2.3 ms final N_total=0 A_sum=0.00..0.00 m^2 N=0..0 cp_clip=0 empty_circle=0
+[INFO] [1792662773.900919754] [dra_mppi_node]: guides active=[True, True, True, True, True] counts=[100, 100, 100, 100, 100] rejected=('representative_dynamic_risk', '', '', 'representative_dynamic_risk', '') safety=ok C_static_candidates=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+[INFO] [1792662773.969429460] [dra_mppi_node]: Received global path with 2 poses in odom
+[INFO] [1792662774.494068831] [dra_mppi_node]: Received global path with 2 poses in odom
+Traceback (most recent call last):
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/validate_ros_pilot.py", line 254, in main
+    executor.spin_once(timeout_sec=.5)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+    self._spin_once_impl(timeout_sec)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 916, in _spin_once_impl
+    handler()
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 270, in __call__
+    self._execute_coroutine_step(self._handler)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+    result = coro.send(None)
+             ^^^^^^^^^^^^^^^
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 592, in handler
+    await call_coroutine()
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 454, in _execute
+    await await_or_execute(tmr.callback)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 115, in await_or_execute
+    return callback(*args)
+           ^^^^^^^^^^^^^^^
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py", line 912, in _control_cycle
+    DraMppiNode._run_control_cycle(self)
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/dra_mppi_node.py", line 1135, in _run_control_cycle
+    result = self.controller.compute(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/mppi_controller.py", line 287, in compute
+    return self._compute_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/mppi_controller.py", line 343, in _compute_impl
+    return self._guide_optimizer.compute(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/guide_conditioned.py", line 291, in compute
+    evaluated = self._join_jobs(jobs, started+cfg.guide_timeout)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/dra_mppi/guide_conditioned.py", line 248, in _join_jobs
+    done, pending = wait(futures, timeout=max(0., deadline-time.perf_counter()))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 305, in wait
+    waiter.event.wait(timeout)
+  File "/usr/lib/python3.12/threading.py", line 655, in wait
+    signaled = self._cond.wait(timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/threading.py", line 359, in wait
+    gotit = waiter.acquire(True, timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/validate_ros_pilot.py", line 325, in <module>
+    main()
+  File "/home/smoc/2026amr_ws/src/amr_basic_stack/planner/local_planner/DRA_MPPI/tools/validate_ros_pilot.py", line 267, in main
+    rclpy.shutdown()
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+    _shutdown(context=context)
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+    context.shutdown()
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+    self.__context.shutdown()
+rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333

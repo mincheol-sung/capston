@@ -1,0 +1,218 @@
+[
+  {
+    "K": 100,
+    "density": 2048.0,
+    "backend": "batch",
+    "workers": 1,
+    "mean_ms": 127.77061560191214,
+    "max_ms": 128.33590409718454,
+    "samples": 93064
+  },
+  {
+    "K": 100,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 1,
+    "mean_ms": 124.46592599153519,
+    "max_ms": 125.26286509819329,
+    "samples": 170467
+  },
+  {
+    "K": 100,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 2,
+    "mean_ms": 114.73250561393797,
+    "max_ms": 115.70510314777493,
+    "samples": 170467
+  },
+  {
+    "K": 100,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 5,
+    "mean_ms": 116.75145379267633,
+    "max_ms": 118.37197188287973,
+    "samples": 170467
+  },
+  {
+    "K": 100,
+    "density": 4096.0,
+    "backend": "batch",
+    "workers": 1,
+    "mean_ms": 256.53435443527997,
+    "max_ms": 259.9983219988644,
+    "samples": 186124
+  },
+  {
+    "K": 100,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 1,
+    "mean_ms": 235.05322579294443,
+    "max_ms": 238.5238960850984,
+    "samples": 339831
+  },
+  {
+    "K": 100,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 2,
+    "mean_ms": 223.6258173827082,
+    "max_ms": 228.88536611571908,
+    "samples": 339831
+  },
+  {
+    "K": 100,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 5,
+    "mean_ms": 220.6264492124319,
+    "max_ms": 224.1296609863639,
+    "samples": 339831
+  },
+  {
+    "K": 250,
+    "density": 2048.0,
+    "backend": "batch",
+    "workers": 1,
+    "mean_ms": 214.92569018155336,
+    "max_ms": 229.74386997520924,
+    "samples": 93490
+  },
+  {
+    "K": 250,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 1,
+    "mean_ms": 155.43157295323908,
+    "max_ms": 156.05267486535013,
+    "samples": 193113
+  },
+  {
+    "K": 250,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 2,
+    "mean_ms": 141.5672956034541,
+    "max_ms": 144.3756981752813,
+    "samples": 193113
+  },
+  {
+    "K": 250,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 5,
+    "mean_ms": 143.50307150743902,
+    "max_ms": 146.99775422923267,
+    "samples": 193113
+  },
+  {
+    "K": 250,
+    "density": 4096.0,
+    "backend": "batch",
+    "workers": 1,
+    "mean_ms": 446.55366614460945,
+    "max_ms": 481.1372098047286,
+    "samples": 186973
+  },
+  {
+    "K": 250,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 1,
+    "mean_ms": 321.19669863022864,
+    "max_ms": 340.33676609396935,
+    "samples": 385500
+  },
+  {
+    "K": 250,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 2,
+    "mean_ms": 307.1492017712444,
+    "max_ms": 315.1820139028132,
+    "samples": 385500
+  },
+  {
+    "K": 250,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 5,
+    "mean_ms": 369.9745873454958,
+    "max_ms": 385.6288099195808,
+    "samples": 385500
+  },
+  {
+    "K": 500,
+    "density": 2048.0,
+    "backend": "batch",
+    "workers": 1,
+    "mean_ms": 621.6552149504423,
+    "max_ms": 734.7912308759987,
+    "samples": 95197
+  },
+  {
+    "K": 500,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 1,
+    "mean_ms": 296.0489730350673,
+    "max_ms": 299.754838924855,
+    "samples": 199511
+  },
+  {
+    "K": 500,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 2,
+    "mean_ms": 256.22038235887885,
+    "max_ms": 264.68417909927666,
+    "samples": 199511
+  },
+  {
+    "K": 500,
+    "density": 2048.0,
+    "backend": "split",
+    "workers": 5,
+    "mean_ms": 234.55438995733857,
+    "max_ms": 251.31498277187347,
+    "samples": 199511
+  },
+  {
+    "K": 500,
+    "density": 4096.0,
+    "backend": "batch",
+    "workers": 1,
+    "mean_ms": 1402.162169991061,
+    "max_ms": 1611.4778048358858,
+    "samples": 190387
+  },
+  {
+    "K": 500,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 1,
+    "mean_ms": 594.6619643829763,
+    "max_ms": 605.7143080979586,
+    "samples": 398547
+  },
+  {
+    "K": 500,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 2,
+    "mean_ms": 491.34840723127127,
+    "max_ms": 495.51349808461964,
+    "samples": 398547
+  },
+  {
+    "K": 500,
+    "density": 4096.0,
+    "backend": "split",
+    "workers": 5,
+    "mean_ms": 424.8242770321667,
+    "max_ms": 428.76219702884555,
+    "samples": 398547
+  }
+]

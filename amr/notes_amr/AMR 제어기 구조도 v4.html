@@ -1,0 +1,593 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>AMR 제어기 구조도 v4</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* 레이아웃: 위에서 아래로 — 머리말 · 블록 다이어그램(가로 스크롤) · 노드 카드 격자 · v3 대비 표 · 남은 것 */
+:root {
+  --bg: #f2f4f3;
+  --surface: #ffffff;
+  --lane: #e6ecea;
+  --ink: #142024;
+  --ink2: #384a50;
+  --muted: #66777c;
+  --rule: #c3cecd;
+  --torque: #0b766f;
+  --danger: #c22a2a;
+  --sim: #6a4cb2;
+  --chip: #dfe9e7;
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1416; --surface: #162023; --lane: #192528; --ink: #e2ebe9; --ink2: #b5c4c2; --muted: #879897;
+    --rule: #2d3c3f; --torque: #3fc1b5; --danger: #ff6e6e; --sim: #a891f2; --chip: #1e2c2f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1416; --surface: #162023; --lane: #192528; --ink: #e2ebe9; --ink2: #b5c4c2; --muted: #879897;
+  --rule: #2d3c3f; --torque: #3fc1b5; --danger: #ff6e6e; --sim: #a891f2; --chip: #1e2c2f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 40px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(26px, 4vw, 36px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 20px; font-weight: 700; }
+h3 { font-size: 14px; font-weight: 600; font-family: var(--mono); }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+.eyebrow { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+header { display: grid; gap: 14px; }
+.lede { color: var(--ink2); max-width: 70ch; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.step { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; background: var(--chip); color: var(--ink2); white-space: nowrap; }
+.step b { color: var(--ink); font-weight: 600; }
+.step.cur { background: var(--torque); color: var(--surface); }
+.step.cur b { color: var(--surface); }
+
+section { display: grid; gap: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; }
+.seg { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.seg-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.seg-buttons { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button {
+  font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--ink2); padding: 6px 12px; cursor: pointer;
+  border-right: 1px solid var(--rule);
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg button:focus-visible { outline: 2px solid var(--torque); outline-offset: -2px; }
+
+figure { margin: 0; display: grid; gap: 12px; }
+.diagram { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 8px; }
+.diagram svg { display: block; width: 100%; min-width: 980px; height: auto; color: var(--ink); }
+figcaption { color: var(--ink2); font-size: 14px; max-width: 80ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--ink2); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend svg { width: 34px; height: 10px; flex: none; }
+
+/* SVG 안의 모양 */
+.lane { fill: var(--lane); }
+.lane-h { font: 600 11px var(--sans); letter-spacing: 0.08em; fill: var(--muted); }
+.box { fill: var(--surface); stroke: var(--rule); stroke-width: 1.2; }
+.box.log { stroke-dasharray: 4 3; }
+.box.safety { stroke: var(--danger); }
+.slot { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.t1 { font: 600 12.5px var(--sans); fill: var(--ink); }
+.t2 { font: 400 11px var(--sans); fill: var(--ink2); }
+.tm { font: 400 10.5px var(--mono); fill: var(--muted); }
+.tag { font: 600 11px var(--sans); fill: var(--torque); }
+.e { fill: none; stroke: var(--ink2); stroke-width: 1.4; }
+.e.tq { stroke: var(--torque); stroke-width: 2.4; }
+.e.sf { stroke: var(--danger); stroke-dasharray: 5 4; stroke-width: 1.6; }
+.e.sm { stroke: var(--sim); stroke-dasharray: 6 4; stroke-width: 1.6; }
+.e.ph { stroke: var(--muted); stroke-dasharray: 2 4; stroke-width: 1.6; }
+.el { font: 400 10.5px var(--mono); fill: var(--ink2); }
+.el.tq { fill: var(--torque); font-weight: 500; }
+.el.sf { fill: var(--danger); }
+.el.sm { fill: var(--sim); }
+.el.ph { fill: var(--muted); font-family: var(--sans); }
+.mk-ink { fill: var(--ink2); } .mk-tq { fill: var(--torque); } .mk-sf { fill: var(--danger); }
+.mk-sm { fill: var(--sim); } .mk-ph { fill: var(--muted); }
+.g { transition: opacity .2s; }
+@media (prefers-reduced-motion: reduce) { .g { transition: none; } }
+
+/* 보기 전환: 지금 모드에서 돌지 않는 것을 흐리게 */
+figure[data-plant="real"] .p-sim, figure[data-plant="real"] .p-simtopic { opacity: .14; }
+figure[data-plant="sim"] .p-real, figure[data-plant="sim"] .p-can { opacity: .14; }
+figure[data-plant="sim_can"] .p-real, figure[data-plant="sim_can"] .p-simtopic { opacity: .14; }
+figure[data-ctrl="mpc"] .c-a { opacity: .14; }
+figure[data-ctrl="pp"] .c-mpc { opacity: .14; }
+.v-real, .v-sim, .v-simcan { display: none; }
+figure[data-plant="real"] .v-real, figure[data-plant="sim"] .v-sim, figure[data-plant="sim_can"] .v-simcan { display: inline; }
+
+.run { display: grid; gap: 6px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+.run div { display: grid; grid-template-columns: minmax(120px, 160px) 1fr; gap: 12px; align-items: baseline; }
+.run code { overflow-wrap: anywhere; color: var(--ink); }
+.run span { font-size: 13px; color: var(--muted); }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.card .role { font-size: 13.5px; color: var(--ink2); }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13.5px; }
+.card .cfg { font-size: 12px; color: var(--muted); font-family: var(--mono); overflow-wrap: anywhere; }
+.card .grp { font-size: 11.5px; color: var(--muted); font-weight: 600; letter-spacing: 0.04em; }
+.chip { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--ink2); margin-right: 4px; }
+.chip.sim { color: var(--sim); }
+.chip.tq { color: var(--torque); }
+
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+th { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 0.04em; background: var(--lane); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+td.when { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+.todo { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.todo > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; }
+.todo ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px; }
+.foot { font-size: 12.5px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">메카넘 AMR · AK40-10 토크 제어 · 구현판</div>
+    <h1>AMR 제어기 구조도 v4</h1>
+    <p class="lede">v3(2026-11-05 제안)를 실제로 짠 코드에 맞춰 다시 그렸다. 노드 이름, 토픽, 주기, 숫자는 모두 <code>amr_ws/src/amr_basic_stack/controller/mpc</code>의 코드와 설정 파일(2026-11-12 기준)에서 가져왔다. 시뮬과 가상 CAN으로 확인했고, 실제 모터로는 아직 돌려 보지 않았다.</p>
+    <div class="steps" aria-label="전환 단계">
+      <span class="step"><b>0</b> 기록 체계 ✓</span>
+      <span class="step"><b>1</b> 메시지 ✓</span>
+      <span class="step"><b>2</b> launch·시뮬 플랜트 ✓</span>
+      <span class="step"><b>3</b> MPC·출력·게이트 ✓</span>
+      <span class="step"><b>4</b> 상태 추정기 ✓</span>
+      <span class="step"><b>5</b> 8자·감시·슬립 기록 ✓</span>
+      <span class="step"><b>6</b> 비교군 A ✓</span>
+      <span class="step cur"><b>7</b> ak40_can_node · 코드 완료, 실물 전</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="h-diagram">
+    <h2 id="h-diagram">블록 다이어그램</h2>
+    <div class="controls">
+      <div class="seg">
+        <span class="seg-label" id="lbl-plant">플랜트</span>
+        <span class="seg-buttons" role="group" aria-labelledby="lbl-plant">
+          <button type="button" id="plant-real" data-plant="real" aria-pressed="true">실차</button>
+          <button type="button" id="plant-sim" data-plant="sim" aria-pressed="false">시뮬</button>
+          <button type="button" id="plant-simcan" data-plant="sim_can" aria-pressed="false">시뮬 + CAN</button>
+        </span>
+      </div>
+      <div class="seg">
+        <span class="seg-label" id="lbl-ctrl">제어기</span>
+        <span class="seg-buttons" role="group" aria-labelledby="lbl-ctrl">
+          <button type="button" id="ctrl-both" data-ctrl="both" aria-pressed="true">둘 다</button>
+          <button type="button" id="ctrl-mpc" data-ctrl="mpc" aria-pressed="false">MPC (B·C)</button>
+          <button type="button" id="ctrl-pp" data-ctrl="pp" aria-pressed="false">A (PP + PI)</button>
+        </span>
+      </div>
+    </div>
+
+    <figure id="fig" data-plant="real" data-ctrl="both">
+      <div class="diagram">
+        <svg viewBox="0 0 1360 800" role="img" aria-label="AMR 제어기 블록 다이어그램. 센서와 SLAM이 상태 추정기로 들어가고, 상태 추정값과 8자 기준궤적이 제어기 슬롯(MPC 또는 퓨어 퍼슛과 바퀴별 PI)으로 들어간다. 제어기 토크는 torque_output, 게이트, ak40_can_node를 거쳐 AK40-10 모터 네 개로 간다. 바퀴 상태는 torque_output과 바퀴 PI로 되돌아가고, fault_monitor는 게이트를 내린다.">
+          <defs>
+            <marker id="a-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ink" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="a-tq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk-tq" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="a-sf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-sf" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="a-sm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-sm" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="a-ph" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ph" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+
+          <!-- 레인 -->
+          <rect class="lane" x="15" y="40" width="230" height="545" rx="8"/>
+          <rect class="lane" x="265" y="40" width="240" height="545" rx="8"/>
+          <rect class="lane" x="525" y="40" width="290" height="545" rx="8"/>
+          <rect class="lane" x="825" y="40" width="240" height="545" rx="8"/>
+          <rect class="lane" x="1085" y="40" width="250" height="545" rx="8"/>
+          <rect class="lane" x="525" y="605" width="810" height="135" rx="8"/>
+          <text class="lane-h" x="130" y="62" text-anchor="middle">센서</text>
+          <text class="lane-h" x="385" y="62" text-anchor="middle">상태 추정</text>
+          <text class="lane-h" x="670" y="62" text-anchor="middle">기준궤적 · 제어기</text>
+          <text class="lane-h" x="945" y="62" text-anchor="middle">출력 · 무장</text>
+          <text class="lane-h" x="1210" y="62" text-anchor="middle">모터 · 플랜트</text>
+          <text class="lane-h" x="540" y="626">안전 · 기록</text>
+
+          <!-- 센서 (실차에서만) -->
+          <g class="g p-real">
+            <rect class="box" x="30" y="150" width="200" height="50" rx="6"/>
+            <text class="t1" x="44" y="170">RPLIDAR S2 × 2</text>
+            <text class="tm" x="44" y="188">/scan_front · /scan_rear 10 Hz</text>
+            <path class="e" d="M130,200 V254" marker-end="url(#a-ink)"/>
+            <rect class="box" x="30" y="256" width="200" height="42" rx="6"/>
+            <text class="t1" x="44" y="274">scan_sector_filter</text>
+            <text class="t2" x="44" y="290">로봇 몸체 가림 제거</text>
+            <path class="e" d="M230,277 H278" marker-end="url(#a-ink)"/>
+
+            <rect class="box" x="30" y="470" width="200" height="50" rx="6"/>
+            <text class="t1" x="44" y="490">RealSense D455 IMU</text>
+            <text class="tm" x="44" y="508">/camera/imu ≥200 Hz</text>
+            <path class="e" d="M130,470 V448" marker-end="url(#a-ink)"/>
+            <rect class="box" x="30" y="396" width="200" height="50" rx="6"/>
+            <text class="t1" x="44" y="416">imu_to_base_node</text>
+            <text class="tm" x="44" y="434">→ /imu/base_link (몸체 좌표)</text>
+            <path class="e" d="M230,421 H278" marker-end="url(#a-ink)"/>
+
+            <rect class="box" x="280" y="214" width="210" height="86" rx="6"/>
+            <text class="t1" x="294" y="234">Cartographer 측위</text>
+            <text class="tm" x="294" y="251">localization_torque_2d.lua</text>
+            <text class="t2" x="294" y="268">외삽 끔 · 휠 오돔 끔</text>
+            <text class="t2" x="294" y="285">스캔 시각 stamp · 약 0.13 s 늦음</text>
+            <path class="e" d="M385,300 V368" marker-end="url(#a-ink)"/>
+            <text class="el" x="392" y="338">/tracked_pose</text>
+            <text class="el" x="392" y="352">약 10 Hz</text>
+          </g>
+
+          <!-- 상태 추정기 -->
+          <rect class="box" x="280" y="370" width="210" height="122" rx="6"/>
+          <text class="t1" x="294" y="390">state_estimator_node</text>
+          <text class="t2" x="294" y="407">IMU 적분으로 예측 (200 Hz)</text>
+          <text class="t2" x="294" y="423">포즈 잔차로 보정 · 고정 칼만 게인</text>
+          <text class="t2" x="294" y="439">늦은 포즈는 그 시각 이력에 맞춤</text>
+          <text class="t2" x="294" y="455">가속도·자이로 바이어스 추정</text>
+          <text class="tm" x="294" y="477">→ /state_estimator/odom 100 Hz</text>
+          <path class="e" d="M490,425 H538" marker-end="url(#a-ink)"/>
+          <text class="el" x="514" y="417" text-anchor="middle">x̂</text>
+
+          <!-- 기준궤적 -->
+          <rect class="box" x="560" y="78" width="220" height="96" rx="6"/>
+          <text class="t1" x="574" y="98">figure8_reference_node</text>
+          <text class="t2" x="574" y="115">지도 고정 8자 · 3 × 1.5 m · 0.5 m/s</text>
+          <text class="t2" x="574" y="131">무장해야 기준 시간이 흐름</text>
+          <text class="t2" x="574" y="147">재무장 때 로봇 위치로 재동기</text>
+          <text class="tm" x="574" y="164">10 Hz · 0.2 s × 20행</text>
+          <path class="e" d="M670,174 V212" marker-end="url(#a-ink)"/>
+          <text class="el" x="664" y="198" text-anchor="end">/dra_mppi/reference_trajectory</text>
+
+          <!-- 제어기 슬롯 -->
+          <rect class="slot" x="540" y="214" width="260" height="322" rx="10"/>
+          <text class="tm" x="552" y="232">controller:=mpc | pure_pursuit</text>
+
+          <g class="g c-mpc">
+            <rect class="box" x="556" y="242" width="228" height="124" rx="6"/>
+            <text class="t1" x="570" y="262">torque_mpc_node</text>
+            <text class="tag" x="772" y="262" text-anchor="end">B · C</text>
+            <text class="t2" x="570" y="279">상태가 올 때마다 1회 · C++ · DAQP</text>
+            <text class="t2" x="570" y="295">0.5 s 예측 (Np 50) · 토크 5칸 (Nc 5)</text>
+            <text class="t2" x="570" y="313">B: |τ| ≤ 1.3 N·m (모터 한계)</text>
+            <text class="t2" x="570" y="329">C: |τ| ≤ 0.067 N·m (μ̂ 0.3 마찰)</text>
+            <text class="t2" x="570" y="345">|Δτ| ≤ τ̄/3 · d̂ 끔 · J_w 끔</text>
+            <text class="tm" x="570" y="360">→ /torque_mpc/cmd_raw</text>
+          </g>
+
+          <g class="g c-a">
+            <rect class="box" x="556" y="384" width="228" height="56" rx="6"/>
+            <text class="t1" x="570" y="404">pure_pursuit_node</text>
+            <text class="tag" x="772" y="404" text-anchor="end">A</text>
+            <text class="t2" x="570" y="421">L_d = 0.5 s·|v| · 진행 속도 P 보정</text>
+            <text class="t2" x="570" y="435">헤딩 = 접선 · v_y = 0</text>
+            <path class="e" d="M670,440 V460" marker-end="url(#a-ink)"/>
+            <text class="el" x="678" y="455">(v_x, ω_z)</text>
+            <rect class="box" x="556" y="462" width="228" height="62" rx="6"/>
+            <text class="t1" x="570" y="481">wheel_pi_node</text>
+            <text class="t2" x="570" y="497">ω_ref = T⁻¹v · τ = K_p·e + K_i·∫e</text>
+            <text class="t2" x="570" y="513">K_p 0.03 · K_i 0.15 · B와 같은 상한</text>
+          </g>
+
+          <!-- 토크 경로 -->
+          <path class="e tq" d="M800,286 H838" marker-end="url(#a-tq)"/>
+          <text class="el tq" x="820" y="279" text-anchor="middle">τ*</text>
+
+          <rect class="box" x="840" y="244" width="210" height="82" rx="6"/>
+          <text class="t1" x="854" y="264">torque_output_node</text>
+          <text class="t2" x="854" y="281">τ + τ_fric(ω) · 지금은 0 (측정 전)</text>
+          <text class="t2" x="854" y="297">안전 클램프 ±1.3 N·m</text>
+          <text class="tm" x="854" y="315">→ /torque_output/cmd_raw</text>
+          <path class="e tq" d="M945,326 V362" marker-end="url(#a-tq)"/>
+
+          <rect class="box" x="840" y="364" width="210" height="110" rx="6"/>
+          <text class="t1" x="854" y="384">keyboard_command_gate</text>
+          <text class="t2" x="854" y="401">'a' 무장 · 's'/스페이스 정지</text>
+          <text class="t2" x="854" y="417">미무장·0.2 s 끊김 → DAMPING</text>
+          <text class="t2" x="854" y="433">받는 즉시 중계 (재샘플 없음)</text>
+          <text class="tm" x="854" y="451">/mpc/armed (latched) →</text>
+          <text class="tm" x="854" y="465">  figure8 · 제어기 · 감시</text>
+          <path class="e tq" d="M1050,412 H1098" marker-end="url(#a-tq)"/>
+          <text class="el tq" x="1074" y="404" text-anchor="middle">/wheel_</text>
+          <text class="el tq" x="1074" y="430" text-anchor="middle">torque_cmd</text>
+
+          <g class="g p-can">
+            <rect class="box" x="1100" y="364" width="220" height="110" rx="6"/>
+            <text class="t1" x="1114" y="384">ak40_can_node</text>
+            <text class="t2" x="1114" y="401">TORQUE: kp 0 · kd 0 · t_ff = τ</text>
+            <text class="t2" x="1114" y="417">DAMPING: v 0 · kd 0.02 (τ = −kd·ω)</text>
+            <text class="t2" x="1114" y="433">100 Hz · 응답 감시 · 모터 재무장</text>
+            <text class="t2" x="1114" y="449">T ±5 N·m · 실물 확인 전 ±0.1</text>
+            <text class="tm" x="1114" y="466">→ /wheel_states</text>
+            <path class="e tq" d="M1210,474 V500" marker-end="url(#a-tq)"/>
+            <text class="el tq" x="1218" y="492">CAN 1 Mbps · MIT</text>
+          </g>
+
+          <!-- 시뮬: 게이트 → 플랜트 직접 -->
+          <g class="g p-simtopic">
+            <path class="e sm" d="M1010,474 V534 H1098" marker-end="url(#a-sm)"/>
+            <text class="el sm" x="1016" y="556">시뮬: 토픽으로 직접</text>
+          </g>
+
+          <rect class="box" x="1100" y="502" width="220" height="66" rx="6"/>
+          <text class="t1" x="1114" y="522"><tspan class="v-real">AMR · AK40-10 × 4</tspan><tspan class="v-sim">sim_plant_torque_node</tspan><tspan class="v-simcan">가짜 AK40 × 4 (vcan0)</tspan></text>
+          <text class="t2" x="1114" y="539"><tspan class="v-real">메카넘 r 0.04 m · 약 4 kg</tspan><tspan class="v-sim">강체 모델 + 슬립 μ (선택)</tspan><tspan class="v-simcan">+ sim_plant_torque_node</tspan></text>
+          <text class="t2" x="1114" y="556"><tspan class="v-real">MIT 모드 · 16~28 V</tspan><tspan class="v-sim">/wheel_states · 참값도 냄</tspan><tspan class="v-simcan">12 비트 양자화까지 흉내</tspan></text>
+
+          <!-- 바퀴 상태 되먹임 -->
+          <path class="e" d="M1210,364 V196 H818 V492 H786" marker-end="url(#a-ink)"/>
+          <path class="e" d="M945,196 V242" marker-end="url(#a-ink)"/>
+          <text class="el" x="1090" y="188" text-anchor="middle">/wheel_states · ω 100 Hz</text>
+          <text class="el sm g p-sim" x="1090" y="212" text-anchor="middle">시뮬은 플랜트가 냄</text>
+
+          <!-- 물리 되먹임 -->
+          <path class="e ph" d="M1320,535 H1344 V772 H130" />
+          <path class="e ph g p-real" d="M130,772 V522" marker-end="url(#a-ph)"/>
+          <text class="el ph" x="720" y="764" text-anchor="middle">로봇이 움직이면 라이다·IMU가 그 움직임을 잰다</text>
+          <g class="g p-sim">
+            <path class="e sm" d="M385,772 V494" marker-end="url(#a-sm)"/>
+            <text class="el sm" x="394" y="560">시뮬: 플랜트가</text>
+            <text class="el sm" x="394" y="574">/imu/base_link ·</text>
+            <text class="el sm" x="394" y="588">/tracked_pose 를</text>
+            <text class="el sm" x="394" y="602">흉내 내 직접 냄</text>
+          </g>
+
+          <!-- 안전 · 기록 -->
+          <g class="g p-sim">
+            <rect class="box log" x="540" y="636" width="260" height="92" rx="6"/>
+            <text class="t1" x="554" y="656">tools/compare_run.py</text>
+            <text class="t2" x="554" y="673">시뮬 참값(/sim/ground_truth) 기준</text>
+            <text class="t2" x="554" y="689">A·B·C 같은 잣대: 추종 오차·토크</text>
+            <text class="t2" x="554" y="705">+ MPC CSV (log_prefix)</text>
+            <text class="tm" x="554" y="720">오프라인 평가 전용</text>
+          </g>
+
+          <rect class="box safety" x="840" y="636" width="210" height="92" rx="6"/>
+          <text class="t1" x="854" y="656">fault_monitor_node</text>
+          <text class="t2" x="854" y="673">SLAM 포즈 튐 · 추종 오차 &gt; 30 cm</text>
+          <text class="t2" x="854" y="689">모터 에러 (255 = 응답 없음)</text>
+          <text class="t2" x="854" y="705">바퀴·상태 0.3 s 끊김</text>
+          <text class="tm" x="854" y="720">입력 /wheel_states · x̂ · status</text>
+          <path class="e sf" d="M900,636 V476" marker-end="url(#a-sf)"/>
+          <text class="el sf" x="906" y="560">/mpc/arm</text>
+          <text class="el sf" x="906" y="574">= false</text>
+
+          <rect class="box log" x="1100" y="636" width="220" height="92" rx="6"/>
+          <text class="t1" x="1114" y="656">slip_logger_node</text>
+          <text class="t2" x="1114" y="673">λ = (ω − ω_nom)·sgn / max(…)</text>
+          <text class="t2" x="1114" y="689">ω_nom = T⁻¹ v̂ · 시뮬은 참값 λ도</text>
+          <text class="t2" x="1114" y="705">로깅 전용 · 되먹임 없음</text>
+          <text class="tm" x="1114" y="720">입력 /wheel_states · x̂</text>
+        </svg>
+      </div>
+      <div class="legend" aria-label="선 종류">
+        <span><svg viewBox="0 0 34 10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" stroke="var(--torque)" stroke-width="2.4"/></svg>토크 명령 경로</span>
+        <span><svg viewBox="0 0 34 10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" stroke="var(--ink2)" stroke-width="1.4"/></svg>측정·상태 토픽</span>
+        <span><svg viewBox="0 0 34 10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" stroke="var(--danger)" stroke-width="1.6" stroke-dasharray="5 4"/></svg>안전 신호</span>
+        <span><svg viewBox="0 0 34 10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" stroke="var(--sim)" stroke-width="1.6" stroke-dasharray="6 4"/></svg>시뮬에서만 다른 길</span>
+        <span><svg viewBox="0 0 34 10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" stroke="var(--muted)" stroke-width="1.6" stroke-dasharray="2 4"/></svg>물리적 움직임</span>
+        <span><svg viewBox="0 0 34 10" aria-hidden="true"><rect x="1" y="1" width="32" height="8" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/></svg>기록 전용 (제어에 안 씀)</span>
+      </div>
+      <figcaption>제어기는 바꿔 끼우는 자리다. MPC(B·C)와 퓨어 퍼슛 + 바퀴별 PI(A)가 같은 기준열과 같은 상태를 받고, 같은 torque_output → 게이트 → 모터 경로로 토크를 낸다. 다른 것은 A만 바퀴 속도(/wheel_states)를 되먹임에 쓴다는 점이다. 위의 플랜트·제어기 버튼으로 그 모드에서 돌지 않는 노드를 흐리게 볼 수 있다.</figcaption>
+    </figure>
+
+    <div class="run" aria-label="실행 명령">
+      <div><span>시뮬</span><code>ros2 launch amr_mpc torque_experiment.launch.py</code></div>
+      <div><span>비교군 A</span><code>… controller:=pure_pursuit</code></div>
+      <div><span>비교군 C</span><code>… limit_mode:=friction</code></div>
+      <div><span>시뮬 + CAN</span><code>… plant:=sim_can</code> <span>(vcan0 먼저)</span></div>
+      <div><span>실차</span><code>… plant:=real</code> <span>(센서·Cartographer는 따로)</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-nodes">
+    <h2 id="h-nodes">노드별로 실제로 하는 일</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="grp">기준궤적</div>
+        <h3>figure8_reference_node</h3>
+        <p class="role">지도에 고정된 8자를 시간 기준궤적으로 낸다.</p>
+        <ul>
+          <li>교차점 (0, 0, 0°) 임시, 3 × 1.5 m, 최소 곡률반경 0.31 m</li>
+          <li>0.5 m/s · 0.4 m/s² · 앞뒤 정렬 회전 1.5 s · 유지 5 s</li>
+          <li>출발점에서 30 cm·30° 밖이면 출발 거부, 안이면 진입 구간</li>
+          <li>무장해야 시간이 흐르고, 재무장 때 배속을 0→1로 올린다</li>
+          <li>기준에서 35 cm 벗어나면 발행을 끊는다</li>
+        </ul>
+        <div class="cfg">config/torque_track.yaml</div>
+      </div>
+      <div class="card">
+        <div class="grp">상태 추정</div>
+        <h3>state_estimator_node</h3>
+        <p class="role">늦게 오는 SLAM 포즈와 IMU로 100 Hz 상태를 만든다.</p>
+        <ul>
+          <li>IMU가 놓인 점 (0.098, 0.017) m을 추정한 뒤 로봇 중심으로 옮긴다</li>
+          <li>게인 K_p 0.71 · K_v 4.16 /s · K_ψ 0.44 (정상상태 칼만)</li>
+          <li>기동 1 s 동안 정지 IMU로 바이어스를 잡는다</li>
+          <li>잔차 15 cm·15° 넘는 포즈는 튐으로 세고 버린다</li>
+        </ul>
+        <div class="cfg">config/torque_estimator.yaml</div>
+      </div>
+      <div class="card">
+        <div class="grp">제어기 · B · C</div>
+        <h3>torque_mpc_node</h3>
+        <p class="role">0.5 s를 예측해 바퀴 4개 토크를 고르고 맨 앞 10 ms만 낸다.</p>
+        <ul>
+          <li>상태 [X, Y, ψ, Ẋ, Ẏ, ψ̇] 모두 map 좌표, 모델 Ẍ = M⁻¹R(ψ)(T⁻¹)ᵀτ</li>
+          <li>비용 W [100, 100, 50, 0.1, 0.1, 0.05] · w_Δ 10 · q_null 0.01 (11-12 잠정)</li>
+          <li><span class="chip tq">B</span>τ̄ = 1.3 N·m · <span class="chip tq">C</span>τ̄ = (r/√2)·μ̂·mg/4·0.8 = 0.067</li>
+          <li>무장 뒤 새 기준열이 올 때까지 안 푼다 · 도착하면 hold → DAMPING</li>
+        </ul>
+        <div class="cfg">config/torque_mpc.yaml · torque_plant.yaml</div>
+      </div>
+      <div class="card">
+        <div class="grp">제어기 · A</div>
+        <h3>pure_pursuit_node → wheel_pi_node</h3>
+        <p class="role">퓨어 퍼슛이 (v_x, ω_z)를 내고, 바퀴별 PI가 토크로 바꾼다.</p>
+        <ul>
+          <li>룩어헤드는 기준 시각의 점부터 찾는다 · v = v_ref + 1.0·e_진행</li>
+          <li>κ = 2y/L², ω = v·κ · 정렬 회전 구간은 헤딩 P 제어</li>
+          <li>PI: K_p 0.03 · K_i 0.15, 상한에 걸리면 적분 멈춤</li>
+          <li>상한·변화율·정지 규칙은 B 설정 파일을 그대로 읽는다</li>
+        </ul>
+        <div class="cfg">config/torque_baseline_a.yaml</div>
+      </div>
+      <div class="card">
+        <div class="grp">출력</div>
+        <h3>torque_output_node</h3>
+        <p class="role">MPC 순토크에 구동계 마찰 보상을 더하고 자른다.</p>
+        <ul>
+          <li>τ_cmd = τ* + coulomb·tanh(ω/0.5) + viscous·ω</li>
+          <li>마찰 값은 벤치 측정 전이라 0</li>
+          <li>±1.3 N·m 안전 클램프 · 변화율 제한은 MPC 제약으로 옮김</li>
+        </ul>
+        <div class="cfg">config/torque_plant.yaml friction</div>
+      </div>
+      <div class="card">
+        <div class="grp">무장 · 정지</div>
+        <h3>keyboard_command_gate</h3>
+        <p class="role">무장된 동안만 토크를 통과시킨다. 나머지는 DAMPING.</p>
+        <ul>
+          <li>DAMPING = τ = −kd·ω. 바퀴가 돌 때만 힘이 난다</li>
+          <li>나가는 때: 무장 전 · 정지 키 · 명령 0.2 s 끊김 · fault</li>
+          <li>/mpc/armed를 latched로 내서 기준·제어기·감시가 함께 멈춘다</li>
+        </ul>
+        <div class="cfg">launch: command_type torques</div>
+      </div>
+      <div class="card">
+        <div class="grp">모터</div>
+        <h3>ak40_can_node</h3>
+        <p class="role">토크 명령과 AK40-10 네 개 사이의 CAN 통역.</p>
+        <ul>
+          <li>MIT 규약 (매뉴얼 v1.0.18 5.3절과 대조함): P ±12.5, V ±45.5, T ±5</li>
+          <li>토크 한 칸 2.44 mN·m · "0"은 +1.22 mN·m로 나간다</li>
+          <li>응답 없는 모터에 0.2 s마다 모터 모드 재송신</li>
+          <li>실물 확인 전(hardware_checked: false)에는 토크 ±0.1 N·m</li>
+        </ul>
+        <div class="cfg">config/ak40.yaml</div>
+      </div>
+      <div class="card">
+        <div class="grp">안전</div>
+        <h3>fault_monitor_node</h3>
+        <p class="role">무장 중 위험을 보면 게이트를 내린다.</p>
+        <ul>
+          <li>SLAM 포즈 튐 수 증가 · 추종 오차 &gt; 0.30 m</li>
+          <li>모터 에러 코드 ≠ 0 (과열·과전류·전압·엔코더·응답 없음)</li>
+          <li>/wheel_states·상태 추정값 0.3 s 끊김</li>
+          <li>이유는 /fault_monitor/fault에 남는다</li>
+        </ul>
+        <div class="cfg">launch 인자 max_track_error</div>
+      </div>
+      <div class="card">
+        <div class="grp">기록</div>
+        <h3>slip_logger_node</h3>
+        <p class="role">바퀴별 슬립률을 기록한다. 제어에는 쓰지 않는다.</p>
+        <ul>
+          <li>ω_nom = T⁻¹·(추정 몸체 속도), ω_ε 2.5 rad/s</li>
+          <li>요약: 평균·RMS·최대·|λ| &gt; 0.1 비율</li>
+          <li>추정 속도 잡음 때문에 측정 바닥이 약 0.1</li>
+        </ul>
+        <div class="cfg">log_prefix → CSV</div>
+      </div>
+      <div class="card">
+        <div class="grp">시뮬 전용</div>
+        <h3>sim_plant_torque_node</h3>
+        <p class="role">실차 대신 같은 토픽으로 대답하는 가짜 로봇.</p>
+        <ul>
+          <li>1판 식-6 강체 모델 · surface_mu를 주면 슬립 모델</li>
+          <li>가짜 IMU 200 Hz (주행 진동 0.95 m/s²) · 가짜 SLAM 10 Hz, 0.13 s 늦게</li>
+          <li><span class="chip sim">sim_can</span>가짜 AK40 네 개가 되어 CAN으로만 대화</li>
+        </ul>
+        <div class="cfg">config/torque_plant.yaml</div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-diff">
+    <h2 id="h-diff">v3에서 바뀐 것</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>항목</th><th>v3 (11-05 제안)</th><th>v4 (구현)</th><th>언제</th></tr></thead>
+        <tbody>
+          <tr><td>포즈 입력</td><td>Cartographer use_odometry false, 외삽 포함 /tracked_pose</td><td>외삽 끔 → 스캔 시각 stamp, 사이는 추정기가 IMU로 메움. 휠 오돔은 스위치(기본 끔)</td><td class="when">11-11</td></tr>
+          <tr><td>상태 추정</td><td>SLAM 스텝에서 측정을 참으로 덮어씀, 속도는 포즈 미분 + LPF</td><td>잔차 보정(고정 칼만 게인), 늦은 포즈를 그 시각 이력에 맞춤, IMU 점 추정 후 중심으로 이동, 바이어스 추정</td><td class="when">11-06, 11-11</td></tr>
+          <tr><td>MPC 모델</td><td>바퀴 관성 J_w 포함, 외란 추정치 d̂로 적분 작용</td><td>둘 다 스위치, 기본 끔 (노미널 MPC). d̂는 계산만 해서 로그에 남김</td><td class="when">11-10</td></tr>
+          <tr><td>MPC 튜닝</td><td>1판 값: 속도 가중 1, w_Δ 0.01</td><td>속도 가중 ×0.1, w_Δ 10 (잠정). 잡음 토크 1.03 → 0.15 N·m. AK40 진동 실측 뒤 확정</td><td class="when">11-12</td></tr>
+          <tr><td>무장 · 정지</td><td>게이트 arming, 0.2 s timeout, 감속 토크 또는 damping</td><td>DAMPING으로 확정. 무장해야 기준 시간이 흐름, 재무장 램프·재동기, MPC는 무장 뒤 새 기준열 대기, 도착하면 hold</td><td class="when">11-11</td></tr>
+          <tr><td>torque_output</td><td>전류 환산 i = (τ + τ_fric)/(K_T·N)</td><td>토크 그대로 낸다 (MIT 모드가 N·m를 받음). 마찰 보상 0, 클램프 ±1.3</td><td class="when">11-11</td></tr>
+          <tr><td>모터 노드</td><td>CAN ↔ AK40 × 4 (개략)</td><td>MIT 규약 매뉴얼 대조, 응답 CAN ID = 모터 ID, 응답 감시·재무장, 실물 확인 전 ±0.1 N·m</td><td class="when">11-12</td></tr>
+          <tr><td>fault_monitor</td><td>모터 에러 · timeout · 포즈 튐 · 과속 · 바퀴 멈춤</td><td>포즈 튐 · 추종 오차 0.30 m · 모터 에러 · 끊김. 과속·바퀴 멈춤은 아직 없음</td><td class="when">11-11</td></tr>
+          <tr><td>기준궤적</td><td>30 m 8자, 1 → 2 → 3 m/s</td><td>지도 고정 8자, 임시 3 × 1.5 m · 0.5 m/s. 랩별 속도(lap_speeds)는 준비만</td><td class="when">11-11</td></tr>
+          <tr><td>평가</td><td>저·중속 A vs B, 고속 B vs C(슬립 제어기)</td><td>발표대로 A / B / C 한 판씩. A 구현, B·C는 limit_mode로 전환. 참값 기준 비교 도구</td><td class="when">11-11</td></tr>
+          <tr><td>시뮬</td><td>없음</td><td>시뮬 플랜트(슬립 모델, 가짜 센서), 가짜 AK40(CAN 전 구간)</td><td class="when">11-10 ~ 11-12</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-left">
+    <h2 id="h-left">아직 남은 것</h2>
+    <div class="todo">
+      <div>
+        <h3>실물 확인 (모터 장착 뒤)</h3>
+        <ul>
+          <li>전원 극성(설치 지침의 색 표기 확인), CAN 종단 120 Ω</li>
+          <li>MIT 모드 전환, CAN ID 1~4, CAN 끊김 설정</li>
+          <li>장착 부호 → hardware_checked: true</li>
+          <li>벤치: J_w, τ_fric(ω), 작은 토크 정확도, DAMPING 기어감</li>
+          <li>센서 묶음(plant:=real)과 종단 지연</li>
+        </ul>
+      </div>
+      <div>
+        <h3>결과 해석</h3>
+        <ul>
+          <li>시뮬에서 A가 B·C보다 좋게 나온 이유: 잡음 없는 바퀴 속도, MPC가 추정기 잡음을 따라감</li>
+          <li>주범은 IMU 가속도 진동 잡음 (단독 10.7 mm)</li>
+          <li>μ 0.3에서 B 이탈을 어떻게 볼지, C의 장점이 드러나는 조건(실제 트랙·빠른 랩·적재)</li>
+        </ul>
+      </div>
+      <div>
+        <h3>아직 코드에 없는 것</h3>
+        <ul>
+          <li>fault_monitor의 과속·바퀴 멈춤 검사</li>
+          <li>토크 사용 에너지 지표 E = ∫Σ|τω|dt</li>
+          <li>시뮬 엔코더 잡음 (지금은 CAN 양자화만)</li>
+          <li>모델 기반 추정기(칼만) — 캡스톤 2로 미룰 생각</li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot">기록: amr/notes_amr/stack_changelog.md · torque_mpc_todo.md · 코드 스냅샷 2026-11-12_1300</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  var fig = document.getElementById('fig');
+  function bind(attr) {
+    var buttons = document.querySelectorAll('button[data-' + attr + ']');
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        fig.setAttribute('data-' + attr, b.getAttribute('data-' + attr));
+        buttons.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      });
+    });
+  }
+  bind('plant');
+  bind('ctrl');
+})();
+</script>
+
+</body></html>

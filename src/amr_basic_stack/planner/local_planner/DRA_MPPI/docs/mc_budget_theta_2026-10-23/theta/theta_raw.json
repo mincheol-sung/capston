@@ -1,0 +1,506 @@
+{
+  "maps": [
+    {
+      "map": "smoc_lab",
+      "shape": [
+        347,
+        326
+      ],
+      "resolution": 0.05,
+      "load_and_inflation_ms": 12.048563919961452,
+      "map_sha256": "772054c30d44aaed93f2bf6b7e1e76b5b441ee4691e1d4ca9a8752161bceec0e"
+    },
+    {
+      "map": "test_imu_scan",
+      "shape": [
+        286,
+        224
+      ],
+      "resolution": 0.05,
+      "load_and_inflation_ms": 2.871791832149029,
+      "map_sha256": "0c8f96346115097ebf4ee507df41fd63703c919d14f33ca5b6237f1db3092ebd"
+    }
+  ],
+  "rows": [
+    {
+      "map": "smoc_lab",
+      "requested_distance": 3.0,
+      "phase": "initial_goal",
+      "repeat": 0,
+      "callback_ms": 19.20907781459391,
+      "success": true,
+      "poses": 31,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -0.316,
+        2.3126
+      ],
+      "search_ms": 18.27675080858171,
+      "plan_ms": 18.4193120803684
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 3.0,
+      "phase": "initial_goal",
+      "repeat": 1,
+      "callback_ms": 18.61938601359725,
+      "success": true,
+      "poses": 31,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -0.316,
+        2.3126
+      ],
+      "search_ms": 17.81891379505396,
+      "plan_ms": 17.903867876157165
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 3.0,
+      "phase": "initial_goal",
+      "repeat": 2,
+      "callback_ms": 18.848268082365394,
+      "success": true,
+      "poses": 31,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -0.316,
+        2.3126
+      ],
+      "search_ms": 18.05855007842183,
+      "plan_ms": 18.149812938645482
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 3.0,
+      "phase": "blocked_path_replan",
+      "repeat": 0,
+      "callback_ms": 39.717167150229216,
+      "success": true,
+      "replan_called": true,
+      "poses": 33,
+      "map_inflation_ms": 1.517502125352621,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -0.316,
+        2.3126
+      ],
+      "search_ms": 38.55692292563617,
+      "plan_ms": 38.64532709121704
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 3.0,
+      "phase": "blocked_path_replan",
+      "repeat": 1,
+      "callback_ms": 39.784849155694246,
+      "success": true,
+      "replan_called": true,
+      "poses": 33,
+      "map_inflation_ms": 1.517502125352621,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -0.316,
+        2.3126
+      ],
+      "search_ms": 38.65472204051912,
+      "plan_ms": 38.77413598820567
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 3.0,
+      "phase": "blocked_path_replan",
+      "repeat": 2,
+      "callback_ms": 40.351474890485406,
+      "success": true,
+      "replan_called": true,
+      "poses": 33,
+      "map_inflation_ms": 1.517502125352621,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -0.316,
+        2.3126
+      ],
+      "search_ms": 39.20654789544642,
+      "plan_ms": 39.32559979148209
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 8.0,
+      "phase": "initial_goal",
+      "repeat": 0,
+      "callback_ms": 636.374264024198,
+      "success": true,
+      "poses": 83,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -1.066,
+        -7.5374
+      ],
+      "search_ms": 634.9199989344925,
+      "plan_ms": 635.1904489565641
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 8.0,
+      "phase": "initial_goal",
+      "repeat": 1,
+      "callback_ms": 624.2776811122894,
+      "success": true,
+      "poses": 83,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -1.066,
+        -7.5374
+      ],
+      "search_ms": 622.8210860863328,
+      "plan_ms": 623.037267010659
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 8.0,
+      "phase": "initial_goal",
+      "repeat": 2,
+      "callback_ms": 624.7036098502576,
+      "success": true,
+      "poses": 83,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -1.066,
+        -7.5374
+      ],
+      "search_ms": 623.2496160082519,
+      "plan_ms": 623.5058549791574
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 8.0,
+      "phase": "blocked_path_replan",
+      "repeat": 0,
+      "callback_ms": 756.2780259177089,
+      "success": true,
+      "replan_called": true,
+      "poses": 89,
+      "map_inflation_ms": 1.304078847169876,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -1.066,
+        -7.5374
+      ],
+      "search_ms": 754.1834029834718,
+      "plan_ms": 754.4390948023647
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 8.0,
+      "phase": "blocked_path_replan",
+      "repeat": 1,
+      "callback_ms": 760.0968510378152,
+      "success": true,
+      "replan_called": true,
+      "poses": 89,
+      "map_inflation_ms": 1.304078847169876,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -1.066,
+        -7.5374
+      ],
+      "search_ms": 758.0193330068141,
+      "plan_ms": 758.2355209160596
+    },
+    {
+      "map": "smoc_lab",
+      "requested_distance": 8.0,
+      "phase": "blocked_path_replan",
+      "repeat": 2,
+      "callback_ms": 759.7791871521622,
+      "success": true,
+      "replan_called": true,
+      "poses": 89,
+      "map_inflation_ms": 1.304078847169876,
+      "start": [
+        -0.316,
+        -0.6874
+      ],
+      "goal": [
+        -1.066,
+        -7.5374
+      ],
+      "search_ms": 757.747489027679,
+      "plan_ms": 757.9676487948745
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 3.0,
+      "phase": "initial_goal",
+      "repeat": 0,
+      "callback_ms": 18.91025179065764,
+      "success": true,
+      "poses": 31,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -1.0113,
+        2.8967
+      ],
+      "search_ms": 18.09782302007079,
+      "plan_ms": 18.187698908150196
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 3.0,
+      "phase": "initial_goal",
+      "repeat": 1,
+      "callback_ms": 18.474085023626685,
+      "success": true,
+      "poses": 31,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -1.0113,
+        2.8967
+      ],
+      "search_ms": 17.762374132871628,
+      "plan_ms": 17.84950797446072
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 3.0,
+      "phase": "initial_goal",
+      "repeat": 2,
+      "callback_ms": 18.578287912532687,
+      "success": true,
+      "poses": 31,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -1.0113,
+        2.8967
+      ],
+      "search_ms": 17.8519319742918,
+      "plan_ms": 17.928367014974356
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 3.0,
+      "phase": "blocked_path_replan",
+      "repeat": 0,
+      "callback_ms": 39.96460395865142,
+      "success": true,
+      "replan_called": true,
+      "poses": 33,
+      "map_inflation_ms": 1.2459051795303822,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -1.0113,
+        2.8967
+      ],
+      "search_ms": 38.80300302989781,
+      "plan_ms": 38.896732963621616
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 3.0,
+      "phase": "blocked_path_replan",
+      "repeat": 1,
+      "callback_ms": 39.56049005500972,
+      "success": true,
+      "replan_called": true,
+      "poses": 33,
+      "map_inflation_ms": 1.2459051795303822,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -1.0113,
+        2.8967
+      ],
+      "search_ms": 38.48335612565279,
+      "plan_ms": 38.573988946154714
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 3.0,
+      "phase": "blocked_path_replan",
+      "repeat": 2,
+      "callback_ms": 39.66488200239837,
+      "success": true,
+      "replan_called": true,
+      "poses": 33,
+      "map_inflation_ms": 1.2459051795303822,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -1.0113,
+        2.8967
+      ],
+      "search_ms": 38.57684298418462,
+      "plan_ms": 38.68459188379347
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 8.0,
+      "phase": "initial_goal",
+      "repeat": 0,
+      "callback_ms": 699.4042389560491,
+      "success": true,
+      "poses": 85,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -3.4113,
+        -6.5033
+      ],
+      "search_ms": 697.9532060213387,
+      "plan_ms": 698.2275790069252
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 8.0,
+      "phase": "initial_goal",
+      "repeat": 1,
+      "callback_ms": 699.3783791549504,
+      "success": true,
+      "poses": 85,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -3.4113,
+        -6.5033
+      ],
+      "search_ms": 697.9816178791225,
+      "plan_ms": 698.1999210547656
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 8.0,
+      "phase": "initial_goal",
+      "repeat": 2,
+      "callback_ms": 698.3769349753857,
+      "success": true,
+      "poses": 85,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -3.4113,
+        -6.5033
+      ],
+      "search_ms": 696.9032159540802,
+      "plan_ms": 697.1691169310361
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 8.0,
+      "phase": "blocked_path_replan",
+      "repeat": 0,
+      "callback_ms": 771.7766971327364,
+      "success": true,
+      "replan_called": true,
+      "poses": 87,
+      "map_inflation_ms": 1.1767239775508642,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -3.4113,
+        -6.5033
+      ],
+      "search_ms": 769.6739749517292,
+      "plan_ms": 769.9483809992671
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 8.0,
+      "phase": "blocked_path_replan",
+      "repeat": 1,
+      "callback_ms": 763.86519218795,
+      "success": true,
+      "replan_called": true,
+      "poses": 87,
+      "map_inflation_ms": 1.1767239775508642,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -3.4113,
+        -6.5033
+      ],
+      "search_ms": 761.9531501550227,
+      "plan_ms": 762.1993029024452
+    },
+    {
+      "map": "test_imu_scan",
+      "requested_distance": 8.0,
+      "phase": "blocked_path_replan",
+      "repeat": 2,
+      "callback_ms": 764.8116450291127,
+      "success": true,
+      "replan_called": true,
+      "poses": 87,
+      "map_inflation_ms": 1.1767239775508642,
+      "start": [
+        -1.0113,
+        -0.1033
+      ],
+      "goal": [
+        -3.4113,
+        -6.5033
+      ],
+      "search_ms": 762.870617210865,
+      "plan_ms": 763.1220929324627
+    }
+  ]
+}

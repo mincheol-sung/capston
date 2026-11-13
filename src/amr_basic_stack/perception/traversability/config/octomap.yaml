@@ -1,0 +1,70 @@
+# octomap_server 2.3.1 — 설계문서 §3.3 의 OctoMap 후보 구성.
+#
+# 공식 바이너리(packages.ros.org)를 그대로 쓴다. 소스 포크 없음.
+# 입력은 depth_preprocess_node 가 만든 /traversability/cloud_filtered 이며
+# STVL 과 같은 점군을 받는다 — §3.3 "공통 D455 전처리를 유지하고 3D 갱신
+# 모듈만 교체한다".
+octomap_server:
+  ros__parameters:
+    # 3D 누적은 연속적인 odom 로컬 윈도우에서 한다(§3.2). map 은 위치추정
+    # 보정이 과거 자세를 소급 변경해 누적이 어긋난다.
+    frame_id: odom
+    base_frame_id: base_footprint
+
+    # 3D voxel 크기. 2D 출력 해상도 0.05 m/cell 와는 별개 설정이다(§3.3
+    # "3D voxel 크기는 별도 비교 설정"). STVL 과 같은 값을 써야 비교가 성립한다.
+    resolution: 0.05
+
+    # ── sensor model (§3.3 의 log-odds 표) ────────────────────────────────
+    #   hit  +0.847 (p=0.7)   miss -0.405 (p=0.4)
+    #   상한 clamp +3.476 (p=0.97)   점유 판정 임계 0 (p=0.5)
+    # 상한까지 포화된 voxel 을 임계 아래로 내리려면 관통 miss 관측이 약 9회
+    # 필요하다. 정면 카메라 1대에서는 그 방향을 계속 봐야 성립한다.
+    # 완화하면 노이즈에 의한 오해제가 는다 — 실측 전에는 기본값을 유지한다.
+    sensor_model.hit: 0.7
+    sensor_model.miss: 0.4
+    sensor_model.min: 0.12
+    sensor_model.max: 0.97
+    # D455 유효 관측 상한. depth_preprocess_node 의 max_range 와 맞춘다.
+    sensor_model.max_range: 6.0
+
+    # ── 발행 z 범위 ──────────────────────────────────────────────────────
+    # ★ occupancy_min_z/max_z 는 이름과 달리 2D 투영만 거르지 않는다.
+    #   octomap_server 는 이 구간을 **발행되는 voxel 마커에도** 적용한다.
+    #   2026-09-09 실측: 0.033~0.31 로 두었더니 입력 점군에 1.08 m 짜리 상부
+    #   돌출이 있는데도 /occupied_cells_vis_array 의 voxel z 최고가 0.275 m
+    #   였다. RViz 에서 상부 구조가 통째로 사라진다.
+    #
+    #   그래서 여기는 "보고 싶은 전체 범위" 로 넓게 둔다. 2D z-band 투영은
+    #   octomap 의 /projected_map 이 아니라 depth_preprocess_node 의
+    #   /traversability/cloud_band 로 한다 — 그쪽이 격자 기하도 맞고 테스트도
+    #   되어 있다. 이 노드의 /projected_map 은 진단용 평탄화일 뿐이다.
+    occupancy_min_z: -0.30
+    occupancy_max_z: 2.00
+
+    # 입력 점군의 z 클리핑. 밴드보다 넓게 잡아 상부 구조도 3D 에는 남긴다.
+    # 3D 지도의 값어치가 "LiDAR 평면이 못 보는 높이"에 있기 때문이다.
+    point_cloud_min_z: -0.30
+    point_cloud_max_z: 2.00
+
+    # ── 표시·성능 ────────────────────────────────────────────────────────
+    # true 면 voxel 을 높이로 색칠한다. RViz 에서 z 축 분포를 눈으로 보는
+    # 가장 빠른 방법이다.
+    use_height_map: true
+    colored_map: false
+    color_factor: 0.8
+
+    # 고립된 voxel 제거. 원거리에서 셀당 픽셀이 한 자릿수로 떨어질 때
+    # 노이즈 한두 점이 그대로 점유가 되는 것을 줄인다.
+    filter_speckles: true
+    # 바닥 평면 제거는 끈다. depth_preprocess_node 의 z_min 이 이미 바닥을
+    # 뺐고, 여기서 또 평면 피팅을 하면 낮은 장애물까지 바닥으로 흡수한다.
+    filter_ground_plane: false
+
+    # 빈 공간 마커는 발행하지 않는다. voxel 수가 수십 배로 늘어 RViz 가 막힌다.
+    publish_free_space: false
+    compress_map: true
+    latch: false
+    # false: 매번 전체를 다시 투영한다. true(증분)로 두면 변경 BBX 밖이
+    # 갱신되지 않아 /projected_map 이 비어 보이는 일이 있다(2026-09-09 실측).
+    incremental_2D_projection: false

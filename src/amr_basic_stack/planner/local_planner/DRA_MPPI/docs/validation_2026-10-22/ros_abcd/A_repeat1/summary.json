@@ -1,0 +1,82 @@
+{
+  "scope": "synthetic ROS DDS pilot",
+  "cycles": 100,
+  "normal_optimizer_cycles": 0,
+  "quantile_method": "numpy percentile method=linear on raw cycles",
+  "callback_over_200ms_count": 50,
+  "callback_over_200ms_ratio": 0.5,
+  "timeout_count": 0,
+  "scheduled_response_ms": {
+    "count": 100,
+    "mean": 164.13442553952336,
+    "p50": 176.82191589847207,
+    "p95": 273.0881102848798,
+    "p99": 286.9227234390565,
+    "max": 298.1245066039264
+  },
+  "backend": "batch",
+  "workers": 1,
+  "frozen_nominal": true,
+  "statuses": {
+    "stale_odom": 50,
+    "expired_input": 50
+  },
+  "fallback_ratio": 1.0,
+  "deadline_miss_ratio": 0.5,
+  "skipped_periods": 0,
+  "all_callback_ms": {
+    "count": 100,
+    "mean": 131.78637197008356,
+    "p50": 127.48110154643655,
+    "p95": 272.8715676581487,
+    "p99": 286.72220587730413,
+    "max": 297.9590860195458
+  },
+  "normal_optimizer_ms": null,
+  "start_delay_ms": {
+    "count": 100,
+    "mean": 32.35178499482572,
+    "p50": 31.698167673312128,
+    "p95": 73.45520069357008,
+    "p99": 87.45520211756235,
+    "max": 98.66031166166067
+  },
+  "deadline_lateness_ms": {
+    "count": 100,
+    "mean": 31.81573122972622,
+    "p50": 27.254507038742297,
+    "p95": 73.09293202124535,
+    "p99": 86.93105155834932,
+    "max": 98.13274252228437
+  },
+  "publish_interval_ms": {
+    "count": 100,
+    "mean": 199.9979059700854,
+    "p50": 179.87160803750157,
+    "p95": 411.3173834164627,
+    "p99": 424.45859544212,
+    "max": 429.6557300258428
+  },
+  "receive_interval_ms": {
+    "count": 101,
+    "mean": 201.8737128825102,
+    "p50": 357.2527428623289,
+    "p95": 411.3131370395422,
+    "p99": 424.5110701303929,
+    "max": 429.8407738097012
+  },
+  "receive_count_in_window": 101,
+  "recorder": {
+    "recorder_summary": true,
+    "written": 110,
+    "dropped": 0,
+    "error": null
+  },
+  "warmup_cycles": 10,
+  "obstacles": 10,
+  "modes": 2,
+  "detour": false,
+  "static_enabled": true,
+  "strategy": "guide_conditioned",
+  "primary_K": 100
+}

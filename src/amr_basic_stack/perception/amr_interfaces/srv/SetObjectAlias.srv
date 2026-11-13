@@ -1,0 +1,5 @@
+string object_id
+string alias
+---
+bool success
+string message

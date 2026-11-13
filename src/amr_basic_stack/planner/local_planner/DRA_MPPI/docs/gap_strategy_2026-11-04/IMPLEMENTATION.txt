@@ -1,0 +1,60 @@
+Gap 전략 구현 및 검증 (2026-11-04)
+
+선택
+  config/dra_mppi.yaml: mppi.strategy: gap
+  YAML 변경 후 노드를 재시작한다. 기본값은 guide_conditioned로 유지했다.
+  stack_master autonomy launch는 기존 config_file 경로로 같은 YAML을 사용한다.
+
+구현
+  gap_inputs.py: 전후방 LaserScan 시간 보정, 센서 TF, scan/map 융합, 이동 가능 거리.
+  gap_geometry.py: 실제 거리 급변과 로봇 이동 공간을 함께 검사하는 원형 구역 분할.
+  gap_conditioned.py: 구역 중앙 seed, 도달 가능성/중복 검사, 최대 3개 gap, nominal.
+  mppi_controller.py / dra_mppi_node.py: 세 번째 전략 선택 및 ROS 입출력 연결.
+  grid_costmap.py: 기존 distance field에 융합용 raw occupancy 보존.
+  guide_conditioned.py: 기존 평가 엔진에 가변 그룹 수/별도 예산 설정을 연결.
+
+판단 기준 (기본값)
+  정적 swept 충돌 없음 AND 목표 오차 <= 0.35m AND 해당 gap 방향 이동 >= 0.25m.
+  nominal XY RMS < 0.22m AND 마지막 3점 평균 거리 < 0.30m이면 중복 제외.
+  nominal이 정적 충돌 상태면 nominal 중복 제외를 생략한다.
+  후진도 gap 방향 내적으로 이동량을 측정하므로 같은 기준으로 평가한다.
+  후보가 3개를 넘거나 후보끼리 RMS < 0.25m이면 공통+정적 soft cost로 정렬한다.
+  추가 동적 MC와 nominal보다 저렴해야 한다는 사전 조건은 없다.
+  gap당 100개, nominal 500-100*g개. MPPI 이동 rollout 합계는 항상 500개.
+  그룹별 MPPI 뒤 최종 대표와 감속 Stop에 기존 정적/동적 검사를 적용한다.
+  현재 YAML의 1차 Monte Carlo / 최종 Gaussian disk 설정을 그대로 사용한다.
+
+검증
+  전체 test/: 240 passed in 3.58s.
+  gap 전용: 17개. 후방 후보, 그룹 수 변경, nominal warm start, 0개 gap,
+  stale/skew/TF 입력, unknown/map 장애물, circular seam, 동적 최종 검사,
+  객체 수 상한, 시간 초과 및 reset을 포함한다.
+  실제 기록 10개 장면: 기존 실험과 모든 구역의 angular bin 경계가 10/10 일치.
+  구역 수:       3, 1, 1, 3, 5, 1, 4, 1, 6, 2.
+  선택 gap 수:   2, 1, 1, 3, 3, 1, 3, 1, 3, 2.
+  모든 장면의 총 sampling 개수: 500.
+  snapshot당 controller 계산: 56.54~87.32ms (각 1회).
+  상세 수치: validation.json.
+  colcon build --packages-select dra_mppi --symlink-install 성공.
+  설치된 설정을 사용하여 standard/guide_conditioned/gap ROS 노드 초기화 성공.
+  초기화 검사는 별도 ROS domain 201에서 수행했고 spin/control callback은 실행하지 않았다.
+
+검증 범위
+  10개 장면은 저장된 실제 scan의 시간 보정 좌표, 융합 지도, nominal을 재사용한다.
+  동적 예측은 주입하지 않았으며 ROS callback/TF/발행/온라인 deskew 시간은 제외한다.
+  따라서 위 시간은 전체 5Hz 충족을 입증하지 않는다. 실주행은 수행하지 않았다.
+  gap.timeout=0.18s 초과 결과는 폐기하지만 worker 종료를 기다리므로 hard realtime
+  실행시간 상한이 아니다. 전체 부하에서는 timing.jsonl_path를 지정해 측정해야 한다.
+
+재현
+  source /opt/ros/jazzy/setup.bash
+  source /home/smoc/2026amr_ws/install/setup.bash
+  export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
+  # 아래 명령은 패키지 디렉터리에서 실행한다.
+  /usr/bin/python3 -m pytest -q test
+  /usr/bin/python3 tools/validate_gap_strategy.py
+
+진단
+  /dra_mppi/gap_diagnostics: 후보별 통과/탈락 사유, 거리, 선택 gap, 예산 (JSON).
+  /dra_mppi/rollouts: gap_regions 경계와 nominal/gap의 anchor·sampling 궤적.
+  입력 오류는 stale_scan hold. 유효 입력의 gap 0개는 nominal 500개 탐색.

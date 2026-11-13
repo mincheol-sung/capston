@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>stack_master</name>
+  <version>0.1.0</version>
+  <description>Top-level launch and configuration package for the AMR stack.</description>
+  <maintainer email="amr@example.com">AMR Team</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>amr_base</exec_depend>
+  <exec_depend>amr_bringup</exec_depend>
+  <exec_depend>amr_description</exec_depend>
+  <exec_depend>amr_laser_tools</exec_depend>
+  <exec_depend>amr_mpc</exec_depend>
+  <exec_depend>amr_mpc_cpp</exec_depend>
+  <exec_depend>amr_perception_bringup</exec_depend>
+  <exec_depend>cartographer_ros</exec_depend>
+  <exec_depend>dra_mppi</exec_depend>
+  <exec_depend>global_planner</exec_depend>
+  <exec_depend>joy</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rplidar_ros</exec_depend>
+  <exec_depend>sensor_fusion</exec_depend>
+  <exec_depend>semantic_slam</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

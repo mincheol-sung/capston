@@ -1,0 +1,14 @@
+{
+  "evaluations": 384,
+  "absolute_max": 9.303844543673279e-07,
+  "absolute_p95": 8.611939700753357e-07,
+  "mae": 2.8583260497227803e-07,
+  "reference_refinement_max": 1.3322676295501878e-15,
+  "false_safe": 0,
+  "unsafe_denominator": 192,
+  "false_unsafe": 0,
+  "unresolved": 0,
+  "seed": 80117,
+  "reference": "Independent polar Gauss-Legendre 80/160; regularized covariance",
+  "limitation": "Synthetic distributions only; refinement is not a certified error bound or prediction calibration."
+}

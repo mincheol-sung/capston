@@ -1,0 +1,550 @@
+[
+  {
+    "bag": "mpc_chain_20260923_113151",
+    "frames": {
+      "/detections_fused": 2832,
+      "/lidar_obstacles": 2832,
+      "/lidar_clusters": 2833,
+      "/detections": 4220,
+      "/odom": 14114
+    },
+    "camera_objects_all_frames": 4720,
+    "sources": {
+      "0": 3060,
+      "2": 109
+    },
+    "semantic_match_pct": 3.439570842537078,
+    "classes": {
+      "umbrella": {
+        "camera_only": 7,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "airplane": {
+        "camera_only": 77,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "tv": {
+        "camera_only": 628,
+        "fused": 2,
+        "match_pct": 0.31746031746031744
+      },
+      "chair": {
+        "camera_only": 768,
+        "fused": 38,
+        "match_pct": 4.714640198511166
+      },
+      "person": {
+        "camera_only": 842,
+        "fused": 5,
+        "match_pct": 0.5903187721369539
+      },
+      "skateboard": {
+        "camera_only": 29,
+        "fused": 4,
+        "match_pct": 12.121212121212121
+      },
+      "traffic light": {
+        "camera_only": 6,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "refrigerator": {
+        "camera_only": 276,
+        "fused": 10,
+        "match_pct": 3.4965034965034967
+      },
+      "oven": {
+        "camera_only": 5,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "toilet": {
+        "camera_only": 25,
+        "fused": 1,
+        "match_pct": 3.8461538461538463
+      },
+      "suitcase": {
+        "camera_only": 190,
+        "fused": 43,
+        "match_pct": 18.454935622317596
+      },
+      "bottle": {
+        "camera_only": 46,
+        "fused": 1,
+        "match_pct": 2.127659574468085
+      },
+      "backpack": {
+        "camera_only": 69,
+        "fused": 4,
+        "match_pct": 5.47945205479452
+      },
+      "bench": {
+        "camera_only": 34,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "sports ball": {
+        "camera_only": 40,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "potted plant": {
+        "camera_only": 1,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "microwave": {
+        "camera_only": 5,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "sink": {
+        "camera_only": 1,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "laptop": {
+        "camera_only": 3,
+        "fused": 1,
+        "match_pct": 25.0
+      },
+      "handbag": {
+        "camera_only": 3,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "parking meter": {
+        "camera_only": 5,
+        "fused": 0,
+        "match_pct": 0.0
+      }
+    },
+    "distance_bins_output_position": {
+      "2-4m": {
+        "camera_only": 1422,
+        "fused": 32,
+        "match_pct": 2.200825309491059
+      },
+      "<2m": {
+        "camera_only": 585,
+        "fused": 11,
+        "match_pct": 1.8456375838926173
+      },
+      ">=6m": {
+        "camera_only": 415,
+        "fused": 7,
+        "match_pct": 1.6587677725118484
+      },
+      "4-6m": {
+        "camera_only": 638,
+        "fused": 59,
+        "match_pct": 8.464849354375897
+      }
+    },
+    "motion": {
+      "moving": {
+        "camera_only": 2759,
+        "fused": 106,
+        "match_pct": 3.699825479930192
+      },
+      "stationary": {
+        "camera_only": 301,
+        "fused": 3,
+        "match_pct": 0.9868421052631579
+      }
+    },
+    "empty_fusion_frames": 1224,
+    "fusion_gap_ms": {
+      "p50": 66.92749,
+      "p90": 133.465576,
+      "p95": 133.601684,
+      "max": 200.699707
+    },
+    "paired_dt_ms": {
+      "p50": 16.793926,
+      "p90": 30.259222,
+      "p95": 32.072514999999996,
+      "max": 66.579455
+    },
+    "reconstructed_frames": 2831,
+    "unreconstructed_frames": 1,
+    "reconstructed_source_agreement_pct": 100.0,
+    "exact_position_validated_matches": 109,
+    "corrected_pair_distance_m": {
+      "p50": 0.02939818282097873,
+      "p90": 0.07031544218757552,
+      "p95": 0.09182143427780673,
+      "max": 0.11577283455259978
+    },
+    "raw_pair_distance_m": {
+      "p50": 0.17810110475130547,
+      "p90": 0.25580363792560873,
+      "p95": 0.278914508083711,
+      "max": 0.3566539248390133
+    },
+    "matched_chi2": {
+      "p50": 4.971015393250923,
+      "p90": 8.04839126345664,
+      "p95": 8.424274867070357,
+      "max": 9.077618734863968
+    },
+    "multiple_gated_candidates": 0,
+    "reconstruction_disagreements_examples": [],
+    "fusion_logs": []
+  },
+  {
+    "bag": "mpc_chain_20260923_135325",
+    "frames": {
+      "/lidar_clusters": 1279,
+      "/lidar_obstacles": 1278,
+      "/detections_fused": 1278,
+      "/detections": 1903,
+      "/odom": 6387
+    },
+    "camera_objects_all_frames": 2236,
+    "sources": {
+      "0": 1401,
+      "2": 115
+    },
+    "semantic_match_pct": 7.58575197889182,
+    "classes": {
+      "person": {
+        "camera_only": 605,
+        "fused": 4,
+        "match_pct": 0.6568144499178982
+      },
+      "tv": {
+        "camera_only": 281,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "laptop": {
+        "camera_only": 10,
+        "fused": 1,
+        "match_pct": 9.090909090909092
+      },
+      "suitcase": {
+        "camera_only": 21,
+        "fused": 7,
+        "match_pct": 25.0
+      },
+      "bench": {
+        "camera_only": 17,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "chair": {
+        "camera_only": 151,
+        "fused": 3,
+        "match_pct": 1.948051948051948
+      },
+      "backpack": {
+        "camera_only": 19,
+        "fused": 5,
+        "match_pct": 20.833333333333332
+      },
+      "umbrella": {
+        "camera_only": 1,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "airplane": {
+        "camera_only": 275,
+        "fused": 14,
+        "match_pct": 4.844290657439446
+      },
+      "oven": {
+        "camera_only": 6,
+        "fused": 2,
+        "match_pct": 25.0
+      },
+      "refrigerator": {
+        "camera_only": 5,
+        "fused": 79,
+        "match_pct": 94.04761904761905
+      },
+      "skateboard": {
+        "camera_only": 2,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "microwave": {
+        "camera_only": 2,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "mouse": {
+        "camera_only": 1,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "bottle": {
+        "camera_only": 1,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "sports ball": {
+        "camera_only": 2,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "traffic light": {
+        "camera_only": 2,
+        "fused": 0,
+        "match_pct": 0.0
+      }
+    },
+    "distance_bins_output_position": {
+      "2-4m": {
+        "camera_only": 696,
+        "fused": 15,
+        "match_pct": 2.109704641350211
+      },
+      "4-6m": {
+        "camera_only": 160,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      ">=6m": {
+        "camera_only": 173,
+        "fused": 3,
+        "match_pct": 1.7045454545454546
+      },
+      "<2m": {
+        "camera_only": 372,
+        "fused": 97,
+        "match_pct": 20.68230277185501
+      }
+    },
+    "motion": {
+      "stationary": {
+        "camera_only": 441,
+        "fused": 71,
+        "match_pct": 13.8671875
+      },
+      "moving": {
+        "camera_only": 960,
+        "fused": 44,
+        "match_pct": 4.382470119521912
+      }
+    },
+    "empty_fusion_frames": 520,
+    "fusion_gap_ms": {
+      "p50": 66.870849,
+      "p90": 133.44575220000002,
+      "p95": 133.496582,
+      "max": 200.1875
+    },
+    "paired_dt_ms": {
+      "p50": 17.056066,
+      "p90": 30.393184400000003,
+      "p95": 31.9817806,
+      "max": 66.642303
+    },
+    "reconstructed_frames": 1277,
+    "unreconstructed_frames": 1,
+    "reconstructed_source_agreement_pct": 100.0,
+    "exact_position_validated_matches": 115,
+    "corrected_pair_distance_m": {
+      "p50": 0.011491969303869162,
+      "p90": 0.022841182479658415,
+      "p95": 0.025797073067358976,
+      "max": 0.1712070181745501
+    },
+    "raw_pair_distance_m": {
+      "p50": 0.03304429526983704,
+      "p90": 0.1021859119367369,
+      "p95": 0.1517119750455654,
+      "max": 0.31476990632755447
+    },
+    "matched_chi2": {
+      "p50": 3.8933894206633513,
+      "p90": 7.334677795479921,
+      "p95": 7.92526146661421,
+      "max": 9.116340709741825
+    },
+    "multiple_gated_candidates": 0,
+    "reconstruction_disagreements_examples": [],
+    "fusion_logs": []
+  },
+  {
+    "bag": "mpc_chain_20260923_135606",
+    "frames": {
+      "/odom": 16980,
+      "/detections": 5222,
+      "/lidar_clusters": 3506,
+      "/detections_fused": 3506,
+      "/lidar_obstacles": 3506
+    },
+    "camera_objects_all_frames": 7573,
+    "sources": {
+      "0": 4845,
+      "2": 239
+    },
+    "semantic_match_pct": 4.70102281667978,
+    "classes": {
+      "chair": {
+        "camera_only": 1125,
+        "fused": 37,
+        "match_pct": 3.1841652323580036
+      },
+      "tv": {
+        "camera_only": 680,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "person": {
+        "camera_only": 1789,
+        "fused": 42,
+        "match_pct": 2.293828509011469
+      },
+      "suitcase": {
+        "camera_only": 95,
+        "fused": 89,
+        "match_pct": 48.369565217391305
+      },
+      "laptop": {
+        "camera_only": 91,
+        "fused": 3,
+        "match_pct": 3.1914893617021276
+      },
+      "refrigerator": {
+        "camera_only": 807,
+        "fused": 53,
+        "match_pct": 6.162790697674419
+      },
+      "toilet": {
+        "camera_only": 24,
+        "fused": 9,
+        "match_pct": 27.272727272727273
+      },
+      "sink": {
+        "camera_only": 40,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "bench": {
+        "camera_only": 28,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "backpack": {
+        "camera_only": 22,
+        "fused": 3,
+        "match_pct": 12.0
+      },
+      "handbag": {
+        "camera_only": 1,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "airplane": {
+        "camera_only": 24,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "skateboard": {
+        "camera_only": 61,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "oven": {
+        "camera_only": 1,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "bottle": {
+        "camera_only": 53,
+        "fused": 3,
+        "match_pct": 5.357142857142857
+      },
+      "bird": {
+        "camera_only": 3,
+        "fused": 0,
+        "match_pct": 0.0
+      },
+      "traffic light": {
+        "camera_only": 1,
+        "fused": 0,
+        "match_pct": 0.0
+      }
+    },
+    "distance_bins_output_position": {
+      "<2m": {
+        "camera_only": 908,
+        "fused": 12,
+        "match_pct": 1.3043478260869565
+      },
+      "2-4m": {
+        "camera_only": 2762,
+        "fused": 85,
+        "match_pct": 2.985598876009835
+      },
+      "4-6m": {
+        "camera_only": 906,
+        "fused": 142,
+        "match_pct": 13.549618320610687
+      },
+      ">=6m": {
+        "camera_only": 269,
+        "fused": 0,
+        "match_pct": 0.0
+      }
+    },
+    "motion": {
+      "stationary": {
+        "camera_only": 2467,
+        "fused": 168,
+        "match_pct": 6.375711574952562
+      },
+      "moving": {
+        "camera_only": 2378,
+        "fused": 71,
+        "match_pct": 2.8991425071457737
+      }
+    },
+    "empty_fusion_frames": 1027,
+    "fusion_gap_ms": {
+      "p50": 66.905273,
+      "p90": 133.5299318,
+      "p95": 133.6166014,
+      "max": 200.241943
+    },
+    "paired_dt_ms": {
+      "p50": 16.885216,
+      "p90": 30.154319,
+      "p95": 31.968973,
+      "max": 66.014416
+    },
+    "reconstructed_frames": 3505,
+    "unreconstructed_frames": 1,
+    "reconstructed_source_agreement_pct": 100.0,
+    "exact_position_validated_matches": 239,
+    "corrected_pair_distance_m": {
+      "p50": 0.03291949445108054,
+      "p90": 0.055591453363872514,
+      "p95": 0.06050297321685945,
+      "max": 0.11207236505164381
+    },
+    "raw_pair_distance_m": {
+      "p50": 0.17957450591299756,
+      "p90": 0.21248989508677174,
+      "p95": 0.22553308874894198,
+      "max": 0.2771114425789857
+    },
+    "matched_chi2": {
+      "p50": 5.740782791973351,
+      "p90": 8.530954579477482,
+      "p95": 8.720923230606019,
+      "max": 8.982271378771419
+    },
+    "multiple_gated_candidates": 0,
+    "reconstruction_disagreements_examples": [],
+    "fusion_logs": [
+      "camera_lidar_fusion_node 시작: /detections + /lidar_clusters -> semantic /detections_fused, tracking /detections_tracking, unmatched LiDAR /lidar_obstacles (slop=67ms, gate=9.21, forward_unmatched=False)",
+      "라이다 yaw 보정 -2.502도 적용 중. URDF(laser_front rpy_offset)를 고치면 이 파라미터를 0.0 으로 되돌릴 것 — 안 그러면 이중 보정이 된다."
+    ]
+  }
+]

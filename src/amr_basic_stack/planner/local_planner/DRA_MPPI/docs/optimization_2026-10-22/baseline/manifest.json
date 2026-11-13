@@ -1,0 +1,32 @@
+{
+  "args": {
+    "output": "planner/local_planner/DRA_MPPI/docs/optimization_2026-10-22/baseline",
+    "profiles": [
+      "mc_legacy",
+      "mc_high"
+    ],
+    "rollouts": [
+      100,
+      500
+    ],
+    "iterations": 8,
+    "workers": [
+      2
+    ]
+  },
+  "scope": "kernel only; fixed identical candidates; fresh process recommended for controlled comparisons",
+  "source_sha256": {
+    "mecanum_model.py": "d5f4956b1091da947dfb9c69db1eabe3ea89cb82d1fc12be96ed2d32330527b2",
+    "control_sampling.py": "a3639dcfd913317161e145487c1442ad0da1207861debcadba38693d1d9deed0",
+    "mppi_controller.py": "d315eeddc1aeb490e3acf19dad88d01c8146f5b53eee8792771b4b0d78a323cc",
+    "common_cost.py": "d752826288490cc47acf1d25be0908b1af6bf3b620c90255f41f0ba8dc4048de",
+    "cycle_timing.py": "a6ce143abea345cf7acdf2cce98dc5d46a84018c935769e2daef5fd1ab6d2632",
+    "grid_costmap.py": "a9ce969643f4d65124b46813febe4ca3948ad946f2b00b9729aeb3d789ed00f7",
+    "dra_mppi_node.py": "2202f416630e0935a71fa92f7f1cc9371e9836b2ae39567f450777c7edf32dbd",
+    "guide_conditioned.py": "1ae3f4012a3fb000f72e77e862d911686ff4dbccdc34453c3a856c9e3801e051",
+    "__init__.py": "1e19bc73547d4d52405563876be7076ce7792da8855806ce9dedb7cdc9817b4c",
+    "geometry.py": "ebb537f3199815b233aad3b5e5e5554df27fb27ad281300ac16e0305c4add4b2",
+    "dynamic_risk.py": "2ad31fb0f0ee8ee9b9de336991c6292f980e5500c0dcca363f81f34738fa864f",
+    "path_handler.py": "0a6f767cb9cf3d31fe98f040be1b0dc046f4919e7c32202894e7cbb2492dba37"
+  }
+}

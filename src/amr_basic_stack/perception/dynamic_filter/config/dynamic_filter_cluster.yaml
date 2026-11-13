@@ -1,0 +1,30 @@
+/**:
+  ros__parameters:
+    tracks_topic: /tracked_object_modes
+    # Keep the same policy/time limits as the radius baseline for comparison.
+    filter_policy: confirmed_person
+    mask_method: cluster
+    scan_timing_mode: unknown  # No geometric removal on unverified beam epochs.
+    filter_radius: 0.35  # Unused by cluster mode; never a fallback.
+    max_extrapolation: 0.30
+    max_measurement_age: 0.30
+    person_label_timeout: 1.0
+    history_duration: 2.0
+    history_size: 100
+    pending_queue_size: 5
+    tf_wait_timeout: 0.15
+    tf_cache_duration: 10.0
+    retry_period: 0.01
+    diagnostic_period: 1.0
+    max_scan_beams: 10000
+    max_tracks: 200
+    # Initial engineering gates, not tuned/validated performance claims.
+    cluster_min_points: 3
+    cluster_base_gap: 0.05
+    cluster_gap_scale: 2.0
+    cluster_max_gap: 0.15
+    cluster_max_span: 0.80
+    cluster_match_distance: 0.45
+    cluster_max_point_distance: 0.60
+    cluster_ambiguity_margin: 0.10
+    cluster_max_per_track: 2
