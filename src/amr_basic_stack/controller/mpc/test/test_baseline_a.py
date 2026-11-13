@@ -189,3 +189,38 @@ def test_pi_tracks_wheel_speed_on_plant():
         hist = np.array(hist)
         assert np.allclose(hist[-50:], ref, atol=0.05 * ref[0]), mu   # 3 s 뒤 5 % 안
         assert hist.max() < 1.3 * ref[0], mu                          # 넘침 30 % 아래
+
+
+def test_pure_pursuit_node_refuses_frame_mismatch():
+    """리뷰 R7: 기준열과 상태의 frame_id 가 다르면 명령을 끊는다 (torque_mpc_node R5 검사와 같게)."""
+    from unittest.mock import Mock
+
+    import rclpy
+    from nav_msgs.msg import Odometry
+
+    from amr_mpc.nodes.pure_pursuit import PurePursuitNode
+    rclpy.init()
+    try:
+        n = PurePursuitNode()
+        n.pub = Mock()
+        n.pub_status, n.pub_la = Mock(), Mock()
+        now = n.now_s()
+        rows = [(0.5 * 0.05 * i, 0.0, 0.0, 0.5, 0.0, 0.0) for i in range(80)]
+        n.ref = ReferenceHorizon.from_rows(now, 0.05, rows)
+        n.ref_rx, n.armed, n.armed_since = now, True, now - 1.0
+
+        def state(frame):
+            m = Odometry()
+            m.header.frame_id = frame
+            m.header.stamp = n.get_clock().now().to_msg()
+            m.pose.pose.orientation.w = 1.0
+            return m
+
+        n.ref_frame = "map"
+        n.on_state(state("odom"))
+        assert not n.pub.publish.called                     # 다르면 명령 없음 (wheel_pi 가 DAMPING)
+        n.on_state(state("map"))
+        assert n.pub.publish.called                         # 같으면 추종
+        n.destroy_node()
+    finally:
+        rclpy.shutdown()

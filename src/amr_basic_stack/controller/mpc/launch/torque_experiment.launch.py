@@ -39,6 +39,7 @@
 """
 import yaml
 import os
+import math
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -46,6 +47,7 @@ from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from amr_mpc.ak40.setup import prepare_can
 
 
 def _truthy(s):
@@ -85,6 +87,16 @@ def _nodes(context):
     source, slam_mode = g("state_source"), g("slam_mode")
     state_topic = g("state_topic") or ("/state_estimator/odom" if source == "estimator" else "/sim/ground_truth")
     nodes = []
+    # Run before returning any motor/controller actions. Never runs for simulation.
+    if plant == "real":
+        if source != "estimator":
+            raise RuntimeError("plant:=real requires state_source:=estimator")
+        if _truthy(g("auto_setup_can")):
+            with open(os.path.join(share, "config", "ak40.yaml")) as f:
+                can_config = yaml.safe_load(f)["ak40"]
+            interface = g("can_interface") or str(can_config["interface"])
+            result = prepare_can(os.path.join(share, "tools", "setup_can.sh"), interface, g("can_device"))
+            nodes.append(LogInfo(msg=f"CAN setup: {result}"))
 
     # 측위 입력 선택 (휠 오돔 스위치) — config/torque_estimator.yaml slam 절, launch 인자 wheel_odom 이 덮어쓴다
     with open(os.path.join(share, "config", "torque_estimator.yaml")) as f:
@@ -122,7 +134,7 @@ def _nodes(context):
     elif plant == "real":
         if source != "estimator":
             raise RuntimeError("plant:=real 에는 참값이 없다 — state_source:=estimator 로")
-        # 모터: config/ak40.yaml (verified: false 면 노드가 시작을 거부한다)
+        # CAN 준비 성공 후에만 모터 시작 (hardware_checked=false이면 토크 제한).
         nodes.append(Node(
             package="amr_mpc", executable="ak40_can_node", name="ak40_can_node", output="screen",
             parameters=[{"interface": g("can_interface")}] if g("can_interface") else []))
@@ -157,7 +169,7 @@ def _nodes(context):
                 **_track(context, share),
                 "frame_id": "map", "odom_topic": state_topic,
                 "wait_for_arm": True, "armed_topic": "/mpc/armed",   # 무장된 동안만 기준 시간이 흐른다
-                # 기준 부하 검사용 바퀴 최고속도. AK40-10 무부하 추정 402 rpm = 42 rad/s (22.2 V, 미실측 — To do 1절)
+                # 기준 부하 검사: 정격 속도 370 rpm ≈ 38.746 rad/s를 기본 운용 상한으로 사용.
                 "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec")),
             }]))
 
@@ -197,7 +209,7 @@ def _nodes(context):
 
     nodes.append(Node(
         package="amr_mpc", executable="torque_output_node", name="torque_output_node", output="screen",
-        parameters=[{"input_topic": torque_in}]))
+        parameters=[{"input_topic": torque_in, "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec"))}]))
 
     # 위험 감시: 무장 중 포즈 튐·추종 오차·모터 에러·센서 끊김이면 /mpc/arm false → DAMPING
     if source == "estimator":                         # 참값 모드에는 추정기 출력이 없어 끊김으로 오판한다
@@ -228,12 +240,18 @@ def _nodes(context):
 def generate_launch_description():
     share = get_package_share_directory("amr_mpc")
     rviz_cfg = os.path.join(share, "rviz", "torque_experiment.rviz")
+    with open(os.path.join(share, "config", "torque_plant.yaml")) as f:
+        rated_rpm = float(yaml.safe_load(f)["motor"]["rated_speed_rpm"])
+    rated_rad_s = rated_rpm * 2.0 * math.pi / 60.0
     A = DeclareLaunchArgument
     return LaunchDescription([
         A("plant", default_value="sim", choices=["sim", "sim_can", "real"],
           description="sim = 시뮬 플랜트(토픽), sim_can = 시뮬 플랜트가 가짜 AK40 + ak40_can_node (CAN 전 구간), "
                       "real = ak40_can_node + IMU 회전 (센서·Cartographer 는 따로)"),
         A("can_interface", default_value="", description="CAN 장치. 비우면 sim_can 은 vcan0, real 은 config/ak40.yaml (can0)"),
+        A("auto_setup_can", default_value="true", choices=["true", "false"],
+          description="plant:=real 에서 모터 시작 전 CAN 자동 준비. sudo는 비대화형; sim에는 적용 안 함"),
+        A("can_device", default_value="", description="slcan USB 장치 경로. 비우면 CANable by-id 자동 선택"),
         A("state_source", default_value="estimator", choices=["estimator", "truth"],
           description="estimator = state_estimator_node (SLAM 포즈 + IMU), truth = 시뮬 참값을 바로"),
         A("slam_mode", default_value="scan_time", choices=["scan_time", "extrapolated"],
@@ -260,7 +278,7 @@ def generate_launch_description():
         A("log_prefix", default_value="", description="MPC CSV 접두. 비면 저장 안 함"),
         # 8자 트랙: 비우면 config/torque_track.yaml
         *[A(k, default_value="", description=f"트랙 {k} (비우면 torque_track.yaml)") for k in _TRACK_KEYS],
-        A("max_wheel_rad_per_sec", default_value="42.0", description="기준 부하 검사용 바퀴 최고속도 [rad/s] (추정)"),
+        A("max_wheel_rad_per_sec", default_value=str(rated_rad_s), description="기준 궤적 부하 검사 상한 [rad/s]. 기본은 torque_plant.yaml 정격 370 rpm; 모터 과속 차단 기능은 아님"),
         A("x0", default_value="0.0"), A("y0", default_value="0.0"), A("yaw0", default_value="0.0"),
         A("use_rviz", default_value="true"),
         OpaqueFunction(function=_nodes),

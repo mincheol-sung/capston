@@ -67,13 +67,21 @@ def uint_to_float(u, lo, hi, bits):
     return lo + (hi - lo) * float(u) / ((1 << bits) - 1)
 
 
-def pack_command(lim, p, v, kp, kd, t):
+def pack_command(lim, p, v, kp, kd, t, torque_limit=None):
     """MIT 명령 8 바이트."""
     pi = float_to_uint(p, -lim.p_max, lim.p_max, 16)
     vi = float_to_uint(v, -lim.v_max, lim.v_max, 12)
     kpi = float_to_uint(kp, 0.0, lim.kp_max, 12)
     kdi = float_to_uint(kd, 0.0, lim.kd_max, 12)
     ti = float_to_uint(t, -lim.t_max, lim.t_max, 12)
+    if torque_limit is not None:
+        # 벤치 코드 pack(torque, limit)와 같이 양자화 후에도 상한을 지킨다.
+        bound = min(float(torque_limit), lim.t_max)
+        if not math.isfinite(bound) or bound < lim.step("t") / 2:
+            raise ValueError("torque_limit must allow at least half a torque step")
+        low = math.ceil((lim.t_max - bound) / lim.step("t"))
+        high = math.floor((lim.t_max + bound) / lim.step("t"))
+        ti = min(max(ti, low), high)
     return bytes([pi >> 8, pi & 0xFF, vi >> 4, ((vi & 0xF) << 4) | (kpi >> 8), kpi & 0xFF,
                   kdi >> 4, ((kdi & 0xF) << 4) | (ti >> 8), ti & 0xFF])
 

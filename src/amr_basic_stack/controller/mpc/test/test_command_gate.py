@@ -136,3 +136,13 @@ def test_torque_mode_timeout_and_disarm_send_damping(teardown):
     g._set_armed(False, 'test')                   # 's' 키
     assert g.command_publisher.publish.call_args_list[-1].args[0].mode == 1
     g.destroy_node()
+
+
+def test_shutdown_sends_damping_last(teardown):
+    """리뷰 R6: 끌 때 마지막 신호는 DAMPING (rclpy 의 SIGINT 처리기를 꺼서 shutdown() 이 낼 수 있다)."""
+    g = make_torque_gate()
+    g._on_command(torque_cmd(0.05))
+    g.shutdown()
+    out = g.command_publisher.publish.call_args_list[-1].args[0]
+    assert out.mode == out.MODE_DAMPING
+    g.destroy_node()

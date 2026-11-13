@@ -90,3 +90,15 @@ def test_slip_plant_free_wheel_spin_down():
         X, Xd, w = sp.step(X, Xd, w, np.zeros(4), h)
     assert np.all(np.abs(w) < 0.1)                                     # 10 rad/s 에서 약 0.3 s 안에 선다
     assert math.isfinite(w.sum())
+
+
+def test_individual_compensation_cancels_each_wheel_friction():
+    p = TorquePlant.from_yaml()
+    f = DrivetrainFriction(p.fric_coulomb, p.fric_viscous)
+    omega = np.array([10, -8, 6, -4], dtype=float)
+    desired = np.array([0.1, -0.05, 0.03, -0.02])
+    command, clipped = motor_command(desired, omega, p.fric_coulomb, p.fric_viscous, 0.5, 1.3)
+    assert not clipped
+    assert command - f(omega) == pytest.approx(desired, abs=1e-8)
+    assert f.stiffness == pytest.approx(np.max(p.fric_coulomb / 0.05 + p.fric_viscous))
+    assert f.active() and math.isfinite(f.stable_dt(p, slip=True))

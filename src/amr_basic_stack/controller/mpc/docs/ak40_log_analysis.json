@@ -1,0 +1,244 @@
+{
+  "source": "/home/junseo/motor_identification_logs",
+  "scope": "Single-motor bench runs, including aborted runs and superseded RR runs. Not four-motor latency validation.",
+  "runs": [
+    {
+      "directory": "20261111_181835_078402_BENCH",
+      "samples_sha256": "a015f153eb5b81811552fedbfbad2fc0873622095a4ecf93455918dab2f46191",
+      "metadata_sha256": "f070ec2e3453c35c7060bcdbf19525bf93a20932ddbf02672ea3171f622c5ca3",
+      "motor_ids": [
+        1
+      ],
+      "simulation": false,
+      "status": "completed",
+      "reason": null,
+      "cleanup_errors": [
+        "4: [Errno 105] No buffer space available"
+      ],
+      "rows": 11100,
+      "received": 11100,
+      "missing_rows": 0,
+      "response_ms": {
+        "p50": 0.9964795008272631,
+        "p99": 1.3053124110592762,
+        "p99_9": 1.5264047340097024,
+        "max": 3.162460998282768
+      },
+      "response_over_4ms": 0,
+      "max_rx_gap_ms": 14.823025001533097,
+      "nonzero_error_rows": 0,
+      "payload_lengths": [
+        8
+      ],
+      "max_abs_command_Nm": 0.09890109890109855,
+      "max_temperature_C": 28.0
+    },
+    {
+      "directory": "20261111_182034_617387_BENCH",
+      "samples_sha256": "25484a0e5f3ddf314677d86279fec41d65062aaae526440b0dac718c0e512d7d",
+      "metadata_sha256": "0dec22422fff04d627ffbbd7d8ca8265b048aba9a65e02243106a145a9d23e90",
+      "motor_ids": [
+        2
+      ],
+      "simulation": false,
+      "status": "aborted",
+      "reason": "Scheduler >30ms late; refusing catch-up burst",
+      "cleanup_errors": [],
+      "rows": 96,
+      "received": 96,
+      "missing_rows": 0,
+      "response_ms": {
+        "p50": 0.8410174996242858,
+        "p99": 1.1926306491659489,
+        "p99_9": 1.194471463750233,
+        "max": 1.1946759987040423
+      },
+      "response_over_4ms": 0,
+      "max_rx_gap_ms": 10.634826001478359,
+      "nonzero_error_rows": 0,
+      "payload_lengths": [
+        8
+      ],
+      "max_abs_command_Nm": 0.0012210012210012167,
+      "max_temperature_C": 28.0
+    },
+    {
+      "directory": "20261111_182044_417135_BENCH",
+      "samples_sha256": "0f7b7a97efd23966447f975449745da5453b58e3522ab6180c982394ba91a8ee",
+      "metadata_sha256": "e4ce586e212763a8b270ab1b806cb67986c1d62aeb02860af41a3b2a84a5d720",
+      "motor_ids": [
+        2
+      ],
+      "simulation": false,
+      "status": "aborted",
+      "reason": "Scheduler >30ms late; refusing catch-up burst",
+      "cleanup_errors": [],
+      "rows": 96,
+      "received": 96,
+      "missing_rows": 0,
+      "response_ms": {
+        "p50": 0.826520999908098,
+        "p99": 1.1733692490452083,
+        "p99_9": 1.2644823266782639,
+        "max": 1.2746060019708239
+      },
+      "response_over_4ms": 0,
+      "max_rx_gap_ms": 10.586159998638323,
+      "nonzero_error_rows": 0,
+      "payload_lengths": [
+        8
+      ],
+      "max_abs_command_Nm": 0.0012210012210012167,
+      "max_temperature_C": 28.0
+    },
+    {
+      "directory": "20261111_182144_929734_BENCH",
+      "samples_sha256": "26da88dd554c2cf2c1361fb61c88a378955e0a4fe6f19f52a9892619d8f6000f",
+      "metadata_sha256": "c96286935441dad1f04113cf5081104c74c009be03010487281f49114f37f192",
+      "motor_ids": [
+        2
+      ],
+      "simulation": false,
+      "status": "aborted",
+      "reason": "Scheduler >30ms late; refusing catch-up burst",
+      "cleanup_errors": [],
+      "rows": 9615,
+      "received": 9615,
+      "missing_rows": 0,
+      "response_ms": {
+        "p50": 0.984588001301745,
+        "p99": 1.4003137795225487,
+        "p99_9": 1.4600405888704722,
+        "max": 2.7493730012793094
+      },
+      "response_over_4ms": 0,
+      "max_rx_gap_ms": 35.27813400069135,
+      "nonzero_error_rows": 0,
+      "payload_lengths": [
+        8
+      ],
+      "max_abs_command_Nm": 0.09890109890109855,
+      "max_temperature_C": 30.0
+    },
+    {
+      "directory": "20261111_182331_861708_BENCH",
+      "samples_sha256": "e6a79170813236b37cdbc4cff1e37be7934c60bd0c77a671f85d6e60a9308f8c",
+      "metadata_sha256": "69fb702b48b6f52797600fa42cbf9f33eea61147df4931c8f8111ff8a00449c7",
+      "motor_ids": [
+        3
+      ],
+      "simulation": false,
+      "status": "aborted",
+      "reason": "Motor 3 did not settle below 0.15rad/s for 0.2s. Aborting.",
+      "cleanup_errors": [],
+      "rows": 8640,
+      "received": 8640,
+      "missing_rows": 0,
+      "response_ms": {
+        "p50": 0.9453670008952031,
+        "p99": 1.1714943188417244,
+        "p99_9": 1.2504787527395875,
+        "max": 1.4558660004695412
+      },
+      "response_over_4ms": 0,
+      "max_rx_gap_ms": 35.1061449982808,
+      "nonzero_error_rows": 0,
+      "payload_lengths": [
+        8
+      ],
+      "max_abs_command_Nm": 0.09890109890109855,
+      "max_temperature_C": 29.0
+    },
+    {
+      "directory": "20261111_182608_700270_BENCH",
+      "samples_sha256": "fbd49188cd23ef204a15f13bc38e655c259c9bc8e48bc274a91e5682e45194f0",
+      "metadata_sha256": "38726901da1638a541fc7a83bdfcff863d2e5706a1aa11eba2e28b67fcfd955b",
+      "motor_ids": [
+        4
+      ],
+      "simulation": false,
+      "status": "aborted",
+      "reason": "Motor 4 did not settle below 0.15rad/s for 0.2s. Aborting.",
+      "cleanup_errors": [],
+      "rows": 3900,
+      "received": 3900,
+      "missing_rows": 0,
+      "response_ms": {
+        "p50": 0.945696499911719,
+        "p99": 1.227981929841917,
+        "p99_9": 1.301985538179001,
+        "max": 1.5522389985562768
+      },
+      "response_over_4ms": 0,
+      "max_rx_gap_ms": 34.88214800017886,
+      "nonzero_error_rows": 0,
+      "payload_lengths": [
+        8
+      ],
+      "max_abs_command_Nm": 0.09890109890109855,
+      "max_temperature_C": 30.0
+    },
+    {
+      "directory": "20261111_182907_296517_BENCH",
+      "samples_sha256": "69c0707d0d8852adb29fd9288ed0aa548f0fbdd632c83bb7cbcc6ac63a747916",
+      "metadata_sha256": "c559e35630da4f2737c612ab4071500ff3179afa8efd8ab4236d967634548935",
+      "motor_ids": [
+        4
+      ],
+      "simulation": false,
+      "status": "completed",
+      "reason": null,
+      "cleanup_errors": [],
+      "rows": 11100,
+      "received": 11100,
+      "missing_rows": 0,
+      "response_ms": {
+        "p50": 0.9979614987969398,
+        "p99": 1.54754123002931,
+        "p99_9": 1.5809138665426878,
+        "max": 1.960033998329891
+      },
+      "response_over_4ms": 0,
+      "max_rx_gap_ms": 35.5045539981802,
+      "nonzero_error_rows": 0,
+      "payload_lengths": [
+        8
+      ],
+      "max_abs_command_Nm": 0.09890109890109855,
+      "max_temperature_C": 32.0
+    },
+    {
+      "directory": "20261111_183226_841201_BENCH",
+      "samples_sha256": "e319577a568b135c454466558df13fce46703abbc3f1c531e206a7c00a3eab8f",
+      "metadata_sha256": "af14cdb5500ebb1c97152c3cf6cb3635873cff8222a1ba6805b4e6ca2fd0c865",
+      "motor_ids": [
+        4
+      ],
+      "simulation": false,
+      "status": "completed",
+      "reason": null,
+      "cleanup_errors": [],
+      "rows": 11100,
+      "received": 11100,
+      "missing_rows": 0,
+      "response_ms": {
+        "p50": 0.9834909997152863,
+        "p99": 1.2545361832235358,
+        "p99_9": 1.344309241048908,
+        "max": 3.639077000116231
+      },
+      "response_over_4ms": 0,
+      "max_rx_gap_ms": 35.294511002575746,
+      "nonzero_error_rows": 0,
+      "payload_lengths": [
+        8
+      ],
+      "max_abs_command_Nm": 0.09890109890109855,
+      "max_temperature_C": 33.0
+    }
+  ],
+  "total_rows": 55647,
+  "missing_rows": 0,
+  "max_response_ms": 3.639077000116231,
+  "response_over_4ms": 0
+}

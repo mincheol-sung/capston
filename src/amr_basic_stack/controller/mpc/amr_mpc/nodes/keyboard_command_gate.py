@@ -4,6 +4,7 @@
 import copy
 import os
 import select
+import signal
 import termios
 import threading
 import time
@@ -13,6 +14,7 @@ from geometry_msgs.msg import Twist
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import Bool, Float32MultiArray
 
 from amr_interfaces.msg import WheelTorqueCommand
@@ -25,6 +27,11 @@ from amr_interfaces.msg import WheelTorqueCommand
 #   'torques' (토크 MPC 스택, 2026-11-11): 정지 신호는 토크 0 이 아니라 MODE_DAMPING 이다.
 #     토크 모터에 0 을 보내면 서지 않고 관성으로 굴러간다. DAMPING 은 드라이버가 MIT kp=0, v=0, kd>0 으로 세운다.
 #     무장 중 중계하는 명령의 header.stamp 는 건드리지 않는다 (종단 지연 측정용).
+#   R6 리뷰 2026-11-13:
+#     · 발행은 모두 lock 안에서 한다. 키보드 스레드의 정지('s')와 실행기 스레드의 즉시 중계(forward_on_receive)가
+#       엇갈려 정지 신호 **뒤에** 토크 명령이 한 번 더 나가는 일을 막는다.
+#     · rclpy 의 SIGINT 처리기를 끈다 (SignalHandlerOptions.NO). 켜 두면 Ctrl+C 때 rclpy 가 먼저 닫혀
+#       shutdown() 의 마지막 정지 신호를 못 내고, 토크 모드에서는 마지막 토크 명령이 남는다 (실측).
 _COMMAND_TYPES = {
     'twist':  (Twist,              Twist),
     'wheels': (Float32MultiArray,  lambda: Float32MultiArray(data=[0.0] * 4)),
@@ -127,9 +134,8 @@ class KeyboardCommandGate(Node):
         with self.lock:
             self.latest_command = copy.deepcopy(message)
             self.latest_command_time = time.monotonic()
-            forward = self.forward_on_receive and self.armed
-        if forward:
-            self.command_publisher.publish(message)
+            if self.forward_on_receive and self.armed:
+                self.command_publisher.publish(message)     # lock 안 — 정지 신호와 순서가 뒤바뀌지 않게
 
     def _on_arm_message(self, message):
         self._set_armed(bool(message.data), 'ROS arm topic')
@@ -142,9 +148,8 @@ class KeyboardCommandGate(Node):
                 # Require a command received after arming; never release a stale
                 # command that was buffered while the robot was disarmed.
                 self.latest_command_time = 0.0
-
-        if not armed:
-            self.command_publisher.publish(self._stop_message())
+            else:
+                self.command_publisher.publish(self._stop_message())
         self._publish_state()
         if changed:
             state = 'ARMED' if armed else 'DISARMED'
@@ -166,7 +171,7 @@ class KeyboardCommandGate(Node):
                 command = copy.deepcopy(self.latest_command)
             else:
                 command = self._stop_message()
-        self.command_publisher.publish(command)
+            self.command_publisher.publish(command)
 
     def _keyboard_loop(self):
         try:
@@ -221,13 +226,14 @@ class KeyboardCommandGate(Node):
 
 
 def main(args=None):
-    rclpy.init(args=args)
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)   # 머리주석 R6
     node = KeyboardCommandGate()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)    # 정지 신호를 내는 동안 두 번째 Ctrl+C 무시
         node.shutdown()
         node.destroy_node()
         if rclpy.ok():
