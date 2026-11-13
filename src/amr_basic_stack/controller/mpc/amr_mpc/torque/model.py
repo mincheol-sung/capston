@@ -30,6 +30,16 @@ S2 = np.array([[0.0, -1.0], [1.0, 0.0]])
 NULL_DIR = np.array([1.0, 1.0, -1.0, -1.0]) / 2.0   # (T⁻¹)ᵀ·n = 0 — 앞뒤가 서로 미는 조합 (1판 식-2)
 
 
+def wheel_coefficients(value, name="friction coefficient"):
+    """Normalize a common scalar or [FL, FR, RL, RR] coefficients."""
+    values = np.asarray(value, dtype=float)
+    if values.ndim == 0:
+        values = np.full(4, float(values))
+    if values.shape != (4,) or not np.isfinite(values).all() or (values < 0).any():
+        raise ValueError(f"{name} must be nonnegative finite scalar or four values [FL, FR, RL, RR]")
+    return values.copy()
+
+
 @dataclass
 class TorquePlant:
     r: float
@@ -41,12 +51,16 @@ class TorquePlant:
     tau_rated: float
     tau_peak: float
     damping_kd: float
-    fric_coulomb: float
-    fric_viscous: float
+    fric_coulomb: np.ndarray
+    fric_viscous: np.ndarray
     fric_max: float
     mu_hat: float
     c_s: float
     g: float
+
+    def __post_init__(self):
+        self.fric_coulomb = wheel_coefficients(self.fric_coulomb, "coulomb_Nm")
+        self.fric_viscous = wheel_coefficients(self.fric_viscous, "viscous_Nms_per_rad")
 
     @classmethod
     def from_yaml(cls, filename=PLANT_FILE, **override):
@@ -63,8 +77,8 @@ class TorquePlant:
             tau_rated=float(motor["tau_rated_Nm"]),
             tau_peak=float(motor["tau_peak_Nm"]),
             damping_kd=float(motor["damping_kd"]),
-            fric_coulomb=float(fric["coulomb_Nm"]),
-            fric_viscous=float(fric["viscous_Nms_per_rad"]),
+            fric_coulomb=fric["coulomb_Nm"],
+            fric_viscous=fric["viscous_Nms_per_rad"],
             fric_max=float(fric["tau_fric_max_Nm"]),
             mu_hat=float(surf["mu_hat"]),
             c_s=float(surf["c_s"]),
@@ -186,7 +200,9 @@ if __name__ == "__main__":
 # 정지 마찰(stiction)은 따로 두지 않았다 — 힘이 τc 보다 작으면 ω_s 수준으로 아주 천천히 기어간다.
 class DrivetrainFriction:
     def __init__(self, coulomb, viscous, smooth=0.05):
-        self.coulomb, self.viscous, self.smooth = float(coulomb), float(viscous), max(1e-6, float(smooth))
+        self.coulomb = wheel_coefficients(coulomb, "coulomb")
+        self.viscous = wheel_coefficients(viscous, "viscous")
+        self.smooth = max(1e-6, float(smooth))
 
     def __call__(self, omega):
         omega = np.asarray(omega, float)
@@ -195,10 +211,10 @@ class DrivetrainFriction:
     @property
     def stiffness(self):
         """dτ_fric/dω 의 최댓값 [N·m·s/rad] (ω = 0). 적분 간격을 정할 때 쓴다."""
-        return self.coulomb / self.smooth + self.viscous
+        return float(np.max(self.coulomb / self.smooth + self.viscous))
 
     def active(self):
-        return self.coulomb != 0.0 or self.viscous != 0.0
+        return bool(np.any(self.coulomb != 0.0) or np.any(self.viscous != 0.0))
 
     def stable_dt(self, plant, slip=False):
         """RK4 가 안정한 적분 간격 대략값. 슬립 모델은 바퀴 관성(J_w) 하나가, 무슬립은 몸체 전체가 마찰에 붙는다."""
