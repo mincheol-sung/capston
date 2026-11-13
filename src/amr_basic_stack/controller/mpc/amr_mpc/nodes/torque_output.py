@@ -9,7 +9,7 @@
 #
 # 구동계 마찰 보상  τ_fric(ω) = coulomb·tanh(ω/ω_s) + viscous·ω   (config/torque_plant.yaml friction 절)
 #   감속기가 먹는 토크를 미리 더해, 바퀴에 실제로 τ* 가 전달되게 한다. MPC 의 외란 추정이 아니라
-#   벤치에서 잰 고정 표로 하는 모터 보정이다.  2026-11-10 결정: 기본값 0 (측정 뒤 넣을지 정한다).
+#   벤치에서 잰 고정 표로 하는 모터 보정이다.  2026-11-13: 벤치 식별 계수를 [FL, FR, RL, RR]별로 적용한다.
 #   coulomb 항은 ω = 0 근처에서 부호가 튀지 않게 tanh 로 잇는다 (ω_s = friction_smooth_rad_s).
 #
 # 규칙
@@ -29,13 +29,14 @@ from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
 
 from amr_interfaces.msg import WheelStates, WheelTorqueCommand
-from amr_mpc.torque.model import TorquePlant
+from amr_mpc.torque.model import TorquePlant, wheel_coefficients
+from amr_mpc.core import config
 
 
 def friction_torque(omega, coulomb, viscous, smooth):
     """τ_fric(ω) [N·m] — 바퀴별 (4,)."""
     omega = np.asarray(omega, float)
-    return coulomb * np.tanh(omega / smooth) + viscous * omega
+    return wheel_coefficients(coulomb) * np.tanh(omega / smooth) + wheel_coefficients(viscous) * omega
 
 
 def motor_command(tau_net, omega, coulomb, viscous, smooth, tau_limit):
@@ -48,21 +49,13 @@ def motor_command(tau_net, omega, coulomb, viscous, smooth, tau_limit):
     return out, bool(np.any(out != raw))
 
 
-def friction_reserve_warning(coulomb, viscous, fric_max):
-    """마찰 보상 몫이 MPC 상한에 남겨져 있나 (2026-11-12 리뷰 R1).
-
-    MPC(B·C)·PI(A) 상한은 τ_lim − tau_fric_max_Nm 이고, 여기서 τ_fric(ω) 를 더한 뒤 τ_lim 으로 자른다.
-    coulomb 을 넣고 tau_fric_max_Nm 을 그대로 0 으로 두면 상한 근처에서 마찰 보상이 잘린다 (실행 중에는
-    "안전 클램프에 걸림" 경고만 나와 원인이 설정인지 알기 어렵다). 실제로 걸리는 것은 B 가 |τ*| > τ_lim − coulomb
-    을 낼 때뿐이다 — C 는 τ_μ(0.067) 가, 지금 튜닝의 B 는 최대 0.15~0.26 N·m 라 닿지 않는다.
-    문제 없으면 None, 있으면 경고 문장.
-    """
-    if coulomb == 0.0 and viscous == 0.0:
-        return None
-    if fric_max < abs(coulomb) + 1e-12:
-        return (f"torque_plant.yaml friction.tau_fric_max_Nm ({fric_max}) 가 coulomb ({coulomb}) 보다 작다 — "
-                f"MPC 상한이 마찰 보상 몫을 남기지 않아 τ_lim 근처에서 보상이 잘린다. "
-                f"tau_fric_max_Nm ≥ coulomb + viscous·ω_max 로 둔다")
+def friction_reserve_warning(coulomb, viscous, fric_max, max_speed=0.0):
+    """Check compensation reserve at the configured operating speed (not MIT range)."""
+    coulomb, viscous = wheel_coefficients(coulomb), wheel_coefficients(viscous)
+    required = float(np.max(coulomb + viscous * abs(max_speed)))
+    if required > fric_max + 1e-12:
+        return (f"마찰 보상 여유 {fric_max} N·m < 운용 속도 {max_speed:.3f} rad/s에서 "
+                f"추정 최대 보상 {required:.6f} N·m. 토크 상한 근처에서는 보상이 잘릴 수 있음.")
     return None
 
 
@@ -70,21 +63,24 @@ class TorqueOutputNode(Node):
     def __init__(self):
         super().__init__("torque_output_node")
         p = TorquePlant.from_yaml()
+        rated_rpm = float(config.load("torque_plant.yaml")["motor"]["rated_speed_rpm"])
         self.declare_parameters("", [
             ("input_topic", "/torque_mpc/cmd_raw"),
             ("output_topic", "/torque_output/cmd_raw"),
             ("wheel_states_topic", "/wheel_states"),
-            ("coulomb_Nm", p.fric_coulomb),
-            ("viscous_Nms_per_rad", p.fric_viscous),
+            ("coulomb_Nm", p.fric_coulomb.tolist()),
+            ("viscous_Nms_per_rad", p.fric_viscous.tolist()),
             ("friction_smooth_rad_s", 0.5),
             ("tau_limit_Nm", p.tau_rated),
             ("wheel_timeout", 0.3),
+            ("max_wheel_rad_per_sec", rated_rpm * 2.0 * np.pi / 60.0),
         ])
         g = lambda n: self.get_parameter(n).value
-        self.coulomb, self.viscous = float(g("coulomb_Nm")), float(g("viscous_Nms_per_rad"))
+        self.coulomb = wheel_coefficients(g("coulomb_Nm"), "coulomb_Nm")
+        self.viscous = wheel_coefficients(g("viscous_Nms_per_rad"), "viscous_Nms_per_rad")
         self.smooth, self.limit = max(1e-6, float(g("friction_smooth_rad_s"))), float(g("tau_limit_Nm"))
         self.wheel_timeout = float(g("wheel_timeout"))
-        self.has_friction = self.coulomb != 0.0 or self.viscous != 0.0
+        self.has_friction = bool(np.any(self.coulomb) or np.any(self.viscous))
         self.omega = np.zeros(4)
         self.omega_t = None
 
@@ -95,7 +91,7 @@ class TorqueOutputNode(Node):
             f"torque_output: {g('input_topic')} → {g('output_topic')}   마찰 보상 "
             f"{'없음(0)' if not self.has_friction else f'coulomb {self.coulomb} N·m, viscous {self.viscous} N·m·s/rad'}"
             f"   안전 클램프 ±{self.limit} N·m")
-        warn = friction_reserve_warning(self.coulomb, self.viscous, p.fric_max)
+        warn = friction_reserve_warning(self.coulomb, self.viscous, p.fric_max, float(g("max_wheel_rad_per_sec")))
         if warn:
             self.get_logger().warning(warn)
 

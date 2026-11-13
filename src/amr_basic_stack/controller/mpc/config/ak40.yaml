@@ -4,6 +4,8 @@
 #   [매뉴얼]   ak-series-driver-manual-v1-0-18-for-ak-2-0-robotic-actuator.pdf  5.3 MIT Communication Protocol (60~68쪽)
 #   [드라이버] ak40-2410-1a-a1-drive-installation-instructions.pdf  (AK-DRV-6S20A, 16~28 V, CAN 1 Mbps)
 #
+# 실험 근거: /home/junseo/motor_identification_logs/HANDOFF_KO.md 및 can_motor_identification.py
+# can0, slcand -s8 (1 Mbps), MIT Kp=Kd=0, 100 Hz, 응답 8바이트, 온도 -40 확인.
 # 확인 상태 — 두 단계로 나눈다
 #   manual_checked   : 범위·메시지 형식을 매뉴얼로 확인했나. false 면 실제 버스(can*)에서 시작을 거부한다
 #   hardware_checked : 모터 ID·장착 부호·MIT 모드 전환을 실물로 확인했나. false 면 실제 버스에서 토크를
@@ -12,23 +14,26 @@
 # ===================================================================
 ak40:
   manual_checked: true      # 2026-11-12 매뉴얼 v1.0.18 5.3 절 대조
-  hardware_checked: false   # 아래 "실물 확인" 표시가 남아 있는 동안 false
-  first_run_tau_limit: 0.1  # [N·m] hardware_checked 가 false 일 때 실제 버스 토크 상한
+  hardware_checked: false   # 회전 방향은 사용자 확인. 장착 상태 전진 동작 시험은 아직 수행하지 않음
+  first_run_tau_limit: 0.1  # [N·m] 기존 첫 시험 제한 유지. 벤치 입력 상한과 같지만 실차 주행 한계의 측정값은 아님
 
   interface: can0           # 실차 CANable 2.0. 시뮬은 launch 가 vcan0 으로 덮어쓴다
   reply_can_id: motor       # 응답 프레임의 CAN ID. 매뉴얼 61쪽 "0X00 + Drive ID" → 모터 자기 ID 로 온다 (숫자를 주면 그 ID)
                             #   어느 쪽이든 응답 [0] 바이트가 모터 ID 다
 
   # 바퀴 순서 [FL, FR, RL, RR]
-  can_ids: [1, 2, 3, 4]     # 실물 확인. 공장 기본값은 1 (매뉴얼 60쪽) — 네 개가 모두 1 이면 버스가 충돌한다.
+  can_ids: [1, 2, 3, 4]     # 2026-11-11 벤치 로그로 ID/위치 확인. 공장 기본값은 1 (매뉴얼 60쪽) — 네 개가 모두 1 이면 버스가 충돌한다.
                             #   CubeMars 상위 프로그램 "Application Function" 쪽에서 모터마다 바꾼다 (시리얼, CP2102)
-  direction: [1, -1, 1, -1] # 실물 확인. +1 = 모터 + 회전이 바퀴 전진 방향. 좌우 모터가 마주 보면 한쪽이 −1.
-                            #   확인법: 바퀴를 띄우고 +0.05 N·m → /wheel_states.velocity 가 4개 모두 + 인지
+  # 2026-11-13 사용자 확인: 네 모터 모두 출력축 끝에서 본체를 보면 +토크 = 시계 방향.
+  # 출력축이 차체 바깥을 향하는 좌우 대칭 장착: 전진은 왼쪽 반시계 / 오른쪽 시계.
+  direction: [-1, 1, -1, 1] # 바퀴 +전진 토크 → 모터 [-,+,-,+]. 수신 위치·속도·토크에도 동일 부호 적용.
+                            # 장착 확인: 바퀴 +토크 명령에서 네 바퀴가 물리적으로 전진 방향으로 도는지 확인.
+                            # velocity의 +부호만으로는 물리적 전진 여부를 검증할 수 없다.
 
   # MIT 모드 정수 변환 범위 — 매뉴얼 63쪽 "Parameter range" 표의 AK40-10 열, KP·KD 는 64~65쪽 예제 코드
   mit_limits:
     p_max: 12.5             # [rad]
-    v_max: 45.5             # [rad/s]  (무부하 추정 42 rad/s 와 가깝다 — 그보다 빠르면 응답 속도가 끝에 붙는다)
+    v_max: 45.5             # [rad/s] MIT 인코딩 범위. 운용 기준 370 rpm(38.746 rad/s)과 별개로 유지
     t_max: 5.0              # [N·m]    토크 한 칸 = 10/4095 = 2.44 mN·m. "0" 은 표현이 안 돼 +1.2 mN·m 로 간다
     kp_max: 500.0
     kd_max: 5.0
@@ -37,7 +42,9 @@ ak40:
 
   # 주기·감시
   rate_hz: 100.0            # 명령 송신·/wheel_states 발행 주기 (제어 100 Hz 와 같게)
-  reply_wait: 0.004         # [s] 명령을 보낸 뒤 응답 4개를 기다리는 최대 시간 (그 안에 오면 바로 발행)
+  # docs/ak40_log_analysis.json: 단일 모터 55,647개 표본, 최대 응답 3.639 ms, 4 ms 초과 0건.
+  # 9 ms로 늘릴 측정 근거가 없어 기존 4 ms 복원. 네 모터 동시 응답 시간은 별도 측정 필요.
+  reply_wait: 0.004         # [s] 네 응답이 모이면 즉시 반환. 100 Hz 주기 중 대기 상한.
   cmd_timeout: 0.2          # [s] /wheel_torque_cmd 가 이만큼 끊기면 DAMPING (게이트 command_timeout 과 같게)
-  reply_timeout: 0.05       # [s] 바퀴 응답이 이만큼 없으면 error = 255 (fault_monitor 가 세운다)
+  reply_timeout: 0.05       # [s] 기존 유지. 로그 최대 수신 간격 35.505 ms; 이 자료만으로 더 줄이지 않음. 초과 시 error=255
   shutdown_damping_s: 0.5   # [s] 노드를 끌 때 DAMPING 을 이만큼 보낸 뒤 모터 모드에서 나온다 (나오면 바퀴가 풀린다)

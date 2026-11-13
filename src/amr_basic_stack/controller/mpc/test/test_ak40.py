@@ -262,3 +262,66 @@ def test_disabled_fake_ignores_commands():
     fake = FakeAk40Motors(IDS, DIR, LIM, 4.1)
     assert fake.on_frame(1, P.pack_command(LIM, 0, 0, 0, 0, 0.1), np.zeros(4), np.zeros(4), np.zeros(4)) is None
     assert np.all(fake.torque(np.zeros(4), np.zeros(4)) == 0.0)
+
+
+def test_recorded_rr_reply_matches_identification_csv():
+    # 20261111_183226_841201_BENCH/samples.csv, cycle 0 (실제 수신 payload).
+    payload = bytes.fromhex('04c8ad7fd7ff4800')
+    r = P.unpack_reply(LIM, payload)
+    assert r == pytest.approx(dict(id=4, p=7.097543297474633,
+                                  v=-0.055555555555557135,
+                                  t=-0.0012210012210012167, temp=32, error=0))
+
+
+def test_quantized_torque_stays_inside_first_run_limit():
+    b = bridge(tau_clamp=0.1)
+    for requested in np.linspace(-0.2, 0.2, 401):
+        b.set_command(MODE_TORQUE, [requested] * 4, now=0)
+        for _, payload in b.command_frames(0)[0]:
+            assert abs(P.unpack_command(LIM, payload)[4]) <= 0.1
+
+
+@pytest.mark.parametrize('torque', [[1, 2, 3], [0, 0, 0, math.nan], [0, 0, math.inf, 0]])
+def test_invalid_command_replaces_previous_torque_with_damping(torque):
+    b = bridge()
+    b.set_command(MODE_TORQUE, [0.1] * 4, now=0)
+    b.set_command(MODE_TORQUE, torque, now=0.01)
+    assert b.command_frames(0.01)[1] == MODE_DAMPING
+
+
+def test_configured_reply_length_requires_temperature_and_error():
+    b = bridge()
+    payload = P.pack_reply(LIM, 1, 0, 0, 0)
+    assert b.is_reply(1, payload)
+    assert not b.is_reply(1, payload[:6])
+    assert not b.is_reply(1, payload[:7])
+    assert bridge(reply_length=6).is_reply(1, payload[:6])
+
+
+@pytest.mark.parametrize('flags', [0x80000000, 0x40000000, 0x20000000])
+def test_socket_bus_rejects_flagged_frames(flags):
+    import struct
+    from amr_mpc.ak40.bus import CanBus
+
+    class Socket:
+        def recv(self, size):
+            return struct.pack('=IB3x8s', flags | 1, 8, P.pack_reply(LIM, 1, 0, 0, 0))
+
+    bus = CanBus.__new__(CanBus)
+    bus.sock = Socket()
+    assert bus.recv() is None
+
+
+def test_hardware_config_clockwise_positive_motor_mounting():
+    from pathlib import Path
+    import yaml
+
+    c = yaml.safe_load((Path(__file__).parents[1] / 'config/ak40.yaml').read_text())['ak40']
+    # 출력축 바깥에서 +가 시계 방향: 전진하려면 왼쪽 -, 오른쪽 +.
+    b = bridge(can_ids=c['can_ids'], direction=c['direction'])
+    b.set_command(MODE_TORQUE, [0.05] * 4, now=0)
+    motor_tau = [P.unpack_command(LIM, data)[4] for _, data in b.command_frames(0)[0]]
+    assert motor_tau == pytest.approx([-0.05, 0.05, -0.05, 0.05], abs=LIM.step('t'))
+    for cid, velocity in zip(c['can_ids'], [-2, 2, -2, 2]):
+        b.on_reply(P.pack_reply(LIM, cid, 0, velocity, 0), now=0.01)
+    assert b.wheel_states(0.01)['velocity'] == pytest.approx([2] * 4, abs=LIM.step('v'))

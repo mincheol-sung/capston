@@ -71,7 +71,7 @@ class Ak40CanNode(Node):
         self.lim = P.MitLimits.from_dict(c["mit_limits"])
         self.bridge = Ak40Bridge(c["can_ids"], c["direction"], self.lim, plant.damping_kd, tau_clamp,
                                  float(c["cmd_timeout"]), float(c["reply_timeout"]), int(c["temp_offset"]),
-                                 reply_can_id=reply_can_id(c))
+                                 reply_can_id=reply_can_id(c), reply_length=int(c["reply_length"]))
         self.reply_wait = float(c["reply_wait"])
         self.shutdown_s = float(c["shutdown_damping_s"])
         self.period = 1.0 / float(c["rate_hz"])
@@ -79,7 +79,7 @@ class Ak40CanNode(Node):
             self.bus = CanBus(self.ifname)
         except OSError as e:
             raise RuntimeError(
-                f"CAN 장치 {self.ifname} 를 열 수 없다 ({e}). 실차: sudo ip link set {self.ifname} up type can bitrate 1000000 "
+                f"CAN 장치 {self.ifname} 를 열 수 없다 ({e}). CANable slcan: sudo bash tools/setup_can.sh "
                 f"/ 가짜 모터: vcan0 을 먼저 만든다 (amr_mpc/ak40/bus.py 머리주석)") from None
         self.cmd_stamp = None
         self.missing = 0
@@ -133,6 +133,8 @@ class Ak40CanNode(Node):
     def on_tick(self):
         t0 = time.monotonic()
         now = self.now_s()
+        self.bus.drain()
+        self.bridge.fresh[:] = False
         frames, mode, _ = self.bridge.command_frames(now)
         self.send_all(self.bridge.reenter_frames(now) + frames)
         self.collect(self.reply_wait)
@@ -150,8 +152,8 @@ class Ak40CanNode(Node):
                     self.get_logger().error(f"{['FL', 'FR', 'RL', 'RR'][i]} 모터 에러 {e} ({name})")
             self.last_err = errs
         ws = WheelStates()
-        sec = int(s["stamp"])
-        ws.header.stamp.sec, ws.header.stamp.nanosec = sec, int(round((s["stamp"] - sec) * 1e9))
+        stamp_ns = round(s["stamp"] * 1e9)
+        ws.header.stamp.sec, ws.header.stamp.nanosec = divmod(stamp_ns, 1_000_000_000)
         ws.header.frame_id = "base_footprint"
         ws.position = [float(v) for v in s["position"]]
         ws.velocity = [float(v) for v in s["velocity"]]

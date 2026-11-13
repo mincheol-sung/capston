@@ -25,7 +25,7 @@ ERR_NO_REPLY = 0xFF                       # 모터 에러 코드와 겹치지 �
 
 class Ak40Bridge:
     def __init__(self, can_ids, direction, limits, damping_kd, tau_clamp, cmd_timeout, reply_timeout, temp_offset=40,
-                 reenter_period=0.2, reply_can_id=None):
+                 reenter_period=0.2, reply_can_id=None, reply_length=8):
         if len(can_ids) != 4 or len(direction) != 4 or len(set(can_ids)) != 4:
             raise ValueError(f"can_ids·direction 은 서로 다른 4개 [FL, FR, RL, RR] (받은 값 {can_ids}, {direction})")
         if any(d not in (1, -1) for d in direction):
@@ -38,6 +38,9 @@ class Ak40Bridge:
         self.tau_clamp = min(float(tau_clamp), limits.t_max)
         self.cmd_timeout, self.reply_timeout = float(cmd_timeout), float(reply_timeout)
         self.temp_offset = temp_offset
+        self.reply_length = int(reply_length)
+        if self.reply_length not in (6, 8):
+            raise ValueError("reply_length must be 6 or 8")
         self.reply_can_id = reply_can_id        # None = 모터 자기 ID 로 온다 (매뉴얼), 숫자 = 그 ID
         self.unwrap = [P.PositionUnwrapper(limits) for _ in range(4)]
         self.pos = np.zeros(4)
@@ -54,6 +57,12 @@ class Ak40Bridge:
 
     # ── 명령 ────────────────────────────────────────────
     def set_command(self, mode, torque, now):
+        values = np.asarray(torque, float)
+        if values.shape != (4,) or not np.isfinite(values).all():
+            # 잘못된 명령으로 이전 토크가 계속 유지되지 않도록 감쇠로 전환한다.
+            self.cmd_mode = MODE_DAMPING
+            self.cmd_rx = float(now)
+            return
         self.cmd_mode = int(mode)
         self.cmd_tau = np.asarray(torque, float).copy()
         self.cmd_rx = float(now)
@@ -88,7 +97,7 @@ class Ak40Bridge:
         if mode == MODE_TORQUE:
             tau_w = np.clip(np.nan_to_num(self.cmd_tau), -self.tau_clamp, self.tau_clamp)
             for i, cid in enumerate(self.ids):
-                frames.append((cid, P.pack_command(self.lim, 0.0, 0.0, 0.0, 0.0, self.dir[i] * tau_w[i])))
+                frames.append((cid, P.pack_command(self.lim, 0.0, 0.0, 0.0, 0.0, self.dir[i] * tau_w[i], torque_limit=self.tau_clamp)))
         else:
             tau_w = np.zeros(4)
             for cid in self.ids:
@@ -98,7 +107,7 @@ class Ak40Bridge:
     # ── 응답 ────────────────────────────────────────────
     def is_reply(self, can_id, data):
         """이 프레임이 우리 모터의 응답인가. [0] 이 아는 모터 ID 이고 CAN ID 가 규칙에 맞아야 한다."""
-        if len(data) < 6 or data[0] not in self.index:
+        if len(data) != self.reply_length or data[0] not in self.index:
             return False
         return can_id == (data[0] if self.reply_can_id is None else int(self.reply_can_id))
 
