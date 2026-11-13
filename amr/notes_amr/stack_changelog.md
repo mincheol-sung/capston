@@ -49,9 +49,41 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 | `2026-11-12_1144` | 7단계 끝(ak40_can_node·가짜 모터·벤치 도구, 실물 확인 전) |
 | `2026-11-12_1300` | AK40-10 매뉴얼 대조 반영 |
 | `2026-11-12_2048` | 리뷰 R1·R2(마찰 몫 경고, 시뮬 구동계 마찰 + 팀원 벤치 값) |
-| `2026-11-13_1506` | 리뷰 R3~R5(SLAM 끊김 감시, 기준열 0.05 s, 좌표계 검사, run_compare.sh) — 지금 `stack_status.sh`가 비교하는 기준 |
+| `2026-11-13_1506` | 리뷰 R3~R5(SLAM 끊김 감시, 기준열 0.05 s, 좌표계 검사, run_compare.sh) |
+| `2026-11-13_1654` | 리뷰 R6(게이트 Ctrl+C 마지막 DAMPING, NaN·inf → DAMPING, 발행 순서) |
+| `2026-11-13_1720` | 리뷰 R7(퓨어 퍼슛 좌표계 검사) — 지금 `stack_status.sh`가 비교하는 기준 |
 
 ## 변경 기록
+
+### 2026-11-13 (5) — 리뷰 R7 (비교군 A): 퓨어 퍼슛에도 좌표계 검사, 재무장 토크 측정
+- 왜: R7 리뷰. 계산부는 문제 없음. R5 에서 MPC 에 넣은 기준·상태 좌표계 검사가 A 에는 없어 정지 규칙이 갈라져 있었다 (공정성 기준 "같은 정지 규칙")
+- 바꾼 것
+  - `amr_mpc/nodes/pure_pursuit.py` — 상태 frame_id 가 있고 기준열 frame_id 와 다르면 명령을 끊는다 (wheel_pi 가 cmd_timeout 뒤 DAMPING + 리셋). 머리주석에 규칙 추가
+  - `config/torque_baseline_a.yaml` — 주석의 J_w 9.7e-4 → 8.9e-4 (R2 팀원 벤치)
+  - 시험 1개: `test_baseline_a.py::test_pure_pursuit_node_refuses_frame_mismatch`
+- 리뷰에서 확인한 것 (문제 없음): 퓨어 퍼슛 곡률 κ = 2y/L² 와 시간 기준 룩어헤드(기준 시각 점부터, "멀어지는 중" 조건), 진행 보정 v = v_ref + k_along·e_along(주행 중 후진 없음), 제자리 회전 구간, ω·v 상한. 바퀴 PI: 크기·변화율 상한이 B 와 같은 값(τ̄ 1.2, Δτ̄ 0.4/10 ms), |u_prev| ≤ τ̄ 라 lo ≤ hi 항상 성립, 조건부 적분 + 적분항 ±τ̄, dt 0~30 ms 자름, 리셋 시 적분·직전 출력 0. 노드: 미무장·무장 뒤 새 명령 대기·명령 끊김 50 ms·바퀴 상태 끊김 감시 → DAMPING + 리셋, 끌 때 DAMPING. 역기구학 T⁻¹ 는 플랜트와 같은 행렬. NaN 이 들어오면 PI 적분이 NaN 으로 남지만 R6 의 torque_output 검사가 DAMPING 으로 바꾸고 무장 해제 때 리셋된다 (안전 쪽으로 멈춤)
+- **재무장 토크 (A, B 와 같은 시나리오)**: 3 × 1.5 m 8자 0.5 m/s, 12 s 에 정지 → 1.5 s 뒤 재무장, PI 출력 최대 |τ|
+  | 상태 | 순항 중 최대 | 재무장 첫 틱 | 재무장 뒤 0.3 s 최대 | (B 같은 칸) |
+  |---|---|---|---|---|
+  | 추정기 잡음 1배 | 0.058 | 0.053 | 0.057 | 0.24 / 0.067 / 0.116 |
+  | 참값 | 0.029 | 0.062 | 0.062 | 0.034 / 0.063 / 0.094 |
+  - A 가 B 보다 부드럽다 (PI 는 바퀴 속도 오차만 보고, figure8 재개 램프가 속도 기준을 0 에서 올린다)
+- 확인: Python 시험 134개 통과. 시뮬 A 5.07 mm·최대 17 mm (전과 같음)
+- 측정 도구 메모: 재무장 측정은 /mpc/arm 구독자가 붙은 뒤 무장해야 한다 — 첫 판은 연결 전에 보낸 무장 신호가 사라져 재무장만 먹혔다. 그 판 종료 때 **fault_monitor 가 rclpy 종료 중 take_message RuntimeError 로 죽었다** → R9 에서 본다
+- 남은 것 (R9): fault_monitor 종료 처리
+
+### 2026-11-13 (4) — 리뷰 R6 (torque_output·게이트): Ctrl+C 때 마지막 DAMPING, NaN·inf 토크 → DAMPING, 발행 순서
+- 왜: R6 리뷰에서 실제로 돌려 확인한 구멍 셋
+  1. **게이트를 Ctrl+C 로 끄면 마지막 신호가 DAMPING 이 아니었다** (실측: 명령 100 Hz 흐르는 중 SIGINT → 마지막 메시지 mode 0, 토크 0.1). rclpy 기본 SIGINT 처리기가 먼저 context 를 닫아 `shutdown()` 의 `rclpy.ok()` 가 거짓 → 정지 신호를 건너뜀. CAN 노드의 cmd_timeout 0.2 s 뒤에야 DAMPING
+  2. **토크에 NaN·inf 가 섞이면 정지가 아니었다**: inf 는 torque_output 클램프에서 ±1.3 N·m(최대 토크), NaN 은 CAN 다리 `nan_to_num` 에서 0(관성 주행). 스택 어디에도 isfinite 검사가 없었다
+  3. 키보드 스레드의 정지('s')와 실행기 스레드의 즉시 중계가 lock 밖에서 발행해, 드물게 정지 신호 **뒤에** 토크가 한 번 더 나갈 수 있었다 (다음 타이머 20 ms 안에 다시 DAMPING)
+- 바꾼 것
+  - `amr_mpc/nodes/keyboard_command_gate.py` — `rclpy.init(..., signal_handler_options=SignalHandlerOptions.NO)` + 끌 때 두 번째 Ctrl+C 무시 (torque_output·ak40 과 같은 방식). 발행 셋(즉시 중계·정지·타이머)을 모두 lock 안으로. 머리주석에 이유
+  - `amr_mpc/nodes/torque_output.py` — MODE_TORQUE 인데 토크가 유한하지 않으면 DAMPING 으로 바꿔 내고 오류 로그 (stamp 유지). 바퀴 속도의 NaN·inf 는 그 바퀴 마찰 보상만 0. 머리주석 구조도 v3 → v4
+  - 시험 5개 추가: `test_torque_output.py` (바퀴 속도 NaN, 토크 NaN·+inf·−inf → DAMPING), `test_command_gate.py` (끌 때 마지막 DAMPING)
+- 리뷰에서 확인한 것 (문제 없음): DAMPING 그대로 통과, 안전 클램프 ±1.3 + 경고, stamp 유지(torque_output·게이트 둘 다), forward_on_receive 에서 타이머 중복 없음, 무장 직후 묵은 명령 안 냄(`latest_command_time = 0`), 게이트 command_timeout 0.2 s = CAN cmd_timeout 0.2 s, 정지 신호에는 지금 시각, /mpc/armed latched
+- 확인: Python 시험 133개 통과. 실제 프로세스 SIGINT 3회 모두 마지막 메시지 DAMPING. 시뮬 B 12.7 mm (변화 없음)
+- 남은 것 (R8): CAN 다리 `bridge.py` 도 NaN·inf 를 `nan_to_num`(→ 0, +inf → 최대) 대신 DAMPING 으로 바꾸는 게 맞다 — 마지막 방어선
 
 ### 2026-11-13 (3) — 리뷰 R5 (torque_mpc C++): 기준·상태 좌표계 검사, 재무장 토크 측정
 - 왜: R5 리뷰. 기준열 frame_id 와 상태 frame_id 를 비교하지 않아, 다른 좌표계(예: odom 기준 + map 상태)가 들어오면 두 좌표계 차이만큼 로봇을 끌고 간다

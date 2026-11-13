@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# torque_output — MPC 순토크를 모터 명령 토크로 바꾼다 (구조도 v3, 1판 식-22).
+# torque_output — MPC 순토크를 모터 명령 토크로 바꾼다 (구조도 v4).
 #   ros2 run amr_mpc torque_output_node
 # ---------------------------------------------------------------
 #   /torque_mpc/cmd_raw     (WheelTorqueCommand)  MPC 순토크 τ* — 바닥에 전달하려는 토크
@@ -17,6 +17,9 @@
 #   - MODE_DAMPING 은 그대로 통과시킨다.
 #   - 변화율 제한은 여기 없다. MPC 제약이 한다 (v3 에서 이동).
 #   - /wheel_states 가 끊기면 마찰 보상만 0 으로 두고 토크는 계속 낸다 (마찰 값이 0 이 아닐 때만 경고).
+#   - 토크에 NaN·inf 가 있으면 DAMPING 으로 바꿔 낸다 (R6 리뷰 2026-11-13). 그대로 두면 inf 는 클램프에서
+#     ±τ_lim(최대 토크)이 되고, NaN 은 CAN 다리의 nan_to_num 에서 토크 0(관성 주행)이 된다 — 둘 다 정지가 아니다.
+#     바퀴 속도에 NaN 이 있으면 그 바퀴 마찰 보상만 0 으로 둔다.
 # ---------------------------------------------------------------
 import signal
 
@@ -36,7 +39,10 @@ def friction_torque(omega, coulomb, viscous, smooth):
 
 
 def motor_command(tau_net, omega, coulomb, viscous, smooth, tau_limit):
-    """순토크 + 마찰 보상을 안전 한계로 자른 모터 명령. 반환 (τ_cmd, 잘렸는가)."""
+    """순토크 + 마찰 보상을 안전 한계로 자른 모터 명령. 반환 (τ_cmd, 잘렸는가).
+    τ_net 이 유한하다고 가정한다 (on_cmd 가 먼저 거른다). ω 의 NaN·inf 는 그 바퀴 보상만 0."""
+    omega = np.asarray(omega, float)
+    omega = np.where(np.isfinite(omega), omega, 0.0)
     raw = np.asarray(tau_net, float) + friction_torque(omega, coulomb, viscous, smooth)
     out = np.clip(raw, -tau_limit, tau_limit)
     return out, bool(np.any(out != raw))
@@ -103,6 +109,14 @@ class TorqueOutputNode(Node):
     def on_cmd(self, msg):
         if msg.mode != WheelTorqueCommand.MODE_TORQUE:
             self.pub.publish(msg)                       # DAMPING 등은 그대로
+            return
+        if not np.all(np.isfinite(msg.torque)):
+            self.get_logger().error(f"MPC 토크에 NaN·inf {list(msg.torque)} — DAMPING 으로 바꿔 낸다",
+                                    throttle_duration_sec=1.0)
+            out = WheelTorqueCommand()
+            out.header = msg.header
+            out.mode = WheelTorqueCommand.MODE_DAMPING
+            self.pub.publish(out)
             return
         omega = self.omega
         if self.omega_t is None or self.now_s() - self.omega_t > self.wheel_timeout:

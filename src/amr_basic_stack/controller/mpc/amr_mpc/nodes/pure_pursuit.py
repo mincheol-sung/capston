@@ -16,6 +16,7 @@
 #   미무장 · 기준 없음 · 무장 뒤 새 기준열 전 · 기준열 끊김(ref_timeout) · hold 진입(정지 기준 + 오차 enter 안 + 멈춤)
 #   이면 명령을 내지 않는다. wheel_pi_node 가 cmd_timeout 뒤 DAMPING + PI 리셋으로 세운다.
 #   상태가 끊기면 이 노드가 깨어나지 않으니 역시 명령이 끊긴다 (같은 결과).
+#   기준열과 상태의 frame_id 가 다르면 명령을 끊는다 (torque_mpc_node 와 같은 검사, R7 리뷰 2026-11-13).
 #   safety·hold 문턱은 torque_mpc.yaml 을 그대로 읽는다 (A 와 B·C 의 정지 규칙이 갈라지지 않게 한 곳에서).
 # ---------------------------------------------------------------
 import math
@@ -132,6 +133,10 @@ class PurePursuitNode(Node):
         if now - self.ref_rx > self.ref_timeout:
             self.get_logger().warning(f"기준열 {now - self.ref_rx:.2f} s 없음", throttle_duration_sec=2.0)
             return self.stop("기준열 끊김")
+        if m.header.frame_id and self.ref_frame != m.header.frame_id:    # torque_mpc_node 와 같은 검사 (R5·R7 리뷰)
+            self.get_logger().error(f"기준열 좌표계 '{self.ref_frame}' ≠ 상태 좌표계 '{m.header.frame_id}' — 명령 끊음",
+                                    throttle_duration_sec=2.0)
+            return self.stop("기준·상태 좌표계 다름")
 
         p = m.pose.pose
         pose = np.array([p.position.x, p.position.y, yaw_of(p.orientation)])
