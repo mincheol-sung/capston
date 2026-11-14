@@ -123,6 +123,10 @@ public:
     tu.daqp_iter_limit = declare_parameter<int>("daqp_iter_limit", yt["daqp_iter_limit"].as<int>(1000));
     limit_mode_ = declare_parameter<std::string>("limit_mode", ym["torque_limit"]["mode"].as<std::string>());
     tu.limit_mode = amr_mpc_cpp::parse_limit_mode(limit_mode_);
+    // 선형화 방식 (torque_mpc.hpp 머리주석). YAML 에 절이 없으면 reference (1판 방식, 2026-11-14 기본 유지 결정)
+    linearization_ = declare_parameter<std::string>(
+      "linearization", ym["linearization"] ? ym["linearization"]["mode"].as<std::string>("reference") : "reference");
+    tu.linearization = amr_mpc_cpp::parse_linearization(linearization_);
     tu.rate_fraction = declare_parameter<double>("rate_fraction", ym["torque_limit"]["rate_fraction"].as<double>());
     tu.dist_enable = declare_parameter<bool>("disturbance_enable", ym["disturbance"]["enable"].as<bool>());
     tu.dist_alpha = declare_parameter<double>("disturbance_alpha", ym["disturbance"]["alpha"].as<double>());
@@ -183,6 +187,10 @@ public:
       ref_topic.c_str(), state_topic.c_str(), cmd_topic.c_str(), tu.Ts * 1e3, tu.Np, tu.Nc, md.mass, md.inertia_z,
       md.use_wheel_inertia ? "켬" : "끔", md.mu(), limit_mode_.c_str(), tb(0), mpc_->dtau_bar_of(tb(0)),
       md.tau_motor_limit(), md.tau_friction_limit(), md.mu_hat, tu.dist_enable ? "켬" : "끔", tu.dist_alpha);
+    RCLCPP_INFO(
+      get_logger(), "  선형화 %s (%s)", linearization_.c_str(),
+      tu.linearization == amr_mpc_cpp::TorqueLinearization::CurrentState ?
+      "매 주기 현재 추정 상태 x̂(k), τ(k−1) 에서 야코비안" : "1판: 지평의 기준 방향 θ_r 을 대입");
   }
 
   void finish()
@@ -396,7 +404,7 @@ private:
   std::unique_ptr<TorqueMPC> mpc_;
   std::optional<HoldLatch> latch_;
   std::optional<ReferenceHorizon> ref_;
-  std::string limit_mode_, ref_frame_, csv_path_;
+  std::string limit_mode_, linearization_, ref_frame_, csv_path_;
   double last_state_rx_ = 0.0, last_state_stamp_ = 0.0, ref_rx_ = 0.0, armed_since_ = 0.0;
   double state_timeout_ = 0.3, ref_timeout_ = 0.5, hold_stopped_speed_ = 0.04;
   bool debug_ = true, active_ = false, done_ = false, armed_ = false;

@@ -62,6 +62,69 @@ double TorqueModel::tau_friction_limit() const
   return wheel_radius / std::sqrt(2.0) * mu_hat * mass * gravity / 4.0 * c_s;
 }
 
+// ── 현재 상태 기준 선형화 ───────────────────────────────────────
+TorqueLinearization parse_linearization(const std::string & s)
+{
+  if (s == "reference") {return TorqueLinearization::Reference;}
+  if (s == "current_state") {return TorqueLinearization::CurrentState;}
+  throw std::invalid_argument("linearization.mode=" + s + " — reference | current_state 중 하나여야 한다");
+}
+
+TVec6 torque_dynamics(const TorqueModel & md, const TVec6 & x, const TVec4 & tau)
+{
+  TVec6 f;
+  f.head<3>() = x.tail<3>();
+  f.tail<3>() = md.G(x(2)) * tau + md.w(x.tail<3>());
+  return f;
+}
+
+TorqueLinearModel linearize_continuous(const TorqueModel & md, const TVec6 & x0, const TVec4 & tau0)
+{
+  TorqueLinearModel lin;
+  const double c = std::cos(x0(2)), s = std::sin(x0(2));
+  const double xd = x0(3), yd = x0(4), thd = x0(5);
+  lin.A.block<3, 3>(0, 3).setIdentity();
+  // ∂(G τ₀)/∂θ = M⁻¹ (dR/dθ) (T⁻¹)ᵀ τ₀  — 방향이 틀어지면 같은 토크가 내는 map 가속도가 돌아간다
+  const TVec3 F0 = md.force_map() * tau0;
+  lin.A(3, 2) = (-s * F0(0) - c * F0(1)) / md.m_eff();
+  lin.A(4, 2) = (c * F0(0) - s * F0(1)) / md.m_eff();
+  // ∂w/∂Ẋ,  w = a [−θ̇ ẏ, θ̇ ẋ, 0],  a = μ / m_eff   (바퀴 관성 끔이면 a = 0)
+  const double a = md.mu() / md.m_eff();
+  lin.A(3, 4) = -a * thd;
+  lin.A(3, 5) = -a * yd;
+  lin.A(4, 3) = a * thd;
+  lin.A(4, 5) = a * xd;
+  lin.B.bottomRows<3>() = md.G(x0(2));
+  lin.c = torque_dynamics(md, x0, tau0) - lin.A * x0 - lin.B * tau0;
+  return lin;
+}
+
+TorqueLinearModel discretize_zoh(const TorqueLinearModel & cont, double Ts)
+{
+  // exp([[A, B, c], [0, 0, 0]] Ts) = [[A_d, B_d, c_d], [0, I]].  스케일링·제곱 + 테일러 18항
+  using Mat11 = Eigen::Matrix<double, 11, 11>;
+  Mat11 M = Mat11::Zero();
+  M.block<6, 6>(0, 0) = cont.A;
+  M.block<6, 4>(0, 6) = cont.B;
+  M.block<6, 1>(0, 10) = cont.c;
+  M *= Ts;
+  const double norm = M.cwiseAbs().colwise().sum().maxCoeff();
+  int squarings = 0;
+  if (norm > 0.5) {squarings = std::max(0, static_cast<int>(std::ceil(std::log2(norm / 0.5))));}
+  const Mat11 X = M / std::pow(2.0, squarings);
+  Mat11 E = Mat11::Identity(), term = Mat11::Identity();
+  for (int i = 1; i <= 18; ++i) {
+    term = term * X / static_cast<double>(i);
+    E += term;
+  }
+  for (int i = 0; i < squarings; ++i) {E = (E * E).eval();}
+  TorqueLinearModel d;
+  d.A = E.block<6, 6>(0, 0);
+  d.B = E.block<6, 4>(0, 6);
+  d.c = E.block<6, 1>(0, 10);
+  return d;
+}
+
 // ── MPC ─────────────────────────────────────────────────────────
 TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
 : md_(model), tu_(tuning)
@@ -112,6 +175,7 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
 void TorqueMPC::reset()
 {
   has_prev_ = false;
+  has_lin_ = false;
   x_prev_.setZero();
   tau_prev_.setZero();
   d_hat_.setZero();
@@ -137,12 +201,17 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat)
     return;
   }
   // 식-9: 한 스텝 전 상태·토크로 예측한 값과 지금 추정값의 차
-  const double Ts = tu_.Ts;
-  const TVec3 Xp = x_prev_.head<3>(), Vp = x_prev_.tail<3>();
-  const TVec3 a = md_.G(Xp(2)) * tau_prev_ + md_.w(Vp);
   TVec6 pred;
-  pred.head<3>() = Xp + Ts * Vp + 0.5 * Ts * Ts * a;
-  pred.tail<3>() = Vp + Ts * a;
+  if (tu_.linearization == TorqueLinearization::CurrentState && has_lin_) {
+    // 직전 주기에 MPC 가 쓴 바로 그 모델 (x̂(k−1), τ(k−2) 에서 선형화) 의 한 스텝 예측
+    pred = lin_prev_.A * x_prev_ + lin_prev_.B * tau_prev_ + lin_prev_.c;
+  } else {
+    const double Ts = tu_.Ts;
+    const TVec3 Xp = x_prev_.head<3>(), Vp = x_prev_.tail<3>();
+    const TVec3 a = md_.G(Xp(2)) * tau_prev_ + md_.w(Vp);
+    pred.head<3>() = Xp + Ts * Vp + 0.5 * Ts * Ts * a;
+    pred.tail<3>() = Vp + Ts * a;
+  }
   TVec6 d = x_hat - pred;
   d(2) = wrap(d(2));
   d_hat_ = (1.0 - tu_.dist_alpha) * d_hat_ + tu_.dist_alpha * d;     // 식-11
@@ -199,6 +268,15 @@ TVec4 TorqueMPC::step(const TVec6 & x_hat, const std::vector<TorqueRefPoint> & r
   update_disturbance(x_hat);
   const TVec6 d_use = tu_.dist_enable ? d_hat_ : TVec6::Zero();
 
+  // current_state: 이번 주기의 모델을 x̂(k), τ(k−1) 에서 한 번 만든다 (머리주석 "선형화 방식")
+  const bool current = tu_.linearization == TorqueLinearization::CurrentState;
+  TorqueLinearModel lin;
+  Eigen::Matrix<double, 6, Eigen::Dynamic> Phi_j;
+  if (current) {
+    lin = discretize_zoh(linearize_continuous(md_, x_hat, tau_prev_), Ts);
+    Phi_j = Eigen::Matrix<double, 6, Eigen::Dynamic>::Zero(6, nU_);
+  }
+
   // 지평을 따라: 영입력 응답 x_free (w, d̂ 포함), 기준 상태 x_r, 토크 응답 Φ
   TVec6 xf = x_hat;
   Eigen::Matrix<double, 3, Eigen::Dynamic> P = Eigen::Matrix<double, 3, Eigen::Dynamic>::Zero(3, nU_);
@@ -206,23 +284,31 @@ TVec4 TorqueMPC::step(const TVec6 & x_hat, const std::vector<TorqueRefPoint> & r
   // 식-15: 첫 점을 θ̂ 에 가장 가까운 가지로, 이후는 앞 점과 연속
   double th_r = x_hat(2) + wrap(ref[0].first(2) - x_hat(2));
   for (int i = 0; i < Np; ++i) {
-    // 스텝 i 의 기준 방향·속도로 B_i, w_i (식-14)
-    const TVec3 & u_i = ref[i].second;
-    const double c = std::cos(th_r), s = std::sin(th_r);
-    const TVec3 Xdot_r(u_i(0) * c - u_i(1) * s, u_i(0) * s + u_i(1) * c, u_i(2));
-    const TVec3 w_i = md_.w(Xdot_r);
-    const TMat34 G_i = md_.G(th_r);
-
-    // x_{i+1} = A x_i + B_i τ + E w_i + d̂
-    xf.head<3>() += Ts * xf.tail<3>() + 0.5 * Ts * Ts * w_i;
-    xf.tail<3>() += Ts * w_i;
-    xf += d_use;
-    P += Ts * V;
     const int cidx = std::min(i, Nc - 1);
-    P.block<3, 4>(0, 4 * cidx) += 0.5 * Ts * Ts * G_i;
-    V.block<3, 4>(0, 4 * cidx) += Ts * G_i;
-    Phi_.block(6 * i, 0, 3, nU_) = P;
-    Phi_.block(6 * i + 3, 0, 3, nU_) = V;
+    if (current) {
+      // x_{i+1} = A_d x_i + B_d τ + c_d + d̂   — 지평 전체에 같은 (A_d, B_d, c_d)
+      xf = lin.A * xf + lin.c + d_use;
+      Phi_j = (lin.A * Phi_j).eval();
+      Phi_j.block<6, 4>(0, 4 * cidx) += lin.B;
+      Phi_.block(6 * i, 0, 6, nU_) = Phi_j;
+    } else {
+      // 스텝 i 의 기준 방향·속도로 B_i, w_i (식-14)
+      const TVec3 & u_i = ref[i].second;
+      const double c = std::cos(th_r), s = std::sin(th_r);
+      const TVec3 Xdot_r(u_i(0) * c - u_i(1) * s, u_i(0) * s + u_i(1) * c, u_i(2));
+      const TVec3 w_i = md_.w(Xdot_r);
+      const TMat34 G_i = md_.G(th_r);
+
+      // x_{i+1} = A x_i + B_i τ + E w_i + d̂
+      xf.head<3>() += Ts * xf.tail<3>() + 0.5 * Ts * Ts * w_i;
+      xf.tail<3>() += Ts * w_i;
+      xf += d_use;
+      P += Ts * V;
+      P.block<3, 4>(0, 4 * cidx) += 0.5 * Ts * Ts * G_i;
+      V.block<3, 4>(0, 4 * cidx) += Ts * G_i;
+      Phi_.block(6 * i, 0, 3, nU_) = P;
+      Phi_.block(6 * i + 3, 0, 3, nU_) = V;
+    }
 
     // 기준 상태 x_r,{i+1}
     const double th_next = th_r + wrap(ref[i + 1].first(2) - ref[i].first(2));
@@ -260,6 +346,8 @@ TVec4 TorqueMPC::step(const TVec6 & x_hat, const std::vector<TorqueRefPoint> & r
   x_prev_ = x_hat;
   tau_prev_ = tau;
   has_prev_ = true;
+  lin_prev_ = lin;
+  has_lin_ = current;
   return tau;
 }
 

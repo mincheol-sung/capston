@@ -16,6 +16,18 @@
 //     lo = clamp(τ_prev − Δτ̄, −τ̄, τ̄),  hi = clamp(τ_prev + Δτ̄, −τ̄, τ̄)
 // 외란 추정치 (식-9~11):  d̂(k) = x̂(k) − A x̂(k−1) − B(θ̂(k−1)) τ(k−1) − E ŵ(k−1)
 //   항상 계산해 d_hat() 으로 내주고(로그), dist_enable 일 때만 예측에 더한다.
+//
+// 선형화 방식 (TorqueTuning::linearization, torque_mpc.yaml 의 linearization.mode)
+//   reference      1판 그대로. 위 B(k), w(k) 에 지평 각 스텝의 기준 방향 θ_r(k)·기준 속도를 넣는다 (기준궤적 따라 LTV).
+//   current_state  교수님 지시 "현재 스텝 기준 linearized model" (successive linearization).
+//                  매 주기 현재 추정 상태 x̂(k) 와 직전 토크 τ(k−1) 에서 연속 모델 ẋ = f(x, τ) 를 야코비안으로 선형화:
+//                    ẋ ≈ A_c x + B_c τ + c_c,   c_c = f(x̂, τ₀) − A_c x̂ − B_c τ₀      (비평형점이라 상수항이 남는다)
+//                    A_c = [0, I; ∂(Gτ₀)/∂θ, ∂w/∂Ẋ],   B_c = [0; G(θ̂)]
+//                  증강행렬 [[A_c, B_c, c_c], [0]] 의 행렬지수로 ZOH 이산화 (A_d, B_d, c_d) 하고,
+//                  그 한 모델(LTI)을 지평 Np 스텝 전체에 쓴다:  x(j+1) = A_d x(j) + B_d τ(j) + c_d [+ d̂].
+//                  다음 주기에 새 x̂ 로 다시 선형화한다. 외란 추정치도 이 모델의 한 스텝 예측 잔차로 구한다.
+//                  θ̇ = 0, τ₀ = 0, 바퀴 관성 끔이면 A_d, B_d 가 위 식-8 의 A, B(θ̂) 와 같아진다.
+//   비용·제약·결정변수는 두 방식이 같다. 달라지는 것은 예측 행렬 Φ 와 영입력 응답뿐이다.
 // ---------------------------------------------------------------
 #pragma once
 
@@ -32,11 +44,18 @@ using TVec3 = Eigen::Vector3d;
 using TVec4 = Eigen::Vector4d;
 using TVec6 = Eigen::Matrix<double, 6, 1>;
 using TMat34 = Eigen::Matrix<double, 3, 4>;
+using TMat6 = Eigen::Matrix<double, 6, 6>;
+using TMat64 = Eigen::Matrix<double, 6, 4>;
 
 enum class TorqueLimitMode {MotorOnly, Friction};   // 비교군 B / C
 
 // 문자열 → 모드. 모르는 값·아직 없는 friction_mtte 는 std::invalid_argument
 TorqueLimitMode parse_limit_mode(const std::string & s);
+
+enum class TorqueLinearization {Reference, CurrentState};   // 머리주석 "선형화 방식"
+
+// "reference" | "current_state".  모르는 값은 std::invalid_argument
+TorqueLinearization parse_linearization(const std::string & s);
 
 // config/torque_plant.yaml
 struct TorqueModel
@@ -68,6 +87,21 @@ struct TorqueModel
   double tau_friction_limit() const;                                                      // τ_μ, 식-21
 };
 
+// 선형 모델  ẋ = A x + B τ + c (연속)  또는  x(k+1) = A x(k) + B τ(k) + c (이산)
+struct TorqueLinearModel
+{
+  TMat6 A = TMat6::Zero();
+  TMat64 B = TMat64::Zero();
+  TVec6 c = TVec6::Zero();
+};
+
+// 연속 비선형 모델 ẋ = f(x, τ) = [Ẋ; G(θ)τ + w(Ẋ)]
+TVec6 torque_dynamics(const TorqueModel & md, const TVec6 & x, const TVec4 & tau);
+// (x0, τ0) 에서의 야코비안 선형화. 그 점에서 f 와 값·1차 미분이 같다
+TorqueLinearModel linearize_continuous(const TorqueModel & md, const TVec6 & x0, const TVec4 & tau0);
+// ZOH 정확 이산화 (τ, c 를 한 샘플 동안 상수로) — 증강행렬의 행렬지수
+TorqueLinearModel discretize_zoh(const TorqueLinearModel & cont, double Ts);
+
 // config/torque_mpc.yaml
 struct TorqueTuning
 {
@@ -78,6 +112,9 @@ struct TorqueTuning
   double w_delta = 0.01;
   double q_null = 0.01;
   TorqueLimitMode limit_mode = TorqueLimitMode::MotorOnly;
+  // 구조체 기본값은 1판 방식(reference) — 1판 수치 예 시험이 이 값에 묶여 있다.
+  // 노드는 torque_mpc.yaml 의 linearization.mode 를 읽고, 그 기본값도 reference 다 (2026-11-14).
+  TorqueLinearization linearization = TorqueLinearization::Reference;
   double rate_fraction = 1.0 / 3.0;
   bool constrained = true;           // false 면 QP 대신 H T = −g (자기검사용, 1판 09절)
   bool dist_enable = false;
@@ -132,6 +169,8 @@ private:
   TVec6 x_prev_ = TVec6::Zero();
   TVec4 tau_prev_ = TVec4::Zero();
   bool has_prev_ = false;
+  TorqueLinearModel lin_prev_;       // current_state: 직전 주기에 쓴 이산 모델 (외란 추정치용)
+  bool has_lin_ = false;
   TVec6 d_hat_ = TVec6::Zero();
   TVec4 tau_bar_override_ = TVec4::Constant(-1.0);
   TorqueStepStats stats_;

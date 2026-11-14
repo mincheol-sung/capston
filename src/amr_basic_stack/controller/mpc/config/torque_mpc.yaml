@@ -16,6 +16,17 @@ torque_limit:
                         # friction_mtte = C + MTTE 온라인 보정. 아직 구현 안 함 (기동 시 거부)
   rate_fraction: 0.3333 # 변화율 상한 Δτ̄ = τ̄ × 이 값 (1판: τ̄/3 — 3 스텝 30 ms 에 상한까지)
 
+# ── 예측 모델의 선형화 방식 (식은 mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp 머리주석)
+#    2026-11-13 교수님 지시 "현재 스텝 기준 linearized model" 로 current_state 를 추가했다.
+#    2026-11-14 결정(전준민): 기본은 reference 유지. 시뮬 비교에서 미끄러운 바닥(surface_mu 0.3) + 토크 상한 B
+#    (motor_only) 조건에서 current_state 만 3/3 회 실패(5 s 만에 추종 오차 30 cm, 토크 1.3 N·m 포화, 큰 슬립).
+#    상한 C(friction)에서는 두 방식 모두 완주. 원인 확인·보완 뒤 다시 비교한다 (stack_changelog 2026-11-14).
+linearization:
+  mode: reference       # reference     = 1판 그대로. 지평 각 스텝에 기준 방향 θ_r·기준 속도를 대입 (기준궤적 따라 LTV)
+                        # current_state = 매 주기 현재 추정 상태 x̂(k)·직전 토크 τ(k−1) 에서 야코비안 선형화,
+                        #                 그 한 모델을 지평 전체에 쓴다 (successive linearization)
+                        # 이번 실행 한 번만 바꿀 때 → launch 인자  linearization:=current_state
+
 # ── 외란 추정치 d̂ (적분 작용, 1판 식-9~11).  2026-11-10 결정: 기본 끔 (노미널 MPC)
 #    꺼도 d̂ 는 계산해서 로그·status 에 남긴다 — "모델이 어디서 틀렸나" 기록용. 예측에 더하지만 않는다.
 disturbance:
