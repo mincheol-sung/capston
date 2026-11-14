@@ -14,7 +14,6 @@
 # 문턱은 아래 파라미터 (launch 에서 덮어쓰기). figure8 의 abort_error(0.35 m)보다 track_error(0.30 m)를 먼저 건다.
 # ---------------------------------------------------------------
 import math
-import signal
 
 import rclpy
 from nav_msgs.msg import Odometry
@@ -24,6 +23,7 @@ from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import Bool, Float64MultiArray, String
 
 from amr_interfaces.msg import WheelStates
+from amr_mpc.core import node_main
 
 
 def check_faults(now, armed, cfg, st):
@@ -113,11 +113,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = FaultMonitorNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM 이 메시지 변환 중에 떨어져도 정상 종료 (R9 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.destroy_node()
         except Exception:

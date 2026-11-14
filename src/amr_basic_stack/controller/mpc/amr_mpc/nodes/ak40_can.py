@@ -7,7 +7,8 @@
 #      ↓  rate_hz(100) 마다: 모터 4개에 MIT 명령 → 응답 4개를 reply_wait 안에 모아서 바로 발행
 #   /wheel_states       (WheelStates)         → 추정기·torque_output·바퀴 PI·slip_logger·fault_monitor. 시뮬 플랜트와 같은 꼴
 #                                              header.stamp = 가장 늦은 CAN 응답 수신 시각, fresh = 이번 주기에 응답이 왔나
-#   /ak40_can/status    (Float64MultiArray)   [t, 낸 모드(0 토크/1 감쇠), 종단 지연 ms, 응답 수, 틱 ms, 누적 응답 누락]
+#   /ak40_can/status    (Float64MultiArray)   [t, 낸 모드(0 토크/1 감쇠), 종단 지연 ms, 응답 수, 틱 ms, 누적 응답 누락,
+#                                              누적 늦은 응답(reply_wait 뒤에 와서 다음 주기에 반영)]
 #                                              종단 지연 = 송신 시각 − 명령 header.stamp(그 명령을 계산한 상태 추정값의 시각)
 # 계산(명령 규칙·부호·감시)은 amr_mpc/ak40/bridge.py, CAN 메시지는 amr_mpc/ak40/protocol.py — 근거는 거기 머리주석.
 #
@@ -18,10 +19,10 @@
 #     응답이 없는 모터에는 0.2 s 마다 모터 모드 명령을 다시 보낸다 (늦게 켜진 모터·전압 강하로 꺼졌다 켜진 모터)
 #   - 명령이 cmd_timeout 끊기면 DAMPING. 토크는 ±motor.tau_peak_Nm 로 자른다
 #   - 응답이 reply_timeout 없으면 그 바퀴 error = 255 → fault_monitor 가 무장을 푼다
-#   - 끌 때: DAMPING 을 shutdown_damping_s 동안 보낸 뒤 모터 모드에서 나온다 (나오면 바퀴가 풀린다)
+#   - 끌 때 (Ctrl+C·SIGTERM·SIGHUP): DAMPING 을 shutdown_damping_s 동안 보낸 뒤 모터 모드에서 나온다 (나오면 바퀴가 풀린다)
+#   - reply_wait 뒤에 온 응답은 다음 주기 시작에 반영한다 (버리면 늘 늦는 실차 버스에서 모두 error 255 가 된다)
 # ---------------------------------------------------------------
 import math
-import signal
 import time
 
 import numpy as np
@@ -34,7 +35,7 @@ from amr_interfaces.msg import WheelStates, WheelTorqueCommand
 from amr_mpc.ak40 import protocol as P
 from amr_mpc.ak40.bridge import Ak40Bridge
 from amr_mpc.ak40.bus import CanBus
-from amr_mpc.core import config
+from amr_mpc.core import config, node_main
 from amr_mpc.torque.model import TorquePlant
 
 
@@ -83,6 +84,7 @@ class Ak40CanNode(Node):
                 f"/ 가짜 모터: vcan0 을 먼저 만든다 (amr_mpc/ak40/bus.py 머리주석)") from None
         self.cmd_stamp = None
         self.missing = 0
+        self.late = 0                               # reply_wait 를 넘겨 다음 주기에 반영한 응답 수 (누적)
 
         self.pub_ws = self.create_publisher(WheelStates, str(g("wheel_states_topic")), 10)
         self.pub_status = self.create_publisher(Float64MultiArray, "/ak40_can/status", 10)
@@ -109,6 +111,8 @@ class Ak40CanNode(Node):
         return self.get_clock().now().nanoseconds * 1e-9
 
     def on_cmd(self, m):
+        if len(m.torque) != 4 or not all(math.isfinite(v) for v in m.torque):
+            self.get_logger().error(f"토크 명령이 잘못됨 {list(m.torque)} — DAMPING", throttle_duration_sec=1.0)
         self.bridge.set_command(m.mode, m.torque, self.now_s())
         self.cmd_stamp = m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
 
@@ -123,6 +127,24 @@ class Ak40CanNode(Node):
             if f is not None and self.bridge.is_reply(f[0], f[1]):
                 self.bridge.on_reply(f[1], self.now_s())
 
+    def take_pending(self, max_frames=1000):
+        """송신 전에 쌓인 응답을 모두 반영하고 개수를 돌려준다.
+        지난 주기의 reply_wait 를 넘겨 온 응답이다. 예전에는 버렸는데(bus.drain), 실차 slcan 에서 네 모터 응답이
+        늘 reply_wait 보다 늦으면 모든 응답이 버려져 reply_timeout 뒤 네 바퀴 모두 error 255 → 로봇이 아예 못 움직인다.
+        가짜 모터(vcan)는 바로 답해서 시뮬에서는 안 보였다. 팀원 벤치 스크립트는 네 모터에 9 ms 를 기다렸다.
+        반영한 응답은 이번 주기 fresh 로 센다 (지난 발행 뒤 새로 온 값이다). 늘 늦는 버스에서는 그 응답으로 4 개가 차
+        이번 주기 응답을 기다리지 않고 바로 낸다 → 바퀴 상태가 한 주기(10 ms) 늦을 뿐, "응답 0/4" 경고·누락 수는 생기지 않는다.
+        늦은 정도는 /ak40_can/status 7번째 값(누적 늦은 응답)으로 본다."""
+        n = 0
+        for _ in range(max_frames):
+            f = self.bus.recv(0.0)
+            if f is None:
+                return n
+            if self.bridge.is_reply(f[0], f[1]):
+                self.bridge.on_reply(f[1], self.now_s())
+                n += 1
+        raise RuntimeError("CAN 수신 적체가 너무 크다 — 버스에 다른 장치가 있거나 노드가 멈췄다")
+
     def send_all(self, frames):
         for cid, data in frames:
             try:
@@ -133,8 +155,8 @@ class Ak40CanNode(Node):
     def on_tick(self):
         t0 = time.monotonic()
         now = self.now_s()
-        self.bus.drain()
         self.bridge.fresh[:] = False
+        self.late += self.take_pending()          # 지난 주기 reply_wait 뒤에 온 응답 — 버리지 않고 반영 (R8 리뷰)
         frames, mode, _ = self.bridge.command_frames(now)
         self.send_all(self.bridge.reenter_frames(now) + frames)
         self.collect(self.reply_wait)
@@ -164,7 +186,8 @@ class Ak40CanNode(Node):
         self.pub_ws.publish(ws)
         st = Float64MultiArray()
         lat = (now - self.cmd_stamp) * 1e3 if (self.cmd_stamp and mode == 0) else math.nan
-        st.data = [now, float(mode), lat, float(n_fresh), (time.monotonic() - t0) * 1e3, float(self.missing)]
+        st.data = [now, float(mode), lat, float(n_fresh), (time.monotonic() - t0) * 1e3, float(self.missing),
+                   float(self.late)]
         self.pub_status.publish(st)
 
     def shutdown(self):
@@ -180,6 +203,9 @@ class Ak40CanNode(Node):
 
 def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+    # SIGTERM(kill, systemd, launch 의 2차 신호)·SIGHUP(터미널 닫힘)도 Ctrl+C 처럼 아래 finally 의 정지 절차를 밟는다
+    # (R8 리뷰 2026-11-14, R10 에서 node_main.spin 으로 합침). 그러지 않으면 SignalHandlerOptions.NO 라 즉시 죽어
+    # DAMPING·모터 모드 해제 없이 끊기고, 모터가 마지막 명령(토크일 수 있다)을 모터 쪽 CAN 끊김 설정에 맡기게 된다.
     try:
         node = Ak40CanNode()
     except RuntimeError as e:
@@ -187,11 +213,8 @@ def main():
         rclpy.shutdown()
         raise SystemExit(1)
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.shutdown()
             print("[ak40_can_node] DAMPING 뒤 모터 모드 해제", flush=True)

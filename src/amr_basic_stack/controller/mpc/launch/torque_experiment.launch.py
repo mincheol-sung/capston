@@ -43,7 +43,8 @@ import math
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -91,6 +92,10 @@ def _nodes(context):
     if plant == "real":
         if source != "estimator":
             raise RuntimeError("plant:=real requires state_source:=estimator")
+        # 실차는 띄우자마자 무장하지 않는다 (R10 리뷰 2026-11-14). 센서·추정기 준비 전이라 fault_monitor 가 곧 세우겠지만,
+        # 그 사이 모터가 토크를 받을 수 있다. 무장은 "준비 끝" 로그와 /wheel_states error 0 을 보고 키보드 'a' 로.
+        if _truthy(g("armed")):
+            raise RuntimeError("plant:=real 에서는 armed:=true 를 쓸 수 없다 — 띄운 뒤 준비를 보고 'a' 로 무장")
         if _truthy(g("auto_setup_can")):
             with open(os.path.join(share, "config", "ak40.yaml")) as f:
                 can_config = yaml.safe_load(f)["ak40"]
@@ -126,7 +131,8 @@ def _nodes(context):
                          "sensor_noise_scale": float(g("sensor_noise_scale")),
                          "surface_mu": float(g("surface_mu")) if g("surface_mu") else -1.0,
                          "friction_scale": float(g("friction_scale")),
-                         "can_interface": can_if if plant == "sim_can" else ""}]))
+                         "can_interface": can_if if plant == "sim_can" else "",
+                         "can_reply_delay": float(g("can_reply_delay"))}]))
         if plant == "sim_can":
             nodes.append(Node(
                 package="amr_mpc", executable="ak40_can_node", name="ak40_can_node", output="screen",
@@ -138,6 +144,17 @@ def _nodes(context):
         nodes.append(Node(
             package="amr_mpc", executable="ak40_can_node", name="ak40_can_node", output="screen",
             parameters=[{"interface": g("can_interface")}] if g("can_interface") else []))
+        # 로봇 모델 TF (robot_state_publisher). imu_to_base_node 는 base_footprint ← camera_imu_optical_frame TF 가 있어야
+        # IMU 를 내고, Cartographer 도 라이다·카메라 위치를 TF 로 안다. sensors.launch.py 는 이것을 띄우지 않는다
+        # (bringup.launch.py 가 띄우지만 그쪽은 RoboClaw 구동 노드까지 띄운다 — AK40 실차에서는 쓰지 않는다). R10 리뷰 2026-11-14
+        if _truthy(g("robot_state")):
+            try:
+                desc = get_package_share_directory("amr_description")
+            except Exception as e:
+                raise RuntimeError(f"amr_description 패키지를 찾을 수 없다 ({e}) — NUC 에서 빌드·source 했는지 확인. "
+                                   f"robot_state_publisher 를 따로 띄웠다면 robot_state:=false") from None
+            nodes.append(IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(os.path.join(desc, "launch", "robot_state.launch.py"))))
         # IMU: D455 원본(/camera/imu, optical 프레임) → 몸체 프레임 /imu/base_link (localization.launch.py 와 같은 노드)
         nodes.append(Node(
             package="amr_perception_bringup", executable="imu_to_base_node", name="imu_to_base_node", output="screen",
@@ -147,11 +164,15 @@ def _nodes(context):
             parameters=[{"target_frame": "base_footprint", "bias_calib_s": 0.0}],
             remappings=[("imu_in", "/camera/imu"), ("imu_out", "/imu/base_link")]))
         nodes.append(LogInfo(msg=(
-            "plant:=real — 이 launch 는 모터(ak40_can_node)와 IMU 회전 노드만 띄운다. 다른 터미널에서 먼저:\n"
-            "  ① 센서: ros2 launch amr_bringup sensors.launch.py   (라이다·D455 IMU·robot_state_publisher)\n"
+            "plant:=real — 이 launch 는 모터(ak40_can_node), IMU 회전 노드, "
+            f"{'robot_state_publisher(로봇 모델 TF)' if _truthy(g('robot_state')) else '(robot_state:=false — TF 는 따로)'} 를 띄운다. "
+            "다른 터미널에서 먼저:\n"
+            "  ① 센서: ros2 launch amr_bringup sensors.launch.py   (라이다·D455 IMU)\n"
             f"  ② 측위: ros2 launch amr_perception_bringup cartographer.launch.py mode:=localization map:=<지도 이름> lua_basename:={carto_lua}\n"
             "     (저장된 지도 pbstream 위에서, 외삽 끔 → /tracked_pose 스캔 시각 stamp)\n"
-            "  ★ 실차 센서 묶음은 아직 실차로 확인하지 않았다 (7단계 기록 참고). 인자 이름은 각 launch 파일에서 확인할 것")))
+            "  ✗ 같이 띄우지 말 것: bringup.launch.py (RoboClaw 구동 노드), localization.launch.py (IMU 회전 노드가 하나 더 떠 IMU 가 두 배로 온다)\n"
+            "  NUC 에서는 use_rviz:=false 권장 (화면 없음·CPU 를 MPC 와 나눠 쓴다)\n"
+            "  실차 확인 순서: amr/notes_amr/real_robot_checklist.md")))
     else:
         raise RuntimeError(f"plant:={plant!r} — sim, sim_can 또는 real")
 
@@ -254,6 +275,10 @@ def generate_launch_description():
         A("can_interface", default_value="", description="CAN 장치. 비우면 sim_can 은 vcan0, real 은 config/ak40.yaml (can0)"),
         A("auto_setup_can", default_value="true", choices=["true", "false"],
           description="plant:=real 에서 모터 시작 전 CAN 자동 준비. sudo는 비대화형; sim에는 적용 안 함"),
+        A("robot_state", default_value="true", choices=["true", "false"],
+          description="plant:=real 에서 robot_state_publisher(로봇 모델 TF)를 같이 띄운다. 따로 띄웠으면 false"),
+        A("can_reply_delay", default_value="0.0",
+          description="plant:=sim_can 가짜 모터 응답 지연 [s]. ak40 reply_wait(0.004)보다 크게 주면 늘 늦는 실차 버스를 흉내 낸다"),
         A("can_device", default_value="", description="slcan USB 장치 경로. 비우면 CANable by-id 자동 선택"),
         A("state_source", default_value="estimator", choices=["estimator", "truth"],
           description="estimator = state_estimator_node (SLAM 포즈 + IMU), truth = 시뮬 참값을 바로"),
@@ -268,7 +293,7 @@ def generate_launch_description():
         A("wheel_odom", default_value="", description="휠 오돔 true/false (비우면 torque_estimator.yaml slam.use_wheel_odom, 기본 false)"),
         A("use_mpc", default_value="true", description="false 면 플랜트(+RViz)만 띄운다"),
         A("use_figure8", default_value="true", description="8자 기준궤적 노드. false 면 기준열을 밖에서 준다"),
-        A("armed", default_value="false", description="게이트 초기 상태. false 면 터미널에서 'a' 로 무장"),
+        A("armed", default_value="false", description="게이트 초기 상태. false 면 터미널에서 'a' 로 무장. plant:=real 에서는 true 금지"),
         # 모델·비교군. 비우면 config/torque_plant.yaml, torque_mpc.yaml 값
         A("payload_kg", default_value="0.0", description="적재 [kg]. 2차 발표 조건 0 / 5"),
         A("ctrl_payload_kg", default_value="", description="제어기가 믿는 적재. 비우면 payload_kg 와 같게"),

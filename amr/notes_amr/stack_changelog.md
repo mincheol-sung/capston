@@ -1,12 +1,14 @@
-# 스택 변경 기록 (git 대용)
+# 스택 변경 기록
 
 `amr_ws/src/amr_basic_stack`의 코드·설정·launch를 바꿀 때마다 여기에 남긴다.
-git은 쓰지 않는다(2026-11-10 결정. `.git`이 손상됐고, 지금 코드를 기준으로 새로 출발한다).
+**2026-11-14부터 git(브랜치 `smc`)을 다시 쓴다. 스냅샷(`stack_status.sh --snapshot`)은 더 찍지 않는다** — 바뀐 파일·되돌리기는 git 으로 한다
+(사용자 결정). 이 파일은 "왜 바꿨고 어떻게 확인했나" 를 남기는 용도로 계속 쓴다. 아래 "이 파일이 git의 무엇을 대신하나"·"기준 시점" 은
+git 이 깨져 있던 2026-11-10 ~ 11-14 의 기록이다. 그 기간의 스냅샷은 `stack_baseline/` 에 남아 있다.
 
 - 결정·과제·논의는 `torque_mpc_todo.md`, **실제로 무엇을 바꿨는지**는 이 파일이다.
 - 최신 기록이 위로 온다.
 
-## 이 파일이 git의 무엇을 대신하나
+## 이 파일이 git의 무엇을 대신하나 (2026-11-10 ~ 11-14, 지금은 git 을 쓴다)
 
 | git | 여기서는 |
 |---|---|
@@ -35,7 +37,7 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 - 되돌리려면: (특별한 절차가 있을 때만)
 ```
 
-## 기준 시점
+## 기준 시점 (스냅샷 — 2026-11-14_1042 가 마지막. 이후는 git 커밋)
 
 | 기준 | 내용 |
 |---|---|
@@ -52,9 +54,52 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 | `2026-11-13_1506` | 리뷰 R3~R5(SLAM 끊김 감시, 기준열 0.05 s, 좌표계 검사, run_compare.sh) |
 | `2026-11-13_1654` | 리뷰 R6(게이트 Ctrl+C 마지막 DAMPING, NaN·inf → DAMPING, 발행 순서) |
 | `2026-11-13_1720` | 리뷰 R7(퓨어 퍼슛 좌표계 검사) |
-| `2026-11-13_1900` | 실차 IMU QoS(BEST_EFFORT)·추정기 입력 감시·시뮬 IMU BEST_EFFORT·imu_to_base 이중 보정 끔·시뮬 기동 로그 — 지금 `stack_status.sh`가 비교하는 기준 |
+| `2026-11-13_1900` | 실차 IMU QoS(BEST_EFFORT)·추정기 입력 감시·시뮬 IMU BEST_EFFORT·imu_to_base 이중 보정 끔·시뮬 기동 로그 |
+| `2026-11-14_1005` | 리뷰 R8(ak40 늦은 응답 반영·SIGTERM 정지 절차, 시뮬 가짜 모터 import 복구·응답 지연 흉내) |
+| `2026-11-14_1023` | 리뷰 R9(공통 종료 처리 node_main.spin, fault_monitor·slip_logger 적용, 응답 없는 바퀴 슬립 제외) |
+| `2026-11-14_1042` | 리뷰 R10 끝(실차 launch robot_state·즉시 무장 금지, 전 노드 공통 종료 처리, launch 모드 시험) — **리뷰 0~R10 완료.** 마지막 스냅샷 |
 
 ## 변경 기록
+
+### 2026-11-14 (3) — 리뷰 R10 (launch 연결): 실차 경로에 robot_state, 실차 즉시 무장 금지, 모든 토크 스택 노드에 공통 종료 처리, 모드별 launch 시험
+- 대조 결과 (문제없음): launch 가 노드에 넘기는 파라미터 이름 60여 개가 모두 노드에 선언돼 있다(rclpy·rclcpp 는 선언 안 된 이름을 말없이 버리므로 오타면 조용히 무시된다 — 스크립트로 전부 대조). 토픽 사슬 figure8 → MPC/퓨어 퍼슛 → (바퀴 PI) → torque_output → 게이트 → 시뮬/ak40, /wheel_states·/state_estimator/odom·/mpc/armed 구독자 모두 기본 이름이 맞다
+- 바꾼 것
+  - `launch/torque_experiment.launch.py` (plant:=real)
+    - **robot_state_publisher 포함** (`robot_state:=true` 기본): 안내문은 "sensors.launch.py 가 robot_state_publisher 를 띄운다" 고 했지만 실제로는 안 띄운다(bringup.launch.py 가 띄우는데 그쪽은 RoboClaw 구동 노드까지 띄운다). 없으면 imu_to_base 가 TF 를 기다리다 IMU 를 하나도 못 내고 Cartographer 도 라이다 위치를 모른다. amr_description 이 없으면 알아듣는 오류
+    - **armed:=true 거부**: 주석에는 "시뮬에서만" 이라 했지만 막혀 있지 않았다. 실차는 준비를 보고 'a'
+    - 안내문 정정: 같이 띄우지 말 것(bringup.launch.py·localization.launch.py — 후자는 imu_to_base_node 를 하나 더 띄워 IMU 가 두 배), NUC 에서 use_rviz:=false 권장, 실차 확인 목록 경로
+  - 공통 종료 처리 `node_main.spin` 을 나머지 노드에 적용: 게이트·추정기·figure8·퓨어 퍼슛·바퀴 PI·torque_output·휠 오돔·시뮬 플랜트·ak40_can (R8 에서 ak40 에 따로 넣은 SIGTERM 처리를 이것으로 합침). 옛 스택 노드(body_tracking, wheel_tracking, sim_plant_body/wheel, fake_reference)는 손대지 않음
+  - `test/test_launch_modes.py` 11개: sim 기본·비교군 A·참값·sim_can·휠 오돔·플랜트만·실차(MPC·A)·robot_state 끔·실차 즉시 무장 거부·실차 참값 거부. `test_can_setup.py` 의 launch 시험에 armed 값 추가(실차 무장 검사가 CAN 준비 전에 읽는다)
+- 실제 프로세스 확인: 게이트에 무장·토크 중계 중 SIGINT 2·SIGTERM 2·SIGHUP 1 → 다섯 번 모두 마지막 메시지 DAMPING, exit 0, Traceback 없음(예전 SIGTERM 은 DAMPING 없이 즉시 죽음). 시뮬 세 판(B·A·CAN 6 ms 지연) 끌 때 모든 노드 "finished cleanly", "process has died" 0
+- 실차 확인으로 남김 (`real_robot_checklist.md` R10 절 + 4단계 명령 정정): TF 확인, 노드 중복, CAN 자동 준비 sudo, 끌 때 로그
+- 확인: Python 시험 182개·C++ 12개 통과. 시뮬 B 15.4 mm(게이트 신호 시험과 겹친 판) → 다시 12.8 mm, A 5.1 mm, CAN(6 ms 지연) 13.0 mm
+
+### 2026-11-14 (2) — 리뷰 R9 (fault_monitor·slip_logger): 종료 중 죽던 것 고침(공통 spin), 응답 없는 바퀴 슬립 제외
+- 대조 결과 (문제없음): fault_monitor 검사 5개(포즈 튐·추종 오차·모터 에러·바퀴 끊김·상태 끊김)는 무장 중에만, 무장 순간에 포즈 튐 기준·추종 오차를 다시 잡는다. 한 번 세우면 같은 판에서 반복 발행 안 함. /mpc/arm(VOLATILE)·/mpc/armed(TRANSIENT_LOCAL) 짝 맞음. 실차 경로의 끊김(카메라 IMU·Cartographer·ak40)은 모두 추정기 출력 멈춤이나 /wheel_states 끊김·255 로 이어져 잡힌다. slip_logger 식은 구조도 정의와 같다(ω_nom = T⁻¹v̂, 분모 max(|ω|,|ω_nom|,ω_ε))
+- 바꾼 것
+  - **종료 중 죽던 것** (R7 에서 봄): Ctrl+C 가 rclpy 의 메시지 변환(pybind11) 한가운데 떨어지면 KeyboardInterrupt 가 `RuntimeError: Unable to convert call argument '0' to Python object` 로 바뀌어 `except KeyboardInterrupt` 를 빠져나갔다 → Traceback, exit code 1. 메시지를 1 kHz 로 쏟아붓고 SIGINT 를 보내는 재현에서 fault_monitor 20 판 중 4 판
+  - 새 파일 `amr_mpc/core/node_main.py` `spin(node)`: SIGINT·SIGTERM·SIGHUP → 종료 기록 + KeyboardInterrupt, 신호 뒤의 RuntimeError 는 종료로 봄(신호 없이 난 RuntimeError 는 그대로 올림), 끝나면 세 신호 무시(정리 중 두 번째 신호로 안 끊기게)
+  - `fault_monitor.py`·`slip_logger.py` main 이 이것을 씀. 재현 시험 fault_monitor 0/20, slip_logger 0/15, 15 판 모두 요약 출력. slip_logger 는 이제 SIGTERM 에도 요약·CSV 를 남긴다
+  - `slip_logger.py`: 응답이 없거나(fresh false) 에러인 바퀴의 λ 는 NaN(그 바퀴 속도는 마지막 값이 남은 것 — 차체만 변하면 가짜 슬립), 요약은 그 행을 빼고 뺀 수를 적음. 시뮬 토픽 모드는 늘 fresh·에러 0 이라 안 보였다
+  - 시험 6개 추가: `test/test_node_main.py` 5개(변환 중 신호 = 정상 종료, 신호 없는 RuntimeError 는 올림, 세 신호 각각), `test_slip_logger.py` 1개
+- 남김: 다른 Python 노드(게이트·추정기·torque_output·figure8·퓨어 퍼슛·바퀴 PI·시뮬 플랜트)도 같은 spin 패턴이라 같은 종료 오류가 날 수 있다 → R10(launch·종료 연결)에서 한꺼번에. ak40_can 은 R8 에서 SIGTERM 처리를 따로 넣었다. 과속·바퀴 멈춤 검사는 여전히 "나중에, 필요하면"
+- 관찰 (조사 안 함): 이번 B μ 0.3 한 판은 이탈 없이 완주(13.3 mm). 예전 기록(2026-11-12)은 튜닝 9가지 모두 이탈 — 바퀴별 마찰 보상 변경 뒤 달라졌을 수 있다. todo "B 의 μ 0.3 이탈" 과제 볼 때 다시 확인
+- 확인: Python 시험 171개 통과. 시뮬 μ 0.3: B 13.3 mm·참 슬립률 RMS 0.10~0.17, A 5.4 mm·0.023~0.025. 두 판 모두 Traceback·"process has died" 0
+
+### 2026-11-14 (1) — 리뷰 R8 (ak40 CAN): 늦은 응답 반영, SIGTERM 에도 정지 절차, 가짜 모터 모드 복구 + 실차 확인 목록
+- 실차 확인 목록: `amr/notes_amr/real_robot_checklist.md` 새로 만듦 — todo 곳곳의 실차 항목을 전원 전 → 모터 설정 → 벤치 → 네 바퀴 → 센서 → 바닥 주행 순서로 모음 (사용자 요청). todo "과제" 머리에 링크
+- 대조 결과 (문제없음): MIT 명령·응답 비트 배치, 범위 P ±12.5 V ±45.5 T ±5 KP 500 KD 5, 응답 CAN ID = 모터 ID, 온도 −40, 8 바이트 응답, ID 1~4 = FL FR RL RR, 1 Mbps(setup_can `-s8`) — 매뉴얼·팀원 스크립트(`CAN/can_torque_feedback.py`)와 같다. NaN·inf·길이 틀린 토크 → DAMPING 은 이미 `bridge.set_command` 에 있고 시험도 있음(R6 에서 넘긴 것 닫음)
+- 참고 (고치지 않음): 팀원 스크립트는 정수 변환을 버림으로, 우리는 반올림으로 한다. 토크 0 이 팀원 −1.22 mN·m / 우리 +1.22 mN·m, 평균 반 칸 차이(쿨롱 마찰 0.025 N·m 의 약 5 %). 팀원 마찰 식별값은 버림 기준 명령 토크로 낸 것 — 식의 offset 항이 대부분 흡수한다
+- 바꾼 것 (시뮬에서는 안 보이는 실차 문제)
+  - `amr_mpc/nodes/ak40_can.py` **늦은 응답**: 주기 시작에 `bus.drain()` 으로 버리던 지난 주기의 늦은 응답(reply_wait 4 ms 뒤 도착)을 반영한다(`take_pending`). 실차 slcan 에서 네 모터 응답이 늘 4 ms 보다 늦으면 전부 버려져 0.05 s 뒤 네 바퀴 error 255 → fault_monitor 무장 해제 → 로봇이 아예 못 움직일 수 있었다. 팀원은 네 모터에 9 ms 를 기다렸다(모터 하나 최대 3.6 ms 만 잼). 가짜 모터는 바로 답해서 안 보였다. 늦은 응답도 이번 발행의 fresh 로 센다(거짓 "응답 0/4" 경고 방지). `/ak40_can/status` 에 7번째 값(누적 늦은 응답) 추가
+  - 같은 파일 **SIGTERM·SIGHUP**: Ctrl+C 처럼 DAMPING 0.5 s → 모터 모드 나오기를 밟게 함. 전에는 `SignalHandlerOptions.NO` 라 kill·systemd·터미널 닫힘에 즉시 죽어 모터가 마지막 명령(토크일 수 있다)을 모터 쪽 CAN 끊김 설정에만 맡겼다. 정지 절차 중 두 번째 신호는 무시
+  - 같은 파일: 잘못된 토크 명령(NaN·inf·길이)에 오류 로그
+  - `amr_mpc/nodes/sim_plant_torque.py` **가짜 모터 모드가 켜지자마자 죽던 것**: `from amr_mpc.ak40 import protocol as AKP` 가 빠져 있었다(스냅샷으로 보면 2026-11-12_1300 ~ 2048 사이, R1·R2 무렵 빠짐) → `plant:=sim_can` 이 그 뒤로 내내 안 돌았다. import 복구
+  - 같은 파일 + launch: 가짜 모터 **응답 지연** `can_reply_delay`(기본 0) — 늘 늦는 실차 버스를 시뮬에서 재현
+  - `amr_mpc/ak40/bridge.py` 머리주석: NaN·inf → DAMPING 규칙 적음. `torque_output.py` 머리주석의 옛 "nan_to_num 에서 토크 0" 설명 고침
+  - `test/test_ak40.py` 3개 추가: 늘 늦는 버스에서 error 255 가 안 생기고 상태가 갱신된다 / SIGTERM 으로 꺼도 마지막 프레임이 네 모터 모터 모드 나오기 / 가짜 모터 모드 시뮬 플랜트가 켜진다
+- 실차 확인으로 남김 (`real_robot_checklist.md` R8 절): 네 모터 응답 시간과 늦은 응답 수(늘 늦으면 reply_wait 0.008), kill 로 껐을 때 제동 뒤 풀림, 끌 때 slcan 송신 버퍼 넘침(팀원 벤치에서 한 번), 모터 하나 전원 껐다 켰을 때 다시 붙는지
+- 확인: Python 시험 165개 통과. CAN 전 구간 시뮬(`plant:=sim_can`, unshare 이름공간의 vcan0) B 지연 없음 13.3 mm / 응답 6 ms 지연 11.7·12.8 mm(두 판), 정지 없이 완주. "응답 x/4" 경고는 지연 판도 지연 없음 판과 같은 수준(기동 때 + 데스크톱 흔들림)
 
 ### 2026-11-13 (6) — 실차 IMU 연결 실패(QoS) 고침 + 시뮬·실차 차이 점검
 - 왜: 실차에서 state_estimator 가 IMU 를 하나도 못 받았다 (다른 세션 "SMC 브랜치 연결" 이 원인 확인, 사용자가 이 작업공간에서 고치라고 함). 실차 `imu_to_base_node` 는 `/imu/base_link` 를 BEST_EFFORT 로 내는데 추정기는 숫자(50)만 넘겨 RELIABLE 로 구독 → 연결 막힘 → 바이어스 초기화가 안 끝나 출력 없음 → MPC 도 안 움직임. 시뮬은 RELIABLE 로 내서 안 드러났다

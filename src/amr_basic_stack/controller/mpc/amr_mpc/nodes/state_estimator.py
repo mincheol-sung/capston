@@ -20,7 +20,6 @@
 #   · SLAM 포즈가 max_dead_reckoning 초 넘게 반영되지 않으면 출력을 멈춘다 (IMU 적분만으로 흘러가는 것을 막는다, R3 리뷰).
 # ---------------------------------------------------------------
 import math
-import signal
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
@@ -31,7 +30,7 @@ from rclpy.signals import SignalHandlerOptions
 from sensor_msgs.msg import Imu, PointCloud2
 from std_msgs.msg import Float64MultiArray
 
-from amr_mpc.core import config
+from amr_mpc.core import config, node_main
 from amr_mpc.torque.estimator import PlanarStateEstimator
 
 
@@ -190,11 +189,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = StateEstimatorNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.destroy_node()
         except Exception:

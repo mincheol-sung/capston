@@ -4,7 +4,6 @@
 import copy
 import os
 import select
-import signal
 import termios
 import threading
 import time
@@ -18,6 +17,7 @@ from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import Bool, Float32MultiArray
 
 from amr_interfaces.msg import WheelTorqueCommand
+from amr_mpc.core import node_main
 
 # 구조 A 는 몸체 twist, 구조 B 는 바퀴 각속도 4개를 낸다. 게이트의 arming·freshness·
 # 정지 논리는 완전히 같으므로 메시지 타입만 갈아끼운다.
@@ -229,11 +229,8 @@ def main(args=None):
     rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)   # 머리주석 R6
     node = KeyboardCommandGate()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)    # 정지 신호를 내는 동안 두 번째 Ctrl+C 무시
         node.shutdown()
         node.destroy_node()
         if rclpy.ok():

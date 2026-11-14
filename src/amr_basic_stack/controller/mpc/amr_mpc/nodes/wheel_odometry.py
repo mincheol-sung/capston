@@ -12,7 +12,6 @@
 #   휠 오돔 쪽으로 일부 끌려 슬립이 작게 측정될 수 있다 (torque_mpc_todo.md).
 # ---------------------------------------------------------------
 import math
-import signal
 
 import rclpy
 from nav_msgs.msg import Odometry
@@ -20,6 +19,7 @@ from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
 
 from amr_interfaces.msg import WheelStates
+from amr_mpc.core import node_main
 from amr_mpc.torque.model import TorquePlant
 from amr_mpc.torque.wheel_odometry import WheelOdometry
 
@@ -65,11 +65,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = WheelOdometryNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.destroy_node()
         except Exception:

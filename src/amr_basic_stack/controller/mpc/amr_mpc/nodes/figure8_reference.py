@@ -43,7 +43,6 @@
 # ---------------------------------------------------------------
 import math
 import numpy as np
-import signal
 import rclpy
 import rclpy.duration
 from rclpy.node import Node
@@ -54,6 +53,7 @@ from nav_msgs.msg import Odometry, Path
 from std_msgs.msg import Bool
 from amr_interfaces.msg import PlanarReference, PlanarReferenceArray
 
+from amr_mpc.core import node_main
 from amr_mpc.body import mpc as mpc_mod
 from amr_mpc.core.figure8 import Figure8, lead_in, lead_in_duration, ramp_elapsed, ramp_rate
 K_GEOM = mpc_mod.K_GEOM
@@ -321,11 +321,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = Figure8ReferenceNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)   # 정리 중 두 번째 Ctrl+C(launch 가 보냄) 무시
         try: node.destroy_node()
         except Exception: pass
         if rclpy.ok():

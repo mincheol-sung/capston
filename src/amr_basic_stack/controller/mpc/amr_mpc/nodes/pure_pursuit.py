@@ -20,7 +20,6 @@
 #   safety·hold 문턱은 torque_mpc.yaml 을 그대로 읽는다 (A 와 B·C 의 정지 규칙이 갈라지지 않게 한 곳에서).
 # ---------------------------------------------------------------
 import math
-import signal
 
 import numpy as np
 import rclpy
@@ -33,7 +32,7 @@ from std_msgs.msg import Bool, Float64MultiArray
 
 from amr_interfaces.msg import PlanarReferenceArray
 from amr_mpc.baseline.pure_pursuit import PurePursuitConfig, pure_pursuit
-from amr_mpc.core import config
+from amr_mpc.core import config, node_main
 from amr_mpc.core.reference import HoldLatch, ReferenceHorizon, wrap
 from amr_mpc.torque.model import TorquePlant
 
@@ -187,11 +186,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = PurePursuitNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.destroy_node()
         except Exception:

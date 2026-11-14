@@ -1,5 +1,6 @@
 """AK40-10 CAN 계산부 — 메시지 만들기·풀기(protocol), 노드 계산부(bridge), 가짜 모터(fake). ROS·소켓 없이."""
 import math
+import time
 
 import numpy as np
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from amr_mpc.ak40 import protocol as P
 from amr_mpc.ak40.bridge import ERR_NO_REPLY, MODE_DAMPING, MODE_TORQUE, Ak40Bridge
 from amr_mpc.ak40.fake import FakeAk40Motors
+from amr_mpc.core import config
 
 LIM = P.MitLimits(p_max=12.5, v_max=45.5, t_max=5.0, kp_max=500.0, kd_max=5.0)   # AK40-10, 매뉴얼 v1.0.18 63쪽
 IDS, DIR = [1, 2, 3, 4], [1, -1, 1, -1]
@@ -325,3 +327,131 @@ def test_hardware_config_clockwise_positive_motor_mounting():
     for cid, velocity in zip(c['can_ids'], [-2, 2, -2, 2]):
         b.on_reply(P.pack_reply(LIM, cid, 0, velocity, 0), now=0.01)
     assert b.wheel_states(0.01)['velocity'] == pytest.approx([2] * 4, abs=LIM.step('v'))
+
+
+# ── R8 리뷰 (2026-11-14): 실차에서만 드러나는 것 ────────────────────────────────────
+class _LateBus:
+    """응답이 늘 reply_wait 를 넘겨 오는 버스 (실차 slcan 흉내). 보낸 명령의 응답은 기다리는 동안엔 안 오고,
+    다음 주기 시작(기다리지 않는 recv(0))에야 보인다."""
+    def __init__(self, ifname):
+        from amr_mpc.ak40.fake import FakeAk40Motors
+        c = config.load("ak40.yaml")["ak40"]
+        self.fake = FakeAk40Motors(c["can_ids"], c["direction"], P.MitLimits.from_dict(c["mit_limits"]), 4.1)
+        self.pending = []
+
+    def send(self, can_id, data):
+        r = self.fake.on_frame(can_id, data, np.zeros(4), np.full(4, 2.0), np.zeros(4))   # 바퀴 2 rad/s 로 도는 중
+        if r is not None:
+            self.pending.append((can_id, r))
+
+    def recv(self, timeout=0.0):
+        if timeout > 0.0:                    # reply_wait 안에는 아무것도 안 온다
+            time.sleep(min(timeout, 0.001))
+            return None
+        return self.pending.pop(0) if self.pending else None
+
+    def close(self):
+        pass
+
+
+def test_late_replies_are_used_not_dropped(monkeypatch):
+    """응답이 늘 늦어도 다음 주기에 반영해, 네 바퀴가 'error 255(응답 없음)' 로 바뀌지 않는다.
+    예전(bus.drain 으로 버림)에는 reply_timeout 0.05 s 뒤 네 바퀴 모두 255 → fault_monitor 가 무장을 풀어 로봇이 못 움직였다."""
+    import rclpy
+    import amr_mpc.nodes.ak40_can as node_mod
+    monkeypatch.setattr(node_mod, "CanBus", _LateBus)
+    rclpy.init(args=["--ros-args", "-p", "interface:=vcan_late_test", "-p", "cmd_topic:=/r8_test/cmd",
+                     "-p", "wheel_states_topic:=/r8_test/ws"])
+    try:
+        n = node_mod.Ak40CanNode()
+        published = []
+        n.pub_ws.publish = published.append
+        n.pub_status.publish = lambda m: None
+        for _ in range(30):                  # 약 0.15 s > reply_timeout 0.05 s
+            n.on_tick()
+        last = published[-1]
+        assert list(last.error) == [0, 0, 0, 0]
+        assert np.allclose(last.velocity, 2.0, atol=0.05)          # 바퀴 상태는 늦은 응답으로 계속 갱신된다
+        assert n.late >= 4 * 29
+        assert list(last.fresh) == [True] * 4                       # 늦은 응답도 이번에 받은 것으로 센다 → 거짓 "응답 0/4" 경고 없음
+        assert n.missing <= 4                                       # 첫 주기(아직 아무 응답 없음)만
+        n.destroy_node()
+    finally:
+        rclpy.shutdown()
+
+
+def test_sigterm_runs_damping_then_exit(tmp_path):
+    """kill(SIGTERM) 으로 꺼도 Ctrl+C 와 같이 DAMPING 을 보낸 뒤 모터 모드에서 나온다.
+    예전에는 SIGTERM 에 바로 죽어 모터가 마지막 명령을 계속 낼 수 있었다."""
+    import os
+    import signal
+    import subprocess
+    import sys
+    log = tmp_path / "frames.txt"
+    code = f'''
+import sys
+import amr_mpc.nodes.ak40_can as m
+class RecBus:
+    def __init__(self, ifname):
+        self.f = open({str(log)!r}, "a", buffering=1)
+    def send(self, can_id, data):
+        self.f.write(f"{{can_id}} {{bytes(data).hex()}}\\n")
+    def recv(self, timeout=0.0):
+        return None
+    def close(self):
+        self.f.close()
+m.CanBus = RecBus
+sys.argv = ["ak40_can_node", "--ros-args", "-p", "interface:=vcan_sigterm_test",
+            "-p", "cmd_topic:=/r8_sig/cmd", "-p", "wheel_states_topic:=/r8_sig/ws"]
+m.main()
+'''
+    env = dict(os.environ, ROS_DOMAIN_ID="93")
+    p = subprocess.Popen([sys.executable, "-c", code], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    try:
+        end = time.monotonic() + 15.0
+        while time.monotonic() < end and (not log.exists() or log.read_text().count("\n") < 40):
+            time.sleep(0.1)                  # 기동 + 주기 송신이 시작될 때까지
+        assert log.exists(), p.stdout.read().decode() if p.poll() is not None else "기동 안 됨"
+        p.send_signal(signal.SIGTERM)
+        out = p.communicate(timeout=10)[0].decode()
+    finally:
+        if p.poll() is None:
+            p.kill()
+    lines = log.read_text().split()
+    frames = list(zip(lines[0::2], lines[1::2]))
+    exit_hex = P.EXIT_MOTOR_MODE.hex()
+    assert [d for _, d in frames[-4:]] == [exit_hex] * 4, out          # 마지막은 네 모터 모두 모터 모드 나오기
+    assert "DAMPING 뒤 모터 모드 해제" in out
+
+
+def test_sim_plant_fake_can_mode_starts(monkeypatch):
+    """plant:=sim_can 의 시뮬 플랜트가 가짜 모터 모드로 켜진다 (R8 리뷰: protocol import 가 빠져 켜지자마자 죽던 것).
+    실제 vcan 없이 CanBus 만 바꿔 생성자를 돈다."""
+    import rclpy
+    import amr_mpc.nodes.sim_plant_torque as sim_mod
+
+    class NullBus:
+        def __init__(self, ifname):
+            pass
+
+        def recv(self, timeout=0.0):
+            time.sleep(min(timeout, 0.01))
+            return None
+
+        def send(self, can_id, data):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(sim_mod, "CanBus", NullBus)
+    rclpy.init(args=["--ros-args", "-p", "can_interface:=vcan_test", "-p", "can_reply_delay:=0.006",
+                     "-p", "imu_topic:=/r8_sim/imu", "-p", "pose_topic:=/r8_sim/pose",
+                     "-p", "wheel_states_topic:=/r8_sim/ws", "-p", "truth_topic:=/r8_sim/truth",
+                     "-p", "cmd_topic:=/r8_sim/cmd"])
+    try:
+        n = sim_mod.SimPlantTorqueNode()
+        assert n.fake is not None and n.can_delay == 0.006
+        n.destroy_node()
+    finally:
+        rclpy.shutdown()

@@ -8,6 +8,7 @@
     MODE_TORQUE   → kp 0, kd 0, t_ff = τ (±tau_clamp 로 자름)
     MODE_DAMPING  → kp 0, v_des 0, kd = damping_kd
     명령 없음 / cmd_timeout 초과 → DAMPING. (모터는 마지막 명령을 계속 낸다고 가정 — 안전은 이 노드가 맡는다)
+    토크에 NaN·inf 가 있거나 4 개가 아님 → DAMPING (set_command, 이전 토크를 이어 내지 않는다)
   응답 감시: reply_timeout 동안 응답이 없는 바퀴는 error = ERR_NO_REPLY (fault_monitor 가 0 이 아니면 세운다)
   모터 모드 다시 넣기: 응답이 없는 바퀴에는 reenter_period 마다 ENTER 를 다시 보낸다. 노드보다 모터가 늦게 켜지거나
     (시동 순서), 전압이 떨어져 모터가 다시 켜지면 모터 모드가 풀려 명령에 응답하지 않는다고 본다.

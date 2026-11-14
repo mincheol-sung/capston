@@ -18,10 +18,9 @@
 #   - 변화율 제한은 여기 없다. MPC 제약이 한다 (v3 에서 이동).
 #   - /wheel_states 가 끊기면 마찰 보상만 0 으로 두고 토크는 계속 낸다 (마찰 값이 0 이 아닐 때만 경고).
 #   - 토크에 NaN·inf 가 있으면 DAMPING 으로 바꿔 낸다 (R6 리뷰 2026-11-13). 그대로 두면 inf 는 클램프에서
-#     ±τ_lim(최대 토크)이 되고, NaN 은 CAN 다리의 nan_to_num 에서 토크 0(관성 주행)이 된다 — 둘 다 정지가 아니다.
+#     ±τ_lim(최대 토크)이 된다. CAN 다리(ak40 bridge.set_command)도 NaN·inf 를 DAMPING 으로 바꾸지만 여기서 먼저 막는다.
 #     바퀴 속도에 NaN 이 있으면 그 바퀴 마찰 보상만 0 으로 둔다.
 # ---------------------------------------------------------------
-import signal
 
 import numpy as np
 import rclpy
@@ -30,7 +29,7 @@ from rclpy.signals import SignalHandlerOptions
 
 from amr_interfaces.msg import WheelStates, WheelTorqueCommand
 from amr_mpc.torque.model import TorquePlant, wheel_coefficients
-from amr_mpc.core import config
+from amr_mpc.core import config, node_main
 
 
 def friction_torque(omega, coulomb, viscous, smooth):
@@ -133,11 +132,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = TorqueOutputNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.destroy_node()
         except Exception:

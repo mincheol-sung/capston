@@ -34,8 +34,8 @@
 #   명령·응답 숫자는 12/16 비트로 잘려 오간다 — 실차와 같은 양자화. 응답은 수신 스레드가 곧바로 낸다 (진짜 모터처럼 1 ms 안).
 # ---------------------------------------------------------------
 import math
-import signal
 import threading
+import time
 
 import numpy as np
 import rclpy
@@ -50,9 +50,10 @@ from tf2_ros import TransformBroadcaster
 
 from amr_interfaces.msg import WheelStates, WheelTorqueCommand
 from amr_mpc.torque.model import DrivetrainFriction, SlipPlant, TorquePlant
+from amr_mpc.ak40 import protocol as AKP
 from amr_mpc.ak40.bus import CanBus
 from amr_mpc.ak40.fake import FakeAk40Motors
-from amr_mpc.core import config
+from amr_mpc.core import config, node_main
 from amr_mpc.torque.sim_sensors import DEFAULTS as SENSOR_DEFAULTS, SimSensors
 
 
@@ -89,6 +90,10 @@ class SimPlantTorqueNode(Node):
             ("friction_scale", 1.0),     # 구동계 마찰 = torque_plant.yaml friction × 이 값. 0 이면 마찰 없음
             ("friction_smooth", 0.05),   # [rad/s] 쿨롱 마찰을 잇는 바퀴 속도 (작을수록 진짜 쿨롱에 가깝고 적분이 잘아진다)
             ("can_interface", ""),       # 비우면 ROS 토픽 모드. vcan0 등을 주면 가짜 AK40 모터 모드 (머리주석)
+            # 가짜 모터 응답 지연 [s]. 0 = 바로 답함. 실차 slcan(USB 직렬)은 네 모터 응답이 몇 ms 늦을 수 있다
+            # (팀원 벤치: 모터 하나 최대 3.6 ms, 네 모터는 9 ms 를 기다림). ak40 reply_wait(4 ms)보다 크게 주면
+            # "응답이 늘 늦는 버스" 를 시뮬에서 재현한다 (R8 리뷰 2026-11-14).
+            ("can_reply_delay", 0.0),
         ])
         g = lambda n: self.get_parameter(n).value
         override = {"use_wheel_inertia": bool(g("use_wheel_inertia"))}
@@ -146,7 +151,12 @@ class SimPlantTorqueNode(Node):
                                        self.p.tau_peak, int(ak["temp_offset"]), int(ak["reply_length"]),
                                        reply_can_id=None if rid == "motor" else int(rid))
             self.can = CanBus(str(g("can_interface")))
+            self.can_delay = max(0.0, float(g("can_reply_delay")))
+            self.can_out = []                                 # 지연 응답 (보낼 시각, can_id, data) — 보내는 스레드가 꺼낸다
+            self.can_out_cv = threading.Condition()
             threading.Thread(target=self.can_loop, daemon=True).start()
+            if self.can_delay > 0.0:
+                threading.Thread(target=self.can_send_loop, daemon=True).start()
         self.pub_ws = self.create_publisher(WheelStates, str(g("wheel_states_topic")), 10)
         self.pub_truth = self.create_publisher(Odometry, str(g("truth_topic")), 10)
         self.tf = TransformBroadcaster(self) if bool(g("publish_tf")) else None
@@ -166,7 +176,7 @@ class SimPlantTorqueNode(Node):
                f"SLAM {self.sensors.c['slam_mode']} 지연 {self.sensors.c['slam_latency']*1e3:.0f} ms, "
                f"잡음 배율 {float(g('sensor_noise_scale')):g}")
             + ("" if self.fake is None else
-               f"\n  가짜 AK40 모터 모드: {g('can_interface')}  ID {self.fake.ids}  부호 {list(map(int, self.fake.dir))}"
+               f"\n  가짜 AK40 모터 모드: {g('can_interface')}  ID {self.fake.ids}  부호 {list(map(int, self.fake.dir))}  응답 지연 {self.can_delay*1e3:.1f} ms"
                f"  (/wheel_torque_cmd·/wheel_states 대신 CAN)"))
 
     def can_loop(self):
@@ -180,11 +190,35 @@ class SimPlantTorqueNode(Node):
                 continue
             with self.can_lock:
                 reply = self.fake.on_frame(f[0], f[1], self.wheel_pos, self._wheel_speeds(), self.applied)
-            if reply is not None:
-                try:
-                    self.can.send(self.fake.reply_id(f[0]), reply)
-                except OSError:
-                    pass
+            if reply is None:
+                continue
+            if self.can_delay > 0.0:
+                with self.can_out_cv:
+                    self.can_out.append((time.monotonic() + self.can_delay, self.fake.reply_id(f[0]), reply))
+                    self.can_out_cv.notify()
+                continue
+            try:
+                self.can.send(self.fake.reply_id(f[0]), reply)
+            except OSError:
+                pass
+
+    def can_send_loop(self):
+        """지연 응답을 정해진 시각에 보낸다 (can_reply_delay > 0 일 때만)."""
+        while rclpy.ok():
+            with self.can_out_cv:
+                if not self.can_out:
+                    self.can_out_cv.wait(0.1)
+                    continue
+                due, cid, data = self.can_out[0]
+                wait = due - time.monotonic()
+                if wait > 0.0:
+                    self.can_out_cv.wait(wait)
+                    continue
+                self.can_out.pop(0)
+            try:
+                self.can.send(cid, data)
+            except OSError:
+                pass
 
     def now_s(self):
         return self.get_clock().now().nanoseconds * 1e-9
@@ -307,11 +341,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = SimPlantTorqueNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.destroy_node()
         except Exception:

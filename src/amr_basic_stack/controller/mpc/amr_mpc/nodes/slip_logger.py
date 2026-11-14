@@ -7,6 +7,7 @@
 #   reference_topic         (Odometry)      비교용 참값 (시뮬 /sim/ground_truth, 비우면 안 씀)
 #      ↓
 #   /slip_logger/slip       (Float64MultiArray)  [t, λ_FL, λ_FR, λ_RL, λ_RR, ω_nom×4, (참값 λ×4)]
+#                           응답이 없거나(fresh false) 에러인 바퀴의 λ 는 NaN (그 바퀴 속도는 오래된 값이다)
 #   CSV (log_prefix) + 종료 때 요약
 #
 # 슬립률 (구조도 정의, torque_mpc_todo.md "결정됨"):
@@ -20,7 +21,6 @@
 #   → 0.5 m/s 에서 λ 약 ±0.1 이 바닥 잡음이다. 그래서 평균·RMS 와 함께 "|λ| > noise_floor 인 비율" 을 낸다.
 # ---------------------------------------------------------------
 import math
-import signal
 import time
 
 import numpy as np
@@ -31,6 +31,7 @@ from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import Float64MultiArray
 
 from amr_interfaces.msg import WheelStates
+from amr_mpc.core import node_main
 from amr_mpc.torque.model import TorquePlant
 
 WHEELS = ("FL", "FR", "RL", "RR")
@@ -93,11 +94,20 @@ class SlipLoggerNode(Node):
         w = np.array(m.velocity, float)
         w_nom = self.Tinv @ self.v_body
         lam = slip_ratio(w, w_nom, self.eps)
+        # 실차: 응답이 없거나(fresh false) 에러인 바퀴의 velocity 는 마지막 값이 그대로 남아 있다 → 차체만 변하면 가짜 슬립.
+        # 그 바퀴는 NaN 으로 둔다 (R9 리뷰 2026-11-14). 시뮬 토픽 모드는 늘 fresh, 에러 0 이라 안 보였다.
+        bad = np.zeros(4, bool)
+        if len(m.fresh) == 4:
+            bad |= ~np.array(m.fresh, bool)
+        if len(m.error) == 4:
+            bad |= np.array(m.error) != 0
+        lam[bad] = math.nan
         t = m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
         data = [t, *lam, *w_nom]
         lam_ref = None
         if self.v_ref is not None:
             lam_ref = slip_ratio(w, self.Tinv @ self.v_ref, self.eps)
+            lam_ref[bad] = math.nan
             data += list(lam_ref)
         out = Float64MultiArray()
         out.data = [float(x) for x in data]
@@ -114,8 +124,14 @@ class SlipLoggerNode(Node):
         if mv.any():
             for i, wname in enumerate(WHEELS):
                 lam = R[mv, 2 + i]
+                n_bad = int(np.isnan(lam).sum())         # 응답 없음·에러로 뺀 행
+                lam = lam[~np.isnan(lam)]
+                if lam.size == 0:
+                    lines.append(f"  {wname}: 쓸 수 있는 행 없음 (응답 없음·에러 {n_bad}행)")
+                    continue
                 txt = (f"  {wname}: λ 평균 {lam.mean():+.3f}  RMS {np.sqrt(np.mean(lam**2)):.3f}  최대 |λ| {np.abs(lam).max():.3f}"
-                       f"  |λ|>{self.floor} 비율 {np.mean(np.abs(lam) > self.floor)*100:.1f} %")
+                       f"  |λ|>{self.floor} 비율 {np.mean(np.abs(lam) > self.floor)*100:.1f} %"
+                       + (f"  (응답 없음·에러로 뺀 행 {n_bad})" if n_bad else ""))
                 ref = R[mv, 6 + i]
                 if not np.all(np.isnan(ref)):
                     txt += f"   | 참값 λ RMS {np.sqrt(np.nanmean(ref**2)):.3f}  최대 {np.nanmax(np.abs(ref)):.3f}"
@@ -132,11 +148,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = SlipLoggerNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM 이 메시지 변환 중에 떨어져도 정상 종료, SIGTERM 에도 요약·CSV 저장 (R9 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         node.finish()
         try:
             node.destroy_node()
