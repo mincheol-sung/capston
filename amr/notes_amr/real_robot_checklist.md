@@ -5,20 +5,23 @@
 끝난 항목은 여기와 todo 양쪽에 체크하고, 값이 바뀌면 `stack_changelog.md` 에 적는다. 새 실차 항목은 맞는 단계 안에 넣는다.
 
 새 터미널마다 먼저 `amr`. 벤치 도구는 `src/amr_basic_stack/controller/mpc` 에서 돌린다.
+**ROS 를 쓰는 터미널(시뮬·4단계 이후)은 `amr` 다음에 `unset ROS_STATIC_PEERS`** — NUC `~/.bashrc` 의 무응답 peer 때문에 로컬 토픽이 수 초씩 밀린다(2026-11-14, 시뮬 IMU 200 → 11 Hz). `.bashrc` 정리는 팀 결정 대기.
+실차 데이터는 `analysis/torque_mpc_real/<날짜_무엇>/` 한 곳에 모은다 (bag 원본은 `bags/`, 리포 밖).
 
 ---
 
 ## 0. 전원 넣기 전 (멀티미터)
 
-- [ ] 전원 XT30 극성. 설치 지침 표가 "−: 빨강, +: 검정" 으로 관례와 반대라 문서 오류일 수 있다 → 실물로 확인
-- [ ] 드라이버 입력 16~28 V 안인가 (6S 만충 25.2 V)
-- [ ] CAN 종단: 전원 끈 상태에서 CAN_H–CAN_L 사이 약 60 Ω (양 끝 120 Ω 두 개)
+- [x] 전원 XT30 극성. 설치 지침 표가 "−: 빨강, +: 검정" 으로 관례와 반대라 문서 오류일 수 있다 → 실물로 확인 — 2026-11-14 팀원 벤치(네 모터 동작)로 간접 확인
+- [x] 드라이버 입력 16~28 V 안인가 (6S 만충 25.2 V) — 2026-11-14 같은 근거로 간접 확인
+- [x] CAN 종단: 전원 끈 상태에서 CAN_H–CAN_L 사이 약 60 Ω (양 끝 120 Ω 두 개) — 2026-11-14 직접 측정은 안 함. 팀원 벤치 FL·RR 111 s 동안 11100/11100 응답으로 간접 확인. 3단계에서 늦은 응답이 계속 늘면 그때 잰다
 
 ## 1. 모터 설정 — CubeMars 상위 프로그램 (시리얼 CP2102), 모터마다
 
-- [ ] MIT 모드인가 (서보 모드면 전환, 매뉴얼 4.1.1.10)
-- [ ] CAN ID 1~4 = FL FR RL RR (2026-11-11 벤치 로그로 확인됨 — 바뀌지 않았는지만)
+- [x] MIT 모드인가 (서보 모드면 전환, 매뉴얼 4.1.1.10) — 2026-11-14 MIT 명령에 네 모터 응답
+- [x] CAN ID 1~4 = FL FR RL RR (2026-11-11 벤치 로그로 확인됨 — 바뀌지 않았는지만) — 2026-11-14 status 로 다시 확인
 - [ ] **CAN 끊김(sudden interrupt) 설정** — 명령이 끊기면 모터가 스스로 서게. `kill -9`·정전·노드 멈춤 때는 코드가 아무것도 못 하므로 이것이 유일한 안전장치다
+  - 2026-11-14 시험: **공장값에는 보호가 없다** — FL 0.05 N·m 중 `kill -9`, 5 s 뒤 응답 v 11.6 rad/s·t 0.0525 N·m (계속 냄). 매뉴얼 V1.0.17 4.1.1.4 Application Function 에 항목이 있다. 상위 프로그램은 Windows 로 보이고, 값을 쓰기 전에 Read Parameters 먼저(4.1.1.5). 설정 뒤 2단계의 끊김 시험을 다시 해서 t 가 ±0.0012 로 떨어지는지 본다. **설정 전에는 3단계 이후 하지 않는다**. 결과: `analysis/torque_mpc_real/2026-11-14_bench/RESULTS_KO.md`
 - [ ] 필요하면 MIT 캘리브레이션 (4.2.2)
 
 ## 2. 벤치 — 바퀴를 띄우고 모터 하나씩 (ROS 없이)
@@ -28,12 +31,13 @@ bash tools/setup_can.sh                       # can0 준비 (모터 명령은 �
 /usr/bin/python3 tools/ak40_bench.py status --id 1
 ```
 
-- [ ] status: 4개 모두 응답 (위치·속도·토크·온도·에러 0)
+- [x] status: 4개 모두 응답 (위치·속도·토크·온도·에러 0) — 2026-11-14 error 0, 21~22 °C
 - [ ] 가정 확인: 모터 모드 밖에서 MIT 명령에 응답하나 / **명령이 끊기면 마지막 토크를 계속 내나** (1단계 끊김 설정 전후) / 응답 시간 4 ms 안인가 / 에러 코드 종류
-- [ ] damping: `damping --id N --spin 20` → 서는 시간으로 DAMPING kd(지금 0.02 추정)가 적당한지. 너무 약하면 정지 거리가 길고, 너무 세면 덜컥 선다
-- [ ] steps: `steps --id N --taus 0.02,0.04,0.06,0.1 --hold 3` → τ_fric(ω) 곡선. **FR·RL 재시험** (팀원 데이터가 중단된 판)
-- [ ] 작은 토크 정확도, 12 비트 양자화(한 칸 2.44 mN·m, "0" 이 +1.22 mN·m) — DAMPING 중 무부하 바퀴가 기어가는지(가짜 모터 0.056 rad/s)
-- [ ] torque: 무부하 최고 속도. V 범위 45.5 rad/s 에 가까운지 (넘으면 응답 속도가 잘린다)
+  - 2026-11-14: 끊김 → **계속 낸다(설정 전)** 확인. 시험 명령 `(/usr/bin/python3 tools/ak40_bench.py torque --id 1 --tau 0.05 --time 10 & P=$!; sleep 3; kill -9 $P; sleep 5; /usr/bin/python3 tools/ak40_bench.py status --id 1)`. 나머지 셋은 미확인
+- [x] damping: `damping --id N --spin 20` → 서는 시간으로 DAMPING kd(지금 0.02 추정)가 적당한지. 너무 약하면 정지 거리가 길고, 너무 세면 덜컥 선다 — 2026-11-14 네 모터 0.092~0.102 s (예측 0.091), 실제 kd 0.018~0.019. **kd 0.02 유지**
+- [x] steps: `steps --id N --taus 0.02,0.04,0.06,0.1 --hold 3` → τ_fric(ω) 곡선. **FR·RL 재시험** (팀원 데이터가 중단된 판) — 2026-11-14 오름 계단은 정지 마찰(출발 0.04~0.1 N·m)에 걸려 점이 모자라 **내림 계단 `--taus 0.1,0.06,0.04,0.03,0.02`** 로 네 바퀴 τc 0.018~0.022, bv 0.0017~0.0021. 지금 `torque_plant.yaml` 값과 고속에서 ±30 % 차이 → 반영은 PC 쪽 결정
+- [x] 작은 토크 정확도, 12 비트 양자화(한 칸 2.44 mN·m, "0" 이 +1.22 mN·m) — DAMPING 중 무부하 바퀴가 기어가는지(가짜 모터 0.056 rad/s) — 2026-11-14 응답 t·v 모두 반 칸 오프셋 양자화 확인. DAMPING 3 s 동안 위치 변화 ≤ 0.0004 rad → 안 기어감(쿨롱 마찰 약 20 mN·m ≫ 1.22)
+- [x] torque: 무부하 최고 속도. V 범위 45.5 rad/s 에 가까운지 (넘으면 응답 속도가 잘린다) — 2026-11-14 내림 계단 0.1 N·m 에서 약 41~42 rad/s 로 전압 한계(응답 τ 가 명령보다 최대 11 mN·m 낮음). 범위 안. 운용 상한 38.7 rad/s 와 여유 약 7 %
 - [ ] (메모) 드라이버의 K_T·기어 효율 가정은 응답 토크로는 못 잰다 — 관성을 아는 가속 시험 `τ ≈ J·α + τ_fric` 로 비교
 
 ## 3. 네 바퀴 장착, 바퀴 띄운 채 — CAN 노드만
@@ -62,6 +66,7 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 ```
 마지막 launch 가 robot_state_publisher(로봇 모델 TF)도 같이 띄운다. **`bringup.launch.py`(RoboClaw 구동 노드)·`localization.launch.py`(IMU 회전 노드가 하나 더 뜬다)는 띄우지 않는다.** `armed:=true` 는 실차에서 거부된다.
 
+- [ ] **세 터미널 모두 `unset ROS_STATIC_PEERS`** (또는 `.bashrc` 정리 뒤). 안 하면 IMU·포즈가 수 초씩 늦게 와서 추정기가 출력을 멈춘다(2026-11-14 시뮬에서 재현)
 - [ ] CAN 자동 준비: launch 첫 줄 로그 "CAN setup: …". sudo 암호를 묻는 설정이면 실패한다 → 먼저 `sudo -v`, 또는 손으로 준비하고 `auto_setup_can:=false`
 - [ ] TF 가 있는지: `ros2 run tf2_ros tf2_echo base_footprint camera_imu_optical_frame` 가 값을 낸다 (없으면 imu_to_base 가 "TF 대기 중" 에서 멈추고 추정기가 "IMU 0 개")
 - [ ] 노드가 겹치지 않는지: `ros2 node list` 에 imu_to_base_node·robot_state_publisher 가 하나씩만
@@ -79,8 +84,10 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 - [ ] AK40 교체 뒤 IMU 진동 잡음 재측정 (지금 0.95 m/s² 는 RoboClaw 시절 bag) — 추정기 잡음 설정과 MPC 튜닝이 이 값에 기대고 있다
 - [ ] **SLAM 포즈 튐으로 서는 횟수**: 실차 Cartographer 가 스캔 매칭을 고칠 때 0.15 m·15° 넘게 튀면 fault_monitor 가 세운다(`pose_jump`). 시뮬에는 튐이 없다. `/fault_monitor/fault` 에 pose_jump 가 자주 뜨면 문턱(`torque_estimator.yaml` jump_xy·jump_yaw_deg)이나 `trip_on_pose_jump` 를 정한다
 - [ ] 주행 중 갑자기 서면 `/fault_monitor/fault` 의 이유부터. 배터리가 낮으면 드라이버가 에러 4(저전압)를 낸다
-- [ ] 마찰 보상이 하중 실린 바닥에서도 맞는지: 일정 속도 직진에서 d̂ x ≈ 0 (또는 PI 적분이 0 근처). 약 10 rad/s 이상은 외삽 값이다
+- [ ] 마찰 보상이 하중 실린 바닥에서도 맞는지: 일정 속도 직진에서 d̂ x ≈ 0 (또는 PI 적분이 0 근처). 약 10 rad/s 이상은 외삽 값이다 — 2026-11-14 무부하 내림 계단으로 41 rad/s 까지 쟀다(바퀴별 값은 `analysis/torque_mpc_real/2026-11-14_bench/`). 바닥 하중에서는 롤러 마찰이 더해진다
 - [ ] 슬립률 잡음 바닥: 슬립이 없을 속도(0.2 m/s 직진)에서 slip_logger 요약의 |λ| RMS. 시뮬 추정기 잡음에서는 0.13~0.27 이었다. 실차 IMU 진동이 다르면 noise_floor(0.1)를 다시 정한다
+- [ ] **저속 출발**: 무부하 정지 마찰이 바퀴마다 0.04~0.1 N·m 로 운동 마찰(약 0.02)의 2~5 배이고, 마찰 보상은 ω = 0 에서 0 이다. 출발이 굼뜨거나 바퀴마다 출발 시각이 달라 틀어지는지
+- [ ] **DAMPING 정지 순간 슬립**: kd 0.02 의 첫 감속 추정 4.6 m/s²(4 kg 추정) > μ 0.3·g 2.9 m/s². 미끄러운 바닥에서 정지할 때 바퀴가 미끄러지는지(slip_logger)
 - [ ] 비교군 A 의 PI 게인: 저속 정지 마찰 근처에서 적분 떨림(limit cycle) 없는지
 - [ ] 실제 트랙 좌표: smoc_lab 지도 위 8자 자리 → `config/torque_track.yaml` `origin_x/y/yaw_deg`, 바닥 테이프
 
