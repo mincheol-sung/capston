@@ -238,6 +238,25 @@
 - [ ] `plant:=real` 센서 묶음 실차 확인: sensors.launch.py + cartographer(localization_torque_2d.lua, 지도) + imu_to_base_node + ak40_can_node. 종단 지연(`/ak40_can/status` 3번째 값) 측정
 - [ ] (선택) 응답 기다림·송신이 Python 타이머라 실차에서 100 Hz 가 흔들리면 C++ 로 옮긴다
 
+### 시뮬에서 안 보이는 실차 차이 — 남은 리뷰(R8~R10) 라운드마다 검사 (2026-11-13 사용자 요청)
+
+계기: 실차에서 추정기가 IMU 를 하나도 못 받았다. 실차 `imu_to_base_node` 는 BEST_EFFORT 로 내고 추정기는 RELIABLE 로 받으려 해서 연결이 막혔다. 시뮬은 RELIABLE 로 내서 서로 맞았다. 라운드마다 아래를 본다.
+
+- 배달 방식(QoS): 실차 상대(RealSense·Cartographer·ak40)가 내는 방식과 우리 구독이 붙는가. 센서 구독은 BEST_EFFORT(양쪽 다 받음), 잠금 토픽(`/mpc/armed`)은 발행·구독 모두 TRANSIENT_LOCAL
+- 시각 기준: stamp 를 어느 시계로 찍나(RealSense global time, 라이다 수신 시각, 시스템 시각). 서로 비교·차감하는 곳이 있는가
+- 실차 경로에만 있는 노드·설정: `imu_to_base_node`, Cartographer, `ak40_can_node`, `hardware_checked`, `auto_setup_can`. 시뮬에서는 한 번도 안 돈다
+- TF·프레임: 실차에서 TF 가 없으면 조용히 기다리는 노드(imu_to_base). frame_id 가 시뮬과 같은가
+- 주기·지연·흔들림: 시뮬은 일정하다. 실차 주기·몰림·CPU 부하(NUC 에 센서·Cartographer 같이 돎)
+- 기동 순서: 센서·측위를 따로 띄운다. 먼저 뜬 노드가 기다리는 동안 조용히 멈춰 있지 않고 로그로 알리는가
+- 시뮬을 실차에 맞출 수 있으면 맞춘다(예: 시뮬 IMU 도 BEST_EFFORT 로 냄). 맞출 수 없으면 여기 실차 확인 과제로 남긴다
+
+이번에 고친 것(2026-11-13): 추정기 IMU 구독 BEST_EFFORT, 시뮬 IMU 발행 BEST_EFFORT, 추정기 입력 감시 로그(IMU·포즈 0 개, IMU stamp 와 시스템 시각 차, 포즈 stamp 가 IMU 보다 미래), torque 실험 launch 의 `imu_to_base_node` 자이로 바이어스 보정 끔(추정기와 이중 보정), 시뮬 기동 로그가 바퀴별 마찰(배열)에서 죽던 것.
+
+실차에서 확인할 것:
+- [ ] `ros2 topic info -v /imu/base_link` — 발행 BEST_EFFORT, 구독(state_estimator) BEST_EFFORT. 추정기 로그 "준비 끝. 바이어스 …" 가 나오는지
+- [ ] 추정기 로그에 "IMU stamp 가 시스템 시각과 … 어긋남" 이 없는지(RealSense `global_time_enabled` 기본 켬에 기대고 있다 — sensors.launch.py 에 명시 안 됨)
+- [ ] "SLAM 포즈 stamp 가 IMU 시각보다 … 미래", "너무 오래된 stamp 의 포즈" 가 없는지(라이다 수신 시각과 RealSense 시각이 맞는지)
+
 ### 측정 (1판 10절 목록 + 트랙)
 
 - [ ] m: 저울. 적재 조건마다.
@@ -316,6 +335,7 @@
 - 2026-11-13 (5): **R5(torque_mpc C++) 리뷰 완료.** 식·제약·비용·노드 안전 규칙 모두 맞음. 기준·상태 좌표계가 다르면 풀지 않게 함. 재무장 토크 0.09~0.12 N·m 로 측정해 "공격적인 MPC" 과제 닫음. 자세한 내용은 `stack_changelog.md` 2026-11-13 (3).
 - 2026-11-13 (6): **R6(torque_output·게이트) 리뷰 완료.** 구멍 셋을 실측하고 막음: 게이트를 Ctrl+C 로 끌 때 마지막 DAMPING 이 안 나가던 것, NaN·inf 토크가 정지가 아니던 것(inf → 최대 토크), 정지와 중계의 발행 순서. 시험 133개 통과, 시뮬 B 12.7 mm 그대로. CAN 다리의 NaN 처리는 R8 에서. 자세한 내용은 `stack_changelog.md` 2026-11-13 (4).
 - 2026-11-13 (7): **R7(비교군 A) 리뷰 완료.** 퓨어 퍼슛·바퀴 PI 계산과 B 와 같은 상한·정지 규칙 확인. MPC 와 같은 좌표계 검사를 퓨어 퍼슛에도 넣음. A 재무장 토크 0.05~0.06 N·m (B 0.09~0.12 보다 부드러움). 시험 134개, 시뮬 A 5.1 mm. fault_monitor 가 종료 중 죽는 것을 봄 → R9. 자세한 내용은 `stack_changelog.md` 2026-11-13 (5).
+- 2026-11-13 (8): **실차 IMU 연결 실패 고침 + 시뮬·실차 차이 점검(사용자 요청).** 실차 IMU(BEST_EFFORT 발행)를 추정기가 RELIABLE 로 받으려 해 연결이 막혔다 → 추정기 구독 BEST_EFFORT, 시뮬 IMU 도 BEST_EFFORT 로 실차에 맞춤. 추정기 입력 감시 로그(IMU·포즈 0 개, 시각 기준 차이), 실차 imu_to_base 의 이중 자이로 바이어스 보정 끔, 바퀴별 마찰 변경 뒤 시뮬이 켜지자마자 죽던 것 고침. 남은 리뷰 R8~R10 은 라운드마다 "시뮬에서 안 보이는 실차 차이" 절 목록으로도 검사. 시험 162개, 시뮬 B 12.8 mm, A 5.1~6.3 mm. 자세한 내용은 `stack_changelog.md` 2026-11-13 (6).
 - 2026-11-08: 실측·검증이 필요한 항목만 뽑아 `notes/torque_mpc_verification.md`를 만듦(노션 업로드용). d̂ 계단 오차 계산을 "수 cm"에서 "최대 약 10 cm"로 정정.
 - 2026-11-06 (7): 외부 검토 의견 반영. d̂와 SLAM 보정 스텝 충돌 과제·교수님 확인 항목 추가, B는 모터 한계만 둔다고 명시, J_w 데이터시트 해석(로터 기준인지) 확인 항목 추가.
 - 2026-11-06 (6): NUC Cartographer 2.0.9004 소스 확인 — 외삽은 위치에 가속도를 쓰지 않는다(일정 속도 가정, IMU 가속도는 중력 방향 추정에만 사용).

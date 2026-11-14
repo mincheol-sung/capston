@@ -2,7 +2,7 @@
 # state_estimator — SLAM 포즈(약 10 Hz, 늦게 도착) + IMU(200 Hz) → 100 Hz 상태 추정값 (구조도 v3).
 #   ros2 run amr_mpc state_estimator_node
 # ---------------------------------------------------------------
-#   /imu/base_link          (sensor_msgs/Imu)             몸체 좌표 가속도 a_x, a_y, 자이로 ω_z
+#   /imu/base_link          (sensor_msgs/Imu, BEST_EFFORT) 몸체 좌표 가속도 a_x, a_y, 자이로 ω_z
 #   /tracked_pose           (geometry_msgs/PoseStamped)   Cartographer tracking_frame(카메라 IMU 위치)의 map 포즈
 #   /scan_matched_points2   (sensor_msgs/PointCloud2)     pose_source: after_scan_match 일 때만 — 새 스캔 매칭이 반영됐다는 신호
 #      ↓  amr_mpc/torque/estimator.py (계산·근거는 그 파일 머리주석)
@@ -26,6 +26,7 @@ import rclpy
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
 from sensor_msgs.msg import Imu, PointCloud2
 from std_msgs.msg import Float64MultiArray
@@ -70,10 +71,24 @@ class StateEstimatorNode(Node):
 
         self.pub = self.create_publisher(Odometry, str(g("output_topic")), 20)
         self.pub_status = self.create_publisher(Float64MultiArray, "/state_estimator/status", 10)
-        self.create_subscription(Imu, str(g("imu_topic")), self.on_imu, 50)
+        # IMU 는 BEST_EFFORT 로 받는다 (실차에서 IMU 가 안 붙던 문제, 2026-11-13). 실차 imu_to_base_node 가 RealSense 에 맞춰 BEST_EFFORT 로
+        # 내는데, 숫자(50)만 넘기면 RELIABLE 구독이 돼 연결이 막힌다 — IMU 가 0 개 → 바이어스 초기화가 안 끝나 출력 없음.
+        # BEST_EFFORT 구독은 RELIABLE 발행(시뮬)과도 붙는다.
+        sensor_qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=50)
+        self.create_subscription(Imu, str(g("imu_topic")), self.on_imu, sensor_qos)
         self.create_subscription(PoseStamped, str(g("pose_topic")), self.on_pose, 50)
         if self.pose_source == "after_scan_match":
             self.create_subscription(PointCloud2, str(g("scan_matched_topic")), self.on_scan_matched, 10)
+        # 입력 감시 (실차 점검, 2026-11-13). 시뮬은 모든 노드가 같은 시계·같은 설정이라 드러나지 않는 실패를 로그로 보인다.
+        #   · IMU·포즈가 아예 안 오면 (토픽 이름, 배달 방식(QoS), TF 대기 등) 아무 출력 없이 조용히 멈춰 있게 된다.
+        #   · IMU stamp 는 MPC 가 기준열(시스템 시각 stamp)을 고르는 시각이 된다 → 시스템 시각과 어긋나면 기준이 밀린다.
+        #   · 포즈 stamp 가 IMU 시각보다 미래면 그 시각의 추정값을 못 찾아 최신 값과 비교한다 (조용히 틀림).
+        self.declare_parameters("", [("clock_tolerance", 0.1), ("input_check_period", 2.0)])
+        self.clock_tol = float(g("clock_tolerance"))
+        self.n_imu = self.n_pose = 0
+        self.t_start = self.now_s()
+        self.create_timer(float(g("input_check_period")), self.check_inputs)
+        self.imu_topic, self.pose_topic = str(g("imu_topic")), str(g("pose_topic"))
         e = self.est
         self.get_logger().info(
             f"state_estimator: {g('imu_topic')} + {g('pose_topic')} [{self.pose_source}] → {g('output_topic')} "
@@ -83,11 +98,33 @@ class StateEstimatorNode(Node):
             f"K_psi {e.K_yaw[0]:.3f}  K_bg {e.K_yaw[1]:.4f} 1/s\n"
             f"  정지 상태에서 {e.init_s:.1f} s 동안 바이어스를 잡는다 — 그동안 로봇을 움직이지 말 것")
 
+    def now_s(self):
+        return self.get_clock().now().nanoseconds * 1e-9
+
+    def check_inputs(self):
+        """입력이 안 들어와 출력이 없는 이유를 주기적으로 알린다 (준비가 끝나면 조용)."""
+        if self.was_ready:
+            return
+        waited = self.now_s() - self.t_start
+        if self.n_imu == 0:
+            self.get_logger().error(
+                f"{waited:.0f} s 동안 IMU 0 개 ({self.imu_topic}). 확인: ros2 topic info -v {self.imu_topic} "
+                f"(발행자가 있는지, 배달 방식 QoS), imu_to_base_node 의 TF 대기 로그")
+        elif not self.est.bias_ready:
+            self.get_logger().warning(f"IMU {self.n_imu} 개 받음 — 정지 바이어스 아직 (로봇이 흔들리면 다시 모은다)")
+        if self.n_pose == 0:
+            self.get_logger().error(f"{waited:.0f} s 동안 SLAM 포즈 0 개 ({self.pose_topic}) — Cartographer 측위가 떠 있는지 확인")
+
     def on_scan_matched(self, _msg):
         self.take_next_pose = True
 
     def on_pose(self, m):
         t = stamp_s(m.header)
+        self.n_pose += 1
+        if self.est.t is not None and t - self.est.t > 0.05:
+            self.get_logger().warning(
+                f"SLAM 포즈 stamp 가 IMU 시각보다 {t - self.est.t:.3f} s 미래 — 두 센서의 시각 기준이 다르다 "
+                f"(라이다·RealSense 시각 설정 확인)", throttle_duration_sec=2.0)
         if self.pose_source == "stamped":
             if t <= self.last_pose_stamp:              # 같은 스캔의 포즈가 다시 온 것
                 return
@@ -105,7 +142,9 @@ class StateEstimatorNode(Node):
         elif r == "reset":
             self.get_logger().error("SLAM 포즈가 계속 다른 곳을 가리킨다 — 그 포즈로 다시 초기화했다")
         elif r == "old":
-            self.get_logger().warning("너무 오래된 stamp 의 포즈 — 버림", throttle_duration_sec=2.0)
+            self.get_logger().warning(
+                f"너무 오래된 stamp 의 포즈 ({self.est.t - t:.3f} s 전 > {self.est.max_pose_age} s) — 버림. "
+                f"계속되면 SLAM 지연이나 두 센서의 시각 기준 차이", throttle_duration_sec=2.0)
         if r in ("used", "jump", "reset") and self.est.t is not None:
             e, s = self.est.last_residual, Float64MultiArray()
             s.data = [float(self.est.t), float(e[0]), float(e[1]), float(e[2]), float(self.est.b_a[0]),
@@ -115,6 +154,12 @@ class StateEstimatorNode(Node):
 
     def on_imu(self, m):
         t = stamp_s(m.header)
+        self.n_imu += 1
+        lag = self.now_s() - t
+        if abs(lag) > self.clock_tol:
+            self.get_logger().warning(
+                f"IMU stamp 가 시스템 시각과 {lag:+.3f} s 어긋남 (허용 {self.clock_tol} s) — MPC 가 기준열을 그만큼 "
+                f"밀린 시각에서 고른다. RealSense global_time_enabled, 시각 동기 확인", throttle_duration_sec=2.0)
         if not self.est.imu(t, m.linear_acceleration.x, m.linear_acceleration.y, m.angular_velocity.z):
             return
         if not self.was_ready:

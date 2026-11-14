@@ -141,7 +141,10 @@ def _nodes(context):
         # IMU: D455 원본(/camera/imu, optical 프레임) → 몸체 프레임 /imu/base_link (localization.launch.py 와 같은 노드)
         nodes.append(Node(
             package="amr_perception_bringup", executable="imu_to_base_node", name="imu_to_base_node", output="screen",
-            parameters=[{"target_frame": "base_footprint"}],
+            # bias_calib_s 0: 회전만 한다. 자이로 바이어스는 state_estimator 가 기동 정지 구간에서 잡는다.
+            #   이 노드도 바이어스를 빼면 (기본 3 s) 추정기가 1 s 만에 잡은 바이어스가 3 s 째에 한 번 더 빠져
+            #   자이로가 그만큼 계단처럼 어긋난다. 시뮬에는 이 노드가 없어 드러나지 않는다 (실차 점검 2026-11-13).
+            parameters=[{"target_frame": "base_footprint", "bias_calib_s": 0.0}],
             remappings=[("imu_in", "/camera/imu"), ("imu_out", "/imu/base_link")]))
         nodes.append(LogInfo(msg=(
             "plant:=real — 이 launch 는 모터(ak40_can_node)와 IMU 회전 노드만 띄운다. 다른 터미널에서 먼저:\n"

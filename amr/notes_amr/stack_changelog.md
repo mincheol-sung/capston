@@ -51,9 +51,23 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 | `2026-11-12_2048` | 리뷰 R1·R2(마찰 몫 경고, 시뮬 구동계 마찰 + 팀원 벤치 값) |
 | `2026-11-13_1506` | 리뷰 R3~R5(SLAM 끊김 감시, 기준열 0.05 s, 좌표계 검사, run_compare.sh) |
 | `2026-11-13_1654` | 리뷰 R6(게이트 Ctrl+C 마지막 DAMPING, NaN·inf → DAMPING, 발행 순서) |
-| `2026-11-13_1720` | 리뷰 R7(퓨어 퍼슛 좌표계 검사) — 지금 `stack_status.sh`가 비교하는 기준 |
+| `2026-11-13_1720` | 리뷰 R7(퓨어 퍼슛 좌표계 검사) |
+| `2026-11-13_1900` | 실차 IMU QoS(BEST_EFFORT)·추정기 입력 감시·시뮬 IMU BEST_EFFORT·imu_to_base 이중 보정 끔·시뮬 기동 로그 — 지금 `stack_status.sh`가 비교하는 기준 |
 
 ## 변경 기록
+
+### 2026-11-13 (6) — 실차 IMU 연결 실패(QoS) 고침 + 시뮬·실차 차이 점검
+- 왜: 실차에서 state_estimator 가 IMU 를 하나도 못 받았다 (다른 세션 "SMC 브랜치 연결" 이 원인 확인, 사용자가 이 작업공간에서 고치라고 함). 실차 `imu_to_base_node` 는 `/imu/base_link` 를 BEST_EFFORT 로 내는데 추정기는 숫자(50)만 넘겨 RELIABLE 로 구독 → 연결 막힘 → 바이어스 초기화가 안 끝나 출력 없음 → MPC 도 안 움직임. 시뮬은 RELIABLE 로 내서 안 드러났다
+- 바꾼 것
+  - `amr_mpc/nodes/state_estimator.py`: IMU 구독을 BEST_EFFORT(KEEP_LAST 50)로. BEST_EFFORT 구독은 RELIABLE 발행(시뮬)과도 붙는다. 발행 쪽은 안 바꿈(200 Hz 재전송, 다른 구독자 영향)
+  - 같은 파일: **입력 감시** — 준비 전까지 2 s 마다 IMU·포즈 0 개면 오류 로그(확인 명령 포함). IMU stamp 가 시스템 시각과 0.1 s(`clock_tolerance`) 넘게 어긋나면 경고(MPC 가 기준열을 그만큼 밀린 시각에서 고른다). 포즈 stamp 가 IMU 시각보다 0.05 s 넘게 미래면 경고(그 시각 추정값을 못 찾아 최신 값과 비교하게 된다). "오래된 포즈" 경고에 나이 표시
+  - `amr_mpc/nodes/sim_plant_torque.py`: 시뮬 IMU 를 실차처럼 BEST_EFFORT 로 낸다 → RELIABLE 구독 실수를 시뮬에서도 잡는다
+  - `launch/torque_experiment.launch.py` (plant:=real): `imu_to_base_node` 에 `bias_calib_s: 0.0`. 이 노드가 기동 3 s 동안 자이로 바이어스를 잡아 빼는데, 추정기도 1 s 만에 같은 바이어스를 잡는다 → 3 s 째에 한 번 더 빠져 자이로가 바이어스만큼 계단처럼 어긋났다. 실차에만 있는 노드라 시뮬에서 안 보였다
+  - `sim_plant_torque.py` 기동 로그: 마찰 계수가 바퀴별 4 개(오늘 17:23 `torque_plant.yaml`·`model.py` 변경, 이 기록에 없음)가 된 뒤 `{coulomb:.4f}` 형식에서 **시뮬 노드가 켜지자마자 죽었다** → 배열로 찍게 고침
+  - `test/test_torque_estimator.py`: 3개 추가 — BEST_EFFORT 로 낸 IMU 를 추정기가 받는다 / RELIABLE 도 받는다 / 시뮬 IMU 발행이 BEST_EFFORT
+- 점검했지만 문제없음: `/camera/imu`(RealSense) → imu_to_base 는 BEST_EFFORT 짝, Cartographer 는 `/camera/imu` 원본을 따로 받음, `/tracked_pose`·`/scan_matched_points2` 는 Cartographer 기본(RELIABLE)과 우리 기본 구독이 짝, `/mpc/armed` 는 발행·구독 모두 TRANSIENT_LOCAL, `/mpc/arm` 은 게이트가 기본(VOLATILE) 구독이라 `ros2 topic pub`·fault_monitor·잠금 발행 모두 붙음. URDF(xacro)에 base_footprint·camera_imu_optical_frame·camera_gyro_frame 있음. 카메라 장착 회전 0
+- 실차 확인으로 남김: RealSense `global_time_enabled`(기본 켬에 기대고 있다, sensors.launch.py 에 명시 없음), 라이다 수신 시각과 IMU 시각이 맞는지 — 새 경고로 보인다. 목록은 todo "시뮬에서 안 보이는 실차 차이" 절
+- 확인: Python 시험 162개 통과(다른 작업으로 늘어난 것 포함). 시뮬 B 12.8 mm·최대 35 mm, A 6.3 / 5.1 mm(두 판, 평소 5.1~5.5 범위 흔들림). 새 경고는 시뮬에서 한 번도 안 뜸, 추정기 "준비 끝" 정상
 
 ### 2026-11-13 (5) — 리뷰 R7 (비교군 A): 퓨어 퍼슛에도 좌표계 검사, 재무장 토크 측정
 - 왜: R7 리뷰. 계산부는 문제 없음. R5 에서 MPC 에 넣은 기준·상태 좌표계 검사가 A 에는 없어 정지 규칙이 갈라져 있었다 (공정성 기준 "같은 정지 규칙")

@@ -10,7 +10,7 @@
 #   TF map → base_footprint                                   ← RViz 용 (publish_tf)
 #
 # 센서 흉내 (sensors:=true, 4단계 state_estimator 용 — amr_mpc/torque/sim_sensors.py)
-#   /imu/base_link         (sensor_msgs/Imu, 200 Hz)        몸체 좌표 가속도·자이로. 바이어스 + 움직일 때 커지는 진동 잡음
+#   /imu/base_link         (sensor_msgs/Imu, 200 Hz, BEST_EFFORT — 실차와 같게)      몸체 좌표 가속도·자이로. 바이어스 + 움직일 때 커지는 진동 잡음
 #   /tracked_pose          (geometry_msgs/PoseStamped)      tracking_frame(카메라 IMU 위치)의 map 포즈. 스캔 매칭 10 Hz, 0.13 s 늦게
 #   /scan_matched_points2  (sensor_msgs/PointCloud2, 빈 것)  slam_mode:=extrapolated 일 때 새 스캔 매칭이 반영되는 틱마다
 #   센서를 켜면 물리 틱이 IMU 주기(200 Hz)가 되고, /wheel_states·참값은 그 절반(100 Hz)으로 낸다.
@@ -44,6 +44,7 @@ from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu, PointCloud2
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
 from tf2_ros import TransformBroadcaster
 
@@ -128,7 +129,10 @@ class SimPlantTorqueNode(Node):
             self.pub_div = max(1, int(round(float(g("imu_rate_hz")) / float(g("rate_hz")))))
             self.dt = self.dt / self.pub_div                  # 물리 틱 = IMU 주기
             self.nsub = max(1, self.nsub // self.pub_div)
-            self.pub_imu = self.create_publisher(Imu, str(g("imu_topic")), 20)
+            # 실차와 같은 배달 방식(BEST_EFFORT)으로 낸다 — 실차 imu_to_base_node 가 RealSense 에 맞춰 BEST_EFFORT 로 낸다.
+            # 시뮬만 RELIABLE 이면 RELIABLE 로 받는 구독자도 시뮬에서는 붙어서, 실차에서만 끊기는 잘못을 놓친다 (2026-11-13).
+            imu_qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=20)
+            self.pub_imu = self.create_publisher(Imu, str(g("imu_topic")), imu_qos)
             self.pub_pose = self.create_publisher(PoseStamped, str(g("pose_topic")), 20)
             self.pub_smp = self.create_publisher(PointCloud2, str(g("scan_matched_topic")), 5)
         self.timeout = float(g("cmd_timeout"))
@@ -155,7 +159,8 @@ class SimPlantTorqueNode(Node):
             + ("슬립 없음" if self.slip is None else
                f"슬립 모델 μ {self.slip.mu:.2f} (바퀴당 최대 {self.slip.Fmax:.2f} N, 토크로 {self.p.r/math.sqrt(2)*self.slip.Fmax:.3f} N·m)")
             + ("  구동계 마찰 없음" if self.fric is None else
-               f"  구동계 마찰 coulomb {self.fric.coulomb:.4f} N·m + viscous {self.fric.viscous:.5f}·ω (ω_s {self.fric.smooth} rad/s)")
+               f"  구동계 마찰 [FL FR RL RR] coulomb {np.array2string(self.fric.coulomb, precision=4)} N·m"
+               f" + viscous {np.array2string(self.fric.viscous, precision=5)}·ω (ω_s {self.fric.smooth} rad/s)")
             + ("" if self.sensors is None else
                f"\n  센서 흉내: IMU {1/self.dt:.0f} Hz @ ({self.sensors.r[0]:.3f}, {self.sensors.r[1]:.3f}) m, "
                f"SLAM {self.sensors.c['slam_mode']} 지연 {self.sensors.c['slam_latency']*1e3:.0f} ms, "
