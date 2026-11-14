@@ -54,7 +54,7 @@ ros2 topic pub -r 50 /wheel_torque_cmd amr_interfaces/msg/WheelTorqueCommand "{m
 - [ ] 위가 끝나면 `config/ak40.yaml` `hardware_checked: true` — 그 전에는 노드가 토크를 ±0.1 N·m 로 묶는다. **1단계 CAN 끊김 설정이 끝난 뒤에만**
 - [x] 100 Hz 가 흔들리지 않는지 (`ros2 topic hz /wheel_states`, `/ak40_can/status` 5번째 값 = 틱 ms). 흔들리면 송수신을 C++ 로 옮기는 것 검토 — 2026-11-14 DAMPING 중 100.002 Hz, 간격 표준편차 0.05 ms, 틱 평균 0.79 ms·최대 1.34 ms → C++ 불필요
 - [x] **네 모터 응답 시간**: `ros2 topic echo /ak40_can/status` 의 4번째 값(응답 수)이 늘 4 인지, 7번째 값(누적 늦은 응답)이 계속 늘어나는지. 늘 늦으면 `config/ak40.yaml` `reply_wait` 를 0.004 → 0.008 정도로 (10 ms 주기 안). 늦은 응답은 다음 주기에 반영돼 멈추지는 않지만 바퀴 상태가 10 ms 늦어진다
-  - 2026-11-14 `candump` 로 잰 응답 도착(명령 송신 뒤): FL 0.60·FR 0.65·RL 1.13·RR 1.17 ms(최대 1.22) — **버스는 4 ms 안에 다 온다.** 그런데 늦은 응답 수는 주기마다 정확히 2 씩 늘었다(11 s 동안 175 → 2407). 원인은 노드 쪽: 지난 주기에 늦게 온 RL·RR 응답을 `take_pending` 이 이번 주기 fresh 로 세서, FL·FR 새 응답(0.6 ms)만으로 4 개가 차 `collect` 가 0.7 ms 에 끝나고, RL·RR 새 응답(1.1 ms)은 또 다음 주기로 밀린다 — 한 번 생기면 계속 유지된다. **RL·RR 바퀴 상태가 늘 한 주기(10 ms) 늦다.** `reply_wait` 를 늘려도 안 고쳐진다(기다리기 전에 끝나므로). 코드 수정은 PC 쪽(todo)
+  - 2026-11-14 `candump` 로 잰 응답 도착(명령 송신 뒤): FL 0.60·FR 0.65·RL 1.13·RR 1.17 ms(최대 1.22) — **버스는 4 ms 안에 다 온다.** 그런데 늦은 응답 수는 주기마다 정확히 2 씩 늘었다(11 s 동안 175 → 2407). 원인은 노드 쪽: 지난 주기에 늦게 온 RL·RR 응답을 `take_pending` 이 이번 주기 fresh 로 세서, FL·FR 새 응답(0.6 ms)만으로 4 개가 차 `collect` 가 0.7 ms 에 끝나고, RL·RR 새 응답(1.1 ms)은 또 다음 주기로 밀린다 — 한 번 생기면 계속 유지된다. **RL·RR 바퀴 상태가 늘 한 주기(10 ms) 늦다.** `reply_wait` 를 늘려도 안 고쳐진다(기다리기 전에 끝나므로). → 같은 날 NUC 에서 고침(collect 는 이번 주기 응답만 셈). 고친 뒤 실차 11 s: 늦은 응답 4 → 4(안 늘어남), 틱 평균 1.24 ms, 99.999 Hz
 - [x] **kill 로 꺼도 서는지**: 토크를 주는 중 다른 터미널에서 `pkill -TERM -f ak40_can_node` → 바퀴가 먼저 제동(DAMPING 0.5 s)된 뒤 풀리는지, 로그 "DAMPING 뒤 모터 모드 해제" — 2026-11-14 0.08 N·m 로 도는 중 SIGTERM → "틱" 하고 제동 후 정지, 화면에 `DAMPING 뒤 모터 모드 해제` (이 줄은 print 라 로그 파일엔 안 남는다). `pkill -f` 가 `ros2 run` 껍데기도 같이 죽여서 "Terminated" 가 먼저 찍히고 프롬프트 뒤에 해제 줄이 나온다 — 정상
 - [x] **끌 때 송신 실패**: 팀원 벤치에서 끌 때 "No buffer space available"(slcan 송신 버퍼 넘침)가 한 번 나왔다. 종료 로그에 "CAN 송신 실패" 가 있는지. 모터 모드 나오기가 빠지면 모터는 DAMPING 상태로 남는다(안전한 쪽) — 2026-11-14 SIGTERM 1 회, "CAN 송신 실패" 없음 (한 번뿐이라 가끔 나는지는 계속 본다)
 - [x] **모터 하나 전원을 껐다 켜기**(노드 켠 채): 그 바퀴 error 255 → 전원이 돌아오면 노드가 다시 모터 모드에 넣어 응답이 돌아오는지. 돌고 있는 모터가 모터 모드 명령을 다시 받았을 때 튀지 않는지
@@ -74,21 +74,22 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 마지막 launch 가 robot_state_publisher(로봇 모델 TF)도 같이 띄운다. **`bringup.launch.py`(RoboClaw 구동 노드)·`localization.launch.py`(IMU 회전 노드가 하나 더 뜬다)는 띄우지 않는다.** `armed:=true` 는 실차에서 거부된다.
 
 - [ ] **세 터미널 모두 `unset ROS_STATIC_PEERS`** (또는 `.bashrc` 정리 뒤). 안 하면 IMU·포즈가 수 초씩 늦게 와서 추정기가 출력을 멈춘다(2026-11-14 시뮬에서 재현)
-- [ ] CAN 자동 준비: launch 첫 줄 로그 "CAN setup: …". sudo 암호를 묻는 설정이면 실패한다 → 먼저 `sudo -v`, 또는 손으로 준비하고 `auto_setup_can:=false`
-- [ ] TF 가 있는지: `ros2 run tf2_ros tf2_echo base_footprint camera_imu_optical_frame` 가 값을 낸다 (없으면 imu_to_base 가 "TF 대기 중" 에서 멈추고 추정기가 "IMU 0 개")
-- [ ] 노드가 겹치지 않는지: `ros2 node list` 에 imu_to_base_node·robot_state_publisher 가 하나씩만
-- [ ] `ros2 topic info -v /imu/base_link` — 발행 `imu_to_base_node` BEST_EFFORT, 구독 `state_estimator_node` BEST_EFFORT
-- [ ] IMU 주기: `ros2 topic hz /imu/base_link` 가 D455 주기 그대로(두 배가 아님), 가속도 값이 몇 표본마다 바뀌는지 (D455 는 가속도·자이로 주기가 다르다)
-- [ ] 추정기 로그 "준비 끝. 바이어스 …" 가 나온다. "IMU 0 개", "SLAM 포즈 0 개" 오류가 없다
-- [ ] 추정기 로그에 시각 경고가 없다: "IMU stamp 가 시스템 시각과 … 어긋남", "SLAM 포즈 stamp 가 IMU 시각보다 … 미래", "너무 오래된 stamp 의 포즈" (RealSense `global_time_enabled` 기본 켬에 기대고 있다)
-- [ ] `/wheel_states` 의 error 가 네 바퀴 모두 0
+- [ ] **전면 라이다 연결** — 2026-11-14 4단계(책상 위, 바퀴 띄움, 무장 안 함)에서 전면 RPLIDAR 가 USB 에 아예 안 잡힘: CP210x 장치가 후면(`fc55e23e…` → `/dev/lidar_rear`) 하나뿐, `/dev/lidar_front`(시리얼 `f2d6a1d4…`) 없음, `rplidar_front` 가 `code: 80008004` 로 바로 죽음 → `/scan_front`·`/scan` 0, `/tracked_pose`·추정기 출력 0. USB 선·어댑터·전원 확인 뒤(`lsusb | grep -c CP210` 가 2, `ls /dev/lidar_*` 에 front) 4단계 다시. 참고: `/dev/ttyUSB0`(CP2102N)은 후면 라이다다 — CubeMars R-Link 가 아니다
+- [x] CAN 자동 준비: launch 첫 줄 로그 "CAN setup: …". sudo 암호를 묻는 설정이면 실패한다 → 먼저 `sudo -v`, 또는 손으로 준비하고 `auto_setup_can:=false` — 2026-11-14 `CAN setup: can0 already UP` (sudo 없이 통과)
+- [x] TF 가 있는지: `ros2 run tf2_ros tf2_echo base_footprint camera_imu_optical_frame` 가 값을 낸다 (없으면 imu_to_base 가 "TF 대기 중" 에서 멈추고 추정기가 "IMU 0 개") — 2026-11-14 (0.098, 0.017, 0.140) m, RPY (−90°, 0, −90°). 추정기 IMU 기준점 (0.098, 0.017) 과 같다
+- [x] 노드가 겹치지 않는지: `ros2 node list` 에 imu_to_base_node·robot_state_publisher 가 하나씩만 — 2026-11-14 22 개 노드 모두 하나씩
+- [x] `ros2 topic info -v /imu/base_link` — 발행 `imu_to_base_node` BEST_EFFORT, 구독 `state_estimator_node` BEST_EFFORT — 2026-11-14 맞음 (구독에 `ekf_carto` 도 BEST_EFFORT 로 붙어 있음)
+- [x] IMU 주기: `ros2 topic hz /imu/base_link` 가 D455 주기 그대로(두 배가 아님), 가속도 값이 몇 표본마다 바뀌는지 (D455 는 가속도·자이로 주기가 다르다) — 2026-11-14 `/camera/imu` 200.6 Hz → `/imu/base_link` 200.6 Hz (두 배 아님), 수신−stamp 0.8 ms. 다시 띄워 10 s: `/camera/imu` 200.4 Hz 중 **가속도는 2 표본마다 바뀐다(100.2 Hz 갱신, 같은 값 2 개 이어짐 970 회 / 1·3·4 개 33 회)**, 자이로는 매 표본. 즉 가속도는 5 ms 마다 같은 값을 한 번 더 낸다(zero-order hold)
+- [ ] 추정기 로그 "준비 끝. 바이어스 …" 가 나온다. "IMU 0 개", "SLAM 포즈 0 개" 오류가 없다 — 2026-11-14 정지 바이어스는 2 s 안에 잡힘("바이어스 아직" 은 첫 검사 한 번), "IMU 0 개" 없음. "SLAM 포즈 0 개" 는 전면 라이다 때문 → 라이다 연결 뒤 다시
+- [ ] 추정기 로그에 시각 경고가 없다: "IMU stamp 가 시스템 시각과 … 어긋남", "SLAM 포즈 stamp 가 IMU 시각보다 … 미래", "너무 오래된 stamp 의 포즈" (RealSense `global_time_enabled` 기본 켬에 기대고 있다) — 2026-11-14 170 s 동안 IMU stamp 경고 없음. 포즈 쪽 경고는 포즈가 없어 미확인
+- [x] `/wheel_states` 의 error 가 네 바퀴 모두 0 — 2026-11-14 100.2 Hz, 에러 로그 없음 (다른 ROS 프로세스가 켜지고 꺼질 때 `응답 3/4`·`2/4` 단발 2 회)
 
 ## 5. 바닥 주행 — 낮은 속도부터, 무장은 키보드 `a`, 정지 `s`·스페이스
 
 - [ ] **무장 순서**: `a` 는 4단계의 "준비 끝" 과 error 0 을 본 뒤에. 그 전에 무장하면 fault_monitor 가 바로 세운다(정상 동작 — 모터 응답 없음 255, 상태 안 옴)
 - [ ] 종단 지연: `/ak40_can/status` 3번째 값 [ms] (토크 모드에서만 나온다)
-- [ ] **IMU 장착 y 좌표**: 제자리 회전에서 추정 속도가 0 근처인가 (설정 +0.017 m 는 9/23 bag 값, 지금 URDF 로는 −0.030 m)
-- [ ] AK40 교체 뒤 IMU 진동 잡음 재측정 (지금 0.95 m/s² 는 RoboClaw 시절 bag) — 추정기 잡음 설정과 MPC 튜닝이 이 값에 기대고 있다
+- [ ] **IMU 장착 y 좌표**: 제자리 회전에서 추정 속도가 0 근처인가 (설정 +0.017 m 는 9/23 bag 값, 지금 URDF 로는 −0.030 m) — 2026-11-14 실차 TF `base_footprint → camera_imu_optical_frame` 는 y = +0.017 → 지금 URDF 와 설정이 같다. 제자리 회전 확인은 그대로
+- [ ] AK40 교체 뒤 IMU 진동 잡음 재측정 (지금 0.95 m/s² 는 RoboClaw 시절 bag) — 추정기 잡음 설정과 MPC 튜닝이 이 값에 기대고 있다 — 정지 기준값(2026-11-14 책상 위, 모터 DAMPING): `/imu/base_link` ax σ 0.0156 · ay σ 0.0168 m/s², wz σ 0.0031 rad/s, 평균 ax −0.222 m/s²(받침 기울기 약 1.3°)·wz −0.0017 rad/s. 주행 중 값과 비교
 - [ ] **SLAM 포즈 튐으로 서는 횟수**: 실차 Cartographer 가 스캔 매칭을 고칠 때 0.15 m·15° 넘게 튀면 fault_monitor 가 세운다(`pose_jump`). 시뮬에는 튐이 없다. `/fault_monitor/fault` 에 pose_jump 가 자주 뜨면 문턱(`torque_estimator.yaml` jump_xy·jump_yaw_deg)이나 `trip_on_pose_jump` 를 정한다
 - [ ] 주행 중 갑자기 서면 `/fault_monitor/fault` 의 이유부터. 배터리가 낮으면 드라이버가 에러 4(저전압)를 낸다
 - [ ] 마찰 보상이 하중 실린 바닥에서도 맞는지: 일정 속도 직진에서 d̂ x ≈ 0 (또는 PI 적분이 0 근처). 약 10 rad/s 이상은 외삽 값이다 — 2026-11-14 무부하 내림 계단으로 41 rad/s 까지 쟀다(바퀴별 값은 `analysis/torque_mpc_real/2026-11-14_bench/`). 바닥 하중에서는 롤러 마찰이 더해진다

@@ -61,6 +61,23 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-14 (4) — 실차에서 찾은 ak40_can_node 늦은 응답 고착 고침, 벤치 spin 토크 상한 (NUC 에서 수정)
+- 왜: 실차 3단계(`analysis/torque_mpc_real/2026-11-14_bench/RESULTS_KO.md` 8절). candump 로 응답은 1.2 ms 안에 다 오는데
+  `/ak40_can/status` 누적 늦은 응답이 주기마다 2 씩 늘었다. 주기 시작에 `take_pending` 으로 반영한 지난 주기 RL·RR 응답이
+  `fresh` 라서, `collect` 의 끝 조건(`all_replied` = fresh.all)이 FL·FR 새 응답(0.6 ms)만으로 차 0.7 ms 에 끝나고 RL·RR 새 응답
+  (1.1 ms)은 다시 다음 주기로 — 자기 유지. RL·RR 바퀴 상태가 늘 10 ms 늦었다. R8 에서 늦은 응답을 버리지 않게 바꿀 때 생긴 것.
+  벤치 도구는 todo "벤치 spin 토크 상한" (docstring 은 max_tau 안이라는데 spin 이 kd 0.5 × 20 rad/s = 10 N·m 를 요구).
+  이날부터 코드를 NUC 에서도 고치기로 함(사용자 결정, smc 브랜치).
+- 바꾼 파일:
+  - `amr_mpc/ak40/bridge.py` — `cycle_rx`(begin_cycle 이후 받은 응답) 추가, `all_replied` 는 cycle_rx 기준
+  - `amr_mpc/nodes/ak40_can.py` — 송신 직전 `begin_cycle()` (기동·주기), collect·take_pending 주석
+  - `test/test_ak40.py` — `_SplitBus`(FL·FR 0.6 ms, RL·RR 1.1 ms, 주기 10 ms) + `test_late_replies_do_not_lock_in`
+  - `tools/ak40_bench.py` — `spin()`: v_des 를 마지막 응답 속도 ± max_tau/kd 로 잘라 모터 토크 kd·|v_des − v| ≤ max_tau
+- 확인: 새 시험이 옛 코드에서 실패(늦은 응답 2 → 42), 고친 코드에서 통과(2 → 2). 시험 183개 통과. `colcon build --packages-select amr_mpc`.
+  **실차**(DAMPING 11 s): 늦은 응답 4 → 4(안 늘어남, 고치기 전 175 → 2407), 응답 4/4 100 %, 틱 평균 1.24 ms(네 응답을 다 기다림,
+  전 0.79), `/wheel_states` 99.999 Hz(간격 8~12 ms, 표준편차 0.10 ms). candump 응답 도착 FL 0.49 · FR 0.61 · RL 0.99 · RR 1.12 ms.
+  벤치 spin 은 무부하 FL 모델 계산으로 요구 토크 최대 0.500 N·m·1.5 s 끝 19.88 rad/s — 실물 미확인.
+
 ### 2026-11-14 (3) — 리뷰 R10 (launch 연결): 실차 경로에 robot_state, 실차 즉시 무장 금지, 모든 토크 스택 노드에 공통 종료 처리, 모드별 launch 시험
 - 대조 결과 (문제없음): launch 가 노드에 넘기는 파라미터 이름 60여 개가 모두 노드에 선언돼 있다(rclpy·rclcpp 는 선언 안 된 이름을 말없이 버리므로 오타면 조용히 무시된다 — 스크립트로 전부 대조). 토픽 사슬 figure8 → MPC/퓨어 퍼슛 → (바퀴 PI) → torque_output → 게이트 → 시뮬/ak40, /wheel_states·/state_estimator/odom·/mpc/armed 구독자 모두 기본 이름이 맞다
 - 바꾼 것

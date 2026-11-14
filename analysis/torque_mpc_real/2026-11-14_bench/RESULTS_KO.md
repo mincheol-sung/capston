@@ -166,7 +166,17 @@ export ROS_DOMAIN_ID=81 && unset ROS_STATIC_PEERS && ros2 topic pub -r 50 /wheel
 | RR | 1.17 ms | 1.22 |
 
 → 버스는 `reply_wait` 4 ms 안에 다 온다. 늦은 응답 2 개/주기는 노드 로직 때문이다: `on_tick` 이 먼저 `take_pending()` 으로 지난 주기 늦게 온 RL·RR 응답을 반영하면서 `fresh` 로 세고, 송신 뒤 `collect()` 는 `all_replied()` 가 참이 되는 순간(FL·FR 새 응답 0.6 ms) 끝난다(틱 0.79 ms 와 일치). RL·RR 의 새 응답(1.1 ms)은 수신 버퍼에 남아 다음 주기 pending 이 된다. 기동 때 한 번 생기면 계속 유지된다.
-결과: **RL·RR 바퀴 상태는 늘 한 주기(10 ms) 늦은 값**. `reply_wait` 를 늘려도 collect 가 그 전에 끝나므로 고쳐지지 않는다. 코드 수정은 PC 쪽(todo 7단계).
+결과: **RL·RR 바퀴 상태는 늘 한 주기(10 ms) 늦은 값**. `reply_wait` 를 늘려도 collect 가 그 전에 끝나므로 고쳐지지 않는다.
+
+**같은 날 NUC 에서 고침** (`stack_changelog.md` 2026-11-14 (4)): collect 의 끝 조건을 "이번 주기 송신 뒤 받은 응답 4 개"(`cycle_rx`)로. 고친 노드로 같은 측정(DAMPING 11 s, `candump_damping_1s_fixed.txt`):
+
+| 항목 | 고치기 전 | 고친 뒤 |
+|---|---|---|
+| 누적 늦은 응답 | 175 → 2407 (주기마다 +2) | **4 → 4** |
+| 틱 평균 / 최대 | 0.79 / 1.34 ms | 1.24 / 3.11 ms (네 응답을 다 기다림) |
+| `/wheel_states` | 100.002 Hz, 표준편차 0.05 ms | 99.999 Hz, 표준편차 0.10 ms (간격 8~12 ms) |
+| 응답 4/4 | 100 % | 100 % |
+| 응답 도착 FL/FR/RL/RR | 0.60 / 0.65 / 1.13 / 1.17 ms | 0.49 / 0.61 / 0.99 / 1.12 ms |
 
 ### 종료 신호 (SIGTERM)
 
@@ -194,10 +204,38 @@ Terminated                                                              ← pkil
 이날 맨 처음 status 에서 네 모터가 모두 "응답 없음" 이었던 것(그 뒤 어떤 조작 후 회복)도 같은 상태였을 수 있다 — 확인 안 됨.
 도는 중에 빼는 시험은 손 위험으로 하지 않았다.
 
+## 9. 4단계 — 센서·측위·전체 스택 (책상 위, 바퀴 띄움, 무장 안 함)
+
+세 터미널 모두 `export ROS_DOMAIN_ID=81 && unset ROS_STATIC_PEERS &&` 뒤에 `sensors.launch.py` / `cartographer.launch.py mode:=localization map:=smoc_lab lua_basename:=localization_torque_2d.lua` / `torque_experiment.launch.py plant:=real use_rviz:=false`. ak40_can_node 는 늦은 응답 고친 판.
+
+| 항목 | 결과 |
+|---|---|
+| CAN 자동 준비 | `CAN setup: can0 already UP` (sudo 없이) |
+| 노드 | 22 개, 모두 하나씩 (imu_to_base·robot_state_publisher 중복 없음) |
+| `/imu/base_link` QoS | 발행 imu_to_base_node BEST_EFFORT → 구독 state_estimator_node·ekf_carto BEST_EFFORT |
+| TF base_footprint → camera_imu_optical_frame | (0.098, 0.017, 0.140) m, RPY (−90°, 0, −90°) — 추정기 IMU 기준점과 같음 |
+| 주기 (6 s, BEST_EFFORT 구독) | `/camera/imu` 200.6 Hz · `/imu/base_link` 200.6 Hz (두 배 아님, 수신−stamp 0.8 ms) · `/wheel_states` 100.2 Hz · `/scan_rear` 10.2 Hz |
+| **`/scan_front`, `/scan`, `/tracked_pose`, `/state_estimator/odom`** | **0 개** |
+| 추정기 | 정지 바이어스 2 s 안에 잡힘. IMU stamp 경고 없음(170 s). "SLAM 포즈 0 개" 오류 계속 → "준비 끝" 안 나옴 |
+
+다시 띄워 측정 (같은 조건, 10 s):
+
+| 항목 | 결과 |
+|---|---|
+| 노드·QoS·TF·CAN 준비 | 위와 같음 (22 개 중복 없음, BEST_EFFORT, (0.098, 0.017, 0.140), already UP) |
+| `/camera/imu` 가속도 갱신 | 200.4 Hz 중 **가속도는 2 표본마다 바뀜(100.2 Hz)**, 자이로는 매 표본. 같은 가속도 값이 2 개 이어짐 970 회, 1·3·4 개 33 회 |
+| `/imu/base_link` 정지 잡음 (n 2001) | ax σ 0.0156 · ay σ 0.0168 m/s², wz σ 0.0031 rad/s. 평균 ax −0.222 m/s²(받침 기울기 asin(0.222/9.81) ≈ 1.3°), wz −0.0017 rad/s |
+| `/wheel_states` (1000 개) | error ≠ 0 행 0, fresh 4/4 100 % |
+| `/ak40_can/status` (전체 스택 부하) | 응답 4/4 100 %, 틱 평균 1.35 · 95 % 1.44 · 최대 2.68 ms, **늦은 응답 9 → 9 (안 늘어남)**, 누락 9 → 9 |
+| CPU (top 5 s, 12 코어) | 전체 user 6.4 % + sys 0.9 %. 노드별(한 코어 기준) ak40_can 9.0 · imu_to_base 8.0 · state_estimator 6.8 · fault_monitor 5.2 · rplidar 4.2 · realsense 4.2 · torque_mpc 4.2 · cartographer 4.0 % — 여유 큼. MPC 는 상태가 없어 아직 안 풂 |
+
+**전면 라이다 미연결**: `rplidar_front` 가 `Error, unexpected error, code: 80008004` 로 시작하자마자 죽음. udev 규칙(`/etc/udev/rules.d`)은 시리얼 `f2d6a1d4…` → `/dev/lidar_front`, `fc55e23e…` → `/dev/lidar_rear` 인데, `lsusb` 의 CP210x 는 하나(후면)뿐이고 `/dev/lidar_front` 가 없다 — NUC 부팅(13:08) 이후 한 번도 USB 에 안 잡힘. 하드웨어(USB 선·어댑터·전원) 확인 뒤 4단계를 다시 한다.
+측위 정확도는 책상 위(라이다 높이가 지도와 다름)라 이번엔 보지 않는다 — 바닥에서.
+
 ## 남은 것 (체크리스트에 반영)
 
 - 1단계: 네 모터 CAN sudden interrupt 설정 → 4절 시험 다시
 - 2단계: 모터 모드 밖 MIT 응답, 응답 시간, 에러 코드 종류 (미확인)
-- 3단계: CAN bus-off 자동 복구 결정(PC), 도는 중 전원 빼기(생략), ak40_can_node 늦은 응답 고착 수정(PC)
-- 4단계: `unset ROS_STATIC_PEERS` (또는 `.bashrc` 정리)
+- 3단계: CAN bus-off 자동 복구 결정, 도는 중 전원 빼기(생략), ak40_can_node 늦은 응답 고착 수정(PC)
+- 4단계: 전면 라이다 연결 뒤 측위·추정기 "준비 끝"·포즈 시각 경고·IMU 가속도 갱신 간격, `unset ROS_STATIC_PEERS` (또는 `.bashrc` 정리)
 - 5단계: 정지 마찰로 저속 출발이 굼뜬지, DAMPING 정지 순간 슬립, 바닥 하중에서 마찰 보상

@@ -51,6 +51,7 @@ class Ak40Bridge:
         self.err = np.zeros(4, int)
         self.rx_t = np.full(4, -math.inf)       # 마지막 응답 시각
         self.fresh = np.zeros(4, bool)          # wheel_states() 이후 새 응답
+        self.cycle_rx = np.zeros(4, bool)       # begin_cycle() 이후 받은 응답 — 이번 주기에 보낸 명령의 응답인가
         self.started_t = None
         self.reenter_period = float(reenter_period)
         self.enter_t = np.full(4, -math.inf)    # 마지막으로 ENTER 를 보낸 시각
@@ -126,6 +127,7 @@ class Ak40Bridge:
         self.err[i] = r["error"]
         self.rx_t[i] = float(now)
         self.fresh[i] = True
+        self.cycle_rx[i] = True
         return i
 
     def wheel_states(self, now):
@@ -140,5 +142,13 @@ class Ak40Bridge:
         self.fresh[:] = False
         return out
 
+    def begin_cycle(self):
+        """명령을 보내기 직전에 부른다. 이후 on_reply 만 cycle_rx 를 채운다."""
+        self.cycle_rx[:] = False
+
     def all_replied(self):
-        return bool(self.fresh.all())
+        """이번 주기에 보낸 명령에 네 모터가 모두 답했나.
+        fresh 로 판단하면 안 된다 — 주기 시작에 반영한 지난 주기의 늦은 응답도 fresh 라서, 새 응답 2 개만 와도 4 개가 차
+        기다리기를 일찍 끝내고, 나머지 새 응답은 또 다음 주기로 밀린다. 실차에서 RL·RR 이 늘 한 주기 늦게 쓰였다
+        (2026-11-14, candump 로 응답은 1.2 ms 안에 왔는데 늦은 응답이 주기마다 2 개씩 쌓임)."""
+        return bool(self.cycle_rx.all())

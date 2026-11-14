@@ -90,6 +90,7 @@ class Ak40CanNode(Node):
         self.pub_status = self.create_publisher(Float64MultiArray, "/ak40_can/status", 10)
         self.create_subscription(WheelTorqueCommand, str(g("cmd_topic")), self.on_cmd, 10)
 
+        self.bridge.begin_cycle()
         for cid, data in self.bridge.start_frames(self.now_s()):
             self.bus.send(cid, data)
         self.collect(0.05)
@@ -117,7 +118,8 @@ class Ak40CanNode(Node):
         self.cmd_stamp = m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
 
     def collect(self, wait):
-        """응답을 모은다 — 4개가 다 오거나 wait 초가 지날 때까지."""
+        """이번 주기에 보낸 명령의 응답을 모은다 — 네 모터가 모두 새로 답하거나 wait 초가 지날 때까지.
+        주기 시작에 take_pending 으로 반영한 지난 주기 응답은 세지 않는다 (bridge.all_replied 주석)."""
         t_end = time.monotonic() + wait
         while not self.bridge.all_replied():
             left = t_end - time.monotonic()
@@ -132,8 +134,9 @@ class Ak40CanNode(Node):
         지난 주기의 reply_wait 를 넘겨 온 응답이다. 예전에는 버렸는데(bus.drain), 실차 slcan 에서 네 모터 응답이
         늘 reply_wait 보다 늦으면 모든 응답이 버려져 reply_timeout 뒤 네 바퀴 모두 error 255 → 로봇이 아예 못 움직인다.
         가짜 모터(vcan)는 바로 답해서 시뮬에서는 안 보였다. 팀원 벤치 스크립트는 네 모터에 9 ms 를 기다렸다.
-        반영한 응답은 이번 주기 fresh 로 센다 (지난 발행 뒤 새로 온 값이다). 늘 늦는 버스에서는 그 응답으로 4 개가 차
-        이번 주기 응답을 기다리지 않고 바로 낸다 → 바퀴 상태가 한 주기(10 ms) 늦을 뿐, "응답 0/4" 경고·누락 수는 생기지 않는다.
+        반영한 응답은 이번 주기 fresh 로 센다 (지난 발행 뒤 새로 온 값이다) → 늘 늦는 버스에서도 "응답 0/4" 경고·누락 수는
+        생기지 않고 바퀴 상태가 한 주기(10 ms) 늦을 뿐이다. 단 collect 의 끝 조건에는 넣지 않는다 — 넣으면 제때 오는 버스에서도
+        일부 바퀴가 늘 한 주기 늦게 굳는다 (2026-11-14 실차, bridge.all_replied 주석).
         늦은 정도는 /ak40_can/status 7번째 값(누적 늦은 응답)으로 본다."""
         n = 0
         for _ in range(max_frames):
@@ -158,6 +161,7 @@ class Ak40CanNode(Node):
         self.bridge.fresh[:] = False
         self.late += self.take_pending()          # 지난 주기 reply_wait 뒤에 온 응답 — 버리지 않고 반영 (R8 리뷰)
         frames, mode, _ = self.bridge.command_frames(now)
+        self.bridge.begin_cycle()
         self.send_all(self.bridge.reenter_frames(now) + frames)
         self.collect(self.reply_wait)
         s = self.bridge.wheel_states(self.now_s())

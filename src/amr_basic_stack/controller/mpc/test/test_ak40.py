@@ -380,6 +380,72 @@ def test_late_replies_are_used_not_dropped(monkeypatch):
         rclpy.shutdown()
 
 
+class _SplitBus:
+    """실차 2026-11-14 처럼 FL·FR 은 0.6 ms, RL·RR 은 1.1 ms 뒤에 답하는 버스 (candump 로 잰 값).
+    leave_stale() 로 '지난 주기 RL·RR 응답이 수신 버퍼에 남아 있는' 상태(고착의 시작)를 만든다."""
+    DELAY = {0: 0.0006, 1: 0.0006, 2: 0.0011, 3: 0.0011}
+
+    def __init__(self, ifname):
+        from amr_mpc.ak40.fake import FakeAk40Motors
+        c = config.load("ak40.yaml")["ak40"]
+        self.fake = FakeAk40Motors(c["can_ids"], c["direction"], P.MitLimits.from_dict(c["mit_limits"]), 4.1)
+        self.ids = list(c["can_ids"])
+        self.queue = []                      # (도착 시각, can_id, data)
+
+    def send(self, can_id, data):
+        r = self.fake.on_frame(can_id, data, np.zeros(4), np.full(4, 2.0), np.zeros(4))
+        if r is None:
+            return
+        self.queue.append((time.monotonic() + self.DELAY[self.ids.index(can_id)], can_id, r))
+
+    def leave_stale(self, wheels):
+        """그 바퀴들의 응답이 이미 도착해 버퍼에 남아 있게 한다 (지난 주기 collect 뒤에 온 응답)."""
+        for i in wheels:
+            cid = self.ids[i]
+            r = self.fake.on_frame(cid, P.pack_command(self.fake.lim, 0, 0, 0, 0, 0), np.zeros(4), np.full(4, 2.0), np.zeros(4))
+            self.queue.append((time.monotonic() - 1.0, cid, r))
+
+    def recv(self, timeout=0.0):
+        t_end = time.monotonic() + timeout
+        while True:
+            self.queue.sort(key=lambda q: q[0])
+            if self.queue and self.queue[0][0] <= time.monotonic():
+                _, cid, r = self.queue.pop(0)
+                return (cid, r)
+            if time.monotonic() >= t_end:
+                return None
+            time.sleep(0.0001)
+
+    def close(self):
+        pass
+
+
+def test_late_replies_do_not_lock_in(monkeypatch):
+    """2026-11-14 실차: 응답은 1.2 ms 안에 다 오는데, 주기 시작에 반영한 지난 주기 RL·RR 응답을 collect 가 '이번 응답' 으로
+    세서 FL·FR 새 응답만 받고 끝냈다 → RL·RR 새 응답이 또 다음 주기로 밀려 늦은 응답이 주기마다 2 개씩 쌓였다.
+    고친 뒤에는 첫 주기 이후 늦은 응답이 더 생기지 않는다."""
+    import rclpy
+    import amr_mpc.nodes.ak40_can as node_mod
+    monkeypatch.setattr(node_mod, "CanBus", _SplitBus)
+    rclpy.init(args=["--ros-args", "-p", "interface:=vcan_split_test", "-p", "cmd_topic:=/split_test/cmd",
+                     "-p", "wheel_states_topic:=/split_test/ws"])
+    try:
+        n = node_mod.Ak40CanNode()
+        n.pub_ws.publish = lambda m: None
+        n.pub_status.publish = lambda m: None
+        n.bus.leave_stale([2, 3])                                   # 고착이 시작된 상태
+        n.on_tick()
+        late_after_first = n.late                                   # 남아 있던 2 개
+        for _ in range(20):
+            time.sleep(0.01)                                        # 주기 사이 10 ms (타이머) — 늦은 응답이 버퍼에 도착할 시간
+            n.on_tick()
+        assert n.late == late_after_first                          # 고착이면 주기마다 +2 (20 주기에 +40)
+        assert n.bridge.cycle_rx.all()                              # 매 주기 네 모터 모두 이번 명령에 답함
+        n.destroy_node()
+    finally:
+        rclpy.shutdown()
+
+
 def test_sigterm_runs_damping_then_exit(tmp_path):
     """kill(SIGTERM) 으로 꺼도 Ctrl+C 와 같이 DAMPING 을 보낸 뒤 모터 모드에서 나온다.
     예전에는 SIGTERM 에 바로 죽어 모터가 마지막 명령을 계속 낼 수 있었다."""

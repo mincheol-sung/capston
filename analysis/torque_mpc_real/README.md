@@ -14,4 +14,4 @@
 
 | 폴더 | 체크리스트 단계 | 내용 |
 |---|---|---|
-| [`2026-11-14_bench`](2026-11-14_bench/RESULTS_KO.md) | 0~3 (+ NUC 시뮬 확인) | NUC 빌드 시뮬 비교, DDS static peers 문제, CAN 끊김 시험, 모터 4개 status·damping·마찰 계단(오름·내림), 3단계 장착 부호 |
+| [`2026-11-14_bench`](2026-11-14_bench/RESULTS_KO.md) | 0~4 (+ NUC 시뮬 확인) | NUC 빌드 시뮬 비교, DDS static peers 문제, CAN 끊김 시험, 모터 4개 status·damping·마찰 계단(오름·내림), 3단계 CAN 노드(부호·100 Hz·늦은 응답 고침·bus-off), 4단계 일부(전면 라이다 미연결) |

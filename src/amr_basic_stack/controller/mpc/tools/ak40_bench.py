@@ -4,6 +4,8 @@
   ★ 모터는 상위 프로그램(CubeMars Tool, 시리얼 CP2102)으로 먼저 MIT 모드로 바꾸고 CAN ID 를 정해 둔다 (매뉴얼 4.1.1.4, 4.1.1.10).
      공장 기본 ID 는 1. 벤치는 모터 하나씩이라 ID 가 겹쳐도 되지만, 차에 달기 전에는 1~4 로 나눠야 한다.
   ★ 바퀴는 바닥에서 띄운다. 모든 명령은 --max_tau(기본 0.5 N·m) 와 --time(최대 10 s) 안에서만 낸다.
+     damping 의 spin(속도 명령) 도 kd·|v_des − v| ≤ max_tau 가 되게 v_des 를 한 주기씩 올린다 (2026-11-14 전에는 kd 0.5 × 20 rad/s
+     = 10 N·m 를 요구했다 — 응답으로 본 최대는 0.4 N·m).
      Ctrl+C 를 누르면 DAMPING 을 0.5 s 보낸 뒤 모터 모드에서 나온다.
 
   CAN 켜기 (candleLight 펌웨어):  sudo ip link set can0 up type can bitrate 1000000
@@ -78,6 +80,20 @@ class Bench:
             time.sleep(max(0.0, t_next - time.monotonic()))
         return out
 
+    def spin(self, v_target, seconds, kd):
+        """속도 명령으로 돌린다. 모터 쪽 토크 kd·(v_des − v) 가 max_tau 를 넘지 않게 v_des 를 마지막 응답 속도 ± max_tau/kd 로 자른다."""
+        out, v_now, step = [], 0.0, self.max_tau / kd
+        t_end = time.monotonic() + min(seconds, 10.0)
+        while time.monotonic() < t_end:
+            t_next = time.monotonic() + self.period
+            v_des = v_now + float(np.clip(v_target - v_now, -step, step))
+            r = self.cmd("spin", v=v_des, kd=kd)
+            if r is not None:
+                v_now = r["v"]
+                out.append((time.monotonic() - self.t0, r))
+            time.sleep(max(0.0, t_next - time.monotonic()))
+        return out
+
     def enter(self):
         r = self.send(P.ENTER_MOTOR_MODE)
         print(f"모터 {self.id} 모드 진입: {'응답 ' + str(_fmt(r)) if r else '응답 없음 (ID·배선·비트레이트 확인)'}")
@@ -135,7 +151,7 @@ def main():
                 w = np.mean([r["v"] for r in tail]); tr = np.mean([r["t"] for r in tail])
                 print(f"{tau:8.3f} | {w:8.2f} | {tr:8.4f} | {tr - tau:+.4f}")
         elif a.what == "damping":
-            b.run("spin", 1.5, v=a.spin, kd=0.5)
+            b.spin(a.spin, 1.5, kd=0.5)
             rs = b.run("damping", 3.0, kd=b.kd)
             v0 = rs[0][1]["v"]
             stop = next((x[0] - rs[0][0] for x in rs if abs(x[1]["v"]) < 0.05 * max(abs(v0), 1e-6)), math.nan)
