@@ -15,3 +15,4 @@
 | 폴더 | 체크리스트 단계 | 내용 |
 |---|---|---|
 | [`2026-11-14_bench`](2026-11-14_bench/RESULTS_KO.md) | 0~4 (+ NUC 시뮬 확인) | NUC 빌드 시뮬 비교, DDS static peers 문제, CAN 끊김 시험, 모터 4개 status·damping·마찰 계단(오름·내림), 3단계 CAN 노드(부호·100 Hz·늦은 응답 고침·bus-off), 4단계 일부(전면 라이다 미연결) |
+| [`2026-11-14_floor`](2026-11-14_floor/RESULTS_KO.md) | 5 (첫 바닥 8자) | smc 첫 판: 무장 전 측위 어긋남 찾아 `/initialpose`, B·제한 해제·0.3 m/s 에서 5.5 s 만에 30 cm 정지(옆걸음 슬립 발산). MPC·슬립 CSV, bag 은 `bags/2026-11-14_floor/run1` |
