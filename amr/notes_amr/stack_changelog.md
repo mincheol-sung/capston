@@ -61,6 +61,21 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-14 (5) — 구동계 마찰을 실측값으로, 보상은 90 % (compensation_scale)
+- 왜: 실차 2단계 내림 계단(`analysis/torque_mpc_real/2026-11-14_bench/RESULTS_KO.md` 7절)에서 바퀴별 마찰이 기존 값(팀원 식별 후보,
+  10 rad/s 이하 자료)과 38.7 rad/s 에서 ±30 % 달랐다(FL·RR 보상 부족, FR·RL 과보상). todo 7단계 "마찰 값 갱신".
+  보상을 측정값보다 약간 작게 넣는 것은 과보상(정지 근처 떨림)을 피하려는 관례이고, 같은 날 워밍업으로 마찰이 약 15 % 줄었다.
+  사용자 결정 90 %. `friction` 절은 실측 그대로 두고(시뮬 플랜트 = 실제 마찰), 보상 노드만 배율을 곱하게 나눴다 —
+  절 값에 90 % 를 넣으면 시뮬 플랜트도 90 % 가 되어 "덜 보상" 효과를 시뮬에서 못 본다.
+- 바꾼 파일:
+  - `config/torque_plant.yaml` — friction coulomb [0.02142, 0.02151, 0.02170, 0.01830], viscous [0.002062, 0.001799, 0.001767, 0.001679]
+    (이전 [0.0280, 0.0279, 0.0239, 0.0253] / [0.00113, 0.00235, 0.00221, 0.00080]), `compensation_scale: 0.9` 추가, tau_fric_max 주석
+  - `amr_mpc/nodes/torque_output.py` — 파라미터 `compensation_scale`(기본 = yaml), 보상 계수 = 실측 × 배율, 0~1.5 밖이면 시작 거부
+  - `test/test_torque_output.py` — 새 값 확인, `test_compensation_scale_applies_to_output_only`
+- 확인: 시험 184개 통과. 정격 38.75 rad/s 보상 최대 0.9 × 0.1013 = 0.091 N·m < tau_fric_max 0.1 → "마찰 보상 여유" 경고 사라짐(시뮬 로그 0 회).
+  시뮬(NUC, 도메인 88) B 12.62 mm·최대 32.5 (이전 마찰 같은 날 12.16 / 35.9, PC 기준 12.8), A 5.09 mm·최대 15.9 (이전 5.34 / 15.5).
+  Traceback·"process has died" 0. 실차 미확인(5단계, 바닥 하중에서 다시 본다).
+
 ### 2026-11-14 (4) — 실차에서 찾은 ak40_can_node 늦은 응답 고착 고침, 벤치 spin 토크 상한 (NUC 에서 수정)
 - 왜: 실차 3단계(`analysis/torque_mpc_real/2026-11-14_bench/RESULTS_KO.md` 8절). candump 로 응답은 1.2 ms 안에 다 오는데
   `/ak40_can/status` 누적 늦은 응답이 주기마다 2 씩 늘었다. 주기 시작에 `take_pending` 으로 반영한 지난 주기 RL·RR 응답이

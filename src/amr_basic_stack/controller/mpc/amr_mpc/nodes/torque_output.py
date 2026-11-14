@@ -11,6 +11,8 @@
 #   감속기가 먹는 토크를 미리 더해, 바퀴에 실제로 τ* 가 전달되게 한다. MPC 의 외란 추정이 아니라
 #   벤치에서 잰 고정 표로 하는 모터 보정이다.  2026-11-13: 벤치 식별 계수를 [FL, FR, RL, RR]별로 적용한다.
 #   coulomb 항은 ω = 0 근처에서 부호가 튀지 않게 tanh 로 잇는다 (ω_s = friction_smooth_rad_s).
+#   보상 계수 = friction 절 값 × compensation_scale (2026-11-14 기본 0.9 — 과보상 떨림을 피해 약간 덜 보상).
+#   friction 절 값 자체는 실측 그대로라 시뮬 플랜트(실제 마찰)와 보상이 10 % 어긋난 채로 시험된다.
 #
 # 규칙
 #   - 받는 즉시 내보낸다 (타이머 없음). header.stamp 는 바꾸지 않는다 — 종단 지연 측정용.
@@ -69,14 +71,18 @@ class TorqueOutputNode(Node):
             ("wheel_states_topic", "/wheel_states"),
             ("coulomb_Nm", p.fric_coulomb.tolist()),
             ("viscous_Nms_per_rad", p.fric_viscous.tolist()),
+            ("compensation_scale", float(config.load("torque_plant.yaml")["friction"].get("compensation_scale", 1.0))),
             ("friction_smooth_rad_s", 0.5),
             ("tau_limit_Nm", p.tau_rated),
             ("wheel_timeout", 0.3),
             ("max_wheel_rad_per_sec", rated_rpm * 2.0 * np.pi / 60.0),
         ])
         g = lambda n: self.get_parameter(n).value
-        self.coulomb = wheel_coefficients(g("coulomb_Nm"), "coulomb_Nm")
-        self.viscous = wheel_coefficients(g("viscous_Nms_per_rad"), "viscous_Nms_per_rad")
+        scale = float(g("compensation_scale"))
+        if not 0.0 <= scale <= 1.5:
+            raise ValueError(f"compensation_scale {scale} — 0~1.5 밖 (1 초과는 과보상)")
+        self.coulomb = scale * wheel_coefficients(g("coulomb_Nm"), "coulomb_Nm")
+        self.viscous = scale * wheel_coefficients(g("viscous_Nms_per_rad"), "viscous_Nms_per_rad")
         self.smooth, self.limit = max(1e-6, float(g("friction_smooth_rad_s"))), float(g("tau_limit_Nm"))
         self.wheel_timeout = float(g("wheel_timeout"))
         self.has_friction = bool(np.any(self.coulomb) or np.any(self.viscous))
@@ -88,7 +94,7 @@ class TorqueOutputNode(Node):
         self.create_subscription(WheelTorqueCommand, str(g("input_topic")), self.on_cmd, 10)
         self.get_logger().info(
             f"torque_output: {g('input_topic')} → {g('output_topic')}   마찰 보상 "
-            f"{'없음(0)' if not self.has_friction else f'coulomb {self.coulomb} N·m, viscous {self.viscous} N·m·s/rad'}"
+            f"{'없음(0)' if not self.has_friction else f'coulomb {self.coulomb} N·m, viscous {self.viscous} N·m·s/rad (실측 × {scale})'}"
             f"   안전 클램프 ±{self.limit} N·m")
         warn = friction_reserve_warning(self.coulomb, self.viscous, p.fric_max, float(g("max_wheel_rad_per_sec")))
         if warn:

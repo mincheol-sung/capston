@@ -67,12 +67,11 @@ def test_non_finite_torque_becomes_damping(bad):
 
 
 def test_individual_bench_friction_and_motor_order():
+    """2026-11-14 NUC 벤치 내림 계단 실측 (analysis/torque_mpc_real/2026-11-14_bench/stepsdown_*.csv)."""
     from amr_mpc.torque.model import TorquePlant
     p = TorquePlant.from_yaml()
-    tc = np.array([0.028006662651145188, 0.027857298189471257,
-                   0.023858548234685657, 0.025326982071718268])
-    bv = np.array([0.0011313792759580596, 0.002350756966912613,
-                   0.002207564358401831, 0.0008002792210842298])
+    tc = np.array([0.02142, 0.02151, 0.02170, 0.01830])
+    bv = np.array([0.002062, 0.001799, 0.001767, 0.001679])
     assert p.fric_coulomb == pytest.approx(tc)
     assert p.fric_viscous == pytest.approx(bv)
     # Equal speeds still produce distinct compensation; reverse speed reverses each torque.
@@ -81,11 +80,31 @@ def test_individual_bench_friction_and_motor_order():
     assert got == pytest.approx(expected)
     assert friction_torque([-10] * 4, tc, bv, 0.5) == pytest.approx(-expected)
     assert friction_torque([0] * 4, tc, bv, 0.5) == pytest.approx(np.zeros(4))
-    # User-selected reserve restored to 0.1; it does not cover full FR compensation at rated speed.
+    # 정격 속도의 실측 마찰 최대 0.1013 (FL) — 보상은 × 0.9 = 0.091 로 tau_fric_max 0.1 안.
     rated_speed = 370 * 2 * np.pi / 60
     assert p.fric_max == pytest.approx(0.1)
-    assert np.max(tc + bv * rated_speed) == pytest.approx(0.11894045494021277, abs=1e-6)
+    assert np.max(tc + bv * rated_speed) == pytest.approx(0.10132, abs=1e-4)
+    assert 0.9 * np.max(tc + bv * rated_speed) < p.fric_max
     assert p.tau_motor_limit() == pytest.approx(1.2)
+
+
+def test_compensation_scale_applies_to_output_only():
+    """torque_output 은 실측 × compensation_scale 로 보상하고, 시뮬 플랜트(TorquePlant)는 실측 그대로 쓴다."""
+    import rclpy
+    from amr_mpc.torque.model import TorquePlant
+    from amr_mpc.nodes.torque_output import TorqueOutputNode
+    from amr_mpc.core import config
+    scale = float(config.load("torque_plant.yaml")["friction"]["compensation_scale"])
+    assert scale == pytest.approx(0.9)
+    p = TorquePlant.from_yaml()
+    rclpy.init()
+    try:
+        n = TorqueOutputNode()
+        assert n.coulomb == pytest.approx(scale * p.fric_coulomb)
+        assert n.viscous == pytest.approx(scale * p.fric_viscous)
+        n.destroy_node()
+    finally:
+        rclpy.shutdown()
 
 
 @pytest.mark.parametrize('bad', [[0.01, 0.02], [0, 0, 0, np.nan], [0, -0.01, 0, 0]])
