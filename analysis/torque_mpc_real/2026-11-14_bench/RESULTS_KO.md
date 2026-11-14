@@ -128,10 +128,76 @@ DAMPING 중 기어감: 없음. damping 시험의 DAMPING 3 s 동안 v 평균 −
 → 약 41~42 rad/s 에서 전압 한계로 전류가 더 안 들어간다(이날 배터리 전압, 무부하). 응답 범위 45.5 아래라 잘리지 않음.
 운용 상한 38.7 rad/s(370 rpm, `max_wheel_rad_per_sec`)와 여유 약 7 % — 바닥 하중·배터리 저하에서 더 줄어든다.
 
+## 8. 3단계 — CAN 노드(`ak40_can_node`), 네 바퀴 띄움, ±0.1 N·m 묶음
+
+끊김 보호 설정 전이라 바퀴를 띄운 채 `hardware_checked: false`(±0.1 N·m) 로만 진행하기로 함(사용자 결정).
+
+### 장착 부호
+
+```bash
+export ROS_DOMAIN_ID=81 && unset ROS_STATIC_PEERS && ros2 run amr_mpc ak40_can_node                       # 터미널 1
+export ROS_DOMAIN_ID=81 && unset ROS_STATIC_PEERS && ros2 topic echo /wheel_states --field velocity      # 터미널 2
+export ROS_DOMAIN_ID=81 && unset ROS_STATIC_PEERS && ros2 topic pub -r 50 /wheel_torque_cmd amr_interfaces/msg/WheelTorqueCommand "{mode: 0, torque: [0.08, 0.08, 0.08, 0.08]}"   # 터미널 3
+```
+
+- 처음에는 바퀴가 안 돌았다: 터미널 1·2 는 시뮬 때 export 한 도메인 81, 터미널 3 은 `.bashrc` 기본 13 이라 명령이 노드에 안 닿음. 모두 81 로 맞춰 해결
+- 0.05 N·m 대신 0.08 N·m: 7절 정지 마찰(FL·RL 은 0.06 에서도 출발 못 함)
+- 결과: **네 바퀴 모두 눈으로 전진 방향** → `direction: [-1, 1, -1, 1]` 맞음. velocity(정상 구간 평균 근처) FL 35.5 · FR 28.3 · RL 31.6 · RR 33.9 rad/s
+- velocity 부호로는 판정할 수 없다: 노드가 명령에 direction 을 곱하고(τ_motor = d·τ_wheel) 응답에도 곱하므로(ω_wheel = d·ω_motor) ω_wheel 부호 = d²·sign(τ_wheel) = + 로 direction 과 무관
+- 같은 0.08 N·m 에서 7절 내림 직선의 예측 ω = (0.08 − τc)/bv 는 FL 28.4 · FR 32.5 · RL 32.9 · RR 36.7 → 관측과 FL +25 %, FR −13 %. 마찰이 시간·온도로 계속 변한다는 7절 관찰과 같은 방향
+
+### 100 Hz·응답 시간 (DAMPING, 토크 없음, 11 s)
+
+| 항목 | 값 |
+|---|---|
+| `/wheel_states` 주기 (`ros2 topic hz -w 1000`) | 100.002 Hz, 간격 표준편차 0.05 ms |
+| 틱 시간 (`/ak40_can/status` 5번째) | 평균 0.79 · 중앙 0.75 · 95 % 0.96 · 최대 1.34 ms |
+| 응답 수 (4번째) | 1117 주기 모두 4 |
+| 누적 누락 (6번째) | 2 → 2 (기동 때 2 개뿐) |
+| 누적 늦은 응답 (7번째) | 175 → 2407, **주기마다 정확히 2** |
+
+`candump -t A can0` 1 s (`candump_damping_1s.txt`, 노드는 4 프레임을 한꺼번에 보낸다)로 잰 명령 송신 → 응답 도착:
+
+| 바퀴 | 평균 | 최대 |
+|---|---|---|
+| FL | 0.60 ms | 0.69 |
+| FR | 0.65 ms | 0.71 |
+| RL | 1.13 ms | 1.21 |
+| RR | 1.17 ms | 1.22 |
+
+→ 버스는 `reply_wait` 4 ms 안에 다 온다. 늦은 응답 2 개/주기는 노드 로직 때문이다: `on_tick` 이 먼저 `take_pending()` 으로 지난 주기 늦게 온 RL·RR 응답을 반영하면서 `fresh` 로 세고, 송신 뒤 `collect()` 는 `all_replied()` 가 참이 되는 순간(FL·FR 새 응답 0.6 ms) 끝난다(틱 0.79 ms 와 일치). RL·RR 의 새 응답(1.1 ms)은 수신 버퍼에 남아 다음 주기 pending 이 된다. 기동 때 한 번 생기면 계속 유지된다.
+결과: **RL·RR 바퀴 상태는 늘 한 주기(10 ms) 늦은 값**. `reply_wait` 를 늘려도 collect 가 그 전에 끝나므로 고쳐지지 않는다. 코드 수정은 PC 쪽(todo 7단계).
+
+### 종료 신호 (SIGTERM)
+
+0.08 N·m 로 네 바퀴가 도는 중 `pkill -TERM -f ak40_can_node` → 바퀴가 "틱" 하고 제동된 뒤 섰다. 터미널 1:
+```
+[WARN] [1794638113.512803841] [ak40_can_node]: 응답 3/4 — 빠진 바퀴 [3]     ← 명령(ros2 topic pub)을 켠 순간
+Terminated                                                              ← pkill -f 가 ros2 run 껍데기도 죽임
+[ak40_can_node] DAMPING 뒤 모터 모드 해제                                 ← 노드 본체의 정지 절차 (print, 로그 파일엔 없음)
+```
+"CAN 송신 실패" 없음. `응답 3/4` 한 주기 누락은 다른 ROS 프로세스가 켜지고 꺼질 때마다 한 번씩 나왔다(이날 4 회, 모두 단발 — error 255 기준 50 ms 에 못 미침).
+
+### 모터 하나 전원 껐다 켜기 (노드 켠 채, 바퀴 정지 상태)
+
+기록: `powercycle_wheel_states.csv` (읽기 전용 기록기, `/wheel_states` error·fresh·velocity 와 `/ak40_can/status`).
+
+| 시각 (epoch …) | 일 |
+|---|---|
+| 364.026 | RR 응답 끊김 (전원 뺌) |
+| 364.067 | RR error 255 (41 ms, 기준 reply_timeout 50 ms) — 나머지 셋 정상 |
+| 373.586 ~ 373.636 | RR 을 다시 꽂은 순간 FL·FR·RL 도 50 ms 안에 응답 끊김 → 네 바퀴 error 255 |
+| 373.6 ~ 406 | 노드가 0.2 s 마다 ENTER 를 다시 보냈지만 33 s 동안 응답 없음 (Ctrl+C 로 끔) |
+
+그 뒤 모터 LED 네 개 모두 켜짐, `ak40_bench.py status --id 1` 도 응답 없음 → `sudo ip link set can0 down; sudo pkill slcand; bash tools/setup_can.sh` 로 CANable2 채널을 닫았다 열자 네 모터 모두 응답(error 0, 38 °C).
+→ 원인은 모터가 아니라 **CANable2 bus-off** (RR 쪽 CAN 트랜시버가 켜질 때의 잡음으로 추정). slcan 펌웨어는 bus-off 를 리눅스에 알리지 않고(`can0` UP·ERROR-ACTIVE, 오류 카운터 0) 스스로 풀지도 않는다. USB 재열거 흔적은 없었다.
+이날 맨 처음 status 에서 네 모터가 모두 "응답 없음" 이었던 것(그 뒤 어떤 조작 후 회복)도 같은 상태였을 수 있다 — 확인 안 됨.
+도는 중에 빼는 시험은 손 위험으로 하지 않았다.
+
 ## 남은 것 (체크리스트에 반영)
 
 - 1단계: 네 모터 CAN sudden interrupt 설정 → 4절 시험 다시
 - 2단계: 모터 모드 밖 MIT 응답, 응답 시간, 에러 코드 종류 (미확인)
-- 3단계 이후: 설정 뒤
+- 3단계: CAN bus-off 자동 복구 결정(PC), 도는 중 전원 빼기(생략), ak40_can_node 늦은 응답 고착 수정(PC)
 - 4단계: `unset ROS_STATIC_PEERS` (또는 `.bashrc` 정리)
 - 5단계: 정지 마찰로 저속 출발이 굼뜬지, DAMPING 정지 순간 슬립, 바닥 하중에서 마찰 보상
