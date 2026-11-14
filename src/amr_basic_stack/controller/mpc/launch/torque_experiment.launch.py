@@ -28,6 +28,8 @@
   ros2 launch amr_mpc torque_experiment.launch.py controller:=pure_pursuit   # 비교군 A (퓨어 퍼슛 + 바퀴별 PI).
                                                                         #   게인은 config/torque_baseline_a.yaml
   ros2 launch amr_mpc torque_experiment.launch.py disturbance:=true     # 외란 추정치 d̂ 켬 (기본 끔)
+  ros2 launch amr_mpc torque_experiment.launch.py linearization:=current_state   # 선형화를 현재 추정 상태 기준으로.
+                                                                        #   기본 reference = 1판 방식(기준궤적)
   ros2 launch amr_mpc torque_experiment.launch.py payload_kg:=5.0       # 적재 +5 kg (플랜트와 제어기 둘 다)
   ros2 launch amr_mpc torque_experiment.launch.py payload_kg:=5.0 ctrl_payload_kg:=0.0   # 제어기는 모름 (질량 오차 시험)
   ros2 launch amr_mpc torque_experiment.launch.py use_mpc:=false        # 플랜트·RViz 만 (손으로 토크 주기, tools/torque_demo_drive.py)
@@ -209,6 +211,8 @@ def _nodes(context):
             ctrl["limit_mode"] = g("limit_mode")
         if g("disturbance"):
             ctrl["disturbance_enable"] = _truthy(g("disturbance"))
+        if g("linearization"):
+            ctrl["linearization"] = g("linearization")
         if g("mu_hat"):
             ctrl["mu_hat"] = float(g("mu_hat"))
         nodes.append(Node(
@@ -217,7 +221,8 @@ def _nodes(context):
         torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"
     elif controller == "pure_pursuit":
         # 비교군 A: 퓨어 퍼슛 (v_x, ω_z) → 바퀴별 PI → 토크. 게인은 config/torque_baseline_a.yaml
-        ignored = [k for k in ("limit_mode", "disturbance", "mu_hat", "ctrl_payload_kg", "log_prefix") if g(k)]
+        ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "ctrl_payload_kg", "log_prefix")
+                   if g(k)]
         if ignored:
             nodes.append(LogInfo(msg=f"controller:=pure_pursuit — MPC 인자 {ignored} 는 쓰지 않는다 "
                                      f"(log_prefix 는 slip_logger 에만 쓴다)"))
@@ -302,6 +307,7 @@ def generate_launch_description():
           description="mpc = torque_mpc_node (비교군 B·C), pure_pursuit = 퓨어 퍼슛 + 바퀴별 PI (비교군 A)"),
         A("limit_mode", default_value="", description="motor_only(B) | friction(C) (YAML 기본 motor_only)"),
         A("disturbance", default_value="", description="외란 추정치 d̂ true/false (YAML 기본 false)"),
+        A("linearization", default_value="", description="reference | current_state (YAML 기본 reference)"),
         A("mu_hat", default_value="", description="제어기의 노면 마찰계수 (YAML 기본 0.3)"),
         A("log_prefix", default_value="", description="MPC CSV 접두. 비면 저장 안 함"),
         # 8자 트랙: 비우면 config/torque_track.yaml

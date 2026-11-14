@@ -278,3 +278,234 @@ TEST(TorqueMPC, RejectsBadConfig)
   TorqueMPC ok(TorqueModel{}, TorqueTuning{});
   EXPECT_THROW(ok.step(TVec6::Zero(), hold_ref(TVec3::Zero(), 10)), std::invalid_argument);
 }
+
+// ───────────── 현재 상태 기준 선형화 (linearization = current_state) ─────────────
+// torque_mpc.hpp 머리주석 "선형화 방식". 인수인계 문서(2026-11-14 jjm) 2절의 시험 9 종.
+namespace
+{
+TorqueTuning current_tuning()
+{
+  TorqueTuning tu;
+  tu.linearization = TorqueLinearization::CurrentState;
+  return tu;
+}
+
+// 등속 원운동 기준열 (지평 Np+1 점)
+std::vector<TorqueRefPoint> circle_ref(double R, double v, double t, const TorqueTuning & tu)
+{
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= tu.Np; ++j) {ref.push_back(circle(R, v, t + j * tu.Ts));}
+  return ref;
+}
+}  // namespace
+
+// 1. 문자열 처리
+TEST(TorqueLinearizationModel, Parsing)
+{
+  EXPECT_EQ(parse_linearization("reference"), TorqueLinearization::Reference);
+  EXPECT_EQ(parse_linearization("current_state"), TorqueLinearization::CurrentState);
+  EXPECT_THROW(parse_linearization("current"), std::invalid_argument);
+  EXPECT_THROW(parse_linearization(""), std::invalid_argument);
+  EXPECT_EQ(TorqueTuning{}.linearization, TorqueLinearization::Reference);   // 구조체 기본값은 1판 방식
+}
+
+// 2. 야코비안이 torque_dynamics 의 중앙 유한차분과 같다 (바퀴 관성 켬, 움직이는 상태, τ₀ ≠ 0)
+TEST(TorqueLinearizationModel, JacobianMatchesFiniteDifference)
+{
+  TorqueModel md;
+  md.use_wheel_inertia = true;
+  TVec6 x0;
+  x0 << 0.3, -0.2, 0.7, 0.4, -0.25, 0.8;
+  TVec4 tau0;
+  tau0 << 0.05, -0.02, 0.08, 0.01;
+  const auto lin = linearize_continuous(md, x0, tau0);
+  const double h = 1e-6;
+  for (int j = 0; j < 6; ++j) {
+    TVec6 e = TVec6::Zero();
+    e(j) = h;
+    const TVec6 col = (torque_dynamics(md, x0 + e, tau0) - torque_dynamics(md, x0 - e, tau0)) / (2 * h);
+    EXPECT_LT((lin.A.col(j) - col).cwiseAbs().maxCoeff(), 1e-7) << "A col " << j;
+  }
+  for (int j = 0; j < 4; ++j) {
+    TVec4 e = TVec4::Zero();
+    e(j) = h;
+    const TVec6 col = (torque_dynamics(md, x0, tau0 + e) - torque_dynamics(md, x0, tau0 - e)) / (2 * h);
+    EXPECT_LT((lin.B.col(j) - col).cwiseAbs().maxCoeff(), 1e-7) << "B col " << j;
+  }
+  // 선형화 점에서 값이 같다 (상수항 c)
+  EXPECT_LT((lin.A * x0 + lin.B * tau0 + lin.c - torque_dynamics(md, x0, tau0)).cwiseAbs().maxCoeff(), 1e-12);
+}
+
+// 3. θ̇ = 0, τ₀ = 0, 바퀴 관성 끔이면 ZOH 결과가 1판 식-8 과 같다
+TEST(TorqueLinearizationModel, ZohReducesToDesignEq8)
+{
+  TorqueModel md;
+  const double Ts = 0.01;
+  TVec6 x0;
+  x0 << 1.0, 2.0, 0.6, 0.3, -0.1, 0.0;
+  const auto d = discretize_zoh(linearize_continuous(md, x0, TVec4::Zero()), Ts);
+  TMat6 A = TMat6::Identity();
+  A.block<3, 3>(0, 3) = Ts * Eigen::Matrix3d::Identity();
+  TMat64 B;
+  B.topRows<3>() = 0.5 * Ts * Ts * md.G(x0(2));
+  B.bottomRows<3>() = Ts * md.G(x0(2));
+  EXPECT_LT((d.A - A).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT((d.B - B).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT(d.c.cwiseAbs().maxCoeff(), 1e-12);
+}
+
+// 4. 이산 모델의 한 스텝 예측이 RK4 플랜트와 맞는다 (선형화 점에서 출발 → 오차는 Ts² 차수보다 작다)
+TEST(TorqueLinearizationModel, OneStepMatchesRk4Plant)
+{
+  for (bool inertia : {false, true}) {
+    TorqueModel md;
+    md.use_wheel_inertia = inertia;
+    Plant plant{md};
+    plant.x << 0.2, 0.1, 1.2, 0.6, 0.3, 1.5;
+    TVec4 tau;
+    tau << 0.1, -0.05, 0.12, 0.02;
+    const auto d = discretize_zoh(linearize_continuous(md, plant.x, tau), 0.01);
+    const TVec6 pred = d.A * plant.x + d.B * tau + d.c;
+    plant.step(tau, 0.01, 50);
+    EXPECT_LT((pred - plant.x).head<3>().cwiseAbs().maxCoeff(), 1e-6) << "inertia " << inertia;
+    EXPECT_LT((pred - plant.x).tail<3>().cwiseAbs().maxCoeff(), 1e-4) << "inertia " << inertia;
+  }
+}
+
+// 5. 정지·기준 = 현재 포즈 → 토크 0, 그리고 yaw 언랩 (기존 두 시험의 current_state 판)
+TEST(TorqueLinearizationMPC, RestAtReferenceAndYawUnwrap)
+{
+  {
+    TorqueMPC mpc(TorqueModel{}, current_tuning());
+    const TVec3 X(0.3, -0.2, 1.0);
+    TVec6 x = TVec6::Zero();
+    x.head<3>() = X;
+    const TVec4 tau = mpc.step(x, hold_ref(X, 51));
+    EXPECT_LT(tau.cwiseAbs().maxCoeff(), 1e-9);
+  }
+  TorqueMPC a(TorqueModel{}, current_tuning()), b(TorqueModel{}, current_tuning());
+  TVec6 x = TVec6::Zero();
+  x(2) = 3.0;
+  const TVec4 ta = a.step(x, hold_ref(TVec3(0, 0, -3.1), 51));
+  const TVec4 tb = b.step(x, hold_ref(TVec3(0, 0, 3.0 + 0.18318530718), 51));
+  EXPECT_LT((ta - tb).cwiseAbs().maxCoeff(), 1e-9);
+  EXPECT_GT(ta(1), 0.0);
+  EXPECT_LT(ta(0), 0.0);
+}
+
+// 6. 등속 선회 통과시험 (1 m/s, R 2.4 m) 을 current_state 로 — 최소 노름 분배, 오차 1 mm 미만
+class SteadyTurnCurrent : public ::testing::TestWithParam<bool> {};
+
+TEST_P(SteadyTurnCurrent, MinimumNormTorqueAndZeroError)
+{
+  TorqueModel md;
+  md.use_wheel_inertia = GetParam();
+  const TorqueTuning tu = current_tuning();
+  TorqueMPC mpc(md, tu);
+  Plant plant{md};
+  const double R = 2.4, v = 1.0;
+  plant.x << 0, 0, 0, v, 0, v / R;
+  TVec4 tau = TVec4::Zero();
+  double emax = 0.0;
+  for (int k = 0; k < 400; ++k) {
+    const double t = k * tu.Ts;
+    tau = mpc.step(plant.x, circle_ref(R, v, t, tu));
+    plant.step(tau, tu.Ts);
+    if (k > 200) {
+      emax = std::max(emax, (plant.x.head<2>() - circle(R, v, t + tu.Ts).first.head<2>()).norm());
+    }
+  }
+  const double want = 0.04 / 4.0 * 4.0 * (v * v / R);
+  EXPECT_NEAR(tau(0), -want, 0.02 * want);
+  EXPECT_NEAR(tau(1), want, 0.02 * want);
+  EXPECT_NEAR(tau(2), want, 0.02 * want);
+  EXPECT_NEAR(tau(3), -want, 0.02 * want);
+  EXPECT_NEAR(TorqueMPC::null_dir().dot(tau), 0.0, 1e-6);
+  EXPECT_LT(emax, 1e-3);
+  EXPECT_EQ(mpc.stats().fallback, 0);
+  // 9a. 플랜트 = 모델이면 외란 추정치가 0 근처 (이 모델의 한 스텝 잔차)
+  EXPECT_LT(mpc.d_hat().cwiseAbs().maxCoeff(), 1e-5);
+}
+INSTANTIATE_TEST_SUITE_P(WheelInertia, SteadyTurnCurrent, ::testing::Values(false, true));
+
+// 7. 직선·기준 위·τ_prev = 0 (정지, θ̇ = 0) 이면 두 방식의 첫 토크가 같다
+TEST(TorqueLinearizationMPC, MatchesReferenceOnStraightLineFromRest)
+{
+  TorqueMPC ref_mpc(TorqueModel{}, TorqueTuning{}), cur_mpc(TorqueModel{}, current_tuning());
+  TVec6 x = TVec6::Zero();
+  x(2) = 0.4;
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= 50; ++j) {
+    const double s = 0.002 * j * j * 0.01;   // 같은 방향으로 천천히 출발
+    ref.push_back({TVec3(s * std::cos(0.4), s * std::sin(0.4), 0.4), TVec3::Zero()});
+  }
+  const TVec4 tr = ref_mpc.step(x, ref), tc = cur_mpc.step(x, ref);
+  EXPECT_GT(tr.cwiseAbs().maxCoeff(), 1e-4);
+  EXPECT_LT((tr - tc).cwiseAbs().maxCoeff(), 1e-9);
+}
+
+// 8. 초기 방향 오차가 큰 폐루프 (30°·40°): 두 방식 모두 수렴하는지, 추종 오차를 비교해 찍는다
+TEST(TorqueLinearizationMPC, LargeInitialHeadingErrorClosedLoop)
+{
+  auto run = [](TorqueLinearization mode, double th0, double & e_rms, double & e_final) {
+      TorqueModel md;
+      TorqueTuning tu;
+      tu.linearization = mode;
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      const double R = 1.0, v = 0.5;
+      plant.x << 0, 0, th0, 0, 0, 0;          // 정지, 방향만 틀어져 있다
+      double s2 = 0.0;
+      int n = 0, fb = 0;
+      for (int k = 0; k < 600; ++k) {
+        const double t = k * tu.Ts;
+        plant.step(mpc.step(plant.x, circle_ref(R, v, t, tu)), tu.Ts);
+        fb += mpc.stats().fallback;
+        const auto r = circle(R, v, t + tu.Ts);
+        const double e = (plant.x.head<2>() - r.first.head<2>()).norm();
+        s2 += e * e; ++n;
+        e_final = e;
+      }
+      e_rms = std::sqrt(s2 / n);
+      return fb;
+    };
+  for (double deg : {30.0, 40.0}) {
+    const double th0 = deg * M_PI / 180.0;
+    double r_rms, r_fin, c_rms, c_fin;
+    const int fb_r = run(TorqueLinearization::Reference, th0, r_rms, r_fin);
+    const int fb_c = run(TorqueLinearization::CurrentState, th0, c_rms, c_fin);
+    std::printf("            초기 방향 오차 %2.0f°  reference RMS %.2f mm 끝 %.3f mm | current_state RMS %.2f mm 끝 %.3f mm\n",
+      deg, r_rms * 1e3, r_fin * 1e3, c_rms * 1e3, c_fin * 1e3);
+    EXPECT_EQ(fb_r, 0);
+    EXPECT_EQ(fb_c, 0);
+    EXPECT_LT(r_fin, 1e-3);                  // 둘 다 6 s 안에 기준으로 돌아온다
+    EXPECT_LT(c_fin, 1e-3);
+  }
+}
+
+// 9b. 모르는 일정한 힘 아래 등속 직진: current_state 에서도 d̂ 가 정상상태 오차를 없앤다
+TEST(TorqueLinearizationMPC, DisturbanceEstimateRemovesOffset)
+{
+  auto run = [](bool enable) {
+      TorqueModel md;
+      TorqueTuning tu = current_tuning();
+      tu.dist_enable = enable;
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      plant.force_ext << -1.0, 0, 0;
+      const double v = 0.5;
+      plant.x << 0, 0, 0, v, 0, 0;
+      double err = 0.0;
+      for (int k = 0; k < 500; ++k) {
+        std::vector<TorqueRefPoint> ref;
+        for (int j = 0; j <= tu.Np; ++j) {ref.push_back({TVec3(v * (k + j) * tu.Ts, 0, 0), TVec3(v, 0, 0)});}
+        plant.step(mpc.step(plant.x, ref), tu.Ts);
+        err = v * (k + 1) * tu.Ts - plant.x(0);
+      }
+      return err;
+    };
+  const double off = run(false), on = run(true);
+  EXPECT_GT(off, 2e-4);
+  EXPECT_LT(std::abs(on), 0.05 * off);
+  std::printf("            [current_state] 정상상태 오차  d̂ 끔 %.3f mm   d̂ 켬 %.4f mm\n", off * 1e3, on * 1e3);
+}

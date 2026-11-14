@@ -61,6 +61,34 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-14 (6) — 토크 MPC 에 "현재 상태 기준 선형화"(current_state) 추가, 기본은 reference 유지 (jjm)
+- 왜: 2026-11-13 교수님 지시 "현재 스텝 기준 linearized model". 전준민이 다른 폴더(`2026amr_ws` `feat/torque-mpc`)에서 만든
+  패치를 이 저장소로 옮겼다. todo "선형화: 기준궤적을 따라 한다" 결정은 그대로 두고 스위치로 비교할 수 있게 했다.
+- 방식: 매 주기 x̂(k)·τ(k−1) 에서 ẋ = f(x, τ) 를 야코비안으로 선형화(상수항 포함) → 증강행렬 지수로 ZOH 이산화 →
+  그 한 모델을 지평 50 스텝 전체에 쓴다. 외란 추정치도 이 모델의 한 스텝 잔차. 비용·제약·결정변수는 그대로.
+- 바꾼 파일:
+  - `mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp`, `src/torque_mpc.cpp` — `TorqueLinearization`, `parse_linearization`,
+    `torque_dynamics`, `linearize_continuous`, `discretize_zoh`, `step()` 예측부 분기, d̂ 분기
+  - `mpc_cpp/src/torque_mpc_node.cpp` — 파라미터 `linearization` (YAML `linearization.mode`, 없으면 reference), 기동 로그
+  - `mpc/config/torque_mpc.yaml` — `linearization: {mode: reference}`
+  - `mpc/launch/torque_experiment.launch.py` — 인자 `linearization:=current_state|reference`
+  - `mpc_cpp/test/test_torque_mpc.cpp` — current_state 시험 10 개 (문자열, 야코비안 = 유한차분, ZOH = 1판 식-8,
+    한 스텝 = RK4 플랜트, 정지·yaw 언랩, 등속 선회 2 종, 직선 출발에서 두 방식 같은 토크, 큰 초기 방향 오차, d̂ 오프셋 제거)
+- 확인 (PC WSL, ROS 2 Jazzy): gtest torque 22·wheel 11 통과, pytest 184 중 실패 4 는 Windows 체크아웃의 CRLF `setup_can.sh` 뿐(기존).
+  시뮬 8자 0.5 m/s (PC, 40 s, 한 번씩 — 반복 실행 사이 RMS 가 ±0.1 cm 정도 흔들림):
+
+  | 조건 | reference | current_state |
+  |---|---|---|
+  | 기본 (상한 B) | RMS 0.90 cm · 최대 2.71 | RMS 0.95~1.10 · 최대 2.30~2.75 |
+  | payload 5 kg, 제어기는 0 kg | 1.17 · 3.11 | 1.17 · 3.01 |
+  | surface_mu 0.3 + 상한 C (friction) | 1.35 · 4.33, 토크 최대 0.127 | 1.29 · 4.62, 0.128 |
+  | **surface_mu 0.3 + 상한 B (motor_only)** | **1.05 · 3.00, 토크 최대 0.25, 완주** | **3/3 회 실패: 약 5 s 에 track_error 30 cm, 토크 1.3 포화, 슬립 λ RMS 0.84** |
+  | 단위시험 초기 방향 오차 30°/40° (R 1 m) | RMS 1.69 / 1.92 mm | 1.48 / 1.78 mm |
+
+- 결정 (전준민): **기본은 reference 유지.** 실차 기본이 상한 B 이고 바닥이 미끄러울 수 있어서. current_state 는 `linearization:=current_state` 로만.
+- 남은 과제: B·저마찰 실패 원인 확인 — 추정: 미끄러져 τ(k−1) 이 커지면 그 τ₀ 로 만든 ∂(Gτ₀)/∂θ 항이 커져 다음 토크가 더 커지는 되먹임.
+  보완 후보: 선형화에 쓰는 τ₀ 를 상한 C 수준으로 제한, 또는 지난 해의 예측 궤적을 따라 다시 선형화(RTI). 보완 뒤 같은 표로 다시 비교. 실차 미확인.
+
 ### 2026-11-14 (5) — 구동계 마찰을 실측값으로, 보상은 90 % (compensation_scale)
 - 왜: 실차 2단계 내림 계단(`analysis/torque_mpc_real/2026-11-14_bench/RESULTS_KO.md` 7절)에서 바퀴별 마찰이 기존 값(팀원 식별 후보,
   10 rad/s 이하 자료)과 38.7 rad/s 에서 ±30 % 달랐다(FL·RR 보상 부족, FR·RL 과보상). todo 7단계 "마찰 값 갱신".
