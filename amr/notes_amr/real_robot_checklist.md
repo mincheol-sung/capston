@@ -23,6 +23,13 @@
 - [x] CAN ID 1~4 = FL FR RL RR (2026-11-11 벤치 로그로 확인됨 — 바뀌지 않았는지만) — 2026-11-14 status 로 다시 확인
 - [ ] **CAN 끊김(sudden interrupt) 설정** — 명령이 끊기면 모터가 스스로 서게. `kill -9`·정전·노드 멈춤 때는 코드가 아무것도 못 하므로 이것이 유일한 안전장치다
   - 2026-11-14 시험: **공장값에는 보호가 없다** — FL 0.05 N·m 중 `kill -9`, 5 s 뒤 응답 v 11.6 rad/s·t 0.0525 N·m (계속 냄). 매뉴얼 V1.0.17 4.1.1.4 Application Function 에 항목이 있다. 상위 프로그램은 Windows 로 보이고, 값을 쓰기 전에 Read Parameters 먼저(4.1.1.5). 설정 뒤 2단계의 끊김 시험을 다시 해서 t 가 ±0.0012 로 떨어지는지 본다. **설정 전에는 3단계를 바퀴 띄운 채 ±0.1 N·m 묶음(`hardware_checked: false`)으로만 하고, `hardware_checked: true`·4단계 바닥·5단계는 설정 뒤에** (2026-11-14 사용자 결정 — 노드가 죽어도 띄운 바퀴가 공중에서 도는 것으로 끝나 벤치와 같은 위험). 결과: `analysis/torque_mpc_real/2026-11-14_bench/RESULTS_KO.md`
+  - 2026-11-14 저녁 설정 시도 (전준민, Windows PC + CubeMars Tool V1.32, CP2102 → 모터 3핀 UART, FL·FR 각각) — **설정 못 함, 막힘**. 모터 설정은 아무것도 바뀌지 않았다 (Write·Restore·Mode Switch 안 누름)
+    - 매뉴얼 V1.0.18 (공식 사이트, `Downloads\cubemars_manual\`): 4.1.1.4 Application Function = "CAN ID, CAN 통신 속도, CAN sudden interrupt 설정" 한 줄뿐. **MIT 모드에서 적용되는지, 끊기면 어떻게 서는지는 안 적혀 있다.** 4.1.1.5: 쓰기 전에 Read Parameters 필수(안 하면 다른 설정이 망가짐 → 공식 기본 파일을 Import Settings 로 복구). 연결은 전용 **R-link** 기준(19쪽)
+    - 연결은 됨(펌웨어 5.1, UUID 읽힘. FL `24 00 46 00…`, FR `1E 00 2B 00…`). 그러나 Read Parameters 가 **기본값만 보인다**: 모터 종류 AK80_3, T_MAX 18 N·m, FR 인데 CAN_ID 1. Application Function 화면의 Timeout 1000 ms·Brake current 0 A 도 기본값으로 보임(1000 ms 가 실제 값이면 오전 kill 시험에서 1 s 뒤 섰어야 한다)
+    - MIT Control → DEBUG: `run / calibrate / setup / encoder / origin / exit` 메뉴(오픈소스 mini-cheetah 펌웨어와 같은 구조로 보임). `setup` 입력 → **응답 없음.** COM3 를 직접 열어 921600·115200 bps 로 듣기 + `setup` 보내기 → 0 글자. 같은 시각 CAN status(FL) 는 정상(ID 1, error 0)
+    - 추정 원인 (확인 안 됨): ① CP2102 대신 R-link(또는 CH340 — 다운로드 폴더에 AK 2.0 용 CH340 드라이버가 있음)가 필요 / UART 배선·속도 불일치 ② MIT 펌웨어는 시리얼 설정을 지원 안 함
+    - 다음: R-link 가 연구실에 있는지 확인 → 있으면 다시 시도. 없으면 CubeMars 에 문의 (MIT 모드 timeout 설정 방법, UART 어댑터·속도). **절대 `calibrate`·`origin` 입력 금지**
+  - 대안 (팀 결정 대기, 2026-11-14 전준민 제안): 모터 전원을 직접 끊는 **물리 비상정지 스위치**를 달면 이 항목 대신 바닥 주행 조건으로 쓸 수 있다. 그 전 임시 운용안 = 저속(≤ 0.3 m/s) + 로봇 옆 1 명(바퀴에서 먼 프레임을 잡고 들어 올림) + 전원 차단 담당 1 명 + 넓은 빈 공간. 들어 올려도 모터는 공중에서 계속 돌고 내려놓으면 다시 달리므로 **들어 올린 뒤 전원 차단까지가 한 동작**이다
 - [x] 필요하면 MIT 캘리브레이션 (4.2.2) — 2026-11-14 네 모터 위치·속도·토크 응답이 정상이라 지금은 필요 없음. 드라이버 보드를 다시 달거나 위치가 튀면 그때
 
 ## 2. 벤치 — 바퀴를 띄우고 모터 하나씩 (ROS 없이)
@@ -73,15 +80,23 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 ```
 마지막 launch 가 robot_state_publisher(로봇 모델 TF)도 같이 띄운다. **`bringup.launch.py`(RoboClaw 구동 노드)·`localization.launch.py`(IMU 회전 노드가 하나 더 뜬다)는 띄우지 않는다.** `armed:=true` 는 실차에서 거부된다.
 
-- [ ] **세 터미널 모두 `unset ROS_STATIC_PEERS`** (또는 `.bashrc` 정리 뒤). 안 하면 IMU·포즈가 수 초씩 늦게 와서 추정기가 출력을 멈춘다(2026-11-14 시뮬에서 재현)
-- [ ] **전면 라이다 연결** — 2026-11-14 4단계(책상 위, 바퀴 띄움, 무장 안 함)에서 전면 RPLIDAR 가 USB 에 아예 안 잡힘: CP210x 장치가 후면(`fc55e23e…` → `/dev/lidar_rear`) 하나뿐, `/dev/lidar_front`(시리얼 `f2d6a1d4…`) 없음, `rplidar_front` 가 `code: 80008004` 로 바로 죽음 → `/scan_front`·`/scan` 0, `/tracked_pose`·추정기 출력 0. USB 선·어댑터·전원 확인 뒤(`lsusb | grep -c CP210` 가 2, `ls /dev/lidar_*` 에 front) 4단계 다시. 참고: `/dev/ttyUSB0`(CP2102N)은 후면 라이다다 — CubeMars R-Link 가 아니다
+- [x] **세 터미널 모두 `unset ROS_STATIC_PEERS`** (또는 `.bashrc` 정리 뒤). 안 하면 IMU·포즈가 수 초씩 늦게 와서 추정기가 출력을 멈춘다(2026-11-14 시뮬에서 재현) — 2026-11-14 19:17 세 launch 모두 `unset` + 같은 `ROS_DOMAIN_ID` 로 실행, 아래 주기 정상. 참고: 비대화형 ssh 로 띄우면 `.bashrc` 를 안 읽어 RMW 가 FastDDS 로 바뀐다 → `RMW_IMPLEMENTATION`·`CYCLONEDDS_URI` 를 `.bashrc` 에서 가져와 맞춤
+- [x] **전면 라이다 연결** — 2026-11-14 19:17 해결 (아래 기록). 두 라이다 health 0, 각 10 Hz — 2026-11-14 4단계(책상 위, 바퀴 띄움, 무장 안 함)에서 전면 RPLIDAR 가 USB 에 아예 안 잡힘: CP210x 장치가 후면(`fc55e23e…` → `/dev/lidar_rear`) 하나뿐, `/dev/lidar_front`(시리얼 `f2d6a1d4…`) 없음, `rplidar_front` 가 `code: 80008004` 로 바로 죽음 → `/scan_front`·`/scan` 0, `/tracked_pose`·추정기 출력 0. USB 선·어댑터·전원 확인 뒤(`lsusb | grep -c CP210` 가 2, `ls /dev/lidar_*` 에 front) 4단계 다시. 참고: `/dev/ttyUSB0`(CP2102N)은 후면 라이다다 — CubeMars R-Link 가 아니다
+  - 2026-11-14 저녁 (전준민, `~/capston_jjm` = `b38dea1` 빌드, `ROS_DOMAIN_ID=42`, `.bashrc` 의 CycloneDDS 설정, `unset ROS_STATIC_PEERS`, 무장 안 함): 전면 USB 를 **본체 포트 3-9** 로 옮기자 인식됨(`/dev/lidar_front`, S/N 99A3…). 단 **CAN 어댑터가 쓰던 포트**라 CANable2 는 3-5 로 옮김 → can0 재준비(`sudo pkill slcand` → `setup_can.sh`). 모터 전원이 꺼진 동안 보낸 프레임 때문인지 can0 가 응답 0 이었고, **배터리를 다시 연결하자** 네 모터 응답(error 0, 23 °C)
+    - 1회차 18:52: 노드 22 개 중복 없음, `/imu/base_link` 200 Hz, `/wheel_states` 100 Hz·error 0·fresh 4, `/scan_rear` 10 Hz, CAN setup "already UP", Ctrl+C 종료에 "DAMPING 뒤 모터 모드 해제"·남은 프로세스 없음. **전면은 `health status : 2`(internal error, "reboot the device") 로 죽음** → `/scan`·`/tracked_pose`·추정기 출력 없음
+    - 2회차 18:56 (전면 USB 뽑았다 꽂은 뒤): **전면·후면 둘 다 `health status : 2`** (1회차엔 후면 정상). S/N·펌웨어 1.02 는 둘 다 읽힘 → USB 통신은 되고 라이다 자체가 오류 상태. 원인 미확인 — 라이다 전원 공급(USB 5 V 인지 배터리 쪽 레귤레이터인지, 배터리를 뺐다 꽂은 것과 관계있는지) 확인 필요
+    - 원인 후보: 그 직전에 **모터 배터리를 NUC 용 배터리 단자에 잘못 꽂았다**(사용자, 바로 원래 자리로). 라이다는 NUC 쪽 전원에서 레귤레이터를 거쳐 받는다(사용자 확인). RPLIDAR 는 USB 를 다시 꽂아도 전원이 안 끊기므로 health 오류가 안 풀렸다
+    - **해결 19:03: NUC 를 정상 종료(`sudo poweroff`) 후 다시 켬** → 라이다 전원이 리셋되어 두 라이다 health 0. NUC 재부팅 뒤 can0 는 다시 `setup_can.sh`(sudo) 필요
+    - **3회차 19:17 (4단계 전체 정상)**: 노드 23 개 중복 없음, `/scan_front` 10.0·`/scan_rear` 10.0·`/scan` 10.0·`/tracked_pose` 10.0·`/imu/base_link` 200.0·`/state_estimator/odom` 100.0·`/wheel_states` 100.0 Hz, 바퀴 error 0·fresh 4. 정지 상태 `/tracked_pose` (−0.08, 0.05) m, 추정 속도 (−0.006, 0.001) m/s, 포즈 튐 0. Ctrl+C 종료 "DAMPING 뒤 모터 모드 해제", 남은 프로세스 없음
+    - 남은 관찰: `dual_scan_merger` "라이다 stamp 차이 0.09 s > 0.05 s — 오래된 scan 제외" 가끔(40 s 에 2 회). `ekf_carto` 가 "Could not obtain transform odom->base_footprint" 를 5 s 마다 냄 — 토크 스택(추정기)은 이 EKF 를 쓰지 않아 4단계 판정엔 영향 없음, 꺼도 되는지 팀 확인
+    - 주의: 같은 시각 다른 PC(192.168.0.213)가 NUC 에 ssh 로 Cartographer 빌드(`~/amr_timing_validation_20261114`)를 돌렸다. 한 번에 한 사람만 노드를 띄우기
 - [x] CAN 자동 준비: launch 첫 줄 로그 "CAN setup: …". sudo 암호를 묻는 설정이면 실패한다 → 먼저 `sudo -v`, 또는 손으로 준비하고 `auto_setup_can:=false` — 2026-11-14 `CAN setup: can0 already UP` (sudo 없이 통과)
 - [x] TF 가 있는지: `ros2 run tf2_ros tf2_echo base_footprint camera_imu_optical_frame` 가 값을 낸다 (없으면 imu_to_base 가 "TF 대기 중" 에서 멈추고 추정기가 "IMU 0 개") — 2026-11-14 (0.098, 0.017, 0.140) m, RPY (−90°, 0, −90°). 추정기 IMU 기준점 (0.098, 0.017) 과 같다
 - [x] 노드가 겹치지 않는지: `ros2 node list` 에 imu_to_base_node·robot_state_publisher 가 하나씩만 — 2026-11-14 22 개 노드 모두 하나씩
 - [x] `ros2 topic info -v /imu/base_link` — 발행 `imu_to_base_node` BEST_EFFORT, 구독 `state_estimator_node` BEST_EFFORT — 2026-11-14 맞음 (구독에 `ekf_carto` 도 BEST_EFFORT 로 붙어 있음)
 - [x] IMU 주기: `ros2 topic hz /imu/base_link` 가 D455 주기 그대로(두 배가 아님), 가속도 값이 몇 표본마다 바뀌는지 (D455 는 가속도·자이로 주기가 다르다) — 2026-11-14 `/camera/imu` 200.6 Hz → `/imu/base_link` 200.6 Hz (두 배 아님), 수신−stamp 0.8 ms. 다시 띄워 10 s: `/camera/imu` 200.4 Hz 중 **가속도는 2 표본마다 바뀐다(100.2 Hz 갱신, 같은 값 2 개 이어짐 970 회 / 1·3·4 개 33 회)**, 자이로는 매 표본. 즉 가속도는 5 ms 마다 같은 값을 한 번 더 낸다(zero-order hold)
-- [ ] 추정기 로그 "준비 끝. 바이어스 …" 가 나온다. "IMU 0 개", "SLAM 포즈 0 개" 오류가 없다 — 2026-11-14 정지 바이어스는 2 s 안에 잡힘("바이어스 아직" 은 첫 검사 한 번), "IMU 0 개" 없음. "SLAM 포즈 0 개" 는 전면 라이다 때문 → 라이다 연결 뒤 다시
-- [ ] 추정기 로그에 시각 경고가 없다: "IMU stamp 가 시스템 시각과 … 어긋남", "SLAM 포즈 stamp 가 IMU 시각보다 … 미래", "너무 오래된 stamp 의 포즈" (RealSense `global_time_enabled` 기본 켬에 기대고 있다) — 2026-11-14 170 s 동안 IMU stamp 경고 없음. 포즈 쪽 경고는 포즈가 없어 미확인
+- [x] 추정기 로그 "준비 끝. 바이어스 …" 가 나온다. "IMU 0 개", "SLAM 포즈 0 개" 오류가 없다 — 2026-11-14 정지 바이어스는 2 s 안에 잡힘("바이어스 아직" 은 첫 검사 한 번), "IMU 0 개" 없음. "SLAM 포즈 0 개" 는 전면 라이다 때문 → 라이다 연결 뒤 다시 — 19:17 "준비 끝. 바이어스: 가속도 (−0.102, +0.063) m/s², 자이로 −0.0012 rad/s", "SLAM 포즈 0 개" 없음
+- [x] 추정기 로그에 시각 경고가 없다: "IMU stamp 가 시스템 시각과 … 어긋남", "SLAM 포즈 stamp 가 IMU 시각보다 … 미래", "너무 오래된 stamp 의 포즈" (RealSense `global_time_enabled` 기본 켬에 기대고 있다) — 2026-11-14 170 s 동안 IMU stamp 경고 없음. 포즈 쪽 경고는 포즈가 없어 미확인 — 19:17 포즈 포함 약 90 s 동안 세 경고 모두 없음
 - [x] `/wheel_states` 의 error 가 네 바퀴 모두 0 — 2026-11-14 100.2 Hz, 에러 로그 없음 (다른 ROS 프로세스가 켜지고 꺼질 때 `응답 3/4`·`2/4` 단발 2 회)
 
 ## 5. 바닥 주행 — 낮은 속도부터, 무장은 키보드 `a`, 정지 `s`·스페이스
