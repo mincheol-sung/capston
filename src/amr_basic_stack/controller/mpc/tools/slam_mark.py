@@ -16,6 +16,7 @@ import time
 
 import numpy as np
 import rclpy
+import rclpy.executors
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 
@@ -58,7 +59,10 @@ def main():
     off = (float(est["imu_offset_x"]), float(est["imu_offset_y"]))
     rclpy.init()
     n = Marker(off)
-    threading.Thread(target=rclpy.spin, args=(n,), daemon=True).start()
+    ex = rclpy.executors.SingleThreadedExecutor()
+    ex.add_node(n)
+    th = threading.Thread(target=ex.spin, daemon=True)
+    th.start()
     time.sleep(1.0)
     f = None
     if a.csv:
@@ -106,8 +110,10 @@ def main():
     finally:
         if f:
             f.close()
+        ex.shutdown()              # spin 스레드를 먼저 멈춘다 (끝낼 때 core dump 방지, 2026-11-15)
+        th.join(timeout=2.0)
         n.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":

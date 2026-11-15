@@ -116,6 +116,7 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 ### 5-1. 라이다 오도메트리 확인 (모터 끔, 손으로 밀기 — 5-2·5-3 의 잣대가 SLAM 이라 먼저)
 
 `sensors.launch.py` + `cartographer.launch.py`(localization) 만 띄우고(토크 스택·CAN 노드 없음 → 모터가 풀려 손으로 밀린다), 5-0 측위 확인 뒤. 표시 도구: `/usr/bin/python3 tools/slam_mark.py --csv <결과 폴더>/marks` — Enter 마다 SLAM 위치(바퀴 축 중심, 0.5 s 평균)를 찍고 앞 표시·기준에서의 이동(앞·왼쪽·거리·회전)을 보여 준다. 숫자를 치고 Enter 하면 줄자 값과 차이까지. 바닥에 테이프로 출발점·1 m 직선·직각 표시, 줄자. 기록은 bag(`/tracked_pose /scan_front /scan_rear /scan /tf /tf_static`).
+- [ ] **사람이 라이다에 잡히는 영향** (2026-11-15 추가): 측위는 0.15 m 보다 가까운 점만 버리고(`mapping_2d.lua` min_range), `scan_sector_filter` 는 로봇 자기 몸만 가린다 → 옆에 선 사람 다리도 스캔에 들어간다. 5-2 이후 안전 규칙상 늘 두 명이 옆에 있으므로 실제 조건이기도 하다. 로봇은 그대로 두고 ① 사람 2 m 밖 10 s → ② 로봇 옆(밀 때 자세)에 쪼그려 10 s → ③ 다시 2 m 밖 10 s, 세 구간 `/tracked_pose` 평균 차이(기준 ≤ 1 cm·0.3°). 크면 밀 때 막대를 쓰거나 사람 쪽 스캔을 가리는 방법을 정한다
 - [ ] 정지 잡음 30 s: `/tracked_pose` 흔들림 (기준 ≤ 1 cm, ≤ 0.3°). 2026-11-14 책상 위 12 s 4 mm·0.07°
 - [ ] **아는 거리**: 앞으로 1.0 m, 옆으로 0.5 m, 대각 0.7 m 를 손으로 밀어 테이프 끝에 맞춘 뒤 SLAM 이동 vs 줄자 (기준 오차 ≤ 2 cm 또는 2 %). 같은 길을 되돌아와 출발점 복귀 오차도
 - [ ] **제자리 회전 90°·180°** (손으로, 직각 표시에 맞춰): SLAM yaw vs 실제, 회전 중 추적점이 그리는 원의 중심이 고정인지 — jjm 원 맞춤 (92, 24) mm vs 설정 (98, 17) mm
@@ -189,7 +190,7 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 
 ## 7. 측정값 (발표용, 시간 나면)
 
-- [ ] m: 저울, 적재 조건마다
+- [x] m: 저울, 적재 조건마다 — 2026-11-15 **4.56 kg** (적재 없음, 배터리 포함 상태로 잼). `torque_plant.yaml` body.mass_kg 4.56 으로 바꿈(changelog 2026-11-15 (1))
 - [ ] I_z: CAD 또는 제자리 회전 가속 시험
 - [ ] μ̂: 노면마다 토크 램프 시험
 - [ ] 8자 트랙 공간 약 10 × 5 m + 여유
