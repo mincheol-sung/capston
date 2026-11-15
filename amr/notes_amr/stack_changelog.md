@@ -61,6 +61,29 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-15 (4) — 측위 `translation_weight` 10 → 1 (빠를 때 SLAM 넘침)
+- 왜: 실차 5-2 에서 토크 0.15·0.2 로 빠르게 움직이면 SLAM·추정기가 수십 cm~1 m 틀렸다(줄자 50 cm 에 SLAM 101.6). Cartographer 가 직전 움직임으로
+  예측한 위치를 스캔-지도 맞춤보다 10 배 믿어서(Ceres 비용의 예측 이탈 가중 10), 급정지 뒤에도 1 s 넘게 "계속 달렸다".
+  bag 재생으로 설정을 하나씩 바꿔 원인을 이 값으로 좁혔다(IMU 예측 끔·스캔 누적 1 은 아님) — `analysis/torque_mpc_real/2026-11-15_basic/RESULTS_KO.md`.
+- 바꾼 파일:
+  - `perception/amr_perception_bringup/config/localization_torque_2d.lua` — `TRAJECTORY_BUILDER_2D.ceres_scan_matcher.translation_weight = 1.` (사용자가 직접 넣음).
+    `localization_torque_odom_2d.lua` 도 include 로 같이 바뀐다
+  - `controller/mpc/tools/slam_replay/variants/v_tw10.lua` (예전 값 비교용) 추가, `v_tw1.lua` 주석
+- 확인(재생, `tools/slam_replay`): 빠를 때 — fwd02 끝 49.9·넘침 50.2 cm (줄자 50, 이전 64.2·71.0), basic2 앞·뒤 8 번 IMU 와 1~3 cm·넘침 없음
+  (이전 최대 +185 cm). 느릴 때 — day1 손 밀기 16 표시가 이전 설정과 0.4 cm·0.2° 안에서 같음, 사람 옆 표시 0.7 → 0.2 cm.
+  빌드 반영(설치본 43 행). **실차 미확인** — 측위를 다시 띄워 4-1 로 확인.
+
+### 2026-11-15 (3) — bag 재생 도구 `tools/slam_replay/` (로봇 없이 측위 설정 비교)
+- 왜: 빠르게 움직일 때 SLAM 이 틀린 원인을 bag 재생으로 찾았는데(translation_weight), 그 스크립트가 세션 임시 폴더에 있다가 NUC 재부팅으로
+  지워졌다. 측위 설정을 바꿀 때마다 같은 방법으로 확인하려고 리포에 넣음(사용자 결정).
+- 바꾼 파일 (모두 새 파일, `controller/mpc/tools/slam_replay/`):
+  - `replay.sh` — bag 의 `/scan_front`·`/scan_rear` 로 `scan_sector_filter` 를 다시 돌리고, `/imu/base_link` → `/camera/imu` 로 축을 되돌리고,
+    `cartographer_node`(smoc_lab, frozen)를 준 설정으로 띄워 시작 위치를 넣은 뒤 재생. 도메인 89, 결과 `~/slam_replay_out/<라벨>/pose.csv`
+  - `imu_relay.py`, `set_init.py`(finish/start_trajectory), `pose_rec.py`, `compare.py`(토크 시험: 바퀴·IMU·기록 SLAM·재생 비교 /
+    손 밀기: `slam_mark` 표시마다 줄자와 비교)
+  - `variants/v_tw1.lua`(translation_weight 1), `v_noimu.lua`, `v_acc1.lua`
+- 확인: fwd02(줄자 50 cm) 재생 — 지금 설정 끝 64.2·넘침 71.0, v_tw1 끝 49.9·넘침 50.2 (어제 임시 스크립트 결과와 같음). 바퀴 48.4, IMU 47.9.
+
 ### 2026-11-15 (2) — 기본 동작·SLAM 표시 도구: 메시지 시각 사용, 끝낼 때 core dump 고침
 - 왜: 5-2 4-1 첫 판에서 도구가 SLAM·추정기 값을 "받은 시각"으로 기록해 SLAM 지연(0.1~0.2 s)만큼 밀렸다 → 토크·제동 구간 해석이 틀어짐
   (그 판의 "제동 중 몸체가 미끄러져 바퀴의 두 배를 갔다"는 해석은 틀렸고 실제로는 SLAM 오류였다 — `analysis/torque_mpc_real/2026-11-15_basic/RESULTS_KO.md`).
