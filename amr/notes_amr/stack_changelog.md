@@ -71,7 +71,9 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
   - `controller/mpc/tools/slam_replay/variants/v_tw10.lua` (예전 값 비교용) 추가, `v_tw1.lua` 주석
 - 확인(재생, `tools/slam_replay`): 빠를 때 — fwd02 끝 49.9·넘침 50.2 cm (줄자 50, 이전 64.2·71.0), basic2 앞·뒤 8 번 IMU 와 1~3 cm·넘침 없음
   (이전 최대 +185 cm). 느릴 때 — day1 손 밀기 16 표시가 이전 설정과 0.4 cm·0.2° 안에서 같음, 사람 옆 표시 0.7 → 0.2 cm.
-  빌드 반영(설치본 43 행). **실차 미확인** — 측위를 다시 띄워 4-1 로 확인.
+  **고침(같은 날 밤)**: 처음 넣을 때 `include "localization_2d.lua"` 와 `options.use_…` 두 줄이 두 번 들어가 Cartographer 가 시작하자마자 abort
+  (`Tried to include … twice`, af48c1b 에 들어간 상태) — 중복을 지웠다. 앞서 "설치본 43 행 확인"은 이 중복을 못 본 확인이었다.
+  **실차 확인**: 5-2 4-1 앞·뒤 × 0.15·0.2 에서 SLAM 넘침 0.5~1.6 cm, 앞 0.2 줄자 47.0 vs SLAM 48.4 cm (이전 설정 101.6) — `RESULTS_KO.md` "실차 확인".
 
 ### 2026-11-15 (3) — bag 재생 도구 `tools/slam_replay/` (로봇 없이 측위 설정 비교)
 - 왜: 빠르게 움직일 때 SLAM 이 틀린 원인을 bag 재생으로 찾았는데(translation_weight), 그 스크립트가 세션 임시 폴더에 있다가 NUC 재부팅으로
