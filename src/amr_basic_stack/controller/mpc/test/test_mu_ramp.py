@@ -6,7 +6,7 @@ import os
 import numpy as np
 import pytest
 
-from amr_mpc.torque.model import SlipPlant, TorquePlant
+from amr_mpc.torque.model import TorquePlant
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location("mu_ramp_test", os.path.join(HERE, "..", "tools", "mu_ramp_test.py"))

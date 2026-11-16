@@ -50,6 +50,16 @@ bash tools/setup_can.sh                       # can0 준비 (모터 명령은 �
 - [x] torque: 무부하 최고 속도. V 범위 45.5 rad/s 에 가까운지 (넘으면 응답 속도가 잘린다) — 2026-11-14 내림 계단 0.1 N·m 에서 약 41~42 rad/s 로 전압 한계(응답 τ 가 명령보다 최대 11 mN·m 낮음). 범위 안. 운용 상한 38.7 rad/s 와 여유 약 7 %
 - [x] **측정 마찰 반영 (5단계 전)** — 2026-11-14 NUC 에서 반영: friction = 실측, 보상 × 0.9 (`compensation_scale`), 시뮬 B 12.6·A 5.1 mm. 원래 항목: 2026-11-14 내림 계단 바퀴별 τc·bv 를 `config/torque_plant.yaml` friction 에 넣을지·얼마나(워밍업 15 %, 약간 작게) 정하고 시뮬 재확인. 지금 값이면 38.7 rad/s 에서 보상이 FL·RR 약 30 % 부족, FR·RL 과보상
 - [ ] (메모) 드라이버의 K_T·기어 효율 가정은 응답 토크로는 못 잰다 — 관성을 아는 가속 시험 `τ ≈ J·α + τ_fric` 로 비교
+- [ ] **바퀴 축관성 J_w 다시 재기** (stack_changelog 2026-11-16 (13)) — 로봇을 받침대에 올려 네 바퀴를 띄운 채, 장착 그대로 바퀴 하나씩.
+  지금 값 8.9e-4(팀원 11-12)는 마찰 모델에 따라 6e-4 ~ 1.0e-3 로 흩어진다. 마찰 모양을 가정하지 않는 계단 차분으로 잰다:
+  ```
+  /usr/bin/python3 tools/ak40_bench.py torque --id N --tau 0.06 --time 10        # 워밍업 2~3 번
+  /usr/bin/python3 tools/ak40_bench.py steps --id N --taus 0.1,0.05,0.08,0.05,0.08,0.05,0.08,0.05,0.08,0 --hold 1.0 --csv jw_N_k.csv   # k = 1..3
+  /usr/bin/python3 tools/jw_step_analysis.py jw_N_*.csv
+  ```
+  - J = Δτ/Δω̇ (계단 순간 같은 ω → 마찰 소거). 바퀴당 계단 27 개. 합성 자료 검증 편향 ≤ 0.4 %, 감속기 부하 의존 마찰이 10 % 면 +11 %
+  - 결과의 J(명령)·J(응답), 바퀴별 평균 ± 표준편차를 `torque_plant.yaml` `inertia_J_w_per_wheel_kgm2` 주석과 비교 → 반영은 사용자 결정 (μ = 4J/r² 가 바뀐다)
+  - 요 관성 I_z(지금 0.06 = 균일판 근사)는 CAD 질량 특성으로 따로 (CAD 총질량이 저울 4.56 kg 과 맞는지 먼저)
 
 ## 3. 네 바퀴 장착, 바퀴 띄운 채 — CAN 노드만
 
@@ -208,5 +218,7 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 
 - [x] m: 저울, 적재 조건마다 — 2026-11-15 **4.56 kg** (적재 없음, 배터리 포함 상태로 잼). `torque_plant.yaml` body.mass_kg 4.56 으로 바꿈(changelog 2026-11-15 (1))
 - [ ] I_z: CAD 또는 제자리 회전 가속 시험
-- [ ] μ̂: 노면마다 토크 램프 시험
+- [ ] μ̂: 노면마다 토크 램프 시험 — 도구 `amrmu` (`tools/mu_ramp_test.py`, stack_changelog 2026-11-16 (12)).
+  `amrall` (MPC 없이) 띄운 뒤 다른 터미널에서 `amrmu --dirs fwd,back --repeat 5 --csv …` → 앞·뒤 중앙값을 `torque_plant.yaml surface.mu_hat`
+  (또는 `amrall mu_hat:=`). 기존 데이터 추정 0.33 이상 ~ 0.45. 옆·대각은 참고(`--dirs left,right,fl`)
 - [ ] 8자 트랙 공간 약 10 × 5 m + 여유
