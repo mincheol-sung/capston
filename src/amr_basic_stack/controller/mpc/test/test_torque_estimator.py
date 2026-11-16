@@ -261,3 +261,68 @@ def test_pose_dropout_stops_output():
     assert est.ready_to_publish()
     est0 = PlanarStateEstimator(dict(CFG, max_dead_reckoning=0.0))   # 0 이면 검사 안 함
     assert est0.max_dead_reckoning == 0.0
+
+
+# ── 실차 배달 방식(QoS) 점검 (2026-11-13) ─────────────────────────────────────────
+#   실차 imu_to_base_node 는 /imu/base_link 를 BEST_EFFORT 로 낸다. 추정기가 RELIABLE 로 받으면 연결이 막혀
+#   IMU 가 0 개가 된다. 시뮬이 RELIABLE 로 내던 동안은 이 잘못이 시뮬에서 안 드러났다.
+def _deliveries(publisher_reliability):
+    """주어진 배달 방식으로 IMU 를 내면 추정기가 몇 개 받는가."""
+    import time
+
+    import rclpy
+    from rclpy.executors import SingleThreadedExecutor
+    from rclpy.node import Node
+    from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+    from sensor_msgs.msg import Imu
+
+    from amr_mpc.nodes.state_estimator import StateEstimatorNode
+    topic = f"/qos_test_{publisher_reliability.name.lower()}/imu"      # 돌고 있는 다른 시뮬과 안 섞이게
+    rclpy.init(args=["--ros-args", "-p", f"imu_topic:={topic}"])
+    try:
+        est = StateEstimatorNode()
+        src = Node("qos_test_imu_source")
+        pub = src.create_publisher(Imu, topic, QoSProfile(reliability=publisher_reliability,
+                                                          history=HistoryPolicy.KEEP_LAST, depth=20))
+        ex = SingleThreadedExecutor()
+        ex.add_node(est)
+        ex.add_node(src)
+        end = time.monotonic() + 5.0
+        while est.n_imu == 0 and time.monotonic() < end:
+            m = Imu()
+            m.header.stamp = src.get_clock().now().to_msg()
+            pub.publish(m)
+            ex.spin_once(timeout_sec=0.02)
+        n = est.n_imu
+        est.destroy_node()
+        src.destroy_node()
+        return n
+    finally:
+        rclpy.shutdown()
+
+
+def test_estimator_receives_best_effort_imu_like_real_robot():
+    from rclpy.qos import ReliabilityPolicy
+    assert _deliveries(ReliabilityPolicy.BEST_EFFORT) > 0      # 실차 imu_to_base_node
+
+
+def test_estimator_still_receives_reliable_imu():
+    from rclpy.qos import ReliabilityPolicy
+    assert _deliveries(ReliabilityPolicy.RELIABLE) > 0         # RELIABLE 로 내는 다른 발행자도 받는다
+
+
+def test_sim_imu_is_published_best_effort_like_real_robot():
+    """시뮬 IMU 를 실차와 같은 BEST_EFFORT 로 내야, RELIABLE 구독 실수를 시뮬에서도 잡는다."""
+    import rclpy
+    from rclpy.qos import ReliabilityPolicy
+
+    from amr_mpc.nodes.sim_plant_torque import SimPlantTorqueNode
+    rclpy.init(args=["--ros-args", "-p", "sensors:=true", "-p", "imu_topic:=/qos_test_sim/imu",
+                     "-p", "pose_topic:=/qos_test_sim/pose", "-p", "wheel_states_topic:=/qos_test_sim/ws",
+                     "-p", "truth_topic:=/qos_test_sim/truth", "-p", "cmd_topic:=/qos_test_sim/cmd"])
+    try:
+        n = SimPlantTorqueNode()
+        assert n.pub_imu.qos_profile.reliability == ReliabilityPolicy.BEST_EFFORT
+        n.destroy_node()
+    finally:
+        rclpy.shutdown()

@@ -20,7 +20,6 @@
 #   미무장 · 무장 뒤 새 속도 명령 전 · 속도 명령 끊김(cmd_timeout — 퓨어 퍼슛이 정지를 결정하면 명령을 끊는다) ·
 #   /wheel_states 끊김(wheel_timeout, 감시 타이머가 낸다)
 # ---------------------------------------------------------------
-import signal
 
 import numpy as np
 import rclpy
@@ -32,7 +31,7 @@ from std_msgs.msg import Bool, Float64MultiArray
 
 from amr_interfaces.msg import WheelStates, WheelTorqueCommand
 from amr_mpc.baseline.wheel_pi import WheelPI, wheel_targets
-from amr_mpc.core import config
+from amr_mpc.core import config, node_main
 from amr_mpc.torque.model import TorquePlant
 
 
@@ -156,11 +155,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = WheelPINode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.damping("종료")
         except Exception:

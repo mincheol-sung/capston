@@ -119,7 +119,8 @@ def test_real_launch_does_not_start_nodes_if_setup_fails(monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     values = dict(plant='real', state_source='estimator', slam_mode='scan_time',
-                  state_topic='', auto_setup_can='true', can_interface='', can_device='')
+                  state_topic='', auto_setup_can='true', can_interface='', can_device='',
+                  armed='false')   # R10: 실차 즉시 무장 금지 검사가 CAN 준비 전에 armed 를 읽는다
     class Configuration:
         def __init__(self, key): self.key = key
         def perform(self, context): return values[self.key]

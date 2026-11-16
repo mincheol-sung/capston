@@ -4,6 +4,8 @@
   ★ 모터는 상위 프로그램(CubeMars Tool, 시리얼 CP2102)으로 먼저 MIT 모드로 바꾸고 CAN ID 를 정해 둔다 (매뉴얼 4.1.1.4, 4.1.1.10).
      공장 기본 ID 는 1. 벤치는 모터 하나씩이라 ID 가 겹쳐도 되지만, 차에 달기 전에는 1~4 로 나눠야 한다.
   ★ 바퀴는 바닥에서 띄운다. 모든 명령은 --max_tau(기본 0.5 N·m) 와 --time(최대 10 s) 안에서만 낸다.
+     damping 의 spin(속도 명령) 도 kd·|v_des − v| ≤ max_tau 가 되게 v_des 를 한 주기씩 올린다 (2026-11-14 전에는 kd 0.5 × 20 rad/s
+     = 10 N·m 를 요구했다 — 응답으로 본 최대는 0.4 N·m).
      Ctrl+C 를 누르면 DAMPING 을 0.5 s 보낸 뒤 모터 모드에서 나온다.
 
   CAN 켜기 (candleLight 펌웨어):  sudo ip link set can0 up type can bitrate 1000000
@@ -11,10 +13,14 @@
   /usr/bin/python3 tools/ak40_bench.py torque --id 1 --tau 0.05 --time 2  # 일정 토크 → 가속(J_w), 끝속도
   /usr/bin/python3 tools/ak40_bench.py steps --id 1 --taus 0.02,0.04,0.06,0.1 --hold 3   # 토크 계단 → 정상 속도 = τ_fric(ω)
   /usr/bin/python3 tools/ak40_bench.py damping --id 1 --spin 20           # 20 rad/s 로 돌린 뒤 DAMPING → 서는 시간
-  --csv 경로 를 주면 [t, mode, p, v, τ_응답, 온도, 에러] 를 남긴다.
+  /usr/bin/python3 tools/ak40_bench.py steps --id 1 --taus 0.1,0.05,0.08,0.05,0.08,0.05,0.08,0.05,0.08,0 --hold 1.0 --csv jw_1_1.csv
+                                                                          # J_w: 돌고 있는 중 토크 계단 → tools/jw_step_analysis.py
+  --csv 경로 를 주면 [t, mode, p, v, τ_응답, 온도, 에러, τ_명령] 을 남긴다 (τ_명령 열은 2026-11-16 부터).
 
 무엇을 재나 (To do 1절)
   torque  : 처음 0.2 s 속도 기울기 α 로 J_w ≈ τ/α (마찰을 빼면 τ − τ_fric). 끝속도 = 그 토크의 정상 속도
+            ※ 마찰 모델에 따라 J 가 6e-4 ~ 1.0e-3 로 흩어졌다 (2026-11-16). J_w 는 아래 steps 계단 차분으로 잰다:
+              계단 순간 앞뒤 ω̇ 차 → J = Δτ/Δω̇ (같은 ω 라 마찰이 소거된다, tools/jw_step_analysis.py)
   steps   : 각 계단 마지막 1 s 평균 속도 → (ω, τ) 점들 = 구동계 마찰 곡선. 응답 토크와 명령 토크 차이는 12 비트 양자화만
             보여 준다 — 드라이버는 명령 토크를 Iq = τ/K_T 로 바꾸고 응답 토크도 측정 전류 × K_T 로 내므로 같은 K_T 가정을
             양쪽에 쓴다. 바퀴에 실제로 나간 토크의 정확도는 관성을 아는 가속 시험(τ ≈ J·α + τ_fric)이나 외부 저울로 잰다
@@ -63,8 +69,8 @@ class Bench:
     def cmd(self, mode, p=0.0, v=0.0, kp=0.0, kd=0.0, t=0.0):
         t = float(np.clip(t, -self.max_tau, self.max_tau))
         r = self.send(P.pack_command(self.lim, p, v, kp, kd, t))
-        if r is not None:
-            self.rows.append([time.monotonic() - self.t0, mode, r["p"], r["v"], r["t"], r["temp"], r["error"]])
+        if r is not None:                              # tau_cmd = MIT 명령의 토크 항 t (2026-11-16, J_w 계단 분석용)
+            self.rows.append([time.monotonic() - self.t0, mode, r["p"], r["v"], r["t"], r["temp"], r["error"], t])
         return r
 
     def run(self, mode, seconds, **kw):
@@ -74,6 +80,20 @@ class Bench:
             t_next = time.monotonic() + self.period
             r = self.cmd(mode, **kw)
             if r is not None:
+                out.append((time.monotonic() - self.t0, r))
+            time.sleep(max(0.0, t_next - time.monotonic()))
+        return out
+
+    def spin(self, v_target, seconds, kd):
+        """속도 명령으로 돌린다. 모터 쪽 토크 kd·(v_des − v) 가 max_tau 를 넘지 않게 v_des 를 마지막 응답 속도 ± max_tau/kd 로 자른다."""
+        out, v_now, step = [], 0.0, self.max_tau / kd
+        t_end = time.monotonic() + min(seconds, 10.0)
+        while time.monotonic() < t_end:
+            t_next = time.monotonic() + self.period
+            v_des = v_now + float(np.clip(v_target - v_now, -step, step))
+            r = self.cmd("spin", v=v_des, kd=kd)
+            if r is not None:
+                v_now = r["v"]
                 out.append((time.monotonic() - self.t0, r))
             time.sleep(max(0.0, t_next - time.monotonic()))
         return out
@@ -90,7 +110,7 @@ class Bench:
         if self.csv and self.rows:
             with open(self.csv, "w", newline="") as f:
                 w = csv.writer(f)
-                w.writerow(["t", "mode", "p", "v", "tau_reply", "temp", "error"])
+                w.writerow(["t", "mode", "p", "v", "tau_reply", "temp", "error", "tau_cmd"])
                 w.writerows(self.rows)
             print(f"저장: {len(self.rows)}행 → {self.csv}")
 
@@ -135,7 +155,7 @@ def main():
                 w = np.mean([r["v"] for r in tail]); tr = np.mean([r["t"] for r in tail])
                 print(f"{tau:8.3f} | {w:8.2f} | {tr:8.4f} | {tr - tau:+.4f}")
         elif a.what == "damping":
-            b.run("spin", 1.5, v=a.spin, kd=0.5)
+            b.spin(a.spin, 1.5, kd=0.5)
             rs = b.run("damping", 3.0, kd=b.kd)
             v0 = rs[0][1]["v"]
             stop = next((x[0] - rs[0][0] for x in rs if abs(x[1]["v"]) < 0.05 * max(abs(v0), 1e-6)), math.nan)

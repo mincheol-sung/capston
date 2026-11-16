@@ -11,10 +11,11 @@
 #   state_timeout  /state_estimator/odom 이 timeout 동안 안 왔다
 # 동작: /mpc/arm 에 false → 게이트가 DAMPING 으로 세운다 (MPC·기준궤적도 무장 해제를 보고 멈춘다).
 #       /fault_monitor/fault (String, latched) 에 이유를 남기고 ERROR 로그.
-# 문턱은 아래 파라미터 (launch 에서 덮어쓰기). figure8 의 abort_error(0.35 m)보다 track_error(0.30 m)를 먼저 건다.
+# 문턱은 아래 파라미터 (launch 에서 덮어쓰기). figure8 의 abort_error(1.6 m)보다 track_error(1.5 m)를 먼저 건다.
+# 2026-11-16 0.30 → 1.5 m (사용자 결정): C 가 한계 넘는 기준에서 미끄러지는 대신 늦어지는 모습을 끝까지 남긴다.
+#   로봇이 경로에서 1.5 m 까지 벗어날 수 있다 — 두 사람 정지 절차로 지켜본다.
 # ---------------------------------------------------------------
 import math
-import signal
 
 import rclpy
 from nav_msgs.msg import Odometry
@@ -24,6 +25,7 @@ from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import Bool, Float64MultiArray, String
 
 from amr_interfaces.msg import WheelStates
+from amr_mpc.core import node_main
 
 
 def check_faults(now, armed, cfg, st):
@@ -50,7 +52,7 @@ class FaultMonitorNode(Node):
         self.declare_parameters("", [
             ("arm_topic", "/mpc/arm"),
             ("armed_topic", "/mpc/armed"),
-            ("max_track_error", 0.30),     # [m]
+            ("max_track_error", 1.5),      # [m]
             ("timeout", 0.3),              # [s]
             ("trip_on_pose_jump", True),
             ("rate_hz", 20.0),
@@ -113,11 +115,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = FaultMonitorNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM 이 메시지 변환 중에 떨어져도 정상 종료 (R9 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
         try:
             node.destroy_node()
         except Exception:

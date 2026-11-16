@@ -43,7 +43,6 @@
 # ---------------------------------------------------------------
 import math
 import numpy as np
-import signal
 import rclpy
 import rclpy.duration
 from rclpy.node import Node
@@ -54,8 +53,10 @@ from nav_msgs.msg import Odometry, Path
 from std_msgs.msg import Bool
 from amr_interfaces.msg import PlanarReference, PlanarReferenceArray
 
+from amr_mpc.core import node_main
 from amr_mpc.body import mpc as mpc_mod
 from amr_mpc.core.figure8 import Figure8, lead_in, lead_in_duration, ramp_elapsed, ramp_rate
+from amr_mpc.core.segment import Segment
 K_GEOM = mpc_mod.K_GEOM
 
 
@@ -81,7 +82,7 @@ class Figure8ReferenceNode(Node):
             ("yaw_mode", "tangent"),                  # tangent = 접선 추종 | fixed = 헤딩 고정(게걸음)
             ("align_s", 1.5),                         # tangent 모드 앞뒤 제자리 회전 시간 [s]
             ("start_delay", 3.0),                     # 첫 odom 뒤 이만큼 기동 포즈를 유지하다 출발 (실차에서 손 뺄 시간)
-            ("abort_error", 0.35),                    # 로봇이 기준에서 이만큼 벌어지면 발행 중단 → MPC 타임아웃 정지.
+            ("abort_error", 1.6),                     # 로봇이 기준에서 이만큼 벌어지면 발행 중단 → MPC 타임아웃 정지.
                                                       # 2026-09-03 실차에서 오차 2.8 m 까지 달아났다. 0 이하면 끈다.
             ("hold_s", 5.0),                          # 복귀 후 제자리 유지 시간. <0 이면 무한 유지
             ("rate_hz", 10.0), ("dt", 0.2), ("horizon_steps", 20),
@@ -101,6 +102,16 @@ class Figure8ReferenceNode(Node):
             ("start_tolerance_yaw_deg", 30.0),        # fixed: [deg]
             ("lead_speed", 0.10),                     # fixed: 진입 구간 평균 속도 상한 [m/s]
             ("lead_yaw_rate", 0.5),                   # fixed: 진입 구간 평균 회전속도 상한 [rad/s]
+            # 5-3 단일 축 기준 (2026-11-16, core/segment.py). shape = figure8 | circles8 | line | rotate
+            #   circles8 : 두 원 8자 (core/figure8.py curve="circles") — 지름 width/2 인 원 두 개가 기동 포즈에서 맞닿고,
+            #              잎이 로봇 왼쪽·오른쪽으로 나간다 (width = 좌우 전체 폭). height 는 안 쓴다. yaw_mode 는 figure8 과 같다
+            #   line   : 출발 몸체 방향 seg_dir_deg(0 앞, 90 왼쪽, 45 대각)로 seg_distance [m], 속도는 speed·accel
+            #   rotate : 제자리 seg_angle_deg, 각속도 seg_yaw_rate·seg_yaw_accel
+            #   seg_out_and_back 이면 seg_pause_s 쉬고 돌아온다. origin_mode robot 과 같이 쓴다 (무장한 자리가 출발점)
+            ("shape", "figure8"),
+            ("seg_distance", 0.5), ("seg_dir_deg", 0.0),
+            ("seg_angle_deg", 90.0), ("seg_yaw_rate", 0.8), ("seg_yaw_accel", 1.6),
+            ("seg_out_and_back", True), ("seg_pause_s", 1.0),
         ])
         g = lambda n: self.get_parameter(n).value
         self.dt, self.T, self.frame = float(g("dt")), int(g("horizon_steps")), str(g("frame_id"))
@@ -109,11 +120,21 @@ class Figure8ReferenceNode(Node):
 
         mpc_mod.set_wheel_limit(g("max_wheel_rad_per_sec"))
         V_LIMIT, budget = mpc_mod.V_LIMIT, float(g("load_budget"))
+        self.shape = str(g("shape")).strip().lower()
         try:
-            self.path = Figure8(width=g("width"), height=g("height"), speed=g("speed"),
-                                accel=g("accel"), laps=g("laps"), yaw_mode=str(g("yaw_mode")),
-                                align_s=g("align_s"),
-                                lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None)
+            if self.shape in ("line", "rotate"):
+                self.path = Segment(shape=self.shape, distance=g("seg_distance"), dir_deg=g("seg_dir_deg"),
+                                    speed=g("speed"), accel=g("accel"), angle_deg=g("seg_angle_deg"),
+                                    yaw_rate=g("seg_yaw_rate"), yaw_accel=g("seg_yaw_accel"),
+                                    out_and_back=bool(g("seg_out_and_back")), pause_s=g("seg_pause_s"))
+            elif self.shape not in ("figure8", "circles8"):
+                raise ValueError(f"shape={self.shape!r} — figure8 | circles8 | line | rotate")
+            else:
+                self.path = Figure8(width=g("width"), height=g("height"), speed=g("speed"),
+                                    accel=g("accel"), laps=g("laps"), yaw_mode=str(g("yaw_mode")),
+                                    align_s=g("align_s"),
+                                    lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None,
+                                    curve="circles" if self.shape == "circles8" else "gerono")
         except ValueError as e:
             raise SystemExit(f"[figure8] 파라미터 오류: {e}")
 
@@ -161,10 +182,21 @@ class Figure8ReferenceNode(Node):
             self.publish_path(self.track_origin)
 
         p = self.path
+        if self.shape not in ("figure8", "circles8"):
+            what = (f"직선 {p.L:.2f} m, 방향 {math.degrees(math.atan2(p.u[1], p.u[0])):.0f}°, 최고 {p.V_peak():.2f} m/s, "
+                    f"가감속 {p.A:.2f} m/s²" if self.shape == "line" else
+                    f"제자리 회전 {math.degrees(p.sign * p.L):.0f}°, 최고 {p.V_peak():.2f} rad/s, 각가속 {p.A:.2f} rad/s²")
+            self.get_logger().info(
+                f"5-3 기준: {what}{', 갔다 옴 (쉼 %.1f s)' % p.pause if p.back else ''}\n"
+                f"  시간  대기 {self.delay:.1f} s + 기준 {p.T_total:.1f} s"
+                f"{'' if self.hold < 0 else f' + 유지 {self.hold:.1f} s'}   부하 {max(run, spin)/V_LIMIT*100:.0f} %")
+            return
         for k, V, vmax, t0 in p.lap_profile_summary():
             self.get_logger().info(f"  랩 {k}: 목표 {V:.2f} m/s, 실제 최고 {vmax:.2f} m/s, 시작 {t0:.1f} s")
         self.get_logger().info(
-            f"8자 {p.W:.2f} × {p.H:.2f} m (Gerono 렘니스케이트)  yaw {p.yaw_mode}  {p.laps:g} 바퀴\n"
+            (f"두 원 8자: 지름 {2*p.R:.2f} m 원 두 개, 좌우 폭 {p.W:.2f} m (앞뒤 {2*p.R:.2f} m), 왼쪽 원 먼저"
+             if p.curve == "circles" else f"8자 {p.W:.2f} × {p.H:.2f} m (Gerono 렘니스케이트)")
+            + f"  yaw {p.yaw_mode}  {p.laps:g} 바퀴\n"
             f"  호길이 {p.L:.2f} m  순항 {p.V:.2f} m/s  가감속 {p.A:.2f} m/s²  "
             f"최대곡률 {p.max_curvature():.2f} 1/m (R_min {1/p.max_curvature():.3f} m)\n"
             f"  시간  대기 {self.delay:.1f} s + 정렬 {p.T_align:.1f} s ×2 + 주행 {p.T_path:.1f} s = {p.T_total:.1f} s"
@@ -321,11 +353,8 @@ def main():
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = Figure8ReferenceNode()
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        node_main.spin(node)          # Ctrl+C·SIGTERM·SIGHUP 공통 처리, 신호가 메시지 변환 중에 떨어져도 정상 종료 (R9·R10 리뷰)
     finally:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)   # 정리 중 두 번째 Ctrl+C(launch 가 보냄) 무시
         try: node.destroy_node()
         except Exception: pass
         if rclpy.ok():

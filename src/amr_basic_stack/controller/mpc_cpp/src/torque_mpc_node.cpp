@@ -119,13 +119,22 @@ public:
     if (W.size() != 6) {throw std::invalid_argument("tuning.W 는 6개여야 한다 [x, y, θ, ẋ, ẏ, θ̇]");}
     for (int i = 0; i < 6; ++i) {tu.W(i) = W[i];}
     tu.w_delta = declare_parameter<double>("w_delta", yt["w_delta"].as<double>());
-    tu.q_null = declare_parameter<double>("q_null", yt["q_null"].as<double>());
+    tu.q_null = declare_parameter<double>("q_null", yt["q_null"].as<double>(0.0));
+    tu.r_u = declare_parameter<double>("r_u", yt["r_u"].as<double>(0.0));
+    acc_dt_ = declare_parameter<double>("acc_dt", yt["acc_dt"].as<double>(0.2));     // 기준 가속도 중앙 차분 창 (지시서 3.9)
+    if (!(acc_dt_ > 0.0)) {throw std::invalid_argument("acc_dt > 0 이어야 한다");}
     tu.daqp_iter_limit = declare_parameter<int>("daqp_iter_limit", yt["daqp_iter_limit"].as<int>(1000));
     limit_mode_ = declare_parameter<std::string>("limit_mode", ym["torque_limit"]["mode"].as<std::string>());
     tu.limit_mode = amr_mpc_cpp::parse_limit_mode(limit_mode_);
+    // 선형화 방식 (torque_mpc.hpp 머리주석). YAML 에 절이 없으면 reference (1판 방식, 2026-11-14 기본 유지 결정)
+    linearization_ = declare_parameter<std::string>(
+      "linearization", ym["linearization"] ? ym["linearization"]["mode"].as<std::string>("reference") : "reference");
+    tu.linearization = amr_mpc_cpp::parse_linearization(linearization_);
     tu.rate_fraction = declare_parameter<double>("rate_fraction", ym["torque_limit"]["rate_fraction"].as<double>());
     tu.dist_enable = declare_parameter<bool>("disturbance_enable", ym["disturbance"]["enable"].as<bool>());
     tu.dist_alpha = declare_parameter<double>("disturbance_alpha", ym["disturbance"]["alpha"].as<double>());
+    tu.dist_dt_tol = declare_parameter<double>("disturbance_dt_tol", ym["disturbance"]["dt_tol"].as<double>(0.002));
+    tu.dist_skip_xy = declare_parameter<double>("disturbance_skip_xy", ym["disturbance"]["skip_xy"].as<double>(1e-3));
     mpc_ = std::make_unique<TorqueMPC>(md, tu);
 
     const auto ref_topic = declare_parameter<std::string>("reference_topic", "/dra_mppi/reference_trajectory");
@@ -183,6 +192,10 @@ public:
       ref_topic.c_str(), state_topic.c_str(), cmd_topic.c_str(), tu.Ts * 1e3, tu.Np, tu.Nc, md.mass, md.inertia_z,
       md.use_wheel_inertia ? "켬" : "끔", md.mu(), limit_mode_.c_str(), tb(0), mpc_->dtau_bar_of(tb(0)),
       md.tau_motor_limit(), md.tau_friction_limit(), md.mu_hat, tu.dist_enable ? "켬" : "끔", tu.dist_alpha);
+    RCLCPP_INFO(
+      get_logger(), "  선형화 %s (%s)", linearization_.c_str(),
+      tu.linearization == amr_mpc_cpp::TorqueLinearization::CurrentState ?
+      "매 주기 현재 추정 상태 x̂(k), τ(k−1) 에서 야코비안" : "1판: 지평의 기준 방향 θ_r 을 대입");
   }
 
   void finish()
@@ -272,8 +285,10 @@ private:
     const double now = now_s();
     const double st = rclcpp::Time(m.header.stamp).seconds();
     const double t_state = st > 0.0 ? st : now;         // stamp 가 비어 있으면 수신 시각
+    double dt_state = -1.0;
     if (last_state_stamp_ > 0.0) {
       const double dt = t_state - last_state_stamp_;
+      dt_state = dt;
       if (std::abs(dt - mpc_->tuning().Ts) > 0.5 * mpc_->tuning().Ts) {
         RCLCPP_WARN_THROTTLE(
           get_logger(), *get_clock(), 2000, "상태 주기 %.1f ms ≠ Ts %.1f ms — 모델 이산화와 어긋난다",
@@ -335,7 +350,7 @@ private:
         mpc_->reset();
       }
       publish_damping();
-      if (debug_) {publish_status(now, Xe, TVec4::Zero(), 0.0, t_state - ref_->t0());}
+      if (debug_) {publish_status(now, Xe, TVec4::Zero(), 0.0, t_state - ref_->t0(), true, stopped, TVec4::Zero());}
       return;
     }
     if (was_idle) {
@@ -345,7 +360,20 @@ private:
     }
 
     const auto t_c = std::chrono::steady_clock::now();
-    const TVec4 tau = mpc_->step(x, hz);
+    // 기준 가속도 p̈_r,j (관성 좌표): 기준 속도의 중앙 차분, 창 acc_dt (지시서 3.9 — 0.2 s 계단을 사다리꼴로 편다)
+    acc_ref_.resize(mpc_->tuning().Nc);
+    {
+      const double Ts = mpc_->tuning().Ts, h = 0.5 * acc_dt_;
+      const auto lo = ref_->horizon(t_state - h, Ts, mpc_->tuning().Nc);
+      const auto hi = ref_->horizon(t_state + h, Ts, mpc_->tuning().Nc);
+      auto inertial = [](const amr_mpc_cpp::TorqueRefPoint & p) {
+        const double c = std::cos(p.first(2)), s = std::sin(p.first(2));
+        const TVec3 & u = p.second;
+        return TVec3(u(0) * c - u(1) * s, u(0) * s + u(1) * c, u(2));
+      };
+      for (int j = 0; j < mpc_->tuning().Nc; ++j) {acc_ref_[j] = (inertial(hi[j]) - inertial(lo[j])) / acc_dt_;}
+    }
+    const TVec4 tau = mpc_->step(x, hz, &acc_ref_, dt_state);
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_c).count();
     publish_torque(tau, m.header.stamp);
 
@@ -363,7 +391,9 @@ private:
           d(0), d(1), d(2), d(3), d(4), d(5)});
     }
     if (debug_) {
-      publish_status(now, Xe, tau, ms, ref_age);
+      TVec4 us = TVec4::Zero();                         // 이번 주기 목표 입력 U_s,0 (식-14, 지평 첫 스텝)
+      if (mpc_->target_input().size() >= 4) {us = mpc_->target_input().head<4>();}
+      publish_status(now, Xe, tau, ms, ref_age, false, stopped, us);
       nav_msgs::msg::Path path;
       path.header.frame_id = ref_frame_.empty() ? "map" : ref_frame_;
       path.header.stamp = get_clock()->now();
@@ -381,24 +411,33 @@ private:
     }
   }
 
-  // [t, ex, ey, eθ, τ_FL, τ_FR, τ_RL, τ_RR, τ̄, 활성 제약 수, QP 반복, fallback, step_ms, ref_age, d̂ ×6]
-  void publish_status(double now, const TVec3 & Xe, const TVec4 & tau, double ms, double ref_age)
+  // [t, ex, ey, eθ, τ_FL, τ_FR, τ_RL, τ_RR, τ̄, 활성 제약 수, QP 반복, fallback, step_ms, ref_age, d̂ ×6,      (0~19)
+  //  hold, stopped, U_s FL, FR, RL, RR]                                                                        (20~25)
+  //  2026-11-16 뒤 6 칸 추가 (앞 20 칸 순서 그대로):
+  //    hold    1 = hold 래치로 DAMPING (이 주기는 풀지 않았다, τ·U_s 는 0) / 0 = 추종
+  //    stopped 1 = 몸체 속도·회전이 hold_stopped_speed 아래 (hold 진입 조건 중 하나, 추정기 속도 기준)
+  //    U_s     이번 주기 목표 입력 U_s,0 (식-14) — 모델이 맞으면 기준을 따라가는 데 드는 토크
+  void publish_status(double now, const TVec3 & Xe, const TVec4 & tau, double ms, double ref_age,
+    bool hold, bool stopped, const TVec4 & us)
   {
     const auto & stt = mpc_->stats();
     const TVec6 & d = mpc_->d_hat();
     std_msgs::msg::Float64MultiArray m;
     m.data = {now, Xe(0), Xe(1), Xe(2), tau(0), tau(1), tau(2), tau(3), mpc_->tau_bar().maxCoeff(),
       static_cast<double>(stt.active), static_cast<double>(stt.iters), static_cast<double>(stt.fallback), ms, ref_age,
-      d(0), d(1), d(2), d(3), d(4), d(5)};
+      d(0), d(1), d(2), d(3), d(4), d(5),
+      hold ? 1.0 : 0.0, stopped ? 1.0 : 0.0, us(0), us(1), us(2), us(3)};
     pub_status_->publish(m);
   }
 
   std::unique_ptr<TorqueMPC> mpc_;
   std::optional<HoldLatch> latch_;
   std::optional<ReferenceHorizon> ref_;
-  std::string limit_mode_, ref_frame_, csv_path_;
+  std::string limit_mode_, linearization_, ref_frame_, csv_path_;
   double last_state_rx_ = 0.0, last_state_stamp_ = 0.0, ref_rx_ = 0.0, armed_since_ = 0.0;
   double state_timeout_ = 0.3, ref_timeout_ = 0.5, hold_stopped_speed_ = 0.04;
+  double acc_dt_ = 0.2;
+  std::vector<TVec3> acc_ref_;
   bool debug_ = true, active_ = false, done_ = false, armed_ = false;
   std::vector<std::vector<double>> rows_;
 
