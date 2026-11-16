@@ -61,7 +61,10 @@ def _truthy(s):
 _TRACK_KEYS = ["origin_mode", "origin_x", "origin_y", "origin_yaw_deg", "start_tolerance_xy",
                "start_tolerance_yaw_deg", "lead_speed", "lead_yaw_rate", "width", "height", "yaw_mode",
                "speed", "accel", "laps", "align_s", "start_delay", "abort_error", "hold_s", "lap_speeds",
-               "dt", "horizon_steps"]
+               "dt", "horizon_steps",
+               # 5-3 단일 축 기준 (2026-11-16): shape:=line|rotate 와 seg_* (figure8_reference.py)
+               "shape", "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_yaw_accel",
+               "seg_out_and_back", "seg_pause_s"]
 
 
 def _track(context, share):
@@ -78,8 +81,10 @@ def _track(context, share):
             out[k] = [float(x) for x in (v or [])] or [0.0]
         elif k == "horizon_steps":
             out[k] = int(float(track[k]))
+        elif k == "seg_out_and_back":
+            out[k] = str(track[k]).strip().lower() in ("1", "true", "yes", "on")
         else:
-            out[k] = str(track[k]) if k in ("origin_mode", "yaw_mode") else float(track[k])
+            out[k] = str(track[k]) if k in ("origin_mode", "yaw_mode", "shape") else float(track[k])
     return out
 
 

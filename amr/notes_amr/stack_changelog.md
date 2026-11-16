@@ -61,6 +61,17 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-16 (1) — 5-3 단일 축 기준 `shape:=line|rotate`
+- 왜: 체크리스트 5-3(한 축 폐루프)에 직선·제자리 회전 기준이 필요했다 (기준 노드는 8자만 냈다).
+- 바꾼 파일 (`controller/mpc`):
+  - `amr_mpc/core/segment.py` (새): `Segment` — line(출발 몸체 방향 `dir_deg` 로 `distance`, 사다리꼴 speed·accel, 헤딩 고정) /
+    rotate(제자리 `angle_deg`, 사다리꼴 yaw_rate·yaw_accel), `out_and_back` 이면 `pause_s` 쉬고 돌아옴. Figure8 과 같은 꼴(at·peak_load·path_xy·T_total).
+    자체 검산: 속도 vs 위치 유한차분 최대 차 ≤ 5e-12, 끝 위치 오차 0, 사다리꼴 시간 손계산과 같음(0.5 m·0.2 m/s·0.4 m/s² → 3.00 s)
+  - `nodes/figure8_reference.py`: 파라미터 `shape`, `seg_distance`, `seg_dir_deg`, `seg_angle_deg`, `seg_yaw_rate`, `seg_yaw_accel`, `seg_out_and_back`, `seg_pause_s`
+  - `launch/torque_experiment.launch.py` `_TRACK_KEYS`, `config/torque_track.yaml` 기본값(shape figure8 — 기존 동작 그대로)
+- 확인(시뮬, 도메인 88, `origin_mode:=robot`): B 로 앞 0.5·옆 0.3·대각 0.4 m (0.2 m/s)·회전 90° 완주, 위치 오차 최대 2.2~2.6 cm·끝 0.4~0.7 cm·헤딩 ≤ 0.6°.
+  C `mu_hat:=0.55`(τ_μ 0.1392) 로 앞 0.5 m (0.15 m/s)·회전 90° 완주, 상한 0.139 에 닿음. **실차 미확인.**
+
 ### 2026-11-15 (4) — 측위 `translation_weight` 10 → 1 (빠를 때 SLAM 넘침)
 - 왜: 실차 5-2 에서 토크 0.15·0.2 로 빠르게 움직이면 SLAM·추정기가 수십 cm~1 m 틀렸다(줄자 50 cm 에 SLAM 101.6). Cartographer 가 직전 움직임으로
   예측한 위치를 스캔-지도 맞춤보다 10 배 믿어서(Ceres 비용의 예측 이탈 가중 10), 급정지 뒤에도 1 s 넘게 "계속 달렸다".

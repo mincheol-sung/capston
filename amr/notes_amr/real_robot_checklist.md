@@ -141,7 +141,10 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 ### 5-3. 한 축 폐루프 (MPC) — 직선 하나씩
 
 5-2 결과로 MPC 를 고친 뒤. 저속(≤ 0.3 m/s), `origin_mode:=robot`.
-- [ ] **기준열 모드 필요**: 지금 기준 노드는 8자만 낸다 → 직선(앞 1 m, 옆 0.5 m, 대각)·제자리 90° 기준을 내는 모드 추가 (코드, todo)
+- [x] **기준열 모드** — 2026-11-16 `shape:=line|rotate` (`core/segment.py`, figure8_reference_node). 갔다가 1 s 쉬고 돌아온다. 시뮬(B) 앞 0.5·옆 0.3·대각 0.4 m·90° 모두 완주, 위치 오차 최대 2.2~2.6 cm, 끝 0.4~0.7 cm
+  - 실차 명령 (C 대신): `ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false origin_mode:=robot shape:=line seg_distance:=0.5 speed:=0.15 limit_mode:=friction mu_hat:=0.55 log_prefix:=<결과 폴더>/fwd`
+    옆 `seg_dir_deg:=90 seg_distance:=0.3`, 대각 `seg_dir_deg:=45 seg_distance:=0.4`, 회전 `shape:=rotate seg_angle_deg:=90` (seg_yaw_rate 0.8)
+  - 토크 상한 C `mu_hat:=0.55` → τ_μ 0.139 N·m: 5-2 에서 바퀴당 0.15 는 헛돎 없음, 0.2 앞·왼쪽은 FL 헛돎. 시뮬 0.15 m/s 에서 상한에 닿고도 완주(오차 2.5 cm)
 - [ ] 앞 1 m → 옆 0.5 m → 대각 → 제자리 90°: 각각 추종 오차 RMS·최대, 토크 포화 비율, 슬립률, 정지 정확도
 - [ ] 비교군 A(`controller:=pure_pursuit`)도 같은 직선으로
 
