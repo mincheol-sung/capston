@@ -61,6 +61,95 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-16 (18) — 잘못된 yaw_mode·shape 을 launch 에서 거부, circles8 tangent 교차점 헤딩 완화 `crossing_blend_m`
+- 왜: 접선 판 분석 (`analysis/torque_mpc_real/2026-11-16_circles8/tools/crossing.py`·`halves.py`).
+  ① `yaw_mode:=true` 로 띄운 판 6 개(142227, 185214, 185603, 185707, 185814, 185918)에서 figure8_reference_node 가 시작하자마자
+  ValueError 로 죽었는데 오류가 화면에만 나오고 /rosout·bag 에는 안 남아, 무장해도 기준 없이 서 있었다.
+  ② circles8 tangent 는 교차점에서 곡률 +1/R → −1/R 계단 → 기준 ω 가 +v/R → −v/R 로 한 번에 뒤집힌다 (요 가속 충격).
+  실차 0.7 m/s (μ̂ 0.4): 교차점 ±0.6 s 위치 RMS 10~12 cm (나머지 5.6~6.3), 어느 바퀴든 상한 닿음 95~100 %, 헤딩 최대 3.4~5.7°.
+- 바꾼 파일 (`controller/mpc`):
+  - `launch/torque_experiment.launch.py`: `_track()` 이 yaw_mode(tangent|fixed)·shape(figure8|circles8|line|rotate)·origin_mode(robot|fixed)
+    허용값을 검사해 `RuntimeError` — `_nodes` 맨 앞(실차 CAN 준비 전)에서 먼저 부른다. 트랙 키에 `crossing_blend_m`.
+  - `amr_mpc/core/figure8.py`: `Figure8(crossing_blend=Lb)` (circles + tangent 만, 기본 0 = 예전 그대로). 경로(위치)는 그대로 두고 교차점
+    앞뒤 Lb/2 에서 헤딩 곡률을 σ/R → −σ/R 직선으로 → 요 가속 최대 2v²/(R·Lb), 헤딩이 접선보다 최대 Lb/(4R) 덜 돎(그 구간 메카넘 게걸음).
+    출발·끝 교차점(속도 0)은 건드리지 않음. 여러 바퀴면 안쪽 교차점 모두.
+  - `amr_mpc/nodes/figure8_reference.py`: 파라미터 `crossing_blend_m`, 기동 요약에 완화(요 가속·헤딩) 또는 "교차점 ω 계단" 한 줄.
+  - `config/torque_track.yaml`: `crossing_blend_m: 0.0`. `launch/real_all.launch.py`: `_PASS` 에 `crossing_blend_m`.
+  - 시험: `test_figure8.py` 3 개 (0 = 예전과 같음, Lb 0.2 에서 요 가속 9.8·헤딩 5.73°·경로 같음·유한차분, circles+tangent 만·안쪽 교차점),
+    `test_launch_modes.py` 7 개 (잘못된 값 거부, 맞는 값 통과, 실차에서 CAN 준비 전 거부 — prepare_can 은 가로챔),
+    `test_can_setup.py` 가짜 launch 인자에 use_mpc·use_figure8.
+- 확인: Python 시험 227 개 통과. 수치 검산 (R 0.5, v 0.7, Lb 0.2): ω 의 1 ms 변화 2.800 → 0.0098 rad/s, 요 가속 최대 9.80 (해석 9.80),
+  헤딩 차 최대 5.73° (해석 5.73°), 위치 경로 차 0, 유한차분 |dyaw/dt − ω| 1.8e-3 rad/s·|dp/dt − R(yaw)u| 4.8e-4 m/s.
+  시뮬 (도메인 96, circles8 tangent 0.7 μ̂ 0.4 use_w, 2 판씩): 완화 0 RMS 11.2·11.4 / 최대 27.1·28.0 mm / yaw RMS 0.68·0.69°,
+  완화 0.2 m 13.7·11.6 / 27.7·34.8 mm / 0.51·0.56° → 헤딩 오차 −22 %, 위치는 흔들림 안. **실차 미확인** (교차점 포화가 실차만큼 안 나는 시뮬).
+  `python3 amr_mpc/core/figure8.py` 자기검사는 HEAD 부터 `from mpc import K_GEOM` 로 깨져 있다 (이번 변경과 무관, 안 고침).
+
+### 2026-11-16 (17) — 구동계 마찰 보상표를 오늘 실측으로 (11-14 값은 네 바퀴 모두 과보상)
+- 왜: 접선 판에서 "FR 마찰 2 배" 로 보였던 것을 다시 잼 (`analysis/torque_mpc_real/2026-11-16_jw/RESULTS_KO.md` 끝 절). 바퀴 띄움·38~39 °C 에서
+  코스트다운(토크 0 감속)과 전압 한계 아래 정상 상태(0.045/0.04/0.035/0.03 N·m) — FR 은 같은 속도에 0.003~0.005 N·m 더 들 뿐(2 배 아님, 앞선 결론 틀림).
+  대신 11-14 표가 20 rad/s 에서 네 바퀴 모두 0.007~0.018 N·m 과보상 (τ̄ 0.1012 의 7~18 %, 점성 항 1.5~1.9 배) — 바닥 직선 판 순항에서
+  MPC 순토크가 음수(제동)였던 것과 같은 방향. 사용자 결정: 오늘 값으로.
+- 바꾼 파일: `mpc/config/torque_plant.yaml` friction `coulomb_Nm` [0.02142, 0.02151, 0.02170, 0.01830] → [0.0174, 0.0206, 0.0155, 0.0157],
+  `viscous_Nms_per_rad` [0.002062, 0.001799, 0.001767, 0.001679] → [0.001066, 0.001158, 0.001112, 0.001177] (compensation_scale 0.9 그대로),
+  근거·모르는 것(온도, 26 rad/s 위 외삽, 바닥 하중) 주석. 이 표는 시뮬 플랜트의 실제 마찰로도 쓰인다.
+  `mpc/test/test_torque_output.py` 시험 2 개를 새 값으로 (정격 속도 최대 마찰 0.10132 → 0.06547, 여유 0.1 이면 경고 없음·0.05 면 경고).
+- 확인: Python 시험 통과 (위 227 개에 포함). 시뮬 B 기본 8자 13.64 mm·최대 39.0 (예전 11.7~13.9). **실차 미확인** —
+  `real_robot_checklist.md` "마찰 보상표 갱신 뒤 다시 보기".
+- 되돌리려면: 위 괄호 안 11-14 값.
+
+### 2026-11-16 (16) — 바퀴 축관성 J_w 실측 (계단 차분): 8.77e-4 → 설정 8.9e-4 그대로, 측정 도구 순서·요약 고침
+- 왜: (13) 의 도구로 실차(장착 그대로, 바퀴 띄움) J_w 를 잼. 결과는 `analysis/torque_mpc_real/2026-11-16_jw/RESULTS_KO.md`.
+- 결과: 네 바퀴 121 계단 중앙 **8.77e-4 kg·m²** (사분위 6.6~10.5, 평균 8.58 ± 0.35 표준오차) — 설정 8.9e-4 와 −1.4 % → **설정 안 바꿈**.
+  바퀴별 중앙 FL 9.76 / FR 9.35 / RL 6.81 (저속 다시 7.79) / RR 9.12 ×10⁻⁴. RL 만 낮은 이유는 모름 (전압 한계·기록 누락 아님).
+- 바꾼 파일:
+  - `mpc/tools/jw_step_analysis.py`: CLI `--w_max` (기본 30 rad/s — 0.08 N·m 에서 약 40 rad/s 로 전압 한계에 닿아 응답 토크가 0.010 낮았다),
+    요약을 중앙값·사분위 대표로 (실측 속도 잡음 0.3~0.65 rad/s 라 계단 하나가 ±30 % 흩어짐), 설명의 측정 순서를 실측 순서로
+    (워밍업 `steps --taus 0.09,0.05 --hold 5`, 계단 `0.08,(0.035,0.055)×4,0`), 검증 숫자를 지수 꼴 맞춤 값으로.
+  - `mpc/config/torque_plant.yaml`: `inertia_J_w_kgm2` 주석에 실측 확인 (값 그대로).
+  - `amr/notes_amr/real_robot_checklist.md`: J_w 항목 완료, RL 차이는 하위 항목으로.
+- 확인: `test/test_jw_step_analysis.py` 5 개 통과. 첫 순서(0.1, 0.05/0.08)로 잰 FL 판은 버림 (`hi_jw_1_*`, 결과 문서에 이유).
+
+### 2026-11-16 (15) — 시뮬 플랜트 기본도 바퀴 관성 켬 (`model.use_wheel_inertia: true`)
+- 왜: (14) 로 제어기는 M 에 m_w 를 늘 넣는데 시뮬 플랜트 기본은 M = m 이라 둘이 달랐다. 사용자 결정: 플랜트도 실차처럼 바퀴 관성이 있는 물리로
+  (지시서 7.3 "플랜트는 w 를 포함한 식-5"). 이제 기본 시뮬은 플랜트 M = m_eq + w, 제어기 M = m_eq·w 끔 — w 항만 다르다.
+- 바꾼 파일: `mpc/config/torque_plant.yaml` `model.use_wheel_inertia: false → true`, 주석.
+  영향은 슬립 없는 시뮬 플랜트(`sim_plant_torque`, `tools/baseline_a_offline.py`, `tools/torque_demo_drive.py`) 뿐 — 다른 Python 노드는
+  Tinv·토크 한계·몸체 질량만 쓴다. 슬립 모델(`surface_mu > 0`)은 몸체에 m·I_z, 바퀴에 J_w 를 따로 두므로 이 값과 상관없다 (이중 반영 없음).
+- 확인: Python 시험 216 개 통과. 시뮬 기본 8자 (도메인 95, 한 판씩): **B 11.67 mm·최대 31.5** (예전 12.0~13.9), **A 4.72 mm·최대 14.7** (예전 5.1~6.3). 둘 다 완주.
+- 되돌리려면: launch 인자 `use_wheel_inertia:=false` (플랜트만).
+
+### 2026-11-16 (14) — w 항·외란 추정치 지시서 1·2 번만: 제어기 M 에 m_w 늘, `use_w` 로 w 항만, d̂ 기본 끔
+- 왜: 교수님 지시서(2026-11-16) "w 항과 외란 추정치를 구현하되 끈 채로 제어". 지시서와 지금 코드의 차이 6 개 중 **사용자 결정: 1·2 번만 구현,
+  3(α 0.1 유지)·4(실행 중 전환 없음)·5(status 기록 그대로)·6(수치는 실측값 유지) 은 현행 유지.**
+  1 번 = 지시서는 M = diag(m_eq, m_eq, I_eq) 고정에 w 만 스위치, 코드는 `use_wheel_inertia` 하나가 M(m ↔ m_eq) 과 w 를 같이 껐다 켰다.
+  2 번 = 지시서는 d̂ 기본 끔, 코드는 같은 날 앞선 결정으로 켬(`enable: true`) — **오늘 실차 판 135118~144233 은 d̂ 켬(α 0.1)**.
+  지시서의 회귀 기준("두 스위치 끈 출력 = 지금 출력")은 1 번 때문에 성립하지 않는다: 끈 상태 모델이 M = m → m_eq 로 바뀐다
+  (선회 목표 입력 4 kg 예 ±0.01667 → ±0.02677 N·m, 지금 설정 4.56 kg 이면 ±0.0190 → ±0.0283).
+- 바꾼 파일:
+  - `mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp`·`src/torque_mpc.cpp`: `TorqueModel::use_wheel_inertia` → `use_w`. `mu()` = 4J_w/r² 늘
+    (M_eff·I_eff 에 늘 들어감). `w()` 는 `use_w` 가 꺼지면 계산 없이 0 (0 을 곱하지 않음), `w_value()` 는 스위치와 상관없는 값.
+    current_state 선형화의 ∂w/∂Ẋ 도 `use_w` 일 때만. 예측(식-13)·목표 입력(식-14)·d̂ 잔차(식-9) 모두 같은 `w()` 를 써서 s_w 가 세 곳에 같이 걸린다.
+  - `mpc_cpp/src/torque_mpc_node.cpp`: 파라미터 `use_wheel_inertia` → `use_w` (기본 `torque_mpc.yaml model_terms.use_w`). 기동 로그
+    "바퀴 등가 질량 m_w 2.225 kg (M 에 늘)  w 항 끔/켬".
+  - `mpc/config/torque_mpc.yaml`: `model_terms.use_w: false` (새 절), `disturbance.enable: true → false`.
+  - `mpc/config/torque_plant.yaml`: `model.use_wheel_inertia` 주석 — 이제 시뮬 플랜트 물리만. **기본 false 라 시뮬 플랜트 M = m, 제어기 M = m_eq 로 다르다.**
+  - `mpc/launch/torque_experiment.launch.py`: `use_wheel_inertia` 는 플랜트에만, `ctrl_wheel_inertia` 를 없애고 `use_w` (제어기 w 항).
+  - `mpc/launch/real_all.launch.py`: `_PASS` 의 `use_wheel_inertia` → `use_w` (실차에는 플랜트가 없다), docstring.
+  - `mpc_cpp/test/test_torque_mpc.cpp`: 시험 W1(`TorqueModel.WTermSwitch`: w = [−0.1574, 0, 0], 끄면 0, M 은 늘 6.425) 추가,
+    U10·통과시험 1·current_state 선회의 기대 토크를 use_w 켬 m·a_c / 끔 m_eq·a_c (W3: 0.01667 / 0.02677) 로, 나머지 관성 스위치를 `use_w` 로.
+    시험 안의 수치는 지시서 값(4 kg, J_w 9.7e-4)을 구조체 기본값으로 그대로 쓴다.
+  - `mpc/test/test_launch_modes.py`: 스위치 시험을 새 의미로 (`use_wheel_inertia` 는 플랜트만, 제어기에는 `use_w`), real_all 전달 목록.
+- 확인: `amr_mpc_cpp`·`amr_mpc` 빌드, C++ 시험 38 개(토크 27·바퀴 11)·Python 216 개 통과.
+  시뮬 B 기본 8자 (도메인 94, 한 판씩, 판 사이 흔들림 약 ±0.9 mm — 2026-11-16 같은 조건 반복 14.53/15.47):
+  | 플랜트 | 제어기 | RMS / 최대 mm | Δτ RMS |
+  |---|---|---|---|
+  | M = m (기본) | m_eq, w 끔, d̂ 끔 (새 기본) | 13.06 / 36.2 | 0.021 |
+  | m_eq + w (`use_wheel_inertia:=true`) | m_eq, w 끔 | 12.94 / 37.0 | 0.019 |
+  | m_eq + w | m_eq, w 켬 (플랜트 = 모델) | 12.80 / 35.7 | 0.019 |
+  | M = m | m_eq, w 끔, **d̂ 켬** | 15.26 / 39.6 | 0.029 |
+  처음 세 줄은 흔들림 안. 시뮬에는 일정한 외란이 없어 d̂ 를 켜면 잡음만 더한다 (같은 날 옛 코드 d̂ 켬 B 13.35~13.89). 실차 미확인.
+- 되돌리려면: `disturbance:=true` (d̂). 옛 "M = m" 모델은 스위치가 없다 — J_w 를 0 으로 두면 같다.
+
 ### 2026-11-16 (13) — 바퀴 축관성 J_w 계단 차분 측정 도구 `tools/jw_step_analysis.py`, 벤치 CSV 에 명령 토크 열
 - 왜: J_w 8.9e-4(팀원 11-12 벤치)가 맞는지 물음. 있는 자료로 구하면 방법마다 다르다 (모두 명령 토크 기준):
   | 방법 | 자료 | J_w [kg·m²] |

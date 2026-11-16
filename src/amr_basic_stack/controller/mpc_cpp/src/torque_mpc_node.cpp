@@ -102,8 +102,10 @@ public:
     const double payload = declare_parameter<double>("payload_kg", yp["body"]["payload_kg"].as<double>());
     md.mass = yp["body"]["mass_kg"].as<double>() + payload;
     md.inertia_z = declare_parameter<double>("inertia_z", yp["body"]["inertia_z_kgm2"].as<double>());
-    md.J_w = yp["wheel"]["inertia_J_w_kgm2"].as<double>();
-    md.use_wheel_inertia = declare_parameter<bool>("use_wheel_inertia", yp["model"]["use_wheel_inertia"].as<bool>());
+    md.J_w = yp["wheel"]["inertia_J_w_kgm2"].as<double>();          // m_w = 4J_w/r² 는 M 에 늘 들어간다 (지시서 2026-11-16)
+    // w 항 스위치 (식-6, 지시서 1절 use_w). 제어기 설정이라 torque_mpc.yaml model_terms 에 둔다 — torque_plant.yaml 의
+    // model.use_wheel_inertia 는 이제 시뮬 플랜트 물리만 정한다
+    md.use_w = declare_parameter<bool>("use_w", ym["model_terms"] ? ym["model_terms"]["use_w"].as<bool>(false) : false);
     md.tau_rated = yp["motor"]["tau_rated_Nm"].as<double>();
     md.tau_fric_max = yp["friction"]["tau_fric_max_Nm"].as<double>();
     md.mu_hat = declare_parameter<double>("mu_hat", yp["surface"]["mu_hat"].as<double>());
@@ -187,10 +189,10 @@ public:
     RCLCPP_INFO(
       get_logger(),
       "토크 MPC (C++/DAQP).  기준 %s  상태 %s → %s\n"
-      "  Ts %.0f ms  Np %d  Nc %d   m %.2f kg  I_z %.3f  바퀴관성 %s (μ %.3f kg)\n"
+      "  Ts %.0f ms  Np %d  Nc %d   m %.2f kg  I_z %.3f  바퀴 등가 질량 m_w %.3f kg (M 에 늘)  w 항 %s\n"
       "  상한 모드 %s: τ̄ %.4f N·m, Δτ̄ %.4f N·m/스텝  (모터 %.3f, 마찰 τ_μ %.4f @ μ̂ %.2f)   외란 추정치 %s (α %.2f)",
       ref_topic.c_str(), state_topic.c_str(), cmd_topic.c_str(), tu.Ts * 1e3, tu.Np, tu.Nc, md.mass, md.inertia_z,
-      md.use_wheel_inertia ? "켬" : "끔", md.mu(), limit_mode_.c_str(), tb(0), mpc_->dtau_bar_of(tb(0)),
+      md.mu(), md.use_w ? "켬" : "끔", limit_mode_.c_str(), tb(0), mpc_->dtau_bar_of(tb(0)),
       md.tau_motor_limit(), md.tau_friction_limit(), md.mu_hat, tu.dist_enable ? "켬" : "끔", tu.dist_alpha);
     RCLCPP_INFO(
       get_logger(), "  선형화 %s (%s)", linearization_.c_str(),

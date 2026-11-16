@@ -50,16 +50,16 @@ bash tools/setup_can.sh                       # can0 준비 (모터 명령은 �
 - [x] torque: 무부하 최고 속도. V 범위 45.5 rad/s 에 가까운지 (넘으면 응답 속도가 잘린다) — 2026-11-14 내림 계단 0.1 N·m 에서 약 41~42 rad/s 로 전압 한계(응답 τ 가 명령보다 최대 11 mN·m 낮음). 범위 안. 운용 상한 38.7 rad/s 와 여유 약 7 %
 - [x] **측정 마찰 반영 (5단계 전)** — 2026-11-14 NUC 에서 반영: friction = 실측, 보상 × 0.9 (`compensation_scale`), 시뮬 B 12.6·A 5.1 mm. 원래 항목: 2026-11-14 내림 계단 바퀴별 τc·bv 를 `config/torque_plant.yaml` friction 에 넣을지·얼마나(워밍업 15 %, 약간 작게) 정하고 시뮬 재확인. 지금 값이면 38.7 rad/s 에서 보상이 FL·RR 약 30 % 부족, FR·RL 과보상
 - [ ] (메모) 드라이버의 K_T·기어 효율 가정은 응답 토크로는 못 잰다 — 관성을 아는 가속 시험 `τ ≈ J·α + τ_fric` 로 비교
-- [ ] **바퀴 축관성 J_w 다시 재기** (stack_changelog 2026-11-16 (13)) — 로봇을 받침대에 올려 네 바퀴를 띄운 채, 장착 그대로 바퀴 하나씩.
-  지금 값 8.9e-4(팀원 11-12)는 마찰 모델에 따라 6e-4 ~ 1.0e-3 로 흩어진다. 마찰 모양을 가정하지 않는 계단 차분으로 잰다:
+- [x] **바퀴 축관성 J_w 다시 재기** (stack_changelog 2026-11-16 (13)·(16)) — 로봇을 받침대에 올려 네 바퀴를 띄운 채, 장착 그대로 바퀴 하나씩.
+  **2026-11-16 저녁 측정: 네 바퀴 121 계단 중앙 8.77e-4 kg·m² → 설정 8.9e-4 그대로** (FL 9.76 / FR 9.35 / RL 6.8~7.8 / RR 9.12 ×10⁻⁴).
+  `analysis/torque_mpc_real/2026-11-16_jw/RESULTS_KO.md`. 실측 순서 (도구 설명과 같음):
   ```
-  /usr/bin/python3 tools/ak40_bench.py torque --id N --tau 0.06 --time 10        # 워밍업 2~3 번
-  /usr/bin/python3 tools/ak40_bench.py steps --id N --taus 0.1,0.05,0.08,0.05,0.08,0.05,0.08,0.05,0.08,0 --hold 1.0 --csv jw_N_k.csv   # k = 1..3
-  /usr/bin/python3 tools/jw_step_analysis.py jw_N_*.csv
+  /usr/bin/python3 tools/ak40_bench.py steps --id N --taus 0.09,0.05 --hold 5      # 워밍업 (torque --tau 0.06 은 FL 이 안 돎)
+  /usr/bin/python3 tools/ak40_bench.py steps --id N --taus 0.08,0.035,0.055,0.035,0.055,0.035,0.055,0.035,0.055,0 --hold 1.0 --csv jw_N_k.csv   # k = 1..3
+  /usr/bin/python3 tools/jw_step_analysis.py jw_N_*.csv                             # 대표값 = 중앙값
   ```
-  - J = Δτ/Δω̇ (계단 순간 같은 ω → 마찰 소거). 바퀴당 계단 27 개. 합성 자료 검증 편향 ≤ 0.4 %, 감속기 부하 의존 마찰이 10 % 면 +11 %
-  - 결과의 J(명령)·J(응답), 바퀴별 평균 ± 표준편차를 `torque_plant.yaml` `inertia_J_w_per_wheel_kgm2` 주석과 비교 → 반영은 사용자 결정 (μ = 4J/r² 가 바뀐다)
-  - 요 관성 I_z(지금 0.06 = 균일판 근사)는 CAD 질량 특성으로 따로 (CAD 총질량이 저울 4.56 kg 과 맞는지 먼저)
+  - [ ] RL 만 15~25 % 낮은 이유 (전압 한계·기록 누락은 아님). 바퀴별 값이 필요해지면 추 낙하(K_T 의존 없음)로
+- [ ] 요 관성 I_z(지금 0.06 = 균일판 근사)는 CAD 질량 특성으로 (CAD 총질량이 저울 4.56 kg 과 맞는지 먼저, 무게중심 기준 I_zz)
 
 ## 3. 네 바퀴 장착, 바퀴 띄운 채 — CAN 노드만
 
@@ -199,9 +199,18 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
   - hold·무장 해제 중 서 있는 바퀴를 스스로 미는 떨림이 없는지 (기준 속도 0 이면 보상 0 이어야 한다)
   - 기준과 반대 방향으로는 서 있는 바퀴를 못 돌린다 (명령 −τ̄ + 0.072 > −출발 토크). 기준이 +인데 MPC 가 −로 미는 경우는 드물지만, 그 때 오차가 커지는지
   - 바닥에서 바퀴별 출발 토크 램프 시험으로 `static_Nm` 을 바퀴별 값으로 (지금 4 개 같은 잠정값)
-- [ ] **바퀴 등가 질량 A/B** (stack_changelog 2026-11-16 (10)): 같은 조건을 `amrall use_wheel_inertia:=true` / 기본(false) 로 각 3판 이상.
-  기동 로그 "바퀴관성 켬 (μ 2.225 kg)" 확인. 시뮬에서는 켜도 0.3 m/s RMS 16.1 → 17.5 mm 로 좋아지지 않았다 — 실차에서 진동(5-3 옆·대각)·
-  d̂ 크기·상한 닿음 비율이 줄어드는지 본다. 좋아지면 `torque_plant.yaml` `model.use_wheel_inertia` 기본값을 바꿀지 결정
+- [ ] ~~바퀴 등가 질량 A/B (`amrall use_wheel_inertia:=true`)~~ — 2026-11-16 (14) 로 바뀜: MPC 모델에 m_w 가 **늘** 들어가고
+  (기동 로그 "바퀴 등가 질량 m_w 2.225 kg (M 에 늘)  w 항 끔"), `use_wheel_inertia` 는 실차에서 아무것도 안 바꾼다 (`amrall` 전달 목록에서 뺐다).
+- [ ] **w 항·외란 추정치 기본 끔으로 주행, d̂ 기록 쌓기** (w 항·외란 추정치 지시서 S5, stack_changelog 2026-11-16 (14)):
+  - 기동 로그 "w 항 끔", "외란 추정치 끔" 확인. 오늘(11-16) 135118~144233 판은 d̂ **켬**(α 0.1) 상태였다 — 앞으로의 판과 섞어 비교하지 말 것
+  - 꺼진 동안에도 `/torque_mpc/status` [14..19] 에 d̂_f 가 남는다 (â_d = d̂_f,ṗ / Ts). 이 기록으로 어느 스위치를 먼저 켤지 정한다
+  - w 항은 θ̇ 가 있어야 0 이 아니다 — `yaw_mode:=fixed` 판에서는 켜도 같다. 켜 볼 때는 `amrall use_w:=true` (tangent 8자 등)
+  - 켜 볼 때는 시뮬이나 정지 상태에서 먼저 (지시서 6절). 실행 중 전환(`ros2 param set`)은 없다 — 다시 띄운다
+- [ ] **마찰 보상표 갱신 뒤 다시 보기** (stack_changelog 2026-11-16 (17)): 11-14 값은 네 바퀴 모두 20 rad/s 에서 0.007~0.018 N·m 과보상이었다.
+  같은 조건(circles8 tangent 0.4·0.7, μ̂ 0.4, use_w)으로 앞뒤 약 1 Hz 진동·상한 닿음(어느 바퀴든 74~87 %)·직선 순항 중 MPC 순토크 음수가 줄었는지.
+  차가울 때(첫 판) 덜 보상 쪽이 되는지(마찰 약 15 % 큼)도 첫 판과 나중 판 비교로
+- [ ] **circles8 tangent 교차점 헤딩 완화** (2026-11-16 (18)): `amrall … shape:=circles8 yaw_mode:=tangent crossing_blend_m:=0.2` (0.7 m/s, 요 가속 9.8 rad/s²·헤딩 5.7°)
+  / `0.1` (0.4 m/s). 교차점 ±0.6 s 오차(오늘 0.7 m/s 에서 RMS 10~12 cm, 나머지의 2 배)·상한 닿음이 줄었는지 — `analysis/…/2026-11-16_circles8/tools/crossing.py`
 - [ ] **추종 오차 정지 문턱 1.5 m** (2026-11-16 (11)): 로봇이 경로에서 1.5 m 까지 벗어나도 안 선다 — 주행 공간 확보, 두 사람 정지 절차.
   예전처럼 30 cm 에서 세우려면 `amrall max_track_error:=0.30`
 - [ ] **DAMPING 정지 순간 슬립**: kd 0.02 의 첫 감속 추정 4.6 m/s²(4 kg 추정) > μ 0.3·g 2.9 m/s². 미끄러운 바닥에서 정지할 때 바퀴가 미끄러지는지(slip_logger)

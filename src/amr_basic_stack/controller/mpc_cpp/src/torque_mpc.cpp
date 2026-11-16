@@ -49,12 +49,17 @@ TMat34 TorqueModel::G(double theta) const
   return g;
 }
 
-TVec3 TorqueModel::w(const TVec3 & Xdot) const
+TVec3 TorqueModel::w_value(const TVec3 & Xdot) const
 {
   const double m = mu();
-  if (m == 0.0) {return TVec3::Zero();}
-  // S Ẋ_xy = [−ẏ, ẋ]
+  // 식-6:  w = (m_w / m_eq) θ̇ [−ẏ, ẋ, 0]   (S Ẋ_xy = [−ẏ, ẋ])
   return TVec3(-m * Xdot(2) * Xdot(1) / m_eff(), m * Xdot(2) * Xdot(0) / m_eff(), 0.0);
+}
+
+TVec3 TorqueModel::w(const TVec3 & Xdot) const
+{
+  if (!use_w) {return TVec3::Zero();}             // s_w = 0: 더하지 않는다 (지시서 0.3)
+  return w_value(Xdot);
 }
 
 double TorqueModel::tau_friction_limit() const
@@ -88,12 +93,14 @@ TorqueLinearModel linearize_continuous(const TorqueModel & md, const TVec6 & x0,
   const TVec3 F0 = md.force_map() * tau0;
   lin.A(3, 2) = (-s * F0(0) - c * F0(1)) / md.m_eff();
   lin.A(4, 2) = (c * F0(0) - s * F0(1)) / md.m_eff();
-  // ∂w/∂Ẋ,  w = a [−θ̇ ẏ, θ̇ ẋ, 0],  a = μ / m_eff   (바퀴 관성 끔이면 a = 0)
-  const double a = md.mu() / md.m_eff();
-  lin.A(3, 4) = -a * thd;
-  lin.A(3, 5) = -a * yd;
-  lin.A(4, 3) = a * thd;
-  lin.A(4, 5) = a * xd;
+  // ∂w/∂Ẋ,  w = a [−θ̇ ẏ, θ̇ ẋ, 0],  a = μ / m_eff   (use_w 가 꺼지면 w 가 없으니 야코비안도 없다)
+  if (md.use_w) {
+    const double a = md.mu() / md.m_eff();
+    lin.A(3, 4) = -a * thd;
+    lin.A(3, 5) = -a * yd;
+    lin.A(4, 3) = a * thd;
+    lin.A(4, 5) = a * xd;
+  }
   lin.B.bottomRows<3>() = md.G(x0(2));
   lin.c = torque_dynamics(md, x0, tau0) - lin.A * x0 - lin.B * tau0;
   return lin;

@@ -15,11 +15,14 @@
   export AMR_PEERS=192.168.0.209     # 랩 PC 로 볼 때만
   amrall                                                     # MPC 없이 (basic_motion_test 는 다른 터미널에서 amrmove)
   amrall use_mpc:=true shape:=line seg_distance:=0.4 seg_dir_deg:=45 speed:=0.10 limit_mode:=friction mu_hat:=0.55
+  amrall use_mpc:=true controller:=pure_pursuit shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.3   # 비교군 A
+    (퓨어 퍼슛 + 바퀴별 PI, 게인 config/torque_baseline_a.yaml. v_y = 0 이라 yaw_mode:=tangent 로 — fixed(게걸음)는 못 따라간다.
+     limit_mode·disturbance·mu_hat·use_w 같은 MPC 인자는 A 에서 안 쓴다. 2026-11-16 전에는 controller 가 안 넘어가 늘 MPC 가 떴다)
 ※ 카메라 노드(realsense2_camera_node)가 죽으면(2026-11-15 한 번) IMU 가 없어 측위가 위치를 안 낸다 → Ctrl+C 하고 다시.
 ※ use_mpc:=true 이면 게이트가 무장 전에도 DAMPING 을 50 Hz 로 낸다 → basic_motion_test(amrmove)와 같이 쓰지 말 것.
 ※ torque_output 의 정지 마찰 보상이 기본으로 켜진다 (plant:=real, 2026-11-16). 보상 없이 비교하려면 stiction_comp:=false
-※ use_wheel_inertia:=true 면 MPC 모델에 바퀴 등가 질량 m_w = 4J_w/r² (≈ 2.2 kg) 을 넣는다 (1판 식-3, 2026-11-16). 기본 false.
-  5-2 가속에 맞춘 "바닥 효율" 앞 0.65·회전 0.40 이 이 관성 비(0.672·0.407)와 같다 — stack_changelog 2026-11-16 (10)
+※ MPC 모델에는 바퀴 등가 질량 m_w = 4J_w/r² (≈ 2.2 kg) 이 늘 들어간다 (1판 식-3·5, w 항·외란 추정치 지시서 2026-11-16).
+  w 항(식-6)은 use_w:=true, 외란 추정치는 disturbance:=true 로 켠다 — 둘 다 기본 끔. yaw_mode:=fixed 면 θ̇ = 0 이라 w = 0.
 """
 import os
 
@@ -31,8 +34,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 # torque_experiment.launch.py 로 그대로 넘기는 인자 (비우면 넘기지 않는다 → 그쪽 기본값·YAML)
-_PASS = ["use_mpc", "wheel_odom", "log_prefix", "limit_mode", "mu_hat", "disturbance", "stiction_comp", "use_wheel_inertia",
-         "origin_mode", "shape",
+_PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_hat", "disturbance", "stiction_comp", "use_w",
+         "origin_mode", "shape", "crossing_blend_m",
          "width", "height", "yaw_mode", "align_s",
          "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_out_and_back", "seg_pause_s", "speed",
          "accel", "laps", "hold_s", "max_track_error", "mpc_W", "mpc_w_delta", "mpc_r_u", "mpc_q_null", "mpc_dist_alpha"]

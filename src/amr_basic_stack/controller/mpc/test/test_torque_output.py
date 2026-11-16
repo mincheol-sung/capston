@@ -67,11 +67,11 @@ def test_non_finite_torque_becomes_damping(bad):
 
 
 def test_individual_bench_friction_and_motor_order():
-    """2026-11-14 NUC 벤치 내림 계단 실측 (analysis/torque_mpc_real/2026-11-14_bench/stepsdown_*.csv)."""
+    """2026-11-16 장착 그대로 띄운 정상 상태 실측 (analysis/torque_mpc_real/2026-11-16_jw/ss_*.csv, friction_steady.py)."""
     from amr_mpc.torque.model import TorquePlant
     p = TorquePlant.from_yaml()
-    tc = np.array([0.02142, 0.02151, 0.02170, 0.01830])
-    bv = np.array([0.002062, 0.001799, 0.001767, 0.001679])
+    tc = np.array([0.0174, 0.0206, 0.0155, 0.0157])
+    bv = np.array([0.001066, 0.001158, 0.001112, 0.001177])
     assert p.fric_coulomb == pytest.approx(tc)
     assert p.fric_viscous == pytest.approx(bv)
     # Equal speeds still produce distinct compensation; reverse speed reverses each torque.
@@ -80,10 +80,10 @@ def test_individual_bench_friction_and_motor_order():
     assert got == pytest.approx(expected)
     assert friction_torque([-10] * 4, tc, bv, 0.5) == pytest.approx(-expected)
     assert friction_torque([0] * 4, tc, bv, 0.5) == pytest.approx(np.zeros(4))
-    # 정격 속도의 실측 마찰 최대 0.1013 (FL) — 보상은 × 0.9 = 0.091 로 tau_fric_max 0.1 안.
+    # 정격 속도의 마찰 최대 0.0655 (FR, 26 rad/s 위는 직선 외삽) — 보상은 × 0.9 = 0.059 로 tau_fric_max 0.1 안.
     rated_speed = 370 * 2 * np.pi / 60
     assert p.fric_max == pytest.approx(0.1)
-    assert np.max(tc + bv * rated_speed) == pytest.approx(0.10132, abs=1e-4)
+    assert np.max(tc + bv * rated_speed) == pytest.approx(0.06547, abs=1e-4)
     assert 0.9 * np.max(tc + bv * rated_speed) < p.fric_max
     assert p.tau_motor_limit() == pytest.approx(1.2)
 
@@ -115,11 +115,14 @@ def test_rejects_invalid_wheel_friction(bad):
 
 
 def test_restored_reserve_warns_only_when_operating_speed_needs_more():
+    """여유 tau_fric_max 가 운용 속도의 마찰보다 작을 때만 경고. 2026-11-16 마찰이면 정격 속도에서도 0.1 안 (0.0655)."""
     from amr_mpc.torque.model import TorquePlant
     from amr_mpc.nodes.torque_output import friction_reserve_warning
     p = TorquePlant.from_yaml()
-    assert friction_reserve_warning(p.fric_coulomb, p.fric_viscous, 0.1, 370 * 2 * np.pi / 60)
-    assert friction_reserve_warning(p.fric_coulomb, p.fric_viscous, 0.1, 10.0) is None
+    rated = 370 * 2 * np.pi / 60
+    assert friction_reserve_warning(p.fric_coulomb, p.fric_viscous, 0.1, rated) is None
+    assert friction_reserve_warning(p.fric_coulomb, p.fric_viscous, 0.05, rated)        # 여유가 작으면 경고
+    assert friction_reserve_warning(p.fric_coulomb, p.fric_viscous, 0.05, 10.0) is None
 
 
 # ── 정지 마찰 보상 (2026-11-16) ───────────────────────────────────────────

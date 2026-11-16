@@ -56,9 +56,7 @@ TEST(TorqueModel, ForceMapNullSpaceAndNumbers)
 {
   TorqueModel md;
   EXPECT_LT((md.force_map() * TorqueMPC::null_dir()).cwiseAbs().maxCoeff(), 1e-12);
-  EXPECT_DOUBLE_EQ(md.mu(), 0.0);                       // 기본: 바퀴 관성 끔
-  md.use_wheel_inertia = true;
-  EXPECT_NEAR(md.mu(), 2.425, 1e-3);                    // 1판 식-3
+  EXPECT_NEAR(md.mu(), 2.425, 1e-3);                    // 1판 식-3: m_w 는 늘 M 에 (w 항·외란 추정치 지시서 2026-11-16)
   EXPECT_NEAR(md.I_eff() - md.inertia_z, 0.0954, 1e-4);
   EXPECT_NEAR(md.tau_friction_limit(), 0.0666, 5e-4);   // 1판 식-21 수치 예 (4 kg, μ̂ 0.3)
   // 네 바퀴 같은 토크 → 전방 가속만
@@ -70,8 +68,8 @@ TEST(TorqueModel, ForceMapNullSpaceAndNumbers)
   const TVec3 a90 = md.G(M_PI / 2) * TVec4::Constant(0.1);
   EXPECT_NEAR(a90(0), 0.0, 1e-12);
   EXPECT_GT(a90(1), 0.0);
-  // 1판 식-14 수치 예: θ_r = 90°, u_r = [1, 0, 0.417] → w_xy = [−0.157, 0]
-  const TVec3 w = md.w(TVec3(0.0, 1.0, 0.417));
+  // 1판 식-14 수치 예: θ_r = 90°, u_r = [1, 0, 0.417] → w_xy = [−0.157, 0]  (w 항 스위치와 상관없는 값 — 켜고 끄기는 WTermSwitch)
+  const TVec3 w = md.w_value(TVec3(0.0, 1.0, 0.417));
   EXPECT_NEAR(w(0), -0.157, 1e-3);
   EXPECT_NEAR(w(1), 0.0, 1e-12);
 }
@@ -88,8 +86,7 @@ TEST(TorqueModel, LimitModeParsing)
 // r_Δ = r_U = 0.001 → 0.0241 N·m × 4 (네 바퀴 같음, 영공간 성분 0). 기준이 정지라 U_s = 0
 TEST(TorqueMPC, HandExampleOneStep)
 {
-  TorqueModel md;
-  md.use_wheel_inertia = true;             // 예제가 m_eff = 6.425 kg 기준
+  TorqueModel md;                          // 예제가 m_eff = 6.425 kg 기준 (m_w 는 늘 M 에)
   TorqueTuning tu;
   tu.Np = 1; tu.Nc = 1; tu.constrained = false;
   tu.W << 100, 100, 100, 1, 1, 1;
@@ -102,13 +99,14 @@ TEST(TorqueMPC, HandExampleOneStep)
   EXPECT_LT(mpc.target_input().cwiseAbs().maxCoeff(), 1e-12);
 }
 
-// 지시서 U10: 목표 입력 — 4 kg, 1 m/s, R 2.4 m 등속 선회, θ_r = 90°, 해석 가속도 → U_s = ±0.01667, nᵀU_s = 0
-//   바퀴 관성을 켜도 같다: m_eq (p̈ − w) = (m + m_w)·v²/R − m_w·v²/R = m v²/R
+// 지시서 U10 / w 항 지시서 W3: 목표 입력 — 4 kg, 1 m/s, R 2.4 m 등속 선회, θ_r = 90°, 해석 가속도, nᵀU_s = 0
+//   use_w 켬: m_eq (p̈ − w) = (m + m_w)·v²/R − m_w·v²/R = m v²/R → ±0.01667 N·m
+//   use_w 끔: m_eq p̈ = 6.425 × 0.4167 = 2.677 N → ±0.02677 N·m   (부호 [−, +, +, −])
 class TargetInput : public ::testing::TestWithParam<bool> {};
 TEST_P(TargetInput, SteadyTurnMinimumNorm)
 {
   TorqueModel md;
-  md.use_wheel_inertia = GetParam();
+  md.use_w = GetParam();
   TorqueTuning tu;
   tu.constrained = false;
   TorqueMPC mpc(md, tu);
@@ -121,7 +119,8 @@ TEST_P(TargetInput, SteadyTurnMinimumNorm)
   x << 0, 0, th, 0, v, om;
   mpc.step(x, ref, &acc);
   const TVec4 Us = mpc.target_input().head<4>();
-  const double want = 0.04 / 4.0 * 4.0 * v * v / R;          // r/4 · m v²/R = 0.01667
+  const double want = 0.04 / 4.0 * (md.use_w ? md.mass : md.m_eff()) * v * v / R;   // 0.01667 / 0.02677
+  EXPECT_NEAR(want, md.use_w ? 0.016667 : 0.026771, 1e-5);
   EXPECT_NEAR(Us(0), -want, 1e-4);
   EXPECT_NEAR(Us(1), want, 1e-4);
   EXPECT_NEAR(Us(2), want, 1e-4);
@@ -132,7 +131,23 @@ TEST_P(TargetInput, SteadyTurnMinimumNorm)
   mpc2.step(x, ref);
   EXPECT_LT((mpc2.target_input().head<4>() - Us).cwiseAbs().maxCoeff(), 1e-6);
 }
-INSTANTIATE_TEST_SUITE_P(WheelInertia, TargetInput, ::testing::Values(false, true));
+INSTANTIATE_TEST_SUITE_P(WTerm, TargetInput, ::testing::Values(false, true));
+
+// w 항 지시서 W1: w (식-6) — 4 kg, θ_r = 90°, ṗ_r = [0, 1, 0.417] → [−0.1574, 0, 0] m/s² (원 중심 쪽 = 서쪽).
+//   use_w 가 꺼지면 w() 는 더하지 않는 0, 실제 값은 w_value() (기록·잔차 저장용)
+TEST(TorqueModel, WTermSwitch)
+{
+  TorqueModel md;                                  // 4 kg, J_w 9.7e-4 (지시서 수치) → m_w 2.425, m_eq 6.425
+  const TVec3 v(0.0, 1.0, 0.417);
+  EXPECT_LT(md.w(v).cwiseAbs().maxCoeff(), 1e-15);  // 기본 끔
+  EXPECT_NEAR(md.w_value(v)(0), -2.425 / 6.425 * 0.417, 1e-12);
+  EXPECT_NEAR(md.w_value(v)(0), -0.1574, 1e-4);
+  md.use_w = true;
+  EXPECT_NEAR(md.w(v)(0), -0.1574, 1e-4);
+  EXPECT_NEAR(md.w(v)(1), 0.0, 1e-12);
+  EXPECT_NEAR(md.w(v)(2), 0.0, 1e-12);
+  EXPECT_NEAR(md.m_eff(), 6.425, 1e-3);             // M 은 use_w 와 상관없이 m_eq
+}
 
 // 지시서 U11: U10 상태에서 X̂ = X_r,0, U_{-1} = U_s,0 이면 한 주기 해 U* ≈ U_s,0
 TEST(TorqueMPC, OnReferenceSolutionEqualsTargetInput)
@@ -205,7 +220,7 @@ class SteadyTurn : public ::testing::TestWithParam<bool> {};
 TEST_P(SteadyTurn, MinimumNormTorqueAndZeroError)
 {
   TorqueModel md;
-  md.use_wheel_inertia = GetParam();
+  md.use_w = GetParam();
   TorqueTuning tu;
   TorqueMPC mpc(md, tu);
   Plant plant{md};
@@ -224,7 +239,8 @@ TEST_P(SteadyTurn, MinimumNormTorqueAndZeroError)
       emax = std::max(emax, (plant.x.head<2>() - r.first.head<2>()).norm());
     }
   }
-  const double f = 4.0 * (v * v / R);      // m ω v = 1.67 N (몸체 질량 4 kg — 바퀴 관성과 무관)
+  // use_w 켬: m ω v = 1.67 N (몸체 질량 4 kg — m_eq p̈ − m_w ω v), 끔: m_eq ω v = 2.68 N (w 항·외란 추정치 지시서 W3)
+  const double f = (md.use_w ? md.mass : md.m_eff()) * (v * v / R);
   const double want = 0.04 / 4.0 * f;      // ± r/4 · F_y
   EXPECT_NEAR(tau(0), -want, 0.02 * want);
   EXPECT_NEAR(tau(1), want, 0.02 * want);
@@ -234,7 +250,7 @@ TEST_P(SteadyTurn, MinimumNormTorqueAndZeroError)
   EXPECT_LT(emax, 1e-3);                   // 등속 선회 오차 1 mm 미만
   EXPECT_EQ(mpc.stats().fallback, 0);
 }
-INSTANTIATE_TEST_SUITE_P(WheelInertia, SteadyTurn, ::testing::Values(false, true));
+INSTANTIATE_TEST_SUITE_P(WTerm, SteadyTurn, ::testing::Values(false, true));
 
 // 통과시험 3 (제약 부분): 비교군 C 상한에서 토크가 τ̄ 에 붙고, 변화율이 Δτ̄ 를 넘지 않는다
 TEST(TorqueMPC, FrictionLimitAndRateAreRespected)
@@ -296,8 +312,7 @@ TEST(TorqueMPC, LimitDropBeyondRateStaysFeasible)
 // 식-9 수치 예: 모델에 없는 1 N → d̂ = [7.8e-6, 0, 0, 0.00156, 0, 0]  (m_eff 6.425 kg)
 TEST(TorqueMPC, DisturbanceResidualMatchesDesignExample)
 {
-  TorqueModel md;
-  md.use_wheel_inertia = true;
+  TorqueModel md;                         // m_eff 6.425 kg (m_w 는 늘 M 에)
   TorqueMPC mpc(md, TorqueTuning{});      // d̂ 는 꺼져 있어도 계산은 한다
   Plant plant{md};
   plant.force_ext << 1.0, 0, 0;
@@ -382,11 +397,11 @@ TEST(TorqueLinearizationModel, Parsing)
   EXPECT_EQ(TorqueTuning{}.linearization, TorqueLinearization::Reference);   // 구조체 기본값은 1판 방식
 }
 
-// 2. 야코비안이 torque_dynamics 의 중앙 유한차분과 같다 (바퀴 관성 켬, 움직이는 상태, τ₀ ≠ 0)
+// 2. 야코비안이 torque_dynamics 의 중앙 유한차분과 같다 (w 항 켬, 움직이는 상태, τ₀ ≠ 0)
 TEST(TorqueLinearizationModel, JacobianMatchesFiniteDifference)
 {
   TorqueModel md;
-  md.use_wheel_inertia = true;
+  md.use_w = true;
   TVec6 x0;
   x0 << 0.3, -0.2, 0.7, 0.4, -0.25, 0.8;
   TVec4 tau0;
@@ -430,9 +445,9 @@ TEST(TorqueLinearizationModel, ZohReducesToDesignEq8)
 // 4. 이산 모델의 한 스텝 예측이 RK4 플랜트와 맞는다 (선형화 점에서 출발 → 오차는 Ts² 차수보다 작다)
 TEST(TorqueLinearizationModel, OneStepMatchesRk4Plant)
 {
-  for (bool inertia : {false, true}) {
+  for (bool inertia : {false, true}) {          // w 항 끔·켬
     TorqueModel md;
-    md.use_wheel_inertia = inertia;
+    md.use_w = inertia;
     Plant plant{md};
     plant.x << 0.2, 0.1, 1.2, 0.6, 0.3, 1.5;
     TVec4 tau;
@@ -472,7 +487,7 @@ class SteadyTurnCurrent : public ::testing::TestWithParam<bool> {};
 TEST_P(SteadyTurnCurrent, MinimumNormTorqueAndZeroError)
 {
   TorqueModel md;
-  md.use_wheel_inertia = GetParam();
+  md.use_w = GetParam();
   const TorqueTuning tu = current_tuning();
   TorqueMPC mpc(md, tu);
   Plant plant{md};
@@ -488,7 +503,7 @@ TEST_P(SteadyTurnCurrent, MinimumNormTorqueAndZeroError)
       emax = std::max(emax, (plant.x.head<2>() - circle(R, v, t + tu.Ts).first.head<2>()).norm());
     }
   }
-  const double want = 0.04 / 4.0 * 4.0 * (v * v / R);
+  const double want = 0.04 / 4.0 * (md.use_w ? md.mass : md.m_eff()) * (v * v / R);   // 0.01667 / 0.02677
   EXPECT_NEAR(tau(0), -want, 0.02 * want);
   EXPECT_NEAR(tau(1), want, 0.02 * want);
   EXPECT_NEAR(tau(2), want, 0.02 * want);
@@ -499,7 +514,7 @@ TEST_P(SteadyTurnCurrent, MinimumNormTorqueAndZeroError)
   // 9a. 플랜트 = 모델이면 외란 추정치가 0 근처 (이 모델의 한 스텝 잔차)
   EXPECT_LT(mpc.d_hat().cwiseAbs().maxCoeff(), 1e-5);
 }
-INSTANTIATE_TEST_SUITE_P(WheelInertia, SteadyTurnCurrent, ::testing::Values(false, true));
+INSTANTIATE_TEST_SUITE_P(WTerm, SteadyTurnCurrent, ::testing::Values(false, true));
 
 // 7. 직선·기준 위·τ_prev = 0 (정지, θ̇ = 0) 이면 두 방식의 첫 토크가 같다
 TEST(TorqueLinearizationMPC, MatchesReferenceOnStraightLineFromRest)

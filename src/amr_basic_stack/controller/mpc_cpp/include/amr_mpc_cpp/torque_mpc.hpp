@@ -1,10 +1,13 @@
-// 토크 입력 MPC (구조도 v3, 『메카넘 토크 MPC 1판 설계』 식-1~22).  amr_mpc/torque/model.py 와 같은 모델이다.
+// 토크 입력 MPC (구조도 v3, 『메카넘 토크 MPC 1판 설계』 식-1~22).  amr_mpc/torque/model.py 와 같은 식이다 —
+// 단 2026-11-16 부터 제어기는 m_w 를 늘 M 에 넣고(Python 플랜트는 use_wheel_inertia 일 때만) w 항은 use_w 로 따로 켠다.
 // ---------------------------------------------------------------
 // ROS 에 의존하지 않는다 (노드는 torque_mpc_node.cpp, 시험은 test/test_torque_mpc.cpp).
 //
 // 상태 (관성 좌표, map):  x = [x, y, θ, ẋ, ẏ, θ̇]          입력: τ = [FL, FR, RL, RR] 바퀴 순토크 [N·m]
-//   Ẍ = G(θ) τ + w,   G(θ) = M⁻¹ R(θ) (T⁻¹)ᵀ,   w = M⁻¹ [μ ω_z S Ẋ_xy; 0]                    (식-6)
-//   M = diag(m+μ, m+μ, I_z+μk²),  μ = 4J_w/r²   (use_wheel_inertia 가 꺼지면 μ = 0 → w = 0)
+//   Ẍ = G(θ) τ + s_w·w,   G(θ) = M⁻¹ R(θ) (T⁻¹)ᵀ,   w = M⁻¹ [μ ω_z S Ẋ_xy; 0]                (식-5·6)
+//   M = diag(m+μ, m+μ, I_z+μk²),  μ = m_w = 4J_w/r²  — 바퀴 등가 질량은 늘 넣는다 (식-3·5, 지시서 2026-11-16).
+//   s_w = use_w: w 항만 켜고 끈다 (기본 끔, 교수님 지시 "구현하되 끈 채로"). 꺼지면 w 를 더하지 않는다 (0 을 곱하지 않음).
+//   2026-11-16 전에는 use_wheel_inertia 하나가 μ(=M) 와 w 를 같이 켜고 껐다 (끄면 M = diag(m, m, I_z)).
 // 이산화 (ZOH, 정확):  x(k+1) = A x(k) + B(k) τ(k) + E w(k) [+ d̂]                               (식-8)
 //   A = [I, Ts·I; 0, I],  B(k) = [Ts²/2·G(θ_r(k)); Ts·G(θ_r(k))],  E = [Ts²/2·I; Ts·I]
 // 결정변수는 절대 토크 T = [τ_0 … τ_{Nc−1}] (4Nc).  Nc 이후는 τ_{Nc−1} 유지.
@@ -20,8 +23,9 @@
 //   DAQP 에는  변수 bound(±τ̄, j=0 은 변화율과 교집합)  +  일반 제약 (j ≥ 1 의 차분 행) 으로 넘긴다.
 //   j=0 에서 상한이 변화율보다 우선한다 (torque_mpc_todo.md: 상한이 한 스텝에 Δτ̄ 보다 크게 내려가도 해가 있게):
 //     lo = clamp(τ_prev − Δτ̄, −τ̄, τ̄),  hi = clamp(τ_prev + Δτ̄, −τ̄, τ̄)
-// 외란 추정치 (식-9~11):  d̂(k) = x̂(k) − A x̂(k−1) − B(θ̂(k−1)) τ(k−1) − E ŵ(k−1)
-//   항상 계산해 d_hat() 으로 내주고(로그), dist_enable 일 때만 예측에 더한다.
+// 외란 추정치 (식-9~11):  d̂(k) = x̂(k) − A x̂(k−1) − B(θ̂(k−1)) τ(k−1) − s_w·E ŵ(k−1)
+//   ŵ(k−1) 은 추정 속도 x̂(k−1) 로 쓰는 시점에 계산한다 (s_w 도 그때 — 지시서 6절의 "실제 값 저장, 쓸 때 s_w" 와 같다).
+//   항상 계산해 d_hat() 으로 내주고(로그), dist_enable 일 때만 예측에 더한다 (기본 끔, 지시서 2026-11-16).
 //
 // 선형화 방식 (TorqueTuning::linearization, torque_mpc.yaml 의 linearization.mode)
 //   reference      1판 그대로. 위 B(k), w(k) 에 지평 각 스텝의 기준 방향 θ_r(k)·기준 속도를 넣는다 (기준궤적 따라 LTV).
@@ -71,8 +75,8 @@ struct TorqueModel
   double robot_width = 0.207;
   double mass = 4.0;                 // 몸체 + 적재 [kg]
   double inertia_z = 0.06;           // [kg·m²]
-  double J_w = 9.7e-4;               // [kg·m²]
-  bool use_wheel_inertia = false;
+  double J_w = 9.7e-4;               // [kg·m²]  — m_w = 4J_w/r² 로 M 에 늘 들어간다
+  bool use_w = false;                // w 항 (식-6) 스위치 — 예측·목표 입력·외란 추정치 잔차에 같이
   double tau_rated = 1.3;            // τ_lim [N·m]
   double tau_fric_max = 0.0;         // [N·m]
   double mu_hat = 0.3;
@@ -80,15 +84,17 @@ struct TorqueModel
   double gravity = 9.81;
 
   double k() const {return 0.5 * (wheel_base + robot_width);}
-  double mu() const {return use_wheel_inertia ? 4.0 * J_w / (wheel_radius * wheel_radius) : 0.0;}
+  double mu() const {return 4.0 * J_w / (wheel_radius * wheel_radius);}     // m_w (식-3)
   double m_eff() const {return mass + mu();}
   double I_eff() const {return inertia_z + mu() * k() * k();}
   // (T⁻¹)ᵀ : 바퀴 토크 → 몸체 [F_x, F_y, M_z]
   TMat34 force_map() const;
   // G(θ) = M⁻¹ R(θ) (T⁻¹)ᵀ
   TMat34 G(double theta) const;
-  // w = M⁻¹ [μ ω_z S Ẋ_xy; 0]   (Xdot = [ẋ, ẏ, θ̇])
+  // w = M⁻¹ [μ ω_z S Ẋ_xy; 0]   (Xdot = [ẋ, ẏ, θ̇]).  use_w 가 꺼지면 0 (계산하지 않는다)
   TVec3 w(const TVec3 & Xdot) const;
+  // use_w 와 상관없이 w 의 실제 값 (기록·시험용)
+  TVec3 w_value(const TVec3 & Xdot) const;
   double tau_motor_limit() const {return tau_rated - tau_fric_max;}                       // 비교군 B
   double tau_friction_limit() const;                                                      // τ_μ, 식-21
 };

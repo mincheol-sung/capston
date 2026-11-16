@@ -81,6 +81,7 @@ class Figure8ReferenceNode(Node):
             ("laps", 1.0),                            # 바퀴 수. 1 바퀴마다 기동 포즈로 돌아온다
             ("yaw_mode", "tangent"),                  # tangent = 접선 추종 | fixed = 헤딩 고정(게걸음)
             ("align_s", 1.5),                         # tangent 모드 앞뒤 제자리 회전 시간 [s]
+            ("crossing_blend_m", 0.0),                # circles8 + tangent 교차점 헤딩 완화 길이 [m] (core/figure8.py, 0 = 끔)
             ("start_delay", 3.0),                     # 첫 odom 뒤 이만큼 기동 포즈를 유지하다 출발 (실차에서 손 뺄 시간)
             ("abort_error", 1.6),                     # 로봇이 기준에서 이만큼 벌어지면 발행 중단 → MPC 타임아웃 정지.
                                                       # 2026-09-03 실차에서 오차 2.8 m 까지 달아났다. 0 이하면 끈다.
@@ -134,7 +135,8 @@ class Figure8ReferenceNode(Node):
                                     accel=g("accel"), laps=g("laps"), yaw_mode=str(g("yaw_mode")),
                                     align_s=g("align_s"),
                                     lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None,
-                                    curve="circles" if self.shape == "circles8" else "gerono")
+                                    curve="circles" if self.shape == "circles8" else "gerono",
+                                    crossing_blend=float(g("crossing_blend_m")))
         except ValueError as e:
             raise SystemExit(f"[figure8] 파라미터 오류: {e}")
 
@@ -202,7 +204,10 @@ class Figure8ReferenceNode(Node):
             f"  시간  대기 {self.delay:.1f} s + 정렬 {p.T_align:.1f} s ×2 + 주행 {p.T_path:.1f} s = {p.T_total:.1f} s"
             f"{'' if self.hold < 0 else f' + 유지 {self.hold:.1f} s'}\n"
             f"  부하  주행 {run/V_LIMIT*100:.0f} %  정렬 {spin/V_LIMIT*100:.0f} %  "
-            f"(예산 {budget*100:.0f} %, V_LIMIT {V_LIMIT:.2f} m/s)  → 보정 여유 {(1-run/V_LIMIT)*100:.0f} %")
+            f"(예산 {budget*100:.0f} %, V_LIMIT {V_LIMIT:.2f} m/s)  → 보정 여유 {(1-run/V_LIMIT)*100:.0f} %"
+            + (f"\n  교차점 헤딩 완화 {p.Lb:.2f} m: 요 가속 최대 {2*p.V*p.V/(p.R*p.Lb):.1f} rad/s², 헤딩이 접선보다 최대 "
+               f"{math.degrees(p.Lb/(4*p.R)):.1f}° 덜 돎 (교차점 {len(p.crossings)} 개)" if p.Lb > 0.0 else
+               ("\n  교차점 ω 계단 (crossing_blend_m 0): ω 가 +v/R → −v/R 로 한 번에 뒤집힘" if p.curve == "circles" and p.tangent else "")))
 
     # ---------- 콜백 ----------
     def cb_odom(self, m):

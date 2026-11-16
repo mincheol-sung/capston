@@ -1,23 +1,24 @@
 #!/usr/bin/python3
 """바퀴 축관성 J_w — 돌고 있는 중 토크 계단의 앞뒤 가속도 차로 잰다 (2026-11-16). ROS 없이 돈다.
 
-  측정 (로봇을 받침대에 올려 네 바퀴를 띄우고, ROS 스택은 끈다. 바퀴마다, 3 회씩):
-    /usr/bin/python3 tools/ak40_bench.py torque --id 1 --tau 0.06 --time 10        # 워밍업 (마찰이 데워지며 약 15 % 준다)
-    /usr/bin/python3 tools/ak40_bench.py steps --id 1 --taus 0.1,0.05,0.08,0.05,0.08,0.05,0.08,0.05,0.08,0 --hold 1.0 --csv jw_1_1.csv
-  분석:
+  측정 (로봇을 받침대에 올려 네 바퀴를 띄우고, ROS 스택은 끈다. 바퀴마다, 3 회씩) — 2026-11-16 실측 순서:
+    /usr/bin/python3 tools/ak40_bench.py steps --id 1 --taus 0.09,0.05 --hold 5                  # 워밍업 (0.09 로 출발 → 0.05 유지)
+    /usr/bin/python3 tools/ak40_bench.py steps --id 1 --taus 0.08,0.035,0.055,0.035,0.055,0.035,0.055,0.035,0.055,0 --hold 1.0 --csv jw_1_1.csv
+      ※ 워밍업을 torque --tau 0.06 으로 하면 FL 이 정지 마찰을 못 넘는다 (끝속도 0). 0.05/0.08 왕복은 0.08 에서 약 40 rad/s 로
+        전압 한계에 닿아 응답 토크가 명령보다 0.010 낮다 → 계단 절반이 빠지고 흩어진다. 마찰이 낮은 바퀴는 0.03/0.045 도 된다.
+  분석 (대표값은 중앙값 — 실제 속도 잡음이 0.3~0.65 rad/s 라 계단 하나의 J 가 ±30 % 흩어진다):
     /usr/bin/python3 tools/jw_step_analysis.py jw_1_*.csv
     /usr/bin/python3 tools/jw_step_analysis.py --taus 0.1,0.06,0.04,0.03,0.02 --hold 3 stepsdown_1.csv   # τ_명령 열이 없는 옛 CSV
 
   원리: 바퀴 하나의 운동  J·ω̇ = τ − τ_f(ω).  계단 순간 t_s 에서 ω 는 연속이라 앞뒤 마찰 τ_f(ω(t_s)) 가 같다 →
         J·(ω̇⁺ − ω̇⁻) = τ⁺ − τ⁻   →   J = Δτ / Δω̇
-        ω̇⁻·ω̇⁺ 는 계단 앞·뒤 window 초를 각각 2 차식으로 맞춰 t_s 에서의 기울기로 구한다 (guard 초는 명령 지연이라 뺀다).
+        ω̇⁻·ω̇⁺ 는 계단 앞·뒤 window 초를 ω̇ = α − β·ω 꼴(지수, β 앞뒤 공유)로 맞춰 t_s 에서의 기울기로 구한다 (guard 초는 명령 지연이라 뺀다).
         τc·sign(ω) + bv·ω 같은 마찰 모양을 가정하지 않는다 — 6e-4 ~ 1.0e-3 로 흩어진 예전 추정(2026-11-16)의 원인이 마찰 모델이었다.
   가정: 계단 앞뒤로 마찰이 토크 크기에 따라 바뀌지 않는다 (감속기 부하 의존 마찰이 크면 J 가 1/η 만큼 커 보인다).
         τ_명령은 드라이버가 Iq = τ/K_T 로 내는 값이다 — K_T 가 틀리면 같은 비율로 틀린다 (응답 토크도 같은 K_T 를 쓴다).
   검증 (합성 자료, Stribeck 정지 마찰 0.08·워밍업 15 %·명령 지연 5 ms·속도 양자화 0.022 rad/s·100 Hz ± 1 ms, 3 판):
-        정답 1.0e-3 → +1.7 %, 8.9e-4 → +2.0 %, 6.0e-4 → +3.4 % (window 0.15 / guard 0.02). 부하 의존 마찰 10 % 를 넣으면 +12~14 %.
-  계단 순서: 첫 0.1 은 정지 마찰(벤치 0.04~0.1)을 넘겨 출발시키는 몫 — 0.05·0.08 왕복은 15~35 rad/s 에 머물러
-        0 을 지나지 않고 전압 한계(41 rad/s)에도 안 닿는다.
+        정답 1.0e-3 → +0.4 %, 8.9e-4 → +0.4 %, 6.0e-4 → +0.3 %. 부하 의존 마찰 10 % 를 넣으면 +11 %.
+        합성의 속도 잡음은 실제(0.3~0.65 rad/s)보다 작다 — 실측은 계단 20 개 이상의 중앙값을 쓴다.
 """
 import argparse
 import csv
@@ -121,6 +122,8 @@ def main():
     ap.add_argument("--window", type=float, default=0.15, help="계단 앞·뒤 맞춤 구간 [s]")
     ap.add_argument("--guard", type=float, default=0.02, help="계단 바로 앞뒤로 빼는 구간 [s] (명령 지연)")
     ap.add_argument("--w_min", type=float, default=3.0, help="이보다 느린 계단은 뺀다 [rad/s]")
+    ap.add_argument("--w_max", type=float, default=30.0,
+                    help="이보다 빠른 계단은 뺀다 [rad/s]. 2026-11-16 실차: 0.08 N·m 에서 약 40 rad/s 로 전압 한계에 닿아 응답 토크가 명령보다 0.010 낮았다")
     ap.add_argument("--taus", default="", help="τ_명령 열이 없는 옛 CSV 의 계단 순서 (쉼표)")
     ap.add_argument("--hold", type=float, default=None, help="옛 CSV 의 계단 길이 [s]")
     a = ap.parse_args()
@@ -136,7 +139,7 @@ def main():
     allJ, allR = [], []
     for f in files:
         t, mode, v, tr, tc = read_csv(f, taus, a.hold)
-        est = step_estimates(t, mode, v, tr, tc, a.window, a.guard, a.w_min)
+        est = step_estimates(t, mode, v, tr, tc, a.window, a.guard, a.w_min, a.w_max)
         print(f"== {os.path.basename(f)}")
         print("   t[s]  | τ 명령 앞→뒤 | ω rad/s | ω̇ 앞 → 뒤 rad/s² | 이음 차 rad/s | J(명령) kg·m² | J(응답) kg·m²")
         Jf = []
@@ -154,9 +157,11 @@ def main():
     if allJ:
         m, s, n = summarize(allJ)
         mr, sr, _ = summarize(allR)
-        print(f"\n전체 J(명령 토크) = {m:.3e} ± {s:.1e} kg·m² (계단 {n} 개, 평균의 표준오차 {s/math.sqrt(n):.1e})")
-        print(f"전체 J(응답 토크) = {mr:.3e} ± {sr:.1e}")
-        print(f"→ 바퀴 등가 질량 μ = 4J/r² = {4*m/r**2:.3f} kg   (지금 torque_plant.yaml J_w {J_cfg:.2e} → {4*J_cfg/r**2:.3f} kg)")
+        med, q1, q3 = np.median(allJ), np.percentile(allJ, 25), np.percentile(allJ, 75)
+        print(f"\n전체 J(명령 토크) 중앙값 = {med:.3e} kg·m² (사분위 {q1:.2e}~{q3:.2e}, 계단 {n} 개)   ← 대표값")
+        print(f"             평균 ± 표준편차 = {m:.3e} ± {s:.1e} (평균의 표준오차 {s/math.sqrt(n):.1e})")
+        print(f"전체 J(응답 토크) 중앙값 = {np.median(allR):.3e} (평균 {mr:.3e} ± {sr:.1e})")
+        print(f"→ 바퀴 등가 질량 μ = 4J/r² = {4*med/r**2:.3f} kg (중앙값)   (지금 torque_plant.yaml J_w {J_cfg:.2e} → {4*J_cfg/r**2:.3f} kg)")
 
 
 if __name__ == "__main__":

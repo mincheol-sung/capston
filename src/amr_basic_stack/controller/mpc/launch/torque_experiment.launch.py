@@ -61,7 +61,7 @@ def _truthy(s):
 
 # config/torque_track.yaml 의 키. launch 인자 이름이 같고, 비워 두면 YAML 값을 쓴다
 _TRACK_KEYS = ["origin_mode", "origin_x", "origin_y", "origin_yaw_deg", "start_tolerance_xy",
-               "start_tolerance_yaw_deg", "lead_speed", "lead_yaw_rate", "width", "height", "yaw_mode",
+               "start_tolerance_yaw_deg", "lead_speed", "lead_yaw_rate", "width", "height", "yaw_mode", "crossing_blend_m",
                "speed", "accel", "laps", "align_s", "start_delay", "abort_error", "hold_s", "lap_speeds",
                "dt", "horizon_steps",
                # 5-3 단일 축 기준 (2026-11-16): shape:=line|rotate 와 seg_* (figure8_reference.py)
@@ -87,7 +87,16 @@ def _track(context, share):
             out[k] = str(track[k]).strip().lower() in ("1", "true", "yes", "on")
         else:
             out[k] = str(track[k]) if k in ("origin_mode", "yaw_mode", "shape") else float(track[k])
+    # 문자열 인자는 여기서 허용값을 검사한다 (2026-11-16): yaw_mode:=true 로 띄운 판이 6 개 있었다 — figure8_reference_node 가
+    # 시작하자마자 ValueError 로 죽는데 오류가 화면에만 나오고 /rosout·bag 에는 안 남아, 무장해도 기준 없이 그냥 서 있었다.
+    for k, allowed in _TRACK_CHOICES.items():
+        if out[k] not in allowed:
+            raise RuntimeError(f"{k}:={out[k]!r} — 허용값은 {' | '.join(allowed)} (torque_track.yaml 또는 launch 인자)")
     return out
+
+
+_TRACK_CHOICES = {"yaw_mode": ("tangent", "fixed"), "shape": ("figure8", "circles8", "line", "rotate"),
+                  "origin_mode": ("robot", "fixed")}
 
 
 def _nodes(context):
@@ -97,6 +106,8 @@ def _nodes(context):
     source, slam_mode = g("state_source"), g("slam_mode")
     state_topic = g("state_topic") or ("/state_estimator/odom" if source == "estimator" else "/sim/ground_truth")
     nodes = []
+    if _truthy(g("use_mpc")) and _truthy(g("use_figure8")):
+        _track(context, share)                        # 잘못된 yaw_mode·shape·origin_mode 면 CAN 준비·노드보다 먼저 멈춘다
     # Run before returning any motor/controller actions. Never runs for simulation.
     if plant == "real":
         if source != "estimator":
@@ -122,7 +133,8 @@ def _nodes(context):
             package="amr_mpc", executable="wheel_odometry_node", name="wheel_odometry_node", output="screen",
             parameters=[{"output_topic": slam["wheel_odom_topic"]}]))
 
-    # 플랜트와 제어기가 같이 쓰는 모델 설정. 비어 있으면 YAML 값
+    # 시뮬 플랜트의 바퀴 관성 (물리). 비어 있으면 YAML 값. 2026-11-16 부터 제어기에는 안 간다 —
+    # 제어기는 M 에 m_w 를 늘 넣고 w 항만 use_w 로 켜고 끈다 (w 항·외란 추정치 지시서)
     shared = {}
     if g("use_wheel_inertia"):
         shared["use_wheel_inertia"] = _truthy(g("use_wheel_inertia"))
@@ -213,11 +225,11 @@ def _nodes(context):
     controller = g("controller")
     if controller == "mpc":
         # payload_kg 는 "제어기가 믿는" 적재 (비우면 플랜트와 같게)
-        ctrl = {**shared, "state_topic": state_topic, "armed_topic": "/mpc/armed",
+        ctrl = {"state_topic": state_topic, "armed_topic": "/mpc/armed",
                 "payload_kg": float(g("ctrl_payload_kg")) if g("ctrl_payload_kg") else payload,
                 "log_prefix": g("log_prefix")}
-        if g("ctrl_wheel_inertia"):                   # 제어기만 (시뮬에서 플랜트와 다르게 — 실차 상황 흉내)
-            ctrl["use_wheel_inertia"] = _truthy(g("ctrl_wheel_inertia"))
+        if g("use_w"):                                # w 항 (식-6). 비우면 torque_mpc.yaml model_terms.use_w (기본 false)
+            ctrl["use_w"] = _truthy(g("use_w"))
         if g("limit_mode"):
             ctrl["limit_mode"] = g("limit_mode")
         if g("disturbance"):
@@ -337,10 +349,11 @@ def generate_launch_description():
         # 모델·비교군. 비우면 config/torque_plant.yaml, torque_mpc.yaml 값
         A("payload_kg", default_value="0.0", description="적재 [kg]. 2차 발표 조건 0 / 5"),
         A("ctrl_payload_kg", default_value="", description="제어기가 믿는 적재. 비우면 payload_kg 와 같게"),
-        A("use_wheel_inertia", default_value="", description="모델 바퀴 관성 스위치 (YAML 기본 false). 플랜트와 제어기 둘 다"),
-        A("ctrl_wheel_inertia", default_value="",
-          description="제어기가 믿는 바퀴 관성. 비우면 use_wheel_inertia 와 같게. "
-                      "시뮬로 지금 실차 흉내: use_wheel_inertia:=true ctrl_wheel_inertia:=false (2026-11-16)"),
+        A("use_wheel_inertia", default_value="",
+          description="시뮬 플랜트의 바퀴 관성 (torque_plant.yaml model.use_wheel_inertia). 2026-11-16 부터 플랜트만 — "
+                      "제어기는 M 에 m_w 를 늘 넣는다"),
+        A("use_w", default_value="",
+          description="제어기 w 항 (식-6) true/false. 비우면 torque_mpc.yaml model_terms.use_w (기본 false, 2026-11-16 지시서)"),
         A("controller", default_value="mpc", choices=["mpc", "pure_pursuit"],
           description="mpc = torque_mpc_node (비교군 B·C), pure_pursuit = 퓨어 퍼슛 + 바퀴별 PI (비교군 A)"),
         A("limit_mode", default_value="", description="motor_only(B) | friction(C) (YAML 기본 motor_only)"),
