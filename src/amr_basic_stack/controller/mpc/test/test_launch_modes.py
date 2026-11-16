@@ -102,3 +102,64 @@ def test_real_robot_refuses_armed_at_start(launch_mod):
 def test_real_robot_refuses_truth(launch_mod):
     with pytest.raises(RuntimeError):
         build(launch_mod, plant="real", auto_setup_can="false", state_source="truth")
+
+
+def _torque_output_params(out):
+    """torque_output_node 파라미터 {이름: 값} — 키는 TextSubstitution 튜플이라 글자로 푼다."""
+    n = [n for n in out if getattr(n, "_Node__node_executable", None) == "torque_output_node"][0]
+    return {"".join(getattr(s, "text", str(s)) for s in k): v for d in n._Node__parameters for k, v in d.items()}
+
+
+@pytest.mark.parametrize("arg, expect", [("auto", False), ("true", True), ("false", False)])
+def test_stiction_comp_sim(launch_mod, arg, expect):
+    """정지 마찰 보상 (2026-11-16): auto 면 시뮬에서 끈다 (시뮬 플랜트에 정지 마찰이 없다). true/false 는 그대로."""
+    _, _, out = build(launch_mod, stiction_comp=arg)
+    assert _torque_output_params(out)["stiction_comp"] is expect
+
+
+@pytest.mark.parametrize("arg, expect", [("auto", True), ("false", False)])
+def test_stiction_comp_real(launch_mod, monkeypatch, arg, expect):
+    """auto 면 실차에서 켠다. false 로 끌 수 있다 (A/B 비교)."""
+    real_share = launch_mod.get_package_share_directory
+    monkeypatch.setattr(launch_mod, "get_package_share_directory",
+                        lambda p: "/nonexistent/amr_description" if p == "amr_description" else real_share(p))
+    _, _, out = build(launch_mod, plant="real", auto_setup_can="false", stiction_comp=arg)
+    assert _torque_output_params(out)["stiction_comp"] is expect
+
+
+def _node_params(out, exe):
+    """실행 파일 exe 노드의 파라미터 {이름: 값} (키는 TextSubstitution 튜플이라 글자로 푼다)."""
+    n = [n for n in out if getattr(n, "_Node__node_executable", None) == exe][0]
+    return {"".join(getattr(s, "text", str(s)) for s in k): v for d in n._Node__parameters for k, v in d.items()}
+
+
+@pytest.mark.parametrize("args, plant_expect, ctrl_expect", [
+    ({}, None, None),                                                       # 비우면 둘 다 YAML (model.use_wheel_inertia)
+    ({"use_wheel_inertia": "true"}, True, True),                            # 둘 다
+    ({"use_wheel_inertia": "true", "ctrl_wheel_inertia": "false"}, True, False),   # 지금 실차 흉내 (2026-11-16)
+    ({"ctrl_wheel_inertia": "true"}, None, True),                           # 제어기만
+])
+def test_wheel_inertia_plant_and_controller(launch_mod, args, plant_expect, ctrl_expect):
+    """바퀴 등가 질량 스위치 (2026-11-16): use_wheel_inertia 는 플랜트·제어기 둘 다, ctrl_wheel_inertia 는 제어기만."""
+    _, _, out = build(launch_mod, **args)
+    assert _node_params(out, "sim_plant_torque_node").get("use_wheel_inertia") is plant_expect
+    assert _node_params(out, "torque_mpc_node").get("use_wheel_inertia") is ctrl_expect
+
+
+def test_real_all_passes_model_switches():
+    """amrall(real_all.launch.py) 이 정지 마찰·바퀴 관성 스위치를 torque_experiment 로 넘긴다."""
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "use_wheel_inertia" in m._PASS and "stiction_comp" in m._PASS
+
+
+def test_track_error_stops_before_figure8_abort(launch_mod):
+    """fault_monitor 정지 문턱(launch 기본 1.5 m, 2026-11-16)이 figure8 경성 중단 abort_error(torque_track.yaml 1.6 m)보다 작다."""
+    import yaml
+    _, _, out = build(launch_mod)
+    mte = _node_params(out, "fault_monitor_node")["max_track_error"]
+    with open(os.path.join(HERE, "..", "config", "torque_track.yaml")) as f:
+        abort = float(yaml.safe_load(f)["track"]["abort_error"])
+    assert mte == pytest.approx(1.5) and abort == pytest.approx(1.6)
+    assert mte < abort

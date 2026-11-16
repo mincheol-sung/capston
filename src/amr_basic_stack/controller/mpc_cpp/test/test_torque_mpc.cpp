@@ -84,7 +84,8 @@ TEST(TorqueModel, LimitModeParsing)
   EXPECT_THROW(parse_limit_mode("nope"), std::invalid_argument);
 }
 
-// 1판 07절의 손 계산 예: Np = Nc = 1, 정지, 1 cm 앞 → 0.0275 N·m
+// 지시서 U8 (1판 07절·발표 20쪽 손 계산): Np = Nc = 1, 제약 없음, 정지, 1 cm 앞, Q = diag(100,100,100,1,1,1),
+// r_Δ = r_U = 0.001 → 0.0241 N·m × 4 (네 바퀴 같음, 영공간 성분 0). 기준이 정지라 U_s = 0
 TEST(TorqueMPC, HandExampleOneStep)
 {
   TorqueModel md;
@@ -92,12 +93,84 @@ TEST(TorqueMPC, HandExampleOneStep)
   TorqueTuning tu;
   tu.Np = 1; tu.Nc = 1; tu.constrained = false;
   tu.W << 100, 100, 100, 1, 1, 1;
-  tu.w_delta = 1e-3; tu.q_null = 1e-2;
+  tu.w_delta = 1e-3; tu.r_u = 1e-3; tu.q_null = 0.0;
   TorqueMPC mpc(md, tu);
   std::vector<TorqueRefPoint> ref = {{TVec3::Zero(), TVec3::Zero()}, {TVec3(0.01, 0, 0), TVec3::Zero()}};
   const TVec4 tau = mpc.step(TVec6::Zero(), ref);
-  for (int i = 0; i < 4; ++i) {EXPECT_NEAR(tau(i), 0.0275, 2e-4);}
+  for (int i = 0; i < 4; ++i) {EXPECT_NEAR(tau(i), 0.0241, 1e-4);}
   EXPECT_NEAR(TorqueMPC::null_dir().dot(tau), 0.0, 1e-12);
+  EXPECT_LT(mpc.target_input().cwiseAbs().maxCoeff(), 1e-12);
+}
+
+// 지시서 U10: 목표 입력 — 4 kg, 1 m/s, R 2.4 m 등속 선회, θ_r = 90°, 해석 가속도 → U_s = ±0.01667, nᵀU_s = 0
+//   바퀴 관성을 켜도 같다: m_eq (p̈ − w) = (m + m_w)·v²/R − m_w·v²/R = m v²/R
+class TargetInput : public ::testing::TestWithParam<bool> {};
+TEST_P(TargetInput, SteadyTurnMinimumNorm)
+{
+  TorqueModel md;
+  md.use_wheel_inertia = GetParam();
+  TorqueTuning tu;
+  tu.constrained = false;
+  TorqueMPC mpc(md, tu);
+  const double R = 2.4, v = 1.0, om = v / R, th = M_PI / 2;
+  // θ = 90° 에서 앞(+x 몸체) = map +y, 원 중심은 몸체 왼쪽 = map −x
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= tu.Np; ++j) {ref.push_back({TVec3(0, 0, th + om * j * tu.Ts), TVec3(v, 0, om)});}
+  std::vector<TVec3> acc(tu.Nc, TVec3(-v * v / R, 0.0, 0.0));   // 해석 가속도 (관성 좌표, 중심 쪽)
+  TVec6 x;
+  x << 0, 0, th, 0, v, om;
+  mpc.step(x, ref, &acc);
+  const TVec4 Us = mpc.target_input().head<4>();
+  const double want = 0.04 / 4.0 * 4.0 * v * v / R;          // r/4 · m v²/R = 0.01667
+  EXPECT_NEAR(Us(0), -want, 1e-4);
+  EXPECT_NEAR(Us(1), want, 1e-4);
+  EXPECT_NEAR(Us(2), want, 1e-4);
+  EXPECT_NEAR(Us(3), -want, 1e-4);
+  EXPECT_NEAR(TorqueMPC::null_dir().dot(Us), 0.0, 1e-12);
+  // 지평 점에서 계산한 p̈ (acc_ref 없이) 도 같은 값 — 등속 선회에서는 ω S u 항이 정확히 구심 가속도
+  TorqueMPC mpc2(md, tu);
+  mpc2.step(x, ref);
+  EXPECT_LT((mpc2.target_input().head<4>() - Us).cwiseAbs().maxCoeff(), 1e-6);
+}
+INSTANTIATE_TEST_SUITE_P(WheelInertia, TargetInput, ::testing::Values(false, true));
+
+// 지시서 U11: U10 상태에서 X̂ = X_r,0, U_{-1} = U_s,0 이면 한 주기 해 U* ≈ U_s,0
+TEST(TorqueMPC, OnReferenceSolutionEqualsTargetInput)
+{
+  TorqueModel md;
+  TorqueTuning tu;
+  TorqueMPC mpc(md, tu);
+  Plant plant{md};
+  const double R = 2.4, v = 1.0;
+  plant.x << 0, 0, 0, v, 0, v / R;
+  TVec4 tau = TVec4::Zero();
+  for (int k = 0; k < 300; ++k) {               // 기준 위에서 몇 초 돌아 U_{-1} 이 U_s 로 들어가게
+    std::vector<TorqueRefPoint> ref;
+    for (int j = 0; j <= tu.Np; ++j) {ref.push_back(circle(R, v, k * tu.Ts + j * tu.Ts));}
+    tau = mpc.step(plant.x, ref);
+    plant.step(tau, tu.Ts);
+  }
+  EXPECT_LT((tau - mpc.target_input().head<4>()).cwiseAbs().maxCoeff(), 1e-4);
+}
+
+// 지시서 4절·7.4절: 상태 간격이 Ts 에서 벗어나거나 위치 잔차가 계단이면 외란 추정치 갱신을 건너뛴다
+TEST(TorqueMPC, DisturbanceSkipRules)
+{
+  TorqueTuning tu;
+  tu.dist_enable = true;
+  TorqueMPC mpc(TorqueModel{}, tu);
+  const TVec3 X(0, 0, 0);
+  TVec6 x = TVec6::Zero();
+  mpc.step(x, hold_ref(X, 51));
+  mpc.step(x, hold_ref(X, 51), nullptr, tu.Ts);
+  EXPECT_EQ(mpc.stats().d_skipped, 0);
+  mpc.step(x, hold_ref(X, 51), nullptr, 2.5 * tu.Ts);         // 상태 하나를 놓쳤다
+  EXPECT_EQ(mpc.stats().d_skipped, 1);
+  TVec6 jump = x;
+  jump(0) = 0.01;                                              // SLAM 보정 1 cm 계단
+  mpc.step(jump, hold_ref(X, 51), nullptr, tu.Ts);
+  EXPECT_EQ(mpc.stats().d_skipped, 2);
+  EXPECT_LT(mpc.d_hat().head<2>().cwiseAbs().maxCoeff(), 1e-3);   // 계단이 d̂ 로 들어가지 않았다
 }
 
 // 09절 자기검사 2: 정지 상태에서 기준이 현재 포즈면 T* = 0

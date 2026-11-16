@@ -120,3 +120,80 @@ def test_restored_reserve_warns_only_when_operating_speed_needs_more():
     p = TorquePlant.from_yaml()
     assert friction_reserve_warning(p.fric_coulomb, p.fric_viscous, 0.1, 370 * 2 * np.pi / 60)
     assert friction_reserve_warning(p.fric_coulomb, p.fric_viscous, 0.1, 10.0) is None
+
+
+# ── 정지 마찰 보상 (2026-11-16) ───────────────────────────────────────────
+def test_static_off_keeps_old_formula():
+    """omega_ref 가 None 이거나 static 이 0 이면 예전 식 그대로."""
+    w = [3.0, -0.2, 0.0, 12.0]
+    old = friction_torque(w, coulomb=0.02, viscous=0.002, smooth=0.5)
+    assert np.allclose(friction_torque(w, 0.02, 0.002, 0.5, omega_ref=None, static=0.08), old)
+    assert np.allclose(friction_torque(w, 0.02, 0.002, 0.5, omega_ref=[5, 5, 5, 5], static=0.0), old)
+
+
+def test_static_at_standstill_follows_reference_direction():
+    """바퀴가 서 있으면(ω = 0) 운동 마찰 항은 0, 정지 항이 기준 바퀴속도 방향으로 F_s·tanh(ω_ref/ω_s)."""
+    f = friction_torque([0, 0, 0, 0], 0.02, 0.002, 0.5, omega_ref=[3.0, -3.0, 0.0, 0.25], static=0.08)
+    assert f[0] == pytest.approx(0.08 * np.tanh(6.0))          # 0.07999
+    assert f[1] == pytest.approx(-0.08 * np.tanh(6.0))
+    assert f[2] == 0.0                                          # 기준이 멈춰 있으면 밀지 않는다
+    assert f[3] == pytest.approx(0.08 * np.tanh(0.5))           # 0 근처 기준은 부드럽게
+
+
+def test_static_fades_once_wheel_turns():
+    """|ω| = ω_st 이면 e⁻¹, 1 rad/s 면 e⁻⁴, 5 rad/s 면 사실상 0 — 바퀴가 돌면 예전 식으로 돌아간다.
+    역회전 중(ω > 0, ω_ref < 0) 바퀴가 빠르게 돌면 정지 항이 측정 방향 보상을 뒤집지 않는다."""
+    st, ws = 0.08, 0.5
+    for w, factor in [(0.5, np.exp(-1.0)), (1.0, np.exp(-4.0))]:
+        f = friction_torque([w] * 4, 0.0, 0.0, 0.5, omega_ref=[3.0] * 4, static=st, stribeck=ws)
+        assert f[0] == pytest.approx(st * factor * np.tanh(6.0))
+    f = friction_torque([5.0] * 4, 0.02, 0.002, 0.5, omega_ref=[-3.0] * 4, static=st, stribeck=ws)
+    assert f[0] == pytest.approx(0.02 * np.tanh(10.0) + 0.002 * 5.0, abs=1e-12)
+
+
+def test_motor_command_with_static_and_bag_case():
+    """bag 2026-11-16/142534 의 붙은 순간: τ_net = −τ̄(−0.0759), ω = 0, ω_ref(FL) = −4 rad/s.
+    예전 명령 −0.0759 (출발 토크 ≈ 0.09 못 넘음) → 보상 0.08×0.9 를 더해 −0.148."""
+    tau, clipped = motor_command([-0.0759] * 4, [0.0] * 4, 0.9 * 0.0214, 0.9 * 0.002, 0.5, 1.3,
+                                 omega_ref=[-4.0] * 4, static=0.9 * 0.08)
+    assert tau[0] == pytest.approx(-0.0759 - 0.072 * np.tanh(8.0), abs=1e-9)
+    assert tau[0] < -0.14 and not clipped
+    # ω_ref 의 NaN 은 그 바퀴 정지 항만 0
+    tau, _ = motor_command([0.0] * 4, [0.0] * 4, 0.0, 0.0, 0.5, 1.3, omega_ref=[np.nan, 3, 3, 3], static=0.08)
+    assert tau[0] == 0.0 and tau[1] > 0.07
+
+
+def test_reference_wheel_speed_timing():
+    """references[i] 목표 시각 = stamp + (i+1)·dt. 사이는 선형 보간, 첫 목표 전이면 첫 행, 오래됐거나 지평 끝이면 0."""
+    from amr_mpc.nodes.torque_output import reference_wheel_speed
+    from amr_mpc.torque.model import TorquePlant
+    Tinv = TorquePlant.from_yaml().Tinv
+    rows = np.array([[0.1, 0.0, 0.0], [0.2, 0.0, 0.0], [0.0, 0.3, 0.0]])
+    ref = (100.0, 0.05, rows)
+    r = 0.04
+    assert reference_wheel_speed(ref, 100.02, Tinv, 0.5) == pytest.approx(Tinv @ rows[0])          # 첫 목표(100.05) 전
+    assert reference_wheel_speed(ref, 100.075, Tinv, 0.5) == pytest.approx(Tinv @ [0.15, 0, 0])   # 1·2 행 가운데
+    assert reference_wheel_speed(ref, 100.075, Tinv, 0.5)[0] == pytest.approx(0.15 / r)
+    w = reference_wheel_speed(ref, 100.15, Tinv, 0.5)                                            # 마지막 행: 게걸음 +y
+    assert w == pytest.approx(np.array([-1, 1, 1, -1]) * 0.3 / r)                               # FL·RR 역회전
+    assert np.all(reference_wheel_speed(ref, 100.16, Tinv, 0.5) == 0)                            # 지평 끝
+    assert np.all(reference_wheel_speed((100.0, 0.05, np.tile(rows, (20, 1))), 100.6, Tinv, 0.5) == 0)  # 0.6 s 묵음
+    assert np.all(reference_wheel_speed(None, 100.0, Tinv, 0.5) == 0)
+
+
+@pytest.mark.parametrize("on", [True, False])
+def test_node_static_from_yaml_times_scale(on):
+    """노드: static = torque_plant.yaml friction.static_Nm × compensation_scale, stiction_comp:=false 면 0."""
+    import rclpy
+    from amr_mpc.core import config
+    from amr_mpc.nodes.torque_output import TorqueOutputNode
+    fric = config.load("torque_plant.yaml")["friction"]
+    rclpy.init(args=["--ros-args", "-p", f"stiction_comp:={'true' if on else 'false'}"])
+    try:
+        n = TorqueOutputNode()
+        expect = fric["compensation_scale"] * np.asarray(fric["static_Nm"], float) if on else np.zeros(4)
+        assert n.static == pytest.approx(expect)
+        assert n.has_static == on and (not on or np.all(n.static > 0))
+        n.destroy_node()
+    finally:
+        rclpy.shutdown()

@@ -145,7 +145,7 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
   - 실차 명령 (C 대신): `ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false origin_mode:=robot shape:=line seg_distance:=0.5 speed:=0.15 limit_mode:=friction mu_hat:=0.55 log_prefix:=<결과 폴더>/fwd`
     옆 `seg_dir_deg:=90 seg_distance:=0.3`, 대각 `seg_dir_deg:=45 seg_distance:=0.4`, 회전 `shape:=rotate seg_angle_deg:=90` (seg_yaw_rate 0.8)
   - 토크 상한 C `mu_hat:=0.55` → τ_μ 0.139 N·m: 5-2 에서 바퀴당 0.15 는 헛돎 없음, 0.2 앞·왼쪽은 FL 헛돎. 시뮬 0.15 m/s 에서 상한에 닿고도 완주(오차 2.5 cm)
-- [ ] 앞 1 m → 옆 0.5 m → 대각 → 제자리 90°: 각각 추종 오차 RMS·최대, 토크 포화 비율, 슬립률, 정지 정확도
+- [ ] 앞 1 m → 옆 0.5 m → 대각 → 제자리 90°: 각각 추종 오차 RMS·최대, 토크 포화 비율, 슬립률, 정지 정확도 — 2026-11-16 앞 0.5 m 갔다 오기 2 판(C μ̂ 0.55, 0.15 m/s): 오차 ≤ 2.3 cm·0.9°, 끝 0.8 cm, 상한 1~5 %, 추정기−SLAM ≤ 1.7 cm (`analysis/torque_mpc_real/2026-11-16_5-3`)
 - [ ] 비교군 A(`controller:=pure_pursuit`)도 같은 직선으로
 
 ### 5-4. 8자
@@ -181,6 +181,19 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 - [ ] 마찰 보상이 하중 실린 바닥에서도 맞는지: 일정 속도 직진에서 d̂ x ≈ 0 (또는 PI 적분이 0 근처). 약 10 rad/s 이상은 외삽 값이다 — 2026-11-14 무부하 내림 계단으로 41 rad/s 까지 쟀다(바퀴별 값은 `analysis/torque_mpc_real/2026-11-14_bench/`). 바닥 하중에서는 롤러 마찰이 더해진다
 - [ ] 슬립률 잡음 바닥: 슬립이 없을 속도(0.2 m/s 직진)에서 slip_logger 요약의 |λ| RMS. 시뮬 추정기 잡음에서는 0.13~0.27 이었다. 실차 IMU 진동이 다르면 noise_floor(0.1)를 다시 정한다
 - [ ] **저속 출발**: 무부하 정지 마찰이 바퀴마다 0.04~0.1 N·m 로 운동 마찰(약 0.02)의 2~5 배이고, 마찰 보상은 ω = 0 에서 0 이다. 출발이 굼뜨거나 바퀴마다 출발 시각이 달라 틀어지는지
+  > 2026-11-16 실차에서 드러남: `yaw_mode:=fixed` circles8 은 이동 방향이 45° 를 지날 때 FL·RR 이 역회전해야 한다(ω = (vx − vy ∓ kω)/r).
+  > 바퀴가 0 에 먼저 서면 보상 0 + τ̄(C, 0.0759) 로는 출발 토크를 못 넘어 붙는다 — bag 142534 FL·RR 1.78 s 붙음 → track_error 31 cm 정지,
+  > 142932 는 0.32 s 붙었다 풀려 완주. 대응: torque_output 정지 마찰 보상(`friction.static_Nm` 0.08 × 0.9, 방향 = 기준 바퀴속도, stack_changelog 2026-11-16 (9)).
+- [ ] **정지 마찰 보상 실차 확인** (2026-11-16 (9), `amrall` 기본으로 켜짐 — 기동 로그 "정지 마찰 [0.072 …] N·m"):
+  - 같은 조건(circles8 0.3 m/s, yaw_mode fixed, limit_mode friction)을 켬/끔(`stiction_comp:=false`) 각 3판 이상 — 45° 지점(기준 출발 후 약 1.8 s)에서 FL·RR 이 0 에 0.15 s 넘게 붙는 일이 사라지는지, 완주율. 분석은 `analyze_run.py` + 바퀴별 ω·ω_ref
+  - hold·무장 해제 중 서 있는 바퀴를 스스로 미는 떨림이 없는지 (기준 속도 0 이면 보상 0 이어야 한다)
+  - 기준과 반대 방향으로는 서 있는 바퀴를 못 돌린다 (명령 −τ̄ + 0.072 > −출발 토크). 기준이 +인데 MPC 가 −로 미는 경우는 드물지만, 그 때 오차가 커지는지
+  - 바닥에서 바퀴별 출발 토크 램프 시험으로 `static_Nm` 을 바퀴별 값으로 (지금 4 개 같은 잠정값)
+- [ ] **바퀴 등가 질량 A/B** (stack_changelog 2026-11-16 (10)): 같은 조건을 `amrall use_wheel_inertia:=true` / 기본(false) 로 각 3판 이상.
+  기동 로그 "바퀴관성 켬 (μ 2.225 kg)" 확인. 시뮬에서는 켜도 0.3 m/s RMS 16.1 → 17.5 mm 로 좋아지지 않았다 — 실차에서 진동(5-3 옆·대각)·
+  d̂ 크기·상한 닿음 비율이 줄어드는지 본다. 좋아지면 `torque_plant.yaml` `model.use_wheel_inertia` 기본값을 바꿀지 결정
+- [ ] **추종 오차 정지 문턱 1.5 m** (2026-11-16 (11)): 로봇이 경로에서 1.5 m 까지 벗어나도 안 선다 — 주행 공간 확보, 두 사람 정지 절차.
+  예전처럼 30 cm 에서 세우려면 `amrall max_track_error:=0.30`
 - [ ] **DAMPING 정지 순간 슬립**: kd 0.02 의 첫 감속 추정 4.6 m/s²(4 kg 추정) > μ 0.3·g 2.9 m/s². 미끄러운 바닥에서 정지할 때 바퀴가 미끄러지는지(slip_logger)
 - [ ] 비교군 A 의 PI 게인: 저속 정지 마찰 근처에서 적분 떨림(limit cycle) 없는지
 - [ ] **최고 속도 여유**: 무부하 최고 약 41~42 rad/s(2026-11-14, 전압 한계) vs 운용 상한 38.7 rad/s(1.55 m/s) — 여유 약 7 %. 바닥 하중·배터리 저하에서 1.5 m/s 랩이 바퀴 속도 한계에 걸리는지(응답 τ 가 명령보다 낮아지는지)

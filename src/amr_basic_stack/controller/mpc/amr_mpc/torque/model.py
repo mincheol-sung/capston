@@ -146,17 +146,30 @@ class TorquePlant:
         return self.tau_rated - self.fric_max
 
     # ── 적분 ────────────────────────────────────────────────
-    def step(self, X, Xdot, tau, dt, fric=None):
+    def step(self, X, Xdot, tau, dt, fric=None, eff=None, wheel_eff=None):
         """τ 를 dt 동안 일정하게 두고 RK4 로 한 스텝. 반환 (X, Xdot).
 
         fric: 구동계 마찰 (DrivetrainFriction, 시뮬 플랜트 전용). 주면 바퀴에 전달되는 토크가 τ − τ_fric(ω) 가 된다.
               MPC 예측 모델은 마찰을 모른다 (torque_output 이 미리 더해 지운다고 본다).
+        eff:  바닥 효율 [η_x, η_y, η_ψ] (시뮬 플랜트 전용, 2026-11-16). 몸체 일반화 힘 Tinv^T·τ 의 성분마다 곱한다 →
+              Ẍ = M⁻¹ R(θ) diag(η) Tinv^T τ. 실차 5-2 의 0.15 N·m 가속에 맞추면 0.65(앞뒤)·0.40(옆)·0.40(회전).
+              롤러 손실을 힘 배율로 흉내 낸 것이라 제동에도 똑같이 걸린다. MPC 예측 모델은 모른다(1 로 본다).
+        wheel_eff: 바퀴별 효율 [FL, FR, RL, RR] — 바퀴가 바닥에 전하는 힘의 배율 (접지력이 약한 바퀴 흉내, 2026-11-16).
+              Ẍ = M⁻¹ R(θ) diag(η) Tinv^T diag(η_w) τ.
         """
         tau = np.asarray(tau, float)
+        E = None if eff is None else np.diag(np.asarray(eff, float))
+        Wn = None if wheel_eff is None else np.asarray(wheel_eff, float)
 
         def f(s):
             t = tau if fric is None else tau - fric(self.wheel_speeds(s[:3], s[3:]))
-            return np.concatenate([s[3:], self.accel(s[:3], s[3:], t)])
+            if Wn is not None:
+                t = Wn * t
+            if E is None:
+                a = self.accel(s[:3], s[3:], t)
+            else:
+                a = np.linalg.solve(self.M_eff, self.R(s[2]) @ (E @ (self.Tinv.T @ t))) + self.w(s[3:])
+            return np.concatenate([s[3:], a])
 
         s = np.concatenate([X, Xdot])
         k1 = f(s)

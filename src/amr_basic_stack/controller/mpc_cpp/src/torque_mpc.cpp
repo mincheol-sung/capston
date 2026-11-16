@@ -137,16 +137,21 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
   if (!(tu_.dist_alpha > 0.0 && tu_.dist_alpha <= 1.0)) {throw std::invalid_argument("0 < disturbance.alpha ≤ 1");}
   if (!(tu_.rate_fraction > 0.0)) {throw std::invalid_argument("rate_fraction > 0 이어야 한다");}
   if (md_.tau_motor_limit() <= 0.0) {throw std::invalid_argument("τ_lim − τ_fric,max ≤ 0 — 모터 여유가 없다");}
+  if (!(tu_.w_delta >= 0.0 && tu_.r_u >= 0.0 && tu_.q_null >= 0.0)) {
+    throw std::invalid_argument("w_delta, r_u, q_null ≥ 0 이어야 한다");
+  }
+  if (!(tu_.w_delta + tu_.r_u > 0.0)) {throw std::invalid_argument("w_delta + r_u > 0 이어야 H 가 양의 정부호다");}
 
   nU_ = 4 * tu_.Nc;
   const int mg = 4 * (tu_.Nc - 1);
 
-  // H_const = Dᵀ W̄_Δ D + q_null N.   DᵀD 는 블록 삼중대각: 대각 2I (마지막 I), 이웃 −I
+  // H_const = Dᵀ W̄_Δ D + R̄_U + q_null N.   DᵀD 는 블록 삼중대각: 대각 2I (마지막 I), 이웃 −I
   H_const_ = Eigen::MatrixXd::Zero(nU_, nU_);
   const Eigen::Matrix4d NN = null_dir() * null_dir().transpose();
   for (int j = 0; j < tu_.Nc; ++j) {
     const double diag = (j == tu_.Nc - 1) ? 1.0 : 2.0;
-    H_const_.block<4, 4>(4 * j, 4 * j) = tu_.w_delta * diag * Eigen::Matrix4d::Identity() + tu_.q_null * NN;
+    H_const_.block<4, 4>(4 * j, 4 * j) =
+      (tu_.w_delta * diag + tu_.r_u) * Eigen::Matrix4d::Identity() + tu_.q_null * NN;
     if (j + 1 < tu_.Nc) {
       H_const_.block<4, 4>(4 * j, 4 * (j + 1)) = -tu_.w_delta * Eigen::Matrix4d::Identity();
       H_const_.block<4, 4>(4 * (j + 1), 4 * j) = -tu_.w_delta * Eigen::Matrix4d::Identity();
@@ -161,6 +166,11 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
     }
   }
 
+  {
+    const TMat34 F = md_.force_map();
+    F_pinv_ = F.transpose() * (F * F.transpose()).inverse();      // 식-14 의 ((T⁻¹)ᵀ)⁺ — 행이 직교라 닫힌 형과 같다
+  }
+  Us_.setZero(nU_);
   Phi_.setZero(6 * tu_.Np, nU_);
   WPhi_.setZero(6 * tu_.Np, nU_);
   H_.setZero(nU_, nU_);
@@ -194,7 +204,7 @@ TVec4 TorqueMPC::tau_bar() const
   return out;
 }
 
-void TorqueMPC::update_disturbance(const TVec6 & x_hat)
+void TorqueMPC::update_disturbance(const TVec6 & x_hat, double dt_state)
 {
   if (!has_prev_) {
     d_hat_.setZero();
@@ -214,6 +224,16 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat)
   }
   TVec6 d = x_hat - pred;
   d(2) = wrap(d(2));
+  // 갱신 건너뛰기 (지시서 4절·7.4절): 상태 간격이 Ts 에서 벗어나면 잔차가 −Ts·ẋ 꼴로 틀리고, SLAM 보정 계단은 위치 잔차로 들어와
+  // 예측 구간 끝에서 j 배로 커진다. 이 주기는 d̂_f 를 그대로 둔다 (x̂_prev 는 step 끝에서 갱신).
+  if (tu_.dist_dt_tol > 0.0 && dt_state > 0.0 && std::abs(dt_state - tu_.Ts) > tu_.dist_dt_tol) {
+    stats_.d_skipped = 1;
+    return;
+  }
+  if (tu_.dist_skip_xy > 0.0 && std::max(std::abs(d(0)), std::abs(d(1))) > tu_.dist_skip_xy) {
+    stats_.d_skipped = 2;
+    return;
+  }
   d_hat_ = (1.0 - tu_.dist_alpha) * d_hat_ + tu_.dist_alpha * d;     // 식-11
 }
 
@@ -258,15 +278,18 @@ bool TorqueMPC::solve_qp(const TVec4 & tau_bar)
   return res.exitflag >= 1;
 }
 
-TVec4 TorqueMPC::step(const TVec6 & x_hat, const std::vector<TorqueRefPoint> & ref)
+TVec4 TorqueMPC::step(
+  const TVec6 & x_hat, const std::vector<TorqueRefPoint> & ref, const std::vector<TVec3> * acc_ref, double dt_state)
 {
   const int Np = tu_.Np, Nc = tu_.Nc;
   if (static_cast<int>(ref.size()) < Np + 1) {throw std::invalid_argument("기준 지평은 Np+1 점이 필요하다");}
   const double Ts = tu_.Ts;
   stats_ = TorqueStepStats{};
 
-  update_disturbance(x_hat);
+  update_disturbance(x_hat, dt_state);
   const TVec6 d_use = tu_.dist_enable ? d_hat_ : TVec6::Zero();
+  const TVec3 a_d = d_use.tail<3>() / Ts;          // 식-14 의 â_d
+  const Eigen::Matrix3d Mdiag = TVec3(md_.m_eff(), md_.m_eff(), md_.I_eff()).asDiagonal();
 
   // current_state: 이번 주기의 모델을 x̂(k), τ(k−1) 에서 한 번 만든다 (머리주석 "선형화 방식")
   const bool current = tu_.linearization == TorqueLinearization::CurrentState;
@@ -285,6 +308,25 @@ TVec4 TorqueMPC::step(const TVec6 & x_hat, const std::vector<TorqueRefPoint> & r
   double th_r = x_hat(2) + wrap(ref[0].first(2) - x_hat(2));
   for (int i = 0; i < Np; ++i) {
     const int cidx = std::min(i, Nc - 1);
+    if (i < Nc) {
+      // 식-14 목표 입력: U_s,i = F⁺ R(θ_r,i)ᵀ M (p̈_r,i − w_i − â_d)
+      const TVec3 & u_i = ref[i].second;
+      const double c = std::cos(th_r), s = std::sin(th_r);
+      const TVec3 Xdot_r(u_i(0) * c - u_i(1) * s, u_i(0) * s + u_i(1) * c, u_i(2));
+      TVec3 acc;
+      if (acc_ref && static_cast<int>(acc_ref->size()) > i) {
+        acc = (*acc_ref)[i];
+      } else {
+        // 지평 점에서: p̈ = d/dt (R(θ)u) = R(θ)(u̇ + ω S u),  S u = [−u_y, u_x, 0]
+        const int i0 = std::max(i - 1, 0), i1 = i + 1;
+        const TVec3 du = (ref[i1].second - ref[i0].second) / ((i1 - i0) * Ts);
+        const TVec3 body(du(0) - u_i(2) * u_i(1), du(1) + u_i(2) * u_i(0), du(2));
+        acc << body(0) * c - body(1) * s, body(0) * s + body(1) * c, body(2);
+      }
+      const TVec3 rhs = Mdiag * (acc - md_.w(Xdot_r) - a_d);
+      const TVec3 rb(c * rhs(0) + s * rhs(1), -s * rhs(0) + c * rhs(1), rhs(2));   // R(θ_r)ᵀ
+      Us_.segment<4>(4 * i) = F_pinv_ * rb;
+    }
     if (current) {
       // x_{i+1} = A_d x_i + B_d τ + c_d + d̂   — 지평 전체에 같은 (A_d, B_d, c_d)
       xf = lin.A * xf + lin.c + d_use;
@@ -329,6 +371,7 @@ TVec4 TorqueMPC::step(const TVec6 & x_hat, const std::vector<TorqueRefPoint> & r
   H_ += H_const_;
   g_.noalias() = WPhi_.transpose() * e0_;
   g_.head<4>() -= tu_.w_delta * tau_prev_;
+  g_ -= tu_.r_u * Us_;                              // 식-18 의 −R̄_U 𝐔_s
 
   const TVec4 tb = tau_bar();
   if (!tu_.constrained) {

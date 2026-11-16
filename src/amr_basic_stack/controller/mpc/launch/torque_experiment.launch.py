@@ -28,6 +28,8 @@
   ros2 launch amr_mpc torque_experiment.launch.py controller:=pure_pursuit   # 비교군 A (퓨어 퍼슛 + 바퀴별 PI).
                                                                         #   게인은 config/torque_baseline_a.yaml
   ros2 launch amr_mpc torque_experiment.launch.py disturbance:=true     # 외란 추정치 d̂ 켬 (기본 끔)
+  ros2 launch amr_mpc torque_experiment.launch.py stiction_comp:=false  # torque_output 정지 마찰 보상 끔. 기본 auto = plant:=real 에서만 켬
+                                                                        #   (torque_plant.yaml friction.static_Nm, 기준 바퀴속도 방향. 2026-11-16)
   ros2 launch amr_mpc torque_experiment.launch.py linearization:=current_state   # 선형화를 현재 추정 상태 기준으로.
                                                                         #   기본 reference = 1판 방식(기준궤적)
   ros2 launch amr_mpc torque_experiment.launch.py payload_kg:=5.0       # 적재 +5 kg (플랜트와 제어기 둘 다)
@@ -138,6 +140,8 @@ def _nodes(context):
                          "sensor_noise_scale": float(g("sensor_noise_scale")),
                          "surface_mu": float(g("surface_mu")) if g("surface_mu") else -1.0,
                          "friction_scale": float(g("friction_scale")),
+                         "wheel_efficiency": [float(v) for v in g("wheel_eff").split(",")] if g("wheel_eff") else [1.0, 1.0, 1.0, 1.0],
+                         "floor_efficiency": [float(v) for v in g("floor_eff").split(",")] if g("floor_eff") else [1.0, 1.0, 1.0],
                          "can_interface": can_if if plant == "sim_can" else "",
                          "can_reply_delay": float(g("can_reply_delay"))}]))
         if plant == "sim_can":
@@ -212,6 +216,8 @@ def _nodes(context):
         ctrl = {**shared, "state_topic": state_topic, "armed_topic": "/mpc/armed",
                 "payload_kg": float(g("ctrl_payload_kg")) if g("ctrl_payload_kg") else payload,
                 "log_prefix": g("log_prefix")}
+        if g("ctrl_wheel_inertia"):                   # 제어기만 (시뮬에서 플랜트와 다르게 — 실차 상황 흉내)
+            ctrl["use_wheel_inertia"] = _truthy(g("ctrl_wheel_inertia"))
         if g("limit_mode"):
             ctrl["limit_mode"] = g("limit_mode")
         if g("disturbance"):
@@ -220,6 +226,20 @@ def _nodes(context):
             ctrl["linearization"] = g("linearization")
         if g("mu_hat"):
             ctrl["mu_hat"] = float(g("mu_hat"))
+        # 튜닝 덮어쓰기 (2026-11-16, 5-3 감쇠 시험): mpc_W:="100,100,50,1,1,0.5"  mpc_w_delta:=10
+        if g("mpc_W"):
+            W = [float(v) for v in g("mpc_W").strip("[] ").split(",")]
+            if len(W) != 6:
+                raise RuntimeError(f"mpc_W 는 6 개 [x, y, θ, ẋ, ẏ, θ̇] — {g('mpc_W')!r}")
+            ctrl["W"] = W
+        if g("mpc_w_delta"):
+            ctrl["w_delta"] = float(g("mpc_w_delta"))
+        if g("mpc_r_u"):
+            ctrl["r_u"] = float(g("mpc_r_u"))
+        if g("mpc_q_null"):
+            ctrl["q_null"] = float(g("mpc_q_null"))
+        if g("mpc_dist_alpha"):
+            ctrl["disturbance_alpha"] = float(g("mpc_dist_alpha"))
         nodes.append(Node(
             package="amr_mpc_cpp", executable="torque_mpc_node", name="torque_mpc_node", output="screen",
             parameters=[ctrl]))
@@ -241,9 +261,13 @@ def _nodes(context):
     else:
         raise RuntimeError(f"controller:={controller!r} — mpc 또는 pure_pursuit")
 
+    # 정지 마찰 보상 (2026-11-16): auto = 실차에서만. 시뮬 플랜트에는 정지 마찰이 없어 켜면 없는 마찰을 보상하게 된다
+    stiction = g("stiction_comp")
+    stiction_on = plant == "real" if stiction == "auto" else _truthy(stiction)
     nodes.append(Node(
         package="amr_mpc", executable="torque_output_node", name="torque_output_node", output="screen",
-        parameters=[{"input_topic": torque_in, "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec"))}]))
+        parameters=[{"input_topic": torque_in, "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec")),
+                     "stiction_comp": stiction_on}]))
 
     # 위험 감시: 무장 중 포즈 튐·추종 오차·모터 에러·센서 끊김이면 /mpc/arm false → DAMPING
     if source == "estimator":                         # 참값 모드에는 추정기 출력이 없어 끊김으로 오판한다
@@ -296,23 +320,37 @@ def generate_launch_description():
           description="시뮬 SLAM 꼴. scan_time = 스캔 시각 포즈를 늦게 (외삽 끔), extrapolated = 100 Hz 외삽 스트림 (지금 실차 설정)"),
         A("sensor_noise_scale", default_value="1.0", description="시뮬 센서 잡음 배율 (1 = bag 실측 수준, 0 = 없음)"),
         A("state_topic", default_value="", description="상태 토픽을 직접 줄 때만 (비우면 state_source 에 따라 정한다)"),
-        A("max_track_error", default_value="0.30", description="fault_monitor: 기준과 이만큼 벌어지면 정지 [m]"),
+        A("max_track_error", default_value="1.5",
+          description="fault_monitor: 기준과 이만큼 벌어지면 정지 [m]. 2026-11-16 0.30 → 1.5 (figure8 abort_error 1.6 보다 작게)"),
         A("surface_mu", default_value="", description="시뮬 바닥 마찰계수 (비우면 슬립 없음). 제어기의 mu_hat 과 따로 준다"),
         A("friction_scale", default_value="1.0",
           description="시뮬 구동계 마찰 = torque_plant.yaml friction × 이 값 (0 = 마찰 없음, 1.3 = 보상보다 30 % 큼)"),
+        A("wheel_eff", default_value="", description="시뮬 바퀴별 효율 'FL,FR,RL,RR' (비우면 1). 접지력이 약한 바퀴 흉내 (2026-11-16)"),
+        A("floor_eff", default_value="",
+          description="시뮬 바닥 효율 'η_x,η_y,η_ψ' (비우면 1,1,1). 실차 5-2 맞춤값 0.65,0.40,0.40 (0.15 N·m 가속, 2026-11-16)"),
         A("wheel_odom", default_value="", description="휠 오돔 true/false (비우면 torque_estimator.yaml slam.use_wheel_odom, 기본 false)"),
+        A("stiction_comp", default_value="auto", choices=["auto", "true", "false"],
+          description="torque_output 정지 마찰 보상 (torque_plant.yaml friction.static_Nm). auto = plant:=real 에서만 켬"),
         A("use_mpc", default_value="true", description="false 면 플랜트(+RViz)만 띄운다"),
         A("use_figure8", default_value="true", description="8자 기준궤적 노드. false 면 기준열을 밖에서 준다"),
         A("armed", default_value="false", description="게이트 초기 상태. false 면 터미널에서 'a' 로 무장. plant:=real 에서는 true 금지"),
         # 모델·비교군. 비우면 config/torque_plant.yaml, torque_mpc.yaml 값
         A("payload_kg", default_value="0.0", description="적재 [kg]. 2차 발표 조건 0 / 5"),
         A("ctrl_payload_kg", default_value="", description="제어기가 믿는 적재. 비우면 payload_kg 와 같게"),
-        A("use_wheel_inertia", default_value="", description="모델 바퀴 관성 스위치 (YAML 기본 false)"),
+        A("use_wheel_inertia", default_value="", description="모델 바퀴 관성 스위치 (YAML 기본 false). 플랜트와 제어기 둘 다"),
+        A("ctrl_wheel_inertia", default_value="",
+          description="제어기가 믿는 바퀴 관성. 비우면 use_wheel_inertia 와 같게. "
+                      "시뮬로 지금 실차 흉내: use_wheel_inertia:=true ctrl_wheel_inertia:=false (2026-11-16)"),
         A("controller", default_value="mpc", choices=["mpc", "pure_pursuit"],
           description="mpc = torque_mpc_node (비교군 B·C), pure_pursuit = 퓨어 퍼슛 + 바퀴별 PI (비교군 A)"),
         A("limit_mode", default_value="", description="motor_only(B) | friction(C) (YAML 기본 motor_only)"),
         A("disturbance", default_value="", description="외란 추정치 d̂ true/false (YAML 기본 false)"),
         A("linearization", default_value="", description="reference | current_state (YAML 기본 reference)"),
+        A("mpc_W", default_value="", description="MPC 상태 가중 'x,y,θ,ẋ,ẏ,θ̇' (비우면 torque_mpc.yaml tuning.W)"),
+        A("mpc_w_delta", default_value="", description="MPC 토크 변화 벌점 r_Δ (비우면 torque_mpc.yaml tuning.w_delta)"),
+        A("mpc_r_u", default_value="", description="MPC 입력 편차 벌점 r_U (비우면 torque_mpc.yaml tuning.r_u)"),
+        A("mpc_dist_alpha", default_value="", description="외란 추정치 저역통과 α (비우면 torque_mpc.yaml disturbance.alpha)"),
+        A("mpc_q_null", default_value="", description="MPC 영공간 벌점 (비우면 torque_mpc.yaml tuning.q_null)"),
         A("mu_hat", default_value="", description="제어기의 노면 마찰계수 (YAML 기본 0.3)"),
         A("log_prefix", default_value="", description="MPC CSV 접두. 비면 저장 안 함"),
         # 8자 트랙: 비우면 config/torque_track.yaml

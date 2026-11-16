@@ -1,0 +1,181 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Tool Properties
+    Name: Tool Properties
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 20
+      Reference Frame: map
+      Color: 90; 90; 90
+      Value: true
+    - Class: rviz_default_plugins/Map
+      Name: Map (smoc_lab, /map_carto)
+      Enabled: true
+      Alpha: 0.8
+      Color Scheme: map
+      Topic:
+        Value: /map_carto
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot
+      Enabled: true
+      Visual Enabled: true
+      Collision Enabled: false
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Axes
+      Name: base_footprint
+      Enabled: true
+      Reference Frame: base_footprint
+      Length: 0.25
+      Radius: 0.015
+      Value: true
+    - Class: rviz_default_plugins/LaserScan
+      Name: Scan front
+      Enabled: true
+      Style: Points
+      Size (Pixels): 3
+      Size (m): 0.03
+      Color Transformer: FlatColor
+      Color: 255; 60; 60
+      Decay Time: 0
+      Topic:
+        Value: /scan_front
+        Depth: 5
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/LaserScan
+      Name: Scan rear
+      Enabled: true
+      Style: Points
+      Size (Pixels): 3
+      Size (m): 0.03
+      Color Transformer: FlatColor
+      Color: 60; 160; 255
+      Decay Time: 0
+      Topic:
+        Value: /scan_rear
+        Depth: 5
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Scan matched (Cartographer, map frame)
+      Enabled: true
+      Style: Points
+      Size (Pixels): 2
+      Size (m): 0.02
+      Color Transformer: FlatColor
+      Color: 255; 255; 255
+      Decay Time: 0
+      Topic:
+        Value: /scan_matched_points2
+        Depth: 2
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: Figure8 reference (whole)
+      Enabled: true
+      Color: 120; 120; 255
+      Alpha: 1
+      Line Style: Lines
+      Topic:
+        Value: /figure8/path
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: MPC reference horizon (0.5 s)
+      Enabled: true
+      Color: 255; 170; 0
+      Alpha: 1
+      Line Style: Billboards
+      Line Width: 0.02
+      Topic:
+        Value: /torque_mpc/reference_horizon
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: Trail (estimator, since arm)
+      Enabled: true
+      Color: 40; 230; 80
+      Alpha: 1
+      Line Style: Billboards
+      Line Width: 0.015
+      Topic:
+        Value: /torque_viz/trail
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Pose
+      Name: SLAM pose (/tracked_pose, IMU point)
+      Enabled: false
+      Shape: Arrow
+      Color: 255; 255; 0
+      Shaft Length: 0.2
+      Shaft Radius: 0.01
+      Head Length: 0.06
+      Head Radius: 0.03
+      Topic:
+        Value: /tracked_pose
+        Depth: 5
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: false
+  Global Options:
+    Fixed Frame: map
+    Background Color: 48; 48; 48
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/SetInitialPose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
+      Topic:
+        Value: /initialpose
+    - Class: rviz_default_plugins/Measure
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Current View
+      Scale: 80
+      X: 0
+      Y: 0
+      Value: TopDownOrtho (rviz_default_plugins)
+Window Geometry:
+  Height: 900
+  Width: 1300

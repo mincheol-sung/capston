@@ -8,8 +8,14 @@
 // 이산화 (ZOH, 정확):  x(k+1) = A x(k) + B(k) τ(k) + E w(k) [+ d̂]                               (식-8)
 //   A = [I, Ts·I; 0, I],  B(k) = [Ts²/2·G(θ_r(k)); Ts·G(θ_r(k))],  E = [Ts²/2·I; Ts·I]
 // 결정변수는 절대 토크 T = [τ_0 … τ_{Nc−1}] (4Nc).  Nc 이후는 τ_{Nc−1} 유지.
-// 비용 (식-16):  Σ_{j=1}^{Np} ‖x_j − x_r,j‖²_W + Σ_{j<Nc} w_Δ‖τ_j − τ_{j−1}‖² + q_null Σ_{j<Nc} (nᵀτ_j)²
-//   토크 자체에는 벌점이 없다 — 선회 중 구심 토크가 유지되어도 비용 0.
+// 비용 (식-16):  Σ_{j=1}^{Np} ‖x_j − x_r,j‖²_W + Σ_{j<Nc} w_Δ‖τ_j − τ_{j−1}‖² + r_U Σ_{j<Nc} ‖τ_j − U_s,j‖²
+//                [+ q_null Σ_{j<Nc} (nᵀτ_j)² — 2026-11-16 전 구현의 영공간 벌점. 지시서 기본 0]
+//   목표 입력 (식-14):  U_s,j = ((T⁻¹)ᵀ)⁺ R(θ_r,j)ᵀ M (p̈_r,j − w_j − â_d),   â_d = d̂_ṗ / Ts (외란 추정치를 쓸 때만)
+//     기준 위에서 모델이 맞으면 추종에 필요한 토크(최소 노름 → nᵀU_s = 0). 입력 편차 항이 과도에서 토크를 이쪽으로 당기고
+//     영공간 성분을 0 으로 보낸다. 정상상태에서 U = U_s 라 비용 0 (선회 구심 토크 유지).
+//   기준 가속도 p̈_r: step() 의 acc_ref 로 받는다 (노드: 기준 속도의 중앙 차분 Δt = 0.2 s, 지시서 3.9).
+//     없으면 지평 점에서 p̈ = R(θ_r)(u̇_r + ω_r S u_r), u̇_r 은 이웃 점 차분 (등속 선회에서 정확).
+//   구현 지시서 amr/자료/torque_mpc_v1_implementation.md 3.10~3.12 (2026-11-16).
 // 제약 (식-19~21):  |τ_i,j| ≤ τ̄_i,   |τ_i,j − τ_i,j−1| ≤ Δτ̄_i
 //   DAQP 에는  변수 bound(±τ̄, j=0 은 변화율과 교집합)  +  일반 제약 (j ≥ 1 의 차분 행) 으로 넘긴다.
 //   j=0 에서 상한이 변화율보다 우선한다 (torque_mpc_todo.md: 상한이 한 스텝에 Δτ̄ 보다 크게 내려가도 해가 있게):
@@ -109,8 +115,9 @@ struct TorqueTuning
   int Np = 50;
   int Nc = 5;
   TVec6 W = (TVec6() << 100.0, 100.0, 50.0, 1.0, 1.0, 0.5).finished();
-  double w_delta = 0.01;
-  double q_null = 0.01;
+  double w_delta = 0.01;             // r_Δ
+  double r_u = 0.01;                 // r_U — 입력 편차 항 (식-16 셋째 항, 지시서 3.11)
+  double q_null = 0.0;               // 영공간 벌점 (2026-11-16 전 구현 방식). 지시서는 입력 편차 항이 대신한다 → 0
   TorqueLimitMode limit_mode = TorqueLimitMode::MotorOnly;
   // 구조체 기본값은 1판 방식(reference) — 1판 수치 예 시험이 이 값에 묶여 있다.
   // 노드는 torque_mpc.yaml 의 linearization.mode 를 읽고, 그 기본값도 reference 다 (2026-11-14).
@@ -119,6 +126,9 @@ struct TorqueTuning
   bool constrained = true;           // false 면 QP 대신 H T = −g (자기검사용, 1판 09절)
   bool dist_enable = false;
   double dist_alpha = 1.0;
+  // 외란 추정치 갱신 건너뛰기 (지시서 4절·7.4절). 건너뛰면 d̂_f 를 그대로 두고 x̂_prev 는 갱신한다
+  double dist_dt_tol = 0.002;        // [s] 상태 간격이 Ts ± 이 값을 벗어나면 (step 의 dt_state 로 판단, ≤ 0 이면 검사 안 함)
+  double dist_skip_xy = 1e-3;        // [m] 잔차 위치 성분 |d̂_x|·|d̂_y| 가 이보다 크면 (SLAM 보정 계단). ≤ 0 이면 검사 안 함
   int daqp_iter_limit = 1000;
 };
 
@@ -128,6 +138,7 @@ struct TorqueStepStats
   int active = 0;          // 활성 제약 수
   int fallback = 0;        // QP 실패 → 무제약 해를 상한으로 깎았다
   int exitflag = 0;
+  int d_skipped = 0;       // 이번 주기 외란 추정치 갱신을 건너뜀 (1 = 상태 간격, 2 = 잔차 계단)
 };
 
 // 지평의 한 점: (포즈 X_r = [x, y, θ],  몸체 속도 u_r = [v_x, v_y, ω_z]).  ReferenceHorizon::horizon 의 원소와 같다
@@ -143,7 +154,10 @@ public:
 
   // x_hat: 현재 상태 (관성 좌표).  ref: 지평 Np+1 점 — ref[j] 의 시각 = 지금 + j·Ts  (j = 0 … Np)
   // 반환: 이번 주기 순토크 τ*(k).  θ 는 접힌 값이어도 된다 (안에서 식-15 로 언랩)
-  TVec4 step(const TVec6 & x_hat, const std::vector<TorqueRefPoint> & ref);
+  // acc_ref: (선택) 기준 가속도 p̈_r,j (관성 좌표), j = 0 … Nc−1. 없거나 짧으면 지평 점에서 계산 (머리주석)
+  // dt_state: (선택) 이번 상태와 지난 상태의 시각 차 [s] — 외란 추정치 갱신 건너뛰기 판단용. ≤ 0 이면 검사 안 함
+  TVec4 step(const TVec6 & x_hat, const std::vector<TorqueRefPoint> & ref,
+    const std::vector<TVec3> * acc_ref = nullptr, double dt_state = -1.0);
 
   // 상한을 밖에서 줄 때 (MTTE 등 바퀴별 온라인 상한용 자리). 음수면 모드에서 계산한 값
   void set_tau_bar_override(const TVec4 & tau_bar) {tau_bar_override_ = tau_bar;}
@@ -156,10 +170,11 @@ public:
   const TorqueModel & model() const {return md_;}
   const TorqueTuning & tuning() const {return tu_;}
   const Eigen::VectorXd & solution() const {return T_;}        // T* 전체 (4Nc)
+  const Eigen::VectorXd & target_input() const {return Us_;}   // 이번 주기 목표 입력 U_s (4Nc, 식-14)
   static TVec4 null_dir() {return TVec4(0.5, 0.5, -0.5, -0.5);}
 
 private:
-  void update_disturbance(const TVec6 & x_hat);
+  void update_disturbance(const TVec6 & x_hat, double dt_state);
   bool solve_qp(const TVec4 & tau_bar);
 
   TorqueModel md_;
@@ -176,12 +191,13 @@ private:
   TorqueStepStats stats_;
 
   // 상수부
-  Eigen::MatrixXd H_const_;                          // Dᵀ W̄_Δ D + q_null N
+  Eigen::MatrixXd H_const_;                          // Dᵀ W̄_Δ D + R̄_U + q_null N
+  Eigen::Matrix<double, 4, 3> F_pinv_;               // ((T⁻¹)ᵀ)⁺ = Fᵀ (F Fᵀ)⁻¹ (식-14)
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> A_gen_;   // j ≥ 1 의 차분 행 (DAQP 는 row-major)
 
   // 작업 버퍼
   Eigen::MatrixXd Phi_, WPhi_, H_;
-  Eigen::VectorXd e0_, g_, T_, lam_, lb_, ub_;
+  Eigen::VectorXd e0_, g_, T_, lam_, lb_, ub_, Us_;
 };
 
 }  // namespace amr_mpc_cpp
