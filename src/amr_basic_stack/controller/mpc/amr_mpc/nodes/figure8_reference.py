@@ -56,6 +56,7 @@ from amr_interfaces.msg import PlanarReference, PlanarReferenceArray
 from amr_mpc.core import node_main
 from amr_mpc.body import mpc as mpc_mod
 from amr_mpc.core.figure8 import Figure8, lead_in, lead_in_duration, ramp_elapsed, ramp_rate
+from amr_mpc.core.segment import Segment
 K_GEOM = mpc_mod.K_GEOM
 
 
@@ -101,6 +102,14 @@ class Figure8ReferenceNode(Node):
             ("start_tolerance_yaw_deg", 30.0),        # fixed: [deg]
             ("lead_speed", 0.10),                     # fixed: 진입 구간 평균 속도 상한 [m/s]
             ("lead_yaw_rate", 0.5),                   # fixed: 진입 구간 평균 회전속도 상한 [rad/s]
+            # 5-3 단일 축 기준 (2026-11-16, core/segment.py). shape = figure8 | line | rotate
+            #   line   : 출발 몸체 방향 seg_dir_deg(0 앞, 90 왼쪽, 45 대각)로 seg_distance [m], 속도는 speed·accel
+            #   rotate : 제자리 seg_angle_deg, 각속도 seg_yaw_rate·seg_yaw_accel
+            #   seg_out_and_back 이면 seg_pause_s 쉬고 돌아온다. origin_mode robot 과 같이 쓴다 (무장한 자리가 출발점)
+            ("shape", "figure8"),
+            ("seg_distance", 0.5), ("seg_dir_deg", 0.0),
+            ("seg_angle_deg", 90.0), ("seg_yaw_rate", 0.8), ("seg_yaw_accel", 1.6),
+            ("seg_out_and_back", True), ("seg_pause_s", 1.0),
         ])
         g = lambda n: self.get_parameter(n).value
         self.dt, self.T, self.frame = float(g("dt")), int(g("horizon_steps")), str(g("frame_id"))
@@ -109,11 +118,20 @@ class Figure8ReferenceNode(Node):
 
         mpc_mod.set_wheel_limit(g("max_wheel_rad_per_sec"))
         V_LIMIT, budget = mpc_mod.V_LIMIT, float(g("load_budget"))
+        self.shape = str(g("shape")).strip().lower()
         try:
-            self.path = Figure8(width=g("width"), height=g("height"), speed=g("speed"),
-                                accel=g("accel"), laps=g("laps"), yaw_mode=str(g("yaw_mode")),
-                                align_s=g("align_s"),
-                                lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None)
+            if self.shape in ("line", "rotate"):
+                self.path = Segment(shape=self.shape, distance=g("seg_distance"), dir_deg=g("seg_dir_deg"),
+                                    speed=g("speed"), accel=g("accel"), angle_deg=g("seg_angle_deg"),
+                                    yaw_rate=g("seg_yaw_rate"), yaw_accel=g("seg_yaw_accel"),
+                                    out_and_back=bool(g("seg_out_and_back")), pause_s=g("seg_pause_s"))
+            elif self.shape != "figure8":
+                raise ValueError(f"shape={self.shape!r} — figure8 | line | rotate")
+            else:
+                self.path = Figure8(width=g("width"), height=g("height"), speed=g("speed"),
+                                    accel=g("accel"), laps=g("laps"), yaw_mode=str(g("yaw_mode")),
+                                    align_s=g("align_s"),
+                                    lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None)
         except ValueError as e:
             raise SystemExit(f"[figure8] 파라미터 오류: {e}")
 
@@ -161,6 +179,15 @@ class Figure8ReferenceNode(Node):
             self.publish_path(self.track_origin)
 
         p = self.path
+        if self.shape != "figure8":
+            what = (f"직선 {p.L:.2f} m, 방향 {math.degrees(math.atan2(p.u[1], p.u[0])):.0f}°, 최고 {p.V_peak():.2f} m/s, "
+                    f"가감속 {p.A:.2f} m/s²" if self.shape == "line" else
+                    f"제자리 회전 {math.degrees(p.sign * p.L):.0f}°, 최고 {p.V_peak():.2f} rad/s, 각가속 {p.A:.2f} rad/s²")
+            self.get_logger().info(
+                f"5-3 기준: {what}{', 갔다 옴 (쉼 %.1f s)' % p.pause if p.back else ''}\n"
+                f"  시간  대기 {self.delay:.1f} s + 기준 {p.T_total:.1f} s"
+                f"{'' if self.hold < 0 else f' + 유지 {self.hold:.1f} s'}   부하 {max(run, spin)/V_LIMIT*100:.0f} %")
+            return
         for k, V, vmax, t0 in p.lap_profile_summary():
             self.get_logger().info(f"  랩 {k}: 목표 {V:.2f} m/s, 실제 최고 {vmax:.2f} m/s, 시작 {t0:.1f} s")
         self.get_logger().info(

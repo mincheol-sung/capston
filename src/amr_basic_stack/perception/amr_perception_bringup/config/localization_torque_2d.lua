@@ -33,4 +33,8 @@ include "localization_2d.lua"
 options.use_pose_extrapolator = false
 options.use_odometry = false
 
+-- 2026-11-15: 예측 위치를 스캔 맞춤보다 10배 믿던 기본값(10) 때문에 빠르게 움직이다 서면 SLAM 이
+-- 1 m 가까이 넘쳤다. bag 재생에서 1 로 낮추면 빠를 때 IMU 와 1~3 cm, 느릴 때는 그대로.
+TRAJECTORY_BUILDER_2D.ceres_scan_matcher.translation_weight = 1.
+
 return options

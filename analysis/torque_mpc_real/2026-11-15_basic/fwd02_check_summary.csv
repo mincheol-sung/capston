@@ -1,0 +1,2 @@
+run,dir,amp,dur,tau_fl,tau_fr,tau_rl,tau_rr,est_fwd_m,est_left_m,est_dyaw_deg,slam_fwd_m,slam_left_m,slam_dyaw_deg,kin_fwd_m,kin_left_m,kin_dyaw_deg,eff_slam,dir_err_deg,w_fl,w_fr,w_rl,w_rr,errors
+1,fwd,0.2,0.500,0.2000,0.2000,0.2000,0.2000,0.9916,0.0429,-5.68,1.0164,0.0448,-6.30,0.4737,-0.1182,-14.29,2.084,2.5,25.82,18.56,16.82,16.85,

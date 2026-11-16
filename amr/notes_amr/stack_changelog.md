@@ -61,6 +61,62 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-16 (1) — 5-3 단일 축 기준 `shape:=line|rotate`
+- 왜: 체크리스트 5-3(한 축 폐루프)에 직선·제자리 회전 기준이 필요했다 (기준 노드는 8자만 냈다).
+- 바꾼 파일 (`controller/mpc`):
+  - `amr_mpc/core/segment.py` (새): `Segment` — line(출발 몸체 방향 `dir_deg` 로 `distance`, 사다리꼴 speed·accel, 헤딩 고정) /
+    rotate(제자리 `angle_deg`, 사다리꼴 yaw_rate·yaw_accel), `out_and_back` 이면 `pause_s` 쉬고 돌아옴. Figure8 과 같은 꼴(at·peak_load·path_xy·T_total).
+    자체 검산: 속도 vs 위치 유한차분 최대 차 ≤ 5e-12, 끝 위치 오차 0, 사다리꼴 시간 손계산과 같음(0.5 m·0.2 m/s·0.4 m/s² → 3.00 s)
+  - `nodes/figure8_reference.py`: 파라미터 `shape`, `seg_distance`, `seg_dir_deg`, `seg_angle_deg`, `seg_yaw_rate`, `seg_yaw_accel`, `seg_out_and_back`, `seg_pause_s`
+  - `launch/torque_experiment.launch.py` `_TRACK_KEYS`, `config/torque_track.yaml` 기본값(shape figure8 — 기존 동작 그대로)
+- 확인(시뮬, 도메인 88, `origin_mode:=robot`): B 로 앞 0.5·옆 0.3·대각 0.4 m (0.2 m/s)·회전 90° 완주, 위치 오차 최대 2.2~2.6 cm·끝 0.4~0.7 cm·헤딩 ≤ 0.6°.
+  C `mu_hat:=0.55`(τ_μ 0.1392) 로 앞 0.5 m (0.15 m/s)·회전 90° 완주, 상한 0.139 에 닿음. **실차 미확인.**
+
+### 2026-11-15 (4) — 측위 `translation_weight` 10 → 1 (빠를 때 SLAM 넘침)
+- 왜: 실차 5-2 에서 토크 0.15·0.2 로 빠르게 움직이면 SLAM·추정기가 수십 cm~1 m 틀렸다(줄자 50 cm 에 SLAM 101.6). Cartographer 가 직전 움직임으로
+  예측한 위치를 스캔-지도 맞춤보다 10 배 믿어서(Ceres 비용의 예측 이탈 가중 10), 급정지 뒤에도 1 s 넘게 "계속 달렸다".
+  bag 재생으로 설정을 하나씩 바꿔 원인을 이 값으로 좁혔다(IMU 예측 끔·스캔 누적 1 은 아님) — `analysis/torque_mpc_real/2026-11-15_basic/RESULTS_KO.md`.
+- 바꾼 파일:
+  - `perception/amr_perception_bringup/config/localization_torque_2d.lua` — `TRAJECTORY_BUILDER_2D.ceres_scan_matcher.translation_weight = 1.` (사용자가 직접 넣음).
+    `localization_torque_odom_2d.lua` 도 include 로 같이 바뀐다
+  - `controller/mpc/tools/slam_replay/variants/v_tw10.lua` (예전 값 비교용) 추가, `v_tw1.lua` 주석
+- 확인(재생, `tools/slam_replay`): 빠를 때 — fwd02 끝 49.9·넘침 50.2 cm (줄자 50, 이전 64.2·71.0), basic2 앞·뒤 8 번 IMU 와 1~3 cm·넘침 없음
+  (이전 최대 +185 cm). 느릴 때 — day1 손 밀기 16 표시가 이전 설정과 0.4 cm·0.2° 안에서 같음, 사람 옆 표시 0.7 → 0.2 cm.
+  **고침(같은 날 밤)**: 처음 넣을 때 `include "localization_2d.lua"` 와 `options.use_…` 두 줄이 두 번 들어가 Cartographer 가 시작하자마자 abort
+  (`Tried to include … twice`, af48c1b 에 들어간 상태) — 중복을 지웠다. 앞서 "설치본 43 행 확인"은 이 중복을 못 본 확인이었다.
+  **실차 확인**: 5-2 4-1 앞·뒤 × 0.15·0.2 에서 SLAM 넘침 0.5~1.6 cm, 앞 0.2 줄자 47.0 vs SLAM 48.4 cm (이전 설정 101.6) — `RESULTS_KO.md` "실차 확인".
+
+### 2026-11-15 (3) — bag 재생 도구 `tools/slam_replay/` (로봇 없이 측위 설정 비교)
+- 왜: 빠르게 움직일 때 SLAM 이 틀린 원인을 bag 재생으로 찾았는데(translation_weight), 그 스크립트가 세션 임시 폴더에 있다가 NUC 재부팅으로
+  지워졌다. 측위 설정을 바꿀 때마다 같은 방법으로 확인하려고 리포에 넣음(사용자 결정).
+- 바꾼 파일 (모두 새 파일, `controller/mpc/tools/slam_replay/`):
+  - `replay.sh` — bag 의 `/scan_front`·`/scan_rear` 로 `scan_sector_filter` 를 다시 돌리고, `/imu/base_link` → `/camera/imu` 로 축을 되돌리고,
+    `cartographer_node`(smoc_lab, frozen)를 준 설정으로 띄워 시작 위치를 넣은 뒤 재생. 도메인 89, 결과 `~/slam_replay_out/<라벨>/pose.csv`
+  - `imu_relay.py`, `set_init.py`(finish/start_trajectory), `pose_rec.py`, `compare.py`(토크 시험: 바퀴·IMU·기록 SLAM·재생 비교 /
+    손 밀기: `slam_mark` 표시마다 줄자와 비교)
+  - `variants/v_tw1.lua`(translation_weight 1), `v_noimu.lua`, `v_acc1.lua`
+- 확인: fwd02(줄자 50 cm) 재생 — 지금 설정 끝 64.2·넘침 71.0, v_tw1 끝 49.9·넘침 50.2 (어제 임시 스크립트 결과와 같음). 바퀴 48.4, IMU 47.9.
+
+### 2026-11-15 (2) — 기본 동작·SLAM 표시 도구: 메시지 시각 사용, 끝낼 때 core dump 고침
+- 왜: 5-2 4-1 첫 판에서 도구가 SLAM·추정기 값을 "받은 시각"으로 기록해 SLAM 지연(0.1~0.2 s)만큼 밀렸다 → 토크·제동 구간 해석이 틀어짐
+  (그 판의 "제동 중 몸체가 미끄러져 바퀴의 두 배를 갔다"는 해석은 틀렸고 실제로는 SLAM 오류였다 — `analysis/torque_mpc_real/2026-11-15_basic/RESULTS_KO.md`).
+  `q`·끝날 때 rclpy spin 스레드가 남아 "terminate called without an active exception" 으로 죽었다.
+- 바꾼 파일:
+  - `tools/basic_motion_test.py` — `/tracked_pose`·`/state_estimator/odom` 기록 시각을 header stamp 로, `--dirs` 경로는 executor 를 따로 두고 끝낼 때 shutdown·join
+  - `tools/slam_mark.py` — 같은 종료 처리
+- 확인: 문법, `slam_mark` 를 `q` 로 끝내 종료 코드 0. 4-1 두 번째 판(`fwdback2`)이 고친 도구로 기록됨.
+
+### 2026-11-15 (1) — 로봇 질량 4.0 (추정) → 4.56 kg (저울)
+- 왜: 체크리스트 7단계 m. 사용자가 저울로 잼(AK40 장착, 배터리 포함, 적재 없음). 4.0 은 1판 추정값이라 14 % 가벼웠다.
+  바닥 마찰 한계·C 상한·MPC 모델 질량이 모두 이 값에 기대므로 μ 측정 전에 바꿈(사용자 결정).
+- 바꾼 파일:
+  - `config/torque_plant.yaml` — body.mass_kg 4.56
+- 영향(계산): 바퀴당 수직력 N = m g/4 = 11.18 N (전 9.81). C 상한 τ_μ = (r/√2)·μ̂·N·c_s = 0.0759 N·m @ μ̂ 0.3 (전 0.0666).
+  μ 별 바퀴 미끄럼 시작 토크 μ·N·r: 0.1 → 0.045, 0.15 → 0.067, 0.2 → 0.089, 0.3 → 0.134 N·m.
+  시험 안의 0.0666 은 `mass=4.0` 을 직접 주거나(C++ TorqueModel 기본값) 1판 수치 예라 그대로.
+- 확인: 시험 Python 184·C++ 33 통과. 시뮬(NUC, 도메인 88) 플랜트 로그 "m=4.56 kg", MPC "τ_μ 0.0759 @ μ̂ 0.30".
+  B 12.73 mm·최대 36.2 (4.0 kg 일 때 같은 날 12.0~12.9), A 6.01 mm·최대 18.4 (5.1~6.3), B 0.3 m/s 12.63 mm·36.9 — 모두 완주.
+
 ### 2026-11-14 (8) — 측위 확인 도구 `check_localization.py`, 기본 동작 도구에 방향·크기·CSV
 - 왜: 2026-11-14 밤 첫 바닥 주행 전 측위가 가정값 (0, 0, 0°)에 머물러 있었다(원본 지도 겹침 20.8 %, 실제 1.3 m·64° 어긋남). 손 계산으로 찾아
   `/initialpose` 로 넣었는데 매번 할 일이라 도구로. 그리고 8자 run1 이 옆걸음 슬립으로 발산 → 사용자 제안으로 5단계를 기본 동작부터(체크리스트 5-0~5-4).

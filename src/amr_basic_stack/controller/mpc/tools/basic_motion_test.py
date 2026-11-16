@@ -30,6 +30,7 @@ import time
 
 import numpy as np
 import rclpy
+import rclpy.executors
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
@@ -71,8 +72,9 @@ class Tester(Node):
     def on_slam(self, m):
         q = m.pose.orientation
         yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
+        st = m.header.stamp.sec + m.header.stamp.nanosec * 1e-9   # 스캔 시각 (받은 시각은 SLAM 지연 0.1~0.2 s 만큼 늦다, 2026-11-15)
         with self.lock:
-            self.slam.append((time.time(), m.pose.position.x, m.pose.position.y, yaw))
+            self.slam.append((st if st > 0 else time.time(), m.pose.position.x, m.pose.position.y, yaw))
 
     def fit_rotation(self, t0, t1):
         """Pure rotation: p = c + R(θ) r  → least squares for c (map) and r (body offset of tracked point)."""
@@ -97,8 +99,9 @@ class Tester(Node):
         q = m.pose.pose.orientation
         yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
         t = m.twist.twist
+        st = m.header.stamp.sec + m.header.stamp.nanosec * 1e-9   # 추정값의 시각 (2026-11-15)
         with self.lock:
-            self.odom.append((time.time(), t.linear.x, t.linear.y, t.angular.z,
+            self.odom.append((st if st > 0 else time.time(), t.linear.x, t.linear.y, t.angular.z,
                               m.pose.pose.position.x, m.pose.pose.position.y, yaw))
 
     def on_wheels(self, m):
@@ -283,7 +286,10 @@ def main():
         p = TorquePlant.from_yaml()
         rclpy.init()
         node = Tester()
-        threading.Thread(target=rclpy.spin, args=(node,), daemon=True).start()
+        ex = rclpy.executors.SingleThreadedExecutor()
+        ex.add_node(node)
+        th = threading.Thread(target=ex.spin, daemon=True)
+        th.start()
         time.sleep(1.0)
         try:
             run_matrix(node, a, p)
@@ -292,8 +298,10 @@ def main():
         finally:
             node.hold(WheelTorqueCommand.MODE_DAMPING, [0, 0, 0, 0], 0.5)
             print("DAMPING 보냄. 끝.")
+            ex.shutdown()          # spin 스레드를 먼저 멈춘다 — 안 그러면 끝낼 때 "terminate called …" core dump (2026-11-15)
+            th.join(timeout=2.0)
             node.destroy_node()
-            rclpy.shutdown()
+            rclpy.try_shutdown()
         return
     motions = MOTIONS
     if a.only:
