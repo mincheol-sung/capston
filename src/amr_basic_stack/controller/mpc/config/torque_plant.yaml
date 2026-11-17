@@ -13,12 +13,14 @@
 #   - 외란 추정치 d̂            → torque_mpc.yaml (3단계에서 만든다, 기본 끔)
 # ===================================================================
 
-# ── 기하: 드라이버 twist_to_wheels 와 같은 값 (plant_wheel.yaml geometry 와 같다)
-#    ω_i = (v_x ± v_y ± k ω_z)/r,  k = (wheel_base + width)/2 = 0.19835 m
+# ── 기하: ω_i = (v_x ± v_y ± k ω_z)/r,  k = (wheel_base + width)/2 = 0.1945 m
+#    2026-11-17 AK40 모터 교체 뒤 실측 치수로 갱신 (전준민 실측): 앞뒤 축 간격 169 mm, 좌우 바퀴 간격 220 mm
+#    → lx 0.0845, ly 0.110 m. 이전 값 0.1897 / 0.207 (k 0.19835) 은 RoboClaw 시절 치수로,
+#    plant.yaml·plant_wheel.yaml(구조 A·B)·sys_id 에는 그대로 남아 있다. torque_mpc.hpp 기본값도 1판 수치 예 검산용으로 이전 값
 geometry:
   wheel_radius_m: 0.04
-  wheel_base_m:   0.1897
-  robot_width_m:  0.207
+  wheel_base_m:   0.169
+  robot_width_m:  0.220
 
 # ── 차체
 body:

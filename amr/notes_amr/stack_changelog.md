@@ -61,6 +61,20 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-17 (jjm) — 차체 기하를 AK40 교체 뒤 실측 치수로: 앞뒤 169 mm, 좌우 220 mm (k 0.19835 → 0.1945)
+- 왜: 모터를 AK40 으로 바꾸면서 바퀴 위치가 바뀌었다. **169 / 220 mm 는 실차 실측값**(전준민 실측·전달). 기존 0.1897 / 0.207 m 는 RoboClaw 시절 치수.
+  메카넘 기구학 T⁻¹ 의 회전 항 k = lx + ly 와 바퀴 관성 항 I_eff = I_z + μk² 가 이 값에 기댄다.
+- 바꾼 파일:
+  - `controller/mpc/config/torque_plant.yaml` — `wheel_base_m` 0.1897 → 0.169, `robot_width_m` 0.207 → 0.220 (lx 0.0845, ly 0.110, k 0.1945).
+    토크 MPC(C++ 노드도 이 파일을 읽음)·시뮬 플랜트·추정기·slip_logger·torque_output·도구가 모두 여기서 읽는다
+  - `sensors/amr_description/urdf/amr_basic.urdf` — 바퀴 joint 4 개 (±0.09491, ±0.10352) → (±0.0845, ±0.110). 센서 위치는 그대로
+- 안 바꾼 것: `mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp`·`wheel_mpc.hpp` 기본값(1판 수치 예 검산 시험이 기댐, 실행 땐 yaml 값),
+  `config/plant.yaml`·`plant_wheel.yaml`(구조 A·B), `controller/sys_id/`, `amcl_wiggle_node.py`, `tools/diag_fig8.py` 의 0.19835 — 모두 RoboClaw 시절 경로
+- 확인 (PC WSL): 모델 k = 0.1945 읽음, URDF `check_urdf` 통과, gtest torque 27·wheel 11 통과, pytest 227 중 실패 5 —
+  `test_can_setup` CRLF 4 개(Windows 체크아웃, 기존)와 `test_real_launch_does_not_start_nodes_if_setup_fails` `KeyError: 'controller'`
+  (이 변경 전 smc a48d513 에서도 같은 실패 — launch 의 `controller` 인자에 시험의 가짜 context 가 안 따라옴). 실차 미확인
+- 실차에서 볼 것: 제자리 회전 효율(11-15 4-4 0.98~1.05 는 옛 k 기준)·회전 중심, 시뮬 8자 B·A 오차 재기준
+
 ### 2026-11-16 (18) — 잘못된 yaw_mode·shape 을 launch 에서 거부, circles8 tangent 교차점 헤딩 완화 `crossing_blend_m`
 - 왜: 접선 판 분석 (`analysis/torque_mpc_real/2026-11-16_circles8/tools/crossing.py`·`halves.py`).
   ① `yaw_mode:=true` 로 띄운 판 6 개(142227, 185214, 185603, 185707, 185814, 185918)에서 figure8_reference_node 가 시작하자마자
