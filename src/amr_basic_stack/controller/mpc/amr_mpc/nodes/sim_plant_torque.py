@@ -87,6 +87,8 @@ class SimPlantTorqueNode(Node):
             ("sensor_seed", 0),
             ("surface_mu", -1.0),        # 바닥 마찰계수. ≤ 0 이면 슬립 없음 (기존 모델)
             ("slip_v_eps", 0.02),        # [m/s] 마찰력을 부드럽게 잇는 미끄럼 속도
+            ("floor_efficiency", [1.0, 1.0, 1.0]),   # 바닥 효율 [η_x, η_y, η_ψ] (model.py step eff, 슬립 없는 판만). 실차 5-2 (0.15 N·m 가속 맞춤): 0.65, 0.40, 0.40
+            ("wheel_efficiency", [1.0, 1.0, 1.0, 1.0]),   # 바퀴별 효율 [FL FR RL RR] (model.py step wheel_eff, 슬립 없는 판만)
             ("friction_scale", 1.0),     # 구동계 마찰 = torque_plant.yaml friction × 이 값. 0 이면 마찰 없음
             ("friction_smooth", 0.05),   # [rad/s] 쿨롱 마찰을 잇는 바퀴 속도 (작을수록 진짜 쿨롱에 가깝고 적분이 잘아진다)
             ("can_interface", ""),       # 비우면 ROS 토픽 모드. vcan0 등을 주면 가짜 AK40 모터 모드 (머리주석)
@@ -106,6 +108,14 @@ class SimPlantTorqueNode(Node):
         self.fric = DrivetrainFriction(fs * self.p.fric_coulomb, fs * self.p.fric_viscous, float(g("friction_smooth")))
         if not self.fric.active():
             self.fric = None
+        fe = [float(v) for v in g("floor_efficiency")]
+        self.eff = None if all(abs(v - 1.0) < 1e-9 for v in fe) else fe
+        we = [float(v) for v in g("wheel_efficiency")]
+        self.wheel_eff = None if all(abs(v - 1.0) < 1e-9 for v in we) else we
+        if self.wheel_eff is not None and float(g("surface_mu")) > 0:
+            raise SystemExit("[sim_plant_torque] wheel_efficiency 는 슬립 없는 판(surface_mu ≤ 0)에만")
+        if self.eff is not None and float(g("surface_mu")) > 0:
+            raise SystemExit("[sim_plant_torque] floor_efficiency 는 슬립 없는 판(surface_mu ≤ 0)에만 — 둘 중 하나만")
         self.slip = (SlipPlant(self.p, float(g("surface_mu")), float(g("slip_v_eps")), fric=self.fric)
                      if float(g("surface_mu")) > 0 else None)
         self.w = np.zeros(4)                                      # 슬립 모델의 바퀴 각속도
@@ -260,7 +270,7 @@ class SimPlantTorqueNode(Node):
             if self.slip is not None:
                 self.X, self.Xd, self.w = self.slip.step(self.X, self.Xd, self.w, tau, h)
             else:
-                self.X, self.Xd = self.p.step(self.X, self.Xd, tau, h, fric=self.fric)
+                self.X, self.Xd = self.p.step(self.X, self.Xd, tau, h, fric=self.fric, eff=self.eff, wheel_eff=self.wheel_eff)
             self.wheel_pos += 0.5 * h * (w_before + self._wheel_speeds())
         self.applied = tau
         self.can_lock.release()

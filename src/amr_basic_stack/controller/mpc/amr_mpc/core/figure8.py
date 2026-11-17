@@ -27,6 +27,20 @@
 #   "fixed"    헤딩 고정.  메카넘이므로 몸체를 안 돌리고 게걸음으로 8자를 그린다.  정렬 구간이
 #              필요 없고 ω≡0 이라 부하가 |vx|+|vy| 뿐이다.  헤딩 오차 없이 위치 추종만 보고 싶을 때.
 #
+# 두 원 8자 (curve="circles", 2026-11-16 사용자 요청 "로봇 기준 좌우 8자, 원 지름 1 m, 가로 2 m")
+#   반지름 R = width/4 인 원 두 개가 기동 포즈(교차점)에서 맞닿는다. 원 중심은 로컬 (0, +R)·(0, −R) —
+#   잎이 로봇의 왼쪽·오른쪽(로컬 y)으로 나가고, 교차점의 공통 접선이 로컬 x(앞)다. 경계상자 2R(앞뒤) × 4R(좌우).
+#     s ∈ [0, π)  : 왼쪽 원 반시계  φ = 2s       p = ( R sin φ,  R(1 − cos φ))   θ = φ
+#     s ∈ [π, 2π) : 오른쪽 원 시계  φ = 2(s−π)   p = ( R sin φ, −R(1 − cos φ))   θ = 4π − 2s
+#   |dp/ds| = 2R 로 일정 → 호길이 L = 4πR (한 바퀴). 곡률 +1/R → −1/R 로 교차점에서 계단처럼 바뀐다
+#   (Gerono 와 다른 점 — 교차점을 지날 때 구심 가속 v²/R 의 방향이 한 번에 뒤집힌다). 회전지수 0 으로 닫힌다.
+#
+# 교차점 헤딩 완화 (crossing_blend = Lb [m], circles + tangent 만, 기본 0 = 끔, 2026-11-16)
+#   tangent 면 기준 ω = κ·v 가 교차점에서 +v/R → −v/R 로 계단 → 요 가속이 충격이 되어 실차에서 교차점 ±0.6 s 오차가 2 배·상한 95~100 %.
+#   경로(위치)는 그대로 두고 헤딩만: 교차점 앞뒤 Lb/2 에서 헤딩 곡률을 σ/R → −σ/R 직선으로 잇는다.
+#   → 요 가속 최대 2v²/(R·Lb), 헤딩이 접선보다 최대 Lb/(4R) 덜 돈다 (그 구간 몸체 옆 속도 v·sin δ — 메카넘 게걸음).
+#   예: R 0.5, v 0.7, Lb 0.2 → 9.8 rad/s², 5.7°.  출발·끝 교차점(속도 0)은 건드리지 않는다.
+#
 # 출력 규약은 amr_interfaces/PlanarReference 와 같다: 포즈는 세계(odom)프레임, 속도는 몸체프레임.
 #
 #   python3 figure8.py       자기검사 (닫힘오차·유한차분 검산·부하·곡률)
@@ -84,7 +98,13 @@ def ramp_rate(tau, rate0, ramp_s):
 
 class Figure8:
     def __init__(self, width=1.4, height=0.8, speed=0.25, accel=0.4,
-                 laps=1.0, yaw_mode="tangent", align_s=1.5, samples=8000, lap_speeds=None):
+                 laps=1.0, yaw_mode="tangent", align_s=1.5, samples=8000, lap_speeds=None, curve="gerono",
+                 crossing_blend=0.0):
+        if curve not in ("gerono", "circles"):
+            raise ValueError(f"curve 는 gerono | circles (받은 값 {curve!r})")
+        self.curve = curve
+        if curve == "circles":
+            height = 0.5 * float(width)               # 원 지름 = width/2 (경계상자 앞뒤 길이)
         if width <= 0.0 or height <= 0.0:
             raise ValueError("width, height 는 양수")
         if speed <= 0.0 or accel <= 0.0:
@@ -106,11 +126,28 @@ class Figure8:
         #      (cos s=0 → cos 2s=−1) — 첨점 없는 정칙곡선이라 등속 재매개화가 성립한다.
         n = max(400, int(samples * self.laps)) + 1
         s = np.linspace(0.0, 2.0 * math.pi * self.laps, n)
-        sp = np.hypot(0.5 * self.W * np.cos(s), self.H * np.cos(2.0 * s))
         self.s_tab = s
-        self.arc_tab = np.concatenate(([0.0], np.cumsum(0.5 * (sp[1:] + sp[:-1]) * np.diff(s))))
+        if self.curve == "circles":
+            self.R = 0.25 * self.W
+            self.arc_tab = 2.0 * self.R * s                                   # |dp/ds| = 2R 로 일정
+            sm = np.mod(s, 2.0 * math.pi)                                     # 회전지수 0 → θ 는 바퀴마다 0 에서 다시 시작 (연속)
+            self.th_tab = np.where(sm < math.pi, 2.0 * sm, 4.0 * math.pi - 2.0 * sm)
+        else:
+            sp = np.hypot(0.5 * self.W * np.cos(s), self.H * np.cos(2.0 * s))
+            self.arc_tab = np.concatenate(([0.0], np.cumsum(0.5 * (sp[1:] + sp[:-1]) * np.diff(s))))
+            self.th_tab = np.unwrap(np.arctan2(self.H * np.cos(2.0 * s), 0.5 * self.W * np.cos(s)))
         self.L = float(self.arc_tab[-1])
-        self.th_tab = np.unwrap(np.arctan2(self.H * np.cos(2.0 * s), 0.5 * self.W * np.cos(s)))
+
+        # ---- 교차점 헤딩 완화 (circles + tangent 만, 2026-11-16). 위 머리주석 "교차점 헤딩 완화" 참고
+        self.Lb = float(crossing_blend) if (self.curve == "circles" and self.tangent) else 0.0
+        if self.Lb < 0.0 or (self.curve == "circles" and self.Lb >= 2.0 * math.pi * self.R):
+            raise ValueError(f"crossing_blend {crossing_blend} — 0 이상, 원 둘레 2πR 미만")
+        self.crossings = []                           # (호길이 ℓ_c, σ): 교차점 앞 곡률 σ/R → 뒤 −σ/R
+        if self.Lb > 0.0:
+            k = 1
+            while k * 2.0 * math.pi * self.R < self.L - 0.5 * self.Lb - 1e-9:
+                self.crossings.append((k * 2.0 * math.pi * self.R, 1.0 if k % 2 else -1.0))
+                k += 1
 
         # ---- 사다리꼴 속도 프로파일 (호길이 축)
         V, A = float(speed), float(accel)
@@ -130,10 +167,19 @@ class Figure8:
 
     # ---------- 곡선 ----------
     def _point(self, s):
+        if self.curve == "circles":
+            sm = s % (2.0 * math.pi)
+            if sm < math.pi:
+                phi = 2.0 * sm
+                return np.array([self.R * math.sin(phi), self.R * (1.0 - math.cos(phi))])
+            phi = 2.0 * (sm - math.pi)
+            return np.array([self.R * math.sin(phi), -self.R * (1.0 - math.cos(phi))])
         return np.array([0.5 * self.W * math.sin(s), 0.5 * self.H * math.sin(2.0 * s)])
 
     def _kappa(self, s):
         """부호 있는 곡률 κ = (x'y'' − y'x'') / |p'|³.   ω = κ·v."""
+        if self.curve == "circles":
+            return (1.0 if (s % (2.0 * math.pi)) < math.pi else -1.0) / self.R
         xp, yp = 0.5 * self.W * math.cos(s), self.H * math.cos(2.0 * s)
         xpp, ypp = -0.5 * self.W * math.sin(s), -2.0 * self.H * math.sin(2.0 * s)
         return (xp * ypp - yp * xpp) / (xp * xp + yp * yp) ** 1.5
@@ -188,6 +234,17 @@ class Figure8:
             return self.L - 0.5 * A * td * td, A * td
         return self.L, 0.0
 
+    def _heading_blend(self, ell):
+        """교차점 ±Lb/2 안이면 (헤딩 − 접선 δ, 헤딩 곡률 κ_h), 밖이면 (0, None).
+        u = ℓ − ℓ_c:  접선 θ_t = θ_c − σ|u|/R,  완화 κ_h = −2σu/(R·Lb) (곡률이 직선으로 σ/R → −σ/R)
+                      → θ_h = θ_c − σLb/(4R) − σu²/(R·Lb),  δ = θ_h − θ_t (양 끝 u = ±Lb/2 에서 0, 교차점에서 −σLb/(4R))."""
+        for lc, sg in self.crossings:
+            u = ell - lc
+            if abs(u) <= 0.5 * self.Lb:
+                d = -sg * self.Lb / (4.0 * self.R) - sg * u * u / (self.R * self.Lb) + sg * abs(u) / self.R
+                return d, -2.0 * sg * u / (self.R * self.Lb)
+        return 0.0, None
+
     def _spin(self, tau):
         """정렬 회전 스무스스텝. τ∈[0,1] → (각 α, 각속도 dα/dt).  양 끝에서 α'=0."""
         tau = min(max(tau, 0.0), 1.0)
@@ -209,6 +266,10 @@ class Figure8:
             p = self._point(s)
             th = float(np.interp(s, self.s_tab, self.th_tab))
             yl, wl = (th, self._kappa(s) * v) if self.tangent else (0.0, 0.0)
+            if self.Lb > 0.0:                                             # 교차점 헤딩 완화 — 경로(p, th)는 그대로
+                d, kh = self._heading_blend(sig)
+                if kh is not None:
+                    yl, wl = th + d, kh * v
         elif self.T_align > 0.0 and t < self.T_total:                     # 3) 역정렬 회전
             a, w = self._spin(1.0 - (t - self.T_align - self.T_path) / self.T_align)
             yl, wl = a, -w

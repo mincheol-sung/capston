@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""바닥 토크 스텝 시험 — 실차 한 터미널 (2026-11-17). torque_ramp.launch.py 와 같은 스택, 램프 대신 일정 토크.
+
+  real_all.launch.py use_mpc:=true controller:=step  (센서 · 측위 · CAN · 추정기 · torque_output · 게이트 · fault_monitor · bag)
+    torque_step_node: 'a' 누른 순간부터 바퀴–바닥 토크 τ_g = tau 를 일정하게 (+ 바퀴 관성 ff, torque_output 마찰 보상).
+    출발점에서 distance 만큼 가면 DAMPING + 무장 해제.
+
+사용 (NUC):  amrstep dir:=fwd  tau:=0.3 distance:=2.0 bag:=step_fwd
+             amrstep dir:=left tau:=0.3 distance:=2.0 bag:=step_left
+  tau·distance 는 꼭 준다. 'a' = 한 판, 끝나면 로봇을 되돌려 놓고 다시 'a'. 's'/스페이스 = 즉시 정지.
+  판마다 CSV: analysis/torque_mpc_real/<날짜>_step/step_<dir>_<tau>Nm_<시분초>_run<n>.csv
+  bag: bag:=<이름> → bags/<날짜>/<시분초>_<이름>
+"""
+import os
+import time
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+
+_ARGS = {  # 이 launch 인자 → real_all 인자, 기본값
+    "dir": ("step_dir", "fwd"), "tau": ("step_tau", ""), "distance": ("step_distance", ""),
+    "max_time": ("step_max_time", "5.0"), "inertia_ff": ("step_inertia_ff", "true"), "log_dir": ("step_log_dir", ""),
+    "bag": ("bag", ""), "stiction_comp": ("stiction_comp", ""),
+}
+
+
+def _include(context):
+    share = get_package_share_directory("amr_mpc")
+    ws = os.path.realpath(os.path.join(share, "..", "..", "..", ".."))
+    args = {"use_mpc": "true", "controller": "step"}
+    for k, (dst, _) in _ARGS.items():
+        v = LaunchConfiguration(k).perform(context).strip()
+        if v:
+            args[dst] = v
+    if args.get("step_dir") not in ("fwd", "left"):
+        raise RuntimeError(f"dir:={args.get('step_dir')!r} — fwd 또는 left")
+    if "step_tau" not in args or "step_distance" not in args:
+        raise RuntimeError("tau:=<N·m> 와 distance:=<m> 를 꼭 준다. 예) amrstep dir:=fwd tau:=0.3 distance:=2.0")
+    args.setdefault("step_log_dir",
+                    os.path.join(ws, "analysis", "torque_mpc_real", time.strftime("%Y-%m-%d") + "_step"))
+    src = PythonLaunchDescriptionSource(os.path.join(share, "launch", "real_all.launch.py"))
+    return [IncludeLaunchDescription(src, launch_arguments=args.items())]
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        *[DeclareLaunchArgument(k, default_value=d) for k, (_, d) in _ARGS.items()],
+        OpaqueFunction(function=_include),
+    ])

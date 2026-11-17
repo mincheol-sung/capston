@@ -40,10 +40,13 @@ setup(
             # 토크 MPC 스택 (구조도 v3)
             'sim_plant_torque_node = amr_mpc.nodes.sim_plant_torque:main',
             'torque_output_node = amr_mpc.nodes.torque_output:main',
+            'torque_ramp_node = amr_mpc.nodes.torque_ramp:main',          # 바닥 토크 램프 시험 (2026-11-17)
+            'torque_step_node = amr_mpc.nodes.torque_step:main',          # 바닥 토크 스텝 시험 (2026-11-17)
             'state_estimator_node = amr_mpc.nodes.state_estimator:main',
             'wheel_odometry_node = amr_mpc.nodes.wheel_odometry:main',
             'slip_logger_node = amr_mpc.nodes.slip_logger:main',
             'fault_monitor_node = amr_mpc.nodes.fault_monitor:main',
+            'torque_viz_node = amr_mpc.nodes.torque_viz:main',              # RViz 표시 전용 (map → base_footprint TF, 지나간 경로)
             # 비교군 A (퓨어 퍼슛 + 바퀴별 PI, 6단계)
             'pure_pursuit_node = amr_mpc.nodes.pure_pursuit:main',
             'wheel_pi_node = amr_mpc.nodes.wheel_pi:main',

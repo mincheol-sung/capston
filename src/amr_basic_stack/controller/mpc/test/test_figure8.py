@@ -165,3 +165,66 @@ def test_lap_speeds_absent_keeps_old_profile():
     b = Figure8(width=3.0, height=1.5, speed=0.5, accel=0.4, laps=2, lap_speeds=None)
     for t in np.linspace(0, a.T_total, 50):
         assert np.allclose(a.at(t)[0], b.at(t)[0]) and np.allclose(a.at(t)[1], b.at(t)[1])
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_circles8_two_tangent_circles_closed(mode):
+    """두 원 8자 (curve=circles, 2026-11-16): 지름 width/2 원 두 개가 교차점에서 맞닿고 좌우로 나간다, 닫힌다, 속도 = 포즈 미분."""
+    f = Figure8(width=2.0, speed=0.3, accel=0.4, yaw_mode=mode, curve="circles")
+    R = 0.5
+    assert f.L == pytest.approx(4 * math.pi * R, rel=1e-12)
+    xy = np.array(f.path_xy(n=4000))
+    left, right = xy[:2000], xy[2000:]
+    assert np.abs(np.hypot(left[:, 0], left[:, 1] - R) - R).max() < 1e-9      # 왼쪽 원 (중심 (0, +R))
+    assert np.abs(np.hypot(right[:, 0], right[:, 1] + R) - R).max() < 1e-9    # 오른쪽 원 (중심 (0, −R))
+    assert xy[:, 1].max() == pytest.approx(2 * R, abs=1e-4) and xy[:, 1].min() == pytest.approx(-2 * R, abs=1e-4)
+    assert f.at(1.0)[0][1] > 0.0                                             # 왼쪽 원 먼저
+    X0, _ = f.at(0.0); Xe, ue = f.at(f.T_total + 0.5)
+    assert np.hypot(*(Xe[:2] - X0[:2])) < 1e-9 and abs(wrap(Xe[2] - X0[2])) < 1e-9 and np.abs(ue).max() < 1e-12
+    h = 1e-4
+    for t in np.linspace(h, f.T_total - h, 800):
+        Xm, _ = f.at(t - h); Xp, _ = f.at(t + h); X, u = f.at(t)
+        c, s = math.cos(X[2]), math.sin(X[2])
+        assert np.allclose([c * u[0] - s * u[1], s * u[0] + c * u[1]], (Xp[:2] - Xm[:2]) / (2 * h), atol=1e-6)
+    if mode == "fixed":
+        assert max(abs(f.at(t)[1][2]) for t in np.linspace(0, f.T_total, 200)) == 0.0   # 헤딩 고정 → ω ≡ 0
+
+
+# ── circles8 교차점 헤딩 완화 (2026-11-16) ────────────────────────────────
+def _series(f, dt=0.001):
+    t = np.arange(0.0, f.T_total, dt)
+    X, U = zip(*(f.at(x) for x in t))
+    return t, np.array(X), np.array(U)
+
+
+def test_crossing_blend_zero_is_old_behavior():
+    kw = dict(width=2.0, speed=0.7, accel=0.4, yaw_mode="tangent", curve="circles")
+    _, X0, U0 = _series(Figure8(**kw), 0.01)
+    _, X1, U1 = _series(Figure8(**kw, crossing_blend=0.0), 0.01)
+    assert np.array_equal(X0, X1) and np.array_equal(U0, U1)
+
+
+def test_crossing_blend_limits_yaw_accel_keeps_path():
+    """Lb 0.2, v 0.7, R 0.5: ω 연속, 요 가속 최대 2v²/(R·Lb) = 9.8, 헤딩 최대 Lb/(4R) = 5.73°, 위치 경로 그대로, 유한차분 일치."""
+    kw = dict(width=2.0, speed=0.7, accel=0.4, yaw_mode="tangent", curve="circles")
+    t, X0, U0 = _series(Figure8(**kw))
+    _, XB, UB = _series(Figure8(**kw, crossing_blend=0.2))
+    assert np.max(np.abs(XB[:, :2] - X0[:, :2])) < 1e-12
+    assert np.max(np.abs(np.diff(U0[:, 2]))) > 2.0                       # 예전: 한 칸에 2.8 rad/s 계단
+    assert np.max(np.abs(np.diff(UB[:, 2])) / 0.001) == pytest.approx(9.8, rel=0.02)
+    dyaw = np.angle(np.exp(1j * (XB[:, 2] - X0[:, 2])))
+    assert np.max(np.abs(dyaw)) == pytest.approx(0.2 / (4 * 0.5), rel=0.01)
+    yaw = np.unwrap(XB[:, 2])
+    assert np.max(np.abs(np.gradient(yaw, t)[5:-5] - UB[5:-5, 2])) < 5e-3
+    c, s = np.cos(XB[:, 2]), np.sin(XB[:, 2])
+    vw = np.column_stack([c * UB[:, 0] - s * UB[:, 1], s * UB[:, 0] + c * UB[:, 1]])
+    assert np.max(np.abs(np.gradient(XB[:, :2], t, axis=0)[5:-5] - vw[5:-5])) < 2e-3
+
+
+def test_crossing_blend_only_circles_tangent_and_internal_crossings():
+    assert Figure8(width=2.0, yaw_mode="fixed", curve="circles", crossing_blend=0.2).Lb == 0.0
+    assert Figure8(width=3.0, height=1.5, yaw_mode="tangent", crossing_blend=0.2).Lb == 0.0      # Gerono 는 곡률 연속
+    f = Figure8(width=2.0, laps=2, yaw_mode="tangent", curve="circles", crossing_blend=0.2)
+    assert [c[1] for c in f.crossings] == [1.0, -1.0, 1.0]                                      # 출발·끝(속도 0) 은 빼고
+    with pytest.raises(ValueError):
+        Figure8(width=2.0, yaw_mode="tangent", curve="circles", crossing_blend=-0.1)
