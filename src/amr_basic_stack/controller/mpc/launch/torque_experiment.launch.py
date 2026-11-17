@@ -106,7 +106,8 @@ def _nodes(context):
     source, slam_mode = g("state_source"), g("slam_mode")
     state_topic = g("state_topic") or ("/state_estimator/odom" if source == "estimator" else "/sim/ground_truth")
     nodes = []
-    if _truthy(g("use_mpc")) and _truthy(g("use_figure8")):
+    use_ref = _truthy(g("use_figure8")) and g("controller") != "ramp"   # 램프는 기준궤적 없이 (2026-11-17)
+    if _truthy(g("use_mpc")) and use_ref:
         _track(context, share)                        # 잘못된 yaw_mode·shape·origin_mode 면 CAN 준비·노드보다 먼저 멈춘다
     # Run before returning any motor/controller actions. Never runs for simulation.
     if plant == "real":
@@ -209,7 +210,7 @@ def _nodes(context):
         return nodes
 
     # ── 기준궤적: 8자 시간 기준 (기동 포즈가 교차점)
-    if _truthy(g("use_figure8")):
+    if use_ref:
         nodes.append(Node(
             package="amr_mpc", executable="figure8_reference_node", name="figure8_reference_node", output="screen",
             parameters=[{
@@ -270,8 +271,24 @@ def _nodes(context):
             package="amr_mpc", executable="wheel_pi_node", name="wheel_pi_node", output="screen",
             parameters=[{"armed_topic": "/mpc/armed"}]))
         torque_in, track_status = "/wheel_pi/cmd_raw", "/pure_pursuit/status"
+    elif controller == "ramp":
+        # 바닥 토크 램프 시험 (2026-11-17, torque_ramp.py): MPC 자리에서 τ* = τ_g + 관성 ff 를 /torque_mpc/cmd_raw 로.
+        # 뒤(torque_output 마찰 보상·게이트·fault_monitor)는 MPC 와 같다
+        ramp = {"state_topic": state_topic, "direction": g("ramp_dir") or "fwd"}
+        for arg, par in (("ramp_tau_max", "tau_max"), ("ramp_rate", "rate"), ("ramp_distance", "distance"),
+                         ("ramp_stop_distance", "stop_distance"), ("mu_hat", "mu_hat")):
+            if g(arg):
+                ramp[par] = float(g(arg))
+        if g("ramp_inertia_ff"):
+            ramp["inertia_ff"] = _truthy(g("ramp_inertia_ff"))
+        if g("ramp_log_dir"):
+            ramp["log_dir"] = g("ramp_log_dir")
+        nodes.append(Node(
+            package="amr_mpc", executable="torque_ramp_node", name="torque_ramp_node", output="screen",
+            parameters=[ramp]))
+        torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"
     else:
-        raise RuntimeError(f"controller:={controller!r} — mpc 또는 pure_pursuit")
+        raise RuntimeError(f"controller:={controller!r} — mpc, pure_pursuit 또는 ramp")
 
     # 정지 마찰 보상 (2026-11-16): auto = 실차에서만. 시뮬 플랜트에는 정지 마찰이 없어 켜면 없는 마찰을 보상하게 된다
     stiction = g("stiction_comp")
@@ -354,8 +371,16 @@ def generate_launch_description():
                       "제어기는 M 에 m_w 를 늘 넣는다"),
         A("use_w", default_value="",
           description="제어기 w 항 (식-6) true/false. 비우면 torque_mpc.yaml model_terms.use_w (기본 false, 2026-11-16 지시서)"),
-        A("controller", default_value="mpc", choices=["mpc", "pure_pursuit"],
-          description="mpc = torque_mpc_node (비교군 B·C), pure_pursuit = 퓨어 퍼슛 + 바퀴별 PI (비교군 A)"),
+        A("controller", default_value="mpc", choices=["mpc", "pure_pursuit", "ramp"],
+          description="mpc = torque_mpc_node (비교군 B·C), pure_pursuit = 퓨어 퍼슛 + 바퀴별 PI (비교군 A), "
+                      "ramp = 바닥 토크 램프 시험 torque_ramp_node (8자 기준 없음)"),
+        A("ramp_dir", default_value="", description="ramp: fwd (직진) | left (왼쪽 90°). 비우면 fwd"),
+        A("ramp_tau_max", default_value="", description="ramp: 바퀴–바닥 토크 끝값 [N·m] (기본 1.0)"),
+        A("ramp_rate", default_value="", description="ramp: 기울기 [N·m/s]. 비우면 ramp_distance·mu_hat 로 자동"),
+        A("ramp_distance", default_value="", description="ramp: 자동 기울기의 목표 이동 거리 [m] (기본 3.0)"),
+        A("ramp_stop_distance", default_value="", description="ramp: 이만큼 가면 끊음 [m] (기본 1.15 × ramp_distance)"),
+        A("ramp_inertia_ff", default_value="", description="ramp: 바퀴 관성 feedforward true/false (기본 true)"),
+        A("ramp_log_dir", default_value="", description="ramp: 판마다 CSV 폴더 (비우면 안 남김)"),
         A("limit_mode", default_value="", description="motor_only(B) | friction(C) (YAML 기본 motor_only)"),
         A("disturbance", default_value="", description="외란 추정치 d̂ true/false (YAML 기본 false)"),
         A("linearization", default_value="", description="reference | current_state (YAML 기본 reference)"),

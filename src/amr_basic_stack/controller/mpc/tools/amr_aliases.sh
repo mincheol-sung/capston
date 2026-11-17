@@ -17,9 +17,11 @@
 #   amrmu   [인자...]        바닥 μ̂ 토크 램프 시험 (MPC 없을 때만)          T1  mu_ramp_test.py
 #   amrviz  [인자...]        RViz (랩 PC 에서)                               torque_viz.launch.py
 #   amrall  [인자...]        위 센서·측위·CAN(+MPC)·표시·측위 맞추기를 터미널 하나로 (bag:=true 면 녹화도, 폴더 이름 자동)   real_all.launch.py
+#   amrramp [인자...]        바닥 토크 램프 (amrall 스택 + MPC 대신 램프, dir:=fwd|left mu_hat:= bag:=true)  torque_ramp.launch.py
 #   amrhelp                  이 표
 #   예) amrmpc shape:=line seg_distance:=0.4 seg_dir_deg:=45 speed:=0.10 limit_mode:=friction mu_hat:=0.55
 #       amrmove --dirs fwd,back --amps 0.1 --time 0.5
+#       amrramp dir:=left mu_hat:=0.6 bag:=ramp_left
 #       amrmu --dirs fwd,back,left,right,fl --repeat 3 --csv ~/capston/capston/analysis/torque_mpc_real/2026-11-17_mu/ramp1
 #
 # 컴퓨터마다 다른 값 (source 전에 export 하면 바뀐다)
@@ -65,7 +67,8 @@ amrmove()   ( _amr_env && cd "$AMR_MPC_DIR" && exec /usr/bin/python3 tools/basic
 amrmu()     ( _amr_env && cd "$AMR_MPC_DIR" && exec /usr/bin/python3 tools/mu_ramp_test.py "$@" )   # 2026-11-16 바닥 μ̂
 amrviz()    ( _amr_env && exec ros2 launch amr_mpc torque_viz.launch.py "$@" )
 amrall()    ( _amr_env && sudo -v && exec ros2 launch amr_mpc real_all.launch.py "$@" )   # 2026-11-16 터미널 하나로
+amrramp()   ( _amr_env && sudo -v && exec ros2 launch amr_mpc torque_ramp.launch.py "$@" )   # 2026-11-17 바닥 토크 램프
 amrrec() (   # 이름 생략 가능 — 폴더는 record_all.sh 가 bags/<날짜>/<시분초>[_이름] 로 정한다
   _amr_env && exec bash "$AMR_MPC_DIR/tools/record_all.sh" "${1:-}" "amrrec $*"
 )
-amrhelp() { sed -n '6,23p' "$AMR_MPC_DIR/tools/amr_aliases.sh" | sed 's/^# \{0,1\}//'; }
+amrhelp() { sed -n '6,25p' "$AMR_MPC_DIR/tools/amr_aliases.sh" | sed 's/^# \{0,1\}//'; }
