@@ -106,7 +106,7 @@ def _nodes(context):
     source, slam_mode = g("state_source"), g("slam_mode")
     state_topic = g("state_topic") or ("/state_estimator/odom" if source == "estimator" else "/sim/ground_truth")
     nodes = []
-    use_ref = _truthy(g("use_figure8")) and g("controller") != "ramp"   # 램프는 기준궤적 없이 (2026-11-17)
+    use_ref = _truthy(g("use_figure8")) and g("controller") not in ("ramp", "step")   # 램프·스텝은 기준궤적 없이 (2026-11-17)
     if _truthy(g("use_mpc")) and use_ref:
         _track(context, share)                        # 잘못된 yaw_mode·shape·origin_mode 면 CAN 준비·노드보다 먼저 멈춘다
     # Run before returning any motor/controller actions. Never runs for simulation.
@@ -287,8 +287,22 @@ def _nodes(context):
             package="amr_mpc", executable="torque_ramp_node", name="torque_ramp_node", output="screen",
             parameters=[ramp]))
         torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"
+    elif controller == "step":
+        # 바닥 토크 스텝 시험 (2026-11-17, torque_step.py): τ* = (I + K)·tau·pattern 일정, distance 가면 정지
+        step = {"state_topic": state_topic, "direction": g("step_dir") or "fwd"}
+        for arg, par in (("step_tau", "tau"), ("step_distance", "distance"), ("step_max_time", "max_time")):
+            if g(arg):
+                step[par] = float(g(arg))
+        if g("step_inertia_ff"):
+            step["inertia_ff"] = _truthy(g("step_inertia_ff"))
+        if g("step_log_dir"):
+            step["log_dir"] = g("step_log_dir")
+        nodes.append(Node(
+            package="amr_mpc", executable="torque_step_node", name="torque_step_node", output="screen",
+            parameters=[step]))
+        torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"
     else:
-        raise RuntimeError(f"controller:={controller!r} — mpc, pure_pursuit 또는 ramp")
+        raise RuntimeError(f"controller:={controller!r} — mpc, pure_pursuit, ramp 또는 step")
 
     # 정지 마찰 보상 (2026-11-16): auto = 실차에서만. 시뮬 플랜트에는 정지 마찰이 없어 켜면 없는 마찰을 보상하게 된다
     stiction = g("stiction_comp")
@@ -371,15 +385,21 @@ def generate_launch_description():
                       "제어기는 M 에 m_w 를 늘 넣는다"),
         A("use_w", default_value="",
           description="제어기 w 항 (식-6) true/false. 비우면 torque_mpc.yaml model_terms.use_w (기본 false, 2026-11-16 지시서)"),
-        A("controller", default_value="mpc", choices=["mpc", "pure_pursuit", "ramp"],
+        A("controller", default_value="mpc", choices=["mpc", "pure_pursuit", "ramp", "step"],
           description="mpc = torque_mpc_node (비교군 B·C), pure_pursuit = 퓨어 퍼슛 + 바퀴별 PI (비교군 A), "
-                      "ramp = 바닥 토크 램프 시험 torque_ramp_node (8자 기준 없음)"),
+                      "ramp = 바닥 토크 램프 시험 torque_ramp_node, step = 스텝 시험 torque_step_node (8자 기준 없음)"),
         A("ramp_dir", default_value="", description="ramp: fwd (직진) | left (왼쪽 90°). 비우면 fwd"),
         A("ramp_tau_max", default_value="", description="ramp: 바퀴–바닥 토크 끝값 [N·m] (기본 1.0)"),
         A("ramp_rate", default_value="", description="ramp: 기울기 [N·m/s]. 비우면 ramp_distance·mu_hat 로 자동"),
         A("ramp_distance", default_value="", description="ramp: 자동 기울기의 목표 이동 거리 [m] (기본 3.0)"),
         A("ramp_stop_distance", default_value="", description="ramp: 이만큼 가면 끊음 [m] (기본 1.15 × ramp_distance)"),
         A("ramp_inertia_ff", default_value="", description="ramp: 바퀴 관성 feedforward true/false (기본 true)"),
+        A("step_dir", default_value="", description="step: fwd | left (비우면 fwd)"),
+        A("step_tau", default_value="", description="step: 바퀴–바닥 토크 τ_g [N·m] (꼭 준다)"),
+        A("step_distance", default_value="", description="step: 끊는 이동 거리 [m] (꼭 준다)"),
+        A("step_max_time", default_value="", description="step: 최대 시간 [s] (기본 5)"),
+        A("step_inertia_ff", default_value="", description="step: 바퀴 관성 feedforward true/false (기본 true)"),
+        A("step_log_dir", default_value="", description="step: 판마다 CSV 폴더 (비우면 안 남김)"),
         A("ramp_log_dir", default_value="", description="ramp: 판마다 CSV 폴더 (비우면 안 남김)"),
         A("limit_mode", default_value="", description="motor_only(B) | friction(C) (YAML 기본 motor_only)"),
         A("disturbance", default_value="", description="외란 추정치 d̂ true/false (YAML 기본 false)"),
