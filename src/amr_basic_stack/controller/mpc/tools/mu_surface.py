@@ -9,10 +9,12 @@
   # 한 노면 정리 (mu_ramp_test.py 의 _summary.csv 여러 개, torque_ramp_node CSV 도 섞어도 된다)
   python3 tools/mu_surface.py summarize --surface lab_floor \\
       --summary analysis/torque_mpc_real/2026-11-18_mu/lab_*_summary.csv \\
-      [--ramp-node analysis/torque_mpc_real/2026-11-17_ramp/ramp_*.csv] [--min-runs 5] [--main-dirs fwd,back] \\
+      [--ramp-node analysis/torque_mpc_real/2026-11-17_ramp/ramp_*.csv] \\
+      [--sliding analysis/torque_mpc_real/2026-11-18_step/step_*.csv] [--min-runs 5] [--main-dirs fwd,back] \\
       [--note "…"] [--write]
 
   # 바퀴별 마찰 상한 배율 (차체 값, torque_plant.yaml surface.wheel_limit_scale)
+  python3 tools/mu_surface.py wheels --front 2250 --left 2240 [--total 4560] …   # 저울 1 개: 앞 두 바퀴 합·왼쪽 두 바퀴 합
   python3 tools/mu_surface.py wheels --loads 1050,1180,1220,1110 \\
       [--ramp-node analysis/torque_mpc_real/2026-11-18_ramp/ramp_*.csv] [--motor-gain …] [--mu 0.4]
 
@@ -63,12 +65,20 @@ def cmd_summarize(a):
         runs += S.read_mu_ramp_summary(f)
         sources.append(os.path.relpath(f))
         methods.append("mu_ramp_test")
-    for f in _expand(a.ramp_node):
+    ramp_files, slide_files = _expand(a.ramp_node), _expand(a.sliding)
+    both = set(map(os.path.abspath, ramp_files)) & set(map(os.path.abspath, slide_files))
+    if both:
+        sys.exit(f"같은 파일을 --ramp-node 와 --sliding 에 같이 주면 두 번 센다: {sorted(both)[:3]}")
+    for f in ramp_files:
         runs.append(S.analyze_ramp_node_csv(f, plant))
         sources.append(os.path.relpath(f))
         methods.append("torque_ramp_node(오프라인 판정)")
+    for f in slide_files:
+        runs.append(S.analyze_sliding_csv(f, plant))
+        sources.append(os.path.relpath(f))
+        methods.append("미끄러지는 구간 가속(step·ramp CSV)")
     if not runs:
-        sys.exit("--summary 나 --ramp-node 로 기록을 줄 것")
+        sys.exit("--summary · --ramp-node · --sliding 중 하나로 기록을 줄 것")
     main_dirs = tuple(x.strip() for x in a.main_dirs.split(",") if x.strip())
     stats, rec = S.summarize(runs, main_dirs=main_dirs, min_runs=a.min_runs)
 
@@ -109,6 +119,16 @@ def _four(text, name):
 def cmd_wheels(a):
     plant = TorquePlant.from_yaml()
     loads, gain = _four(a.loads, "--loads"), _four(a.motor_gain, "--motor-gain")
+    if a.front is not None or a.left is not None:
+        if loads or a.front is None or a.left is None:
+            sys.exit("--front 와 --left 를 같이 준다 (--loads 와는 따로). 전체는 --total (비우면 torque_plant.yaml 질량)")
+        total = a.total if a.total is not None else plant.mass * 1000.0
+        try:
+            loads = S.plane_loads(total, a.front, a.left)
+        except ValueError as e:
+            sys.exit(str(e))
+        print(f"쌍 합 → 바퀴별 (대각 쏠림 0 가정): 전체 {total:g}, 앞 {a.front:g} ({a.front / total:.1%}), "
+              f"왼쪽 {a.left:g} ({a.left / total:.1%}) → " + "  ".join(f"{w} {x:.0f}" for w, x in zip(S.WHEELS, loads)))
     onsets = []
     for f in _expand(a.ramp_node):
         o = S.wheel_slip_onsets(f, plant)
@@ -146,12 +166,17 @@ def main():
     s.add_argument("--surface", required=True, help="노면 이름 (영문·숫자·_ , 예: lab_floor, lab_carpet)")
     s.add_argument("--summary", nargs="*", help="mu_ramp_test.py 의 *_summary.csv (glob 가능)")
     s.add_argument("--ramp-node", nargs="*", dest="ramp_node", help="torque_ramp_node 의 ramp_*.csv (glob 가능)")
+    s.add_argument("--sliding", nargs="*", help="torque_step_node 의 step_*.csv (ramp_*.csv 도 가능) — 바퀴가 몸체보다 "
+                                                "0.3 m/s 넘게 빠른 구간의 몸체 가속으로 μ̂. 같은 파일을 --ramp-node 와 같이 주지 말 것")
     s.add_argument("--main-dirs", default=",".join(S.MAIN_DIRS), help="대표값을 정하는 방향 (기본 fwd,back)")
     s.add_argument("--min-runs", type=int, default=5, help="주 방향마다 필요한 슬립 확인 판 수")
     s.add_argument("--note", default="", help="표에 남길 메모 (바닥 상태·날짜·배터리 등)")
     s.add_argument("--write", action="store_true", help="config/surfaces.yaml 에 쓴다")
     w = sub.add_parser("wheels", help="바퀴별 마찰 상한 배율 (하중 + 바퀴별 램프 슬립 시작)")
     w.add_argument("--loads", default="", help="바퀴별 하중 FL,FR,RL,RR (g 이든 kg 이든 같은 단위로)")
+    w.add_argument("--front", type=float, default=None, help="저울 1 개: 앞 두 바퀴 합 (g). --left 와 같이")
+    w.add_argument("--left", type=float, default=None, help="저울 1 개: 왼쪽 두 바퀴 합 (g)")
+    w.add_argument("--total", type=float, default=None, help="전체 무게 (g). 비우면 torque_plant.yaml 질량")
     w.add_argument("--ramp-node", nargs="*", dest="ramp_node", help="torque_ramp_node 의 ramp_*.csv (glob 가능) — 검산용")
     w.add_argument("--motor-gain", default="", dest="motor_gain", help="실제 토크/명령 FL,FR,RL,RR (모르면 비움 = 1)")
     w.add_argument("--mu", type=float, default=None, help="τ̄ 를 보여 줄 μ̂ (비우면 torque_plant.yaml)")

@@ -148,6 +148,51 @@ def analyze_ramp_node_csv(path, plant, slip=0.12, slip_frac=0.15, persist_s=0.05
     return out
 
 
+def analyze_sliding_csv(path, plant, gap_min=0.30, gap_frac=0.20, min_n=8, min_r2=0.9):
+    """torque_step_node(step_…csv)·torque_ramp_node(ramp_…csv) 한 판 → 판 결과 dict (2026-11-18).
+
+    바퀴가 몸체보다 확실히 빨리 도는 구간 — v_wheel − v_est > gap_min 이고 > gap_frac·|v_wheel| — 중 가장 긴 연속 구간의
+    몸체 속도 기울기 a 로 μ̂ (운동 마찰). 스텝은 처음부터 네 바퀴가 헛돌아 바퀴가 속도 한계(≈ 1.6 m/s)에 먼저 닿고 몸체가
+    마찰로 따라붙는다 → 차이가 줄어드는 쪽이라 analyze_ramp_node_csv 의 "더 벌어짐" 확인으로는 늘 버려진다. 그래서 따로 둔다.
+    구간이 min_n 표본보다 짧거나 직선 맞춤 R² < min_r2 면 unconfirmed. 슬립이 없는 판은 이 방법으로 하한을 내지 않는다.
+    """
+    name = os.path.basename(path)
+    direction = next((k for k in DIR_VEC if f"_{k}_" in name), None)
+    if direction is None:
+        raise ValueError(f"{name}: 파일 이름에서 방향(fwd·back·left·right…)을 못 찾았다")
+    u = np.array(DIR_VEC[direction])
+    rows = list(csv.DictReader(open(path)))
+
+    def col(k):
+        return np.array([float(r[k]) if r[k] not in ("", "nan") else np.nan for r in rows])
+    t, vw, ve = col("t"), col("v_wheel_dir"), col("v_est_dir")
+    tau = col("tau_g") if "tau_g" in rows[0] else np.full(len(t), np.nan)
+    ok = np.isfinite(t) & np.isfinite(vw) & np.isfinite(ve)
+    t, vw, ve, tau = t[ok], vw[ok], ve[ok], tau[ok]
+    gap = vw - ve
+    out = {"source": name, "dir": direction, "result": "unconfirmed", "mu": float("nan"), "tau_slip": float("nan"),
+           "t_slip": float("nan"), "v_slip": float("nan"), "gap_grow": float("nan"), "r2": float("nan"), "n": 0}
+    s = (gap > gap_min) & (gap > gap_frac * np.abs(vw)) & (t > t[0] + 0.02)
+    idx = np.flatnonzero(s)
+    if len(idx) == 0:
+        return out
+    blocks = np.split(idx, np.flatnonzero(np.diff(idx) > 1) + 1)
+    b = max(blocks, key=len)
+    out.update(n=int(len(b)), t_slip=float(t[b[0]] - t[0]), v_slip=float(vw[b[0]]), tau_slip=float(tau[b[0]]),
+               gap_grow=float(gap[b[-1]] - gap[b[0]]))
+    if len(b) < min_n:
+        return out
+    tt, vv = t[b] - t[b[0]], ve[b]
+    k, c0 = np.polyfit(tt, vv, 1)
+    ss = float(np.sum((vv - vv.mean()) ** 2))
+    out["r2"] = 1.0 - float(np.sum((vv - (k * tt + c0)) ** 2)) / ss if ss > 0 else float("nan")
+    if not (out["r2"] >= min_r2) or k <= 0:
+        return out
+    out["result"] = "slip"
+    out["mu"] = mu_from_accel(float(k) * u, plant)
+    return out
+
+
 def read_mu_ramp_summary(path):
     """tools/mu_ramp_test.py --csv … 의 _summary.csv → 판 결과 dict 목록."""
     out = []
@@ -241,6 +286,21 @@ def wheel_slip_onsets(path, plant, gap=0.10, gap_frac=0.15, persist=5):
     return out
 
 
+def plane_loads(total, front, left):
+    """저울 1 개로 잰 쌍 합 → 바퀴별 하중 [FL, FR, RL, RR] (평평한 바닥, 차체 비틀림 없음 가정).
+    total = 전체, front = 앞 두 바퀴 합, left = 왼쪽 두 바퀴 합 (같은 단위).
+    네 바퀴 하중은 N = A + B·(앞 +1/뒤 −1) + C·(왼 +1/오 −1) + D·(앞뒤 × 좌우) 꼴인데, 무게중심이 정하는 A·B·C 는 쌍 합으로
+    정해지고 받침 높이 몇 mm 에 거의 안 흔들린다. 대각 성분 D 는 받침·바닥 높이에 민감해서 저울로는 못 정한다 → D = 0 으로 두고
+    실제 바닥의 대각 쏠림은 바퀴별 램프 슬립 시작으로 본다."""
+    total, front, left = float(total), float(front), float(left)
+    if not (total > 0 and 0 < front < total and 0 < left < total):
+        raise ValueError("0 < 앞 합, 왼쪽 합 < 전체 여야 한다")
+    A = total / 4.0
+    B = (front - total / 2.0) / 2.0
+    C = (left - total / 2.0) / 2.0
+    return [A + B + C, A + B - C, A - B + C, A - B - C]
+
+
 def wheel_scale(loads=None, onsets=None, motor_gain=None):
     """바퀴별 배율 추천.
     loads: [FL, FR, RL, RR] 무게 (단위 상관없음) → s_i = (N_i/N̄)/g_i  (주 방법)
@@ -265,7 +325,7 @@ def wheel_scale(loads=None, onsets=None, motor_gain=None):
             light = WHEELS[int(np.argmin(s))]
             if first != light:
                 warnings.append(f"하중으로는 {light} 가 가장 약한데 램프에서는 {first} 가 가장 자주 미끄러졌다 — "
-                                "롤러·접지 상태나 모터 차이 의심 (모터 비 측정 권장)")
+                                "바닥·차체의 대각 쏠림(저울로는 안 보임)이나 롤러·모터 차이 의심. 램프 판을 늘려 확인")
     elif onsets:
         known = {w: m for w, (n, m) in onset.items() if m is not None}
         if len(known) < 2:

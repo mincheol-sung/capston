@@ -78,6 +78,41 @@ def test_direction_from_filename_required(tmp_path):
         S.analyze_ramp_node_csv(str(f), TorquePlant.from_yaml())
 
 
+def fake_step_csv(path, mu, v_cap=1.6, spin_up=0.15, dt=0.01, T=1.5, noise=0.0, seed=0):
+    """torque_step_node 꼴 CSV: 바퀴는 spin_up 초에 속도 한계 v_cap 까지 헛돌고, 몸체는 μ g/√2 로 따라붙는다 (11-17 실차 모양)."""
+    rng = np.random.default_rng(seed)
+    a = mu * G / math.sqrt(2.0)
+    rows, vb = [], 0.0
+    for k in range(int(T / dt)):
+        t = k * dt
+        vw = min(v_cap, v_cap * t / spin_up)
+        vb = min(vw, vb + a * dt)
+        rows.append({"t": f"{t:.4f}", "phase": "step", "tau_g": "0.30000", "v_wheel_dir": f"{vw:.5f}",
+                     "v_est_dir": f"{vb + noise * rng.standard_normal():.5f}"})
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w.writeheader()
+        w.writerows(rows)
+    return path
+
+
+@pytest.mark.parametrize("mu", [0.3, 0.5])
+def test_sliding_step_recovers_mu(tmp_path, mu):
+    p = TorquePlant.from_yaml()
+    f = fake_step_csv(tmp_path / f"step_fwd_0.3Nm_{int(mu*100)}_run1.csv", mu, noise=0.005)
+    r = S.analyze_sliding_csv(str(f), p)
+    assert r["result"] == "slip" and r["dir"] == "fwd"
+    assert abs(r["mu"] - mu) / mu < 0.05
+    assert r["r2"] > 0.95 and r["n"] >= 8
+
+
+def test_sliding_no_slide_is_unconfirmed(tmp_path):
+    p = TorquePlant.from_yaml()
+    f = fake_step_csv(tmp_path / "step_left_0.1Nm_x_run1.csv", mu=50.0)       # 몸체가 바퀴를 바로 따라간다
+    r = S.analyze_sliding_csv(str(f), p)
+    assert r["dir"] == "left" and r["result"] == "unconfirmed" and r["n"] == 0
+
+
 def _runs(d, mus, result="slip"):
     return [{"source": "x", "dir": d, "result": result, "mu": m} for m in mus]
 
@@ -125,6 +160,17 @@ def test_wheel_scale_from_loads_and_motor_gain():
         S.wheel_scale()
     with pytest.raises(ValueError):
         S.wheel_scale(loads=[1, 2, 3])
+
+
+def test_plane_loads_from_pair_sums():
+    L = S.plane_loads(4560, front=2160, left=2380)            # 뒤·왼쪽이 무겁다
+    assert sum(L) == pytest.approx(4560)
+    assert L[0] + L[1] == pytest.approx(2160) and L[0] + L[2] == pytest.approx(2380)
+    assert L[0] + L[3] == pytest.approx(L[1] + L[2])          # 대각 쏠림 0
+    assert np.argmax(L) == 2                                  # RL 이 가장 무겁다
+    assert S.plane_loads(4000, 2000, 2000) == [1000.0] * 4
+    with pytest.raises(ValueError):
+        S.plane_loads(4560, 4560, 2280)
 
 
 def test_wheel_scale_from_onsets_only_lowers_and_warns_on_mismatch():

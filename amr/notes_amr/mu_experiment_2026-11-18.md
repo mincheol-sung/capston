@@ -9,7 +9,7 @@ NUC `smoc@192.168.0.132`, 팀 체크아웃 `~/capston/capston` (smc a48d513) 의
 | ① | 앞·뒤 램프 (`amrmu`) | 노면 μ̂ (뒤 방향 포함) | 20분 |
 | ② | 스텝 (`amrstep`) | 노면 μ̂ (가장 깨끗한 방법) | 15분 |
 | ③ | 느린 램프 (`amrramp`) | **바퀴별로 먼저 미끄러지는 순서·토크** | 15분 |
-| ④ | 바퀴별 하중 (저울) | **바퀴별 무게 N_i** | 10분 |
+| ④ | 바퀴 쌍 하중 (저울 1개) | **앞뒤·좌우 무게 쏠림** | 10분 |
 | ⑤ | 검증 주행 (선택) | μ̂ 0.4 로 덜 미끄러지는지 | 15분 |
 
 ## 0. 시작 전 (T1)
@@ -66,32 +66,48 @@ amrramp dir:=left rate:=0.4 tau_max:=0.5 distance:=1.5 bag:=ramp_left
 ```
 - CSV 는 자동으로 `analysis/torque_mpc_real/2026-11-18_ramp/` (바퀴별 속도·모터 보고 토크가 들어 있다)
 
-## ④ 바퀴별 하중 (전원 없이)
-저울 1개를 바퀴 하나 밑에, 나머지 세 바퀴는 **저울 윗면과 정확히 같은 높이의 받침** 위에. 두 번씩:
+## ④ 바퀴 쌍 하중 — 저울 1개 (전원 없이)
+바퀴 하나씩 재면 받침 높이 1 mm 차이로 대각 두 바퀴(FL+RR ↔ FR+RL)에 무게가 쏠려 값이 흔들린다.
+대신 **두 바퀴씩** 잰다: 앞 두 바퀴 합, 왼쪽 두 바퀴 합. 이 값은 무게중심이 정해서 받침 높이가 5 mm 틀려도 약 1 % 밖에 안 바뀐다.
 
-| 바퀴 | 1회 [g] | 2회 [g] |
-|---|---|---|
-| FL (앞 왼쪽) | | |
-| FR (앞 오른쪽) | | |
-| RL (뒤 왼쪽) | | |
-| RR (뒤 오른쪽) | | |
-| 합 (≈ 4560) | | |
+준비: 저울 위에 **단단한 판** (두 바퀴가 같이 올라가게, 폭 30 cm 이상 — 도마·합판). 판을 올린 채 **영점(tare)**.
+나머지 두 바퀴 밑에는 책·박스로 저울+판 높이와 **대충(±5 mm)** 맞춘 받침.
 
+| 잴 것 | 저울 위 | 받침 위 | 1회 [g] | 2회 [g] |
+|---|---|---|---|---|
+| 앞 합 | FL + FR | RL + RR | | |
+| 뒤 합 (검산) | RL + RR | FL + FR | | |
+| 왼쪽 합 | FL + RL | FR + RR | | |
+| 오른쪽 합 (검산) | FR + RR | FL + RL | | |
+
+- 검산: 앞 + 뒤, 왼쪽 + 오른쪽이 각각 전체(≈ 4560 g)와 1~2 % 안이어야 한다. 아니면 판이 받침에 닿았거나 로봇이 판에서 비스듬함
 - 배터리·케이블 위치는 주행할 때와 똑같이
-- **받침 높이가 1 mm 만 달라도 대각 두 바퀴(FL+RR ↔ FR+RL)로 무게가 쏠린다** — 바퀴 네 개 차체는 그렇다.
-  11-17 기록에서 FL·RR(대각)이 먼저 미끄러졌으니 이 쏠림일 수 있다. 받침을 바꿔 가며 값이 크게 바뀌면 ③ 결과를 주로 쓴다
+- 이걸로 무게중심 쪽 쏠림(앞뒤·좌우)을 안다. **대각 쏠림은 저울로 못 잰다** — 그건 실제 바닥에서 ③ 느린 램프가 본다
+  (11-17 기록은 FL·RR 대각이 먼저 미끄러졌다)
+- 정리: `python3 tools/mu_surface.py wheels --front <앞 합> --left <왼쪽 합> --ramp-node …_ramp/ramp_*.csv --mu <μ̂>`
 
-## ⑤ 검증 주행 (선택)
-T1:
+## ⑤ 검증 주행 (선택) — 같은 상한 vs 바퀴별 상한
+바퀴별 상한 코드는 NUC 의 **내 체크아웃 `~/capston_jjm`** (jjm 7c62f7e, 2026-11-18 빌드)에만 있다. 팀 체크아웃은 그대로.
+⑤ 는 두 조건 모두 이 체크아웃으로 돌린다 (차체 치수 169/220 도 같아야 비교가 된다).
+
+T1 에서 **이 터미널만** 내 체크아웃으로 바꾼다 (새 터미널을 열면 다시 팀 체크아웃):
 ```bash
-amrall use_mpc:=true shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.4 limit_mode:=friction mu_hat:=0.4 bag:=c_mu04
+export AMR_WS=/home/smoc/capston_jjm && source $AMR_WS/src/amr_basic_stack/controller/mpc/tools/amr_aliases.sh
 ```
-- "맞음" 뒤 `a` = 무장, `s`/스페이스 = 정지. **3판** (판마다 Ctrl+C → 같은 명령 다시)
-- 네 바퀴 같은 상한(0.101 N·m)이다. 바퀴별 상한은 NUC 에 코드가 들어간 뒤 `wheel_limit_scale:=…` 로 비교한다
-- NUC 팀 체크아웃은 아직 옛 차체 치수(0.1897/0.207)다 (PR #4 병합 전). 비교는 같은 조건인 기존 판과 하므로 그대로 둔다
+같은 상한 3판:
+```bash
+amrall use_mpc:=true shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.4 limit_mode:=friction mu_hat:=0.4 bag:=c_mu04_same
+```
+바퀴별 상한 3판 (배율은 ③·④ 정리 뒤 Claude 가 알려 준 값):
+```bash
+amrall use_mpc:=true shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.4 limit_mode:=friction mu_hat:=0.4 wheel_limit_scale:=<FL>,<FR>,<RL>,<RR> bag:=c_mu04_wheel
+```
+- 시작 로그에 `바퀴별 τ̄ [FL FR RL RR] = …` 가 나와야 한다
+- "맞음" 뒤 `a` = 무장, `s`/스페이스 = 정지. 판마다 Ctrl+C → 같은 명령 다시
+- bag 은 `~/capston_jjm/bags/<날짜>/` 에 쌓인다 (팀 체크아웃이 아니라)
 
 ## 끝나면
 - T1·T2 모두 Ctrl+C, 0 의 `pgrep` 으로 남은 프로세스 확인
 - 하중 표 값을 채팅으로 알려 주기 → 기록 가져오기·정리는 Claude 가 한다:
   - μ̂: `python3 tools/mu_surface.py summarize --surface lab_floor --summary …_mu/*_summary.csv --write`
-  - 바퀴별 배율: `python3 tools/mu_surface.py wheels --loads FL,FR,RL,RR --ramp-node …_ramp/ramp_*.csv --mu <μ̂>`
+  - 바퀴별 배율: `python3 tools/mu_surface.py wheels --front <앞 합> --left <왼쪽 합> --ramp-node …_ramp/ramp_*.csv --mu <μ̂>`
