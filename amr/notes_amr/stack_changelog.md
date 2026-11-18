@@ -61,6 +61,25 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-18 (jjm) — 노면별 μ̂ 표·절차·도구, C 상한을 바퀴별로 (`surface:=`, `wheel_limit_scale`)
+- 왜: 비교군 C 의 μ̂ 를 판마다 바꿔 쓰고 있었다(0.55·0.6 은 미측정 가정값). 노면마다 잰 값을 상수로 쓰고, 근거를 남긴다.
+  또 11-17 램프 기록에서 FL·RR(대각)이 같은 토크에서 먼저 미끄러졌다 (슬립 시작 모터 토크 중앙 FL 0.181·RR 0.182 vs FR 0.270·RL 0.256 N·m,
+  모터 보고 토크/명령은 0.94~0.96 으로 2 % 안) → 바퀴별 상한이 필요하다.
+- 노면 μ̂:
+  - `amr_mpc/core/surfaces.py` (ROS 없음) — 판정(slip / no_slip 하한 / unconfirmed 버림), 대표값 = 주 방향(앞·뒤) 중앙값 중 작은 쪽, 5 판 이상이면 `확정`
+  - `tools/mu_surface.py list|summarize` — `mu_ramp_test` 의 `_summary.csv`·`torque_ramp_node` CSV 를 모아 `config/surfaces.yaml` 에 쓴다 (`--write`)
+  - `config/surfaces.yaml` — `lab_floor` 는 **미측정**으로 둠
+  - launch `surface:=<이름>` (`torque_experiment`·`amrall`): 표의 μ̂, 표에 없거나 미측정이면 실행 거부. `mu_hat:=` 가 우선
+- 바퀴별 상한: τ̄_i = min(모터, τ_μ·s_i), `torque_plant.yaml surface.wheel_limit_scale: [FL, FR, RL, RR]` (**기본 1 = 예전과 같음**)
+  - C++ `TorqueModel::wheel_limit_scale`·`TorqueMPC::tau_bar()` (C 에서만, 0 < s ≤ 1.5 검사), 노드 파라미터 `wheel_limit_scale`, 시작 로그 `바퀴별 τ̄`
+  - Python `TorquePlant.wheel_limit_scale`·`tau_bar_friction()`, launch 인자 `wheel_limit_scale:=0.85,1,1.1,1`
+  - `tools/mu_surface.py wheels --loads … --ramp-node …` — s_i = (N_i/N̄)/g_i (하중, 모터 비), 바퀴별 램프 슬립 시작으로 검산
+- 문서: `notes_amr/mu_surface_procedure.md` (절차·원리), `notes_amr/mu_experiment_2026-11-18.md` (오늘 실험 명령), 체크리스트 μ̂ 항목에 안내
+- 잠정 분석 (11-17 스텝·램프 11 판, 미끄러지는 구간의 몸체 가속): 앞 μ̂ 중앙 0.49 (0.40~0.53, 5 판), 옆 0.28 (0.24~0.29, 5 판) —
+  뒤 방향·바퀴별 하중은 아직. 표에는 안 씀
+- 확인 (PC WSL): gtest torque 28 통과(새 1), pytest 242 중 실패 5 (기존 CAN 시험 4 + KeyError 'controller' 1, 위 11-17 항목과 같음).
+  시뮬 launch `wheel_limit_scale:=0.85,1,1.1,1` → 바퀴별 τ̄ 0.0860 / 0.1012 / 0.1113 / 0.1012 N·m (μ̂ 0.4). 실차 미확인
+
 ### 2026-11-17 (jjm) — 차체 기하를 AK40 교체 뒤 실측 치수로: 앞뒤 169 mm, 좌우 220 mm (k 0.19835 → 0.1945)
 - 왜: 모터를 AK40 으로 바꾸면서 바퀴 위치가 바뀌었다. **169 / 220 mm 는 실차 실측값**(전준민 실측·전달). 기존 0.1897 / 0.207 m 는 RoboClaw 시절 치수.
   메카넘 기구학 T⁻¹ 의 회전 항 k = lx + ly 와 바퀴 관성 항 I_eff = I_z + μk² 가 이 값에 기댄다.

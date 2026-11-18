@@ -230,4 +230,6 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 - [ ] μ̂: 노면마다 토크 램프 시험 — 도구 `amrmu` (`tools/mu_ramp_test.py`, stack_changelog 2026-11-16 (12)).
   `amrall` (MPC 없이) 띄운 뒤 다른 터미널에서 `amrmu --dirs fwd,back --repeat 5 --csv …` → 앞·뒤 중앙값을 `torque_plant.yaml surface.mu_hat`
   (또는 `amrall mu_hat:=`). 기존 데이터 추정 0.33 이상 ~ 0.45. 옆·대각은 참고(`--dirs left,right,fl`)
+  2026-11-17 부터: 여러 판을 `tools/mu_surface.py summarize --surface <노면> --summary … --write` 로 모아 `config/surfaces.yaml` 에 두고
+  `amrall … limit_mode:=friction surface:=<노면>` 으로 쓴다 — 절차 `notes_amr/mu_surface_procedure.md`. `lab_floor` 아직 미측정
 - [ ] 8자 트랙 공간 약 10 × 5 m + 여유

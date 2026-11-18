@@ -53,6 +53,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from amr_mpc.ak40.setup import prepare_can
+from amr_mpc.core import surfaces
 
 
 def _truthy(s):
@@ -221,6 +222,13 @@ def _nodes(context):
                 "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec")),
             }]))
 
+    # ── 노면 μ̂ (2026-11-17): mu_hat:=값 이 있으면 그 값, 없고 surface:=이름 이면 config/surfaces.yaml 의 값,
+    #    둘 다 없으면 비워 둬서 torque_plant.yaml surface.mu_hat. 표에 없거나 미측정이면 여기서 멈춘다(조용히 기본값으로 안 감)
+    mu_arg = g("mu_hat")
+    if not mu_arg and g("surface"):
+        mu_arg = str(surfaces.lookup(g("surface")))
+        nodes.append(LogInfo(msg=f"surface:={g('surface')} → μ̂ {mu_arg} (config/surfaces.yaml)"))
+
     # ── 제어기. controller:=mpc (비교군 B·C, 기본) | pure_pursuit (비교군 A, 6단계)
     #    둘 다 같은 기준열·같은 상태를 받고, 바퀴 토크를 같은 torque_output → 게이트 → 플랜트 경로로 낸다.
     controller = g("controller")
@@ -237,8 +245,14 @@ def _nodes(context):
             ctrl["disturbance_enable"] = _truthy(g("disturbance"))
         if g("linearization"):
             ctrl["linearization"] = g("linearization")
-        if g("mu_hat"):
-            ctrl["mu_hat"] = float(g("mu_hat"))
+        if mu_arg:
+            ctrl["mu_hat"] = float(mu_arg)
+        # 바퀴별 마찰 상한 배율 (2026-11-18): wheel_limit_scale:="0.85,1,1.1,1" [FL, FR, RL, RR]. 비우면 torque_plant.yaml
+        if g("wheel_limit_scale"):
+            ws = [float(v) for v in g("wheel_limit_scale").strip("[] ").split(",")]
+            if len(ws) != 4 or not all(0.0 < v <= 1.5 for v in ws):
+                raise RuntimeError(f"wheel_limit_scale 는 4 개, 각 0 < s ≤ 1.5 [FL, FR, RL, RR] — {g('wheel_limit_scale')!r}")
+            ctrl["wheel_limit_scale"] = ws
         # 튜닝 덮어쓰기 (2026-11-16, 5-3 감쇠 시험): mpc_W:="100,100,50,1,1,0.5"  mpc_w_delta:=10
         if g("mpc_W"):
             W = [float(v) for v in g("mpc_W").strip("[] ").split(",")]
@@ -259,7 +273,8 @@ def _nodes(context):
         torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"
     elif controller == "pure_pursuit":
         # 비교군 A: 퓨어 퍼슛 (v_x, ω_z) → 바퀴별 PI → 토크. 게인은 config/torque_baseline_a.yaml
-        ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "ctrl_payload_kg", "log_prefix")
+        ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "wheel_limit_scale", "ctrl_payload_kg",
+                               "log_prefix")
                    if g(k)]
         if ignored:
             nodes.append(LogInfo(msg=f"controller:=pure_pursuit — MPC 인자 {ignored} 는 쓰지 않는다 "
@@ -276,9 +291,11 @@ def _nodes(context):
         # 뒤(torque_output 마찰 보상·게이트·fault_monitor)는 MPC 와 같다
         ramp = {"state_topic": state_topic, "direction": g("ramp_dir") or "fwd"}
         for arg, par in (("ramp_tau_max", "tau_max"), ("ramp_rate", "rate"), ("ramp_distance", "distance"),
-                         ("ramp_stop_distance", "stop_distance"), ("mu_hat", "mu_hat")):
+                         ("ramp_stop_distance", "stop_distance")):
             if g(arg):
                 ramp[par] = float(g(arg))
+        if mu_arg:
+            ramp["mu_hat"] = float(mu_arg)
         if g("ramp_inertia_ff"):
             ramp["inertia_ff"] = _truthy(g("ramp_inertia_ff"))
         if g("ramp_log_dir"):
@@ -409,7 +426,10 @@ def generate_launch_description():
         A("mpc_r_u", default_value="", description="MPC 입력 편차 벌점 r_U (비우면 torque_mpc.yaml tuning.r_u)"),
         A("mpc_dist_alpha", default_value="", description="외란 추정치 저역통과 α (비우면 torque_mpc.yaml disturbance.alpha)"),
         A("mpc_q_null", default_value="", description="MPC 영공간 벌점 (비우면 torque_mpc.yaml tuning.q_null)"),
-        A("mu_hat", default_value="", description="제어기의 노면 마찰계수 (YAML 기본 0.3)"),
+        A("mu_hat", default_value="", description="제어기의 노면 마찰계수 (YAML 기본 0.3). surface:= 보다 우선"),
+        A("surface", default_value="", description="노면 이름 → config/surfaces.yaml 의 μ̂ (mu_hat 이 비었을 때). 미측정이면 실행 거부"),
+        A("wheel_limit_scale", default_value="",
+          description="바퀴별 마찰 상한 배율 FL,FR,RL,RR (예 0.85,1,1.1,1). C 에서만. 비우면 torque_plant.yaml surface.wheel_limit_scale"),
         A("log_prefix", default_value="", description="MPC CSV 접두. 비면 저장 안 함"),
         # 8자 트랙: 비우면 config/torque_track.yaml
         *[A(k, default_value="", description=f"트랙 {k} (비우면 torque_track.yaml)") for k in _TRACK_KEYS],

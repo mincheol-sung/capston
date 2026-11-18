@@ -88,6 +88,12 @@ friction:
 surface:
   mu_hat: 0.3                # 추정. 노면마다 토크 램프 시험 (To do 2절)
   c_s: 0.8                   # 안전계수
+  # 바퀴별 마찰 상한 배율 [FL, FR, RL, RR] (2026-11-18) — C 에서 τ̄_i = min(모터, τ_μ·s_i). 노면이 아니라 차체 성질:
+  #   바퀴마다 실린 무게 N_i, 롤러·접지 상태, 모터 출력 차이로 먼저 미끄러지는 바퀴를 낮춘다. μ̂ 는 노면마다(surfaces.yaml),
+  #   이 배율은 차체마다 한 번. 정하는 법: tools/mu_surface.py wheels (바퀴별 하중 + 바퀴별 램프 슬립 시작) — mu_surface_procedure.md 4절.
+  #   2026-11-17 램프 7 판: FL 이 거의 매번 먼저 미끄러짐, RL 은 거의 안 미끄러짐. 모터 보고 토크/명령은 0.94~0.96 (차이 2 % 안).
+  #   하중·바퀴별 램프 측정 전이라 1 로 둔다 (= 예전과 같음). launch 인자 wheel_limit_scale:=0.85,1,1.1,1 로 실행마다 바꿀 수 있다
+  wheel_limit_scale: [1.0, 1.0, 1.0, 1.0]
 
 # ── 모델 스위치 — 2026-11-16 부터 시뮬 플랜트(Python TorquePlant·sim_plant_torque) 물리만 정한다.
 #    제어기(torque_mpc_node)는 이 값을 안 읽는다: M 에 m_w 를 늘 넣고, w 항만 torque_mpc.yaml model_terms.use_w 로 켜고 끈다

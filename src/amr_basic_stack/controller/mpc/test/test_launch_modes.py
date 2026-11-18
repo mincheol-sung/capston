@@ -148,12 +148,24 @@ def test_wheel_inertia_plant_and_w_term(launch_mod, args, plant_expect, use_w_ex
     assert ctrl.get("use_w") is use_w_expect
 
 
+def test_wheel_limit_scale_arg(launch_mod):
+    """2026-11-18 바퀴별 마찰 상한 배율: 비우면 YAML, 주면 4 개 실수로 MPC 에, 틀리면 거부."""
+    _, _, out = build(launch_mod)
+    assert "wheel_limit_scale" not in _node_params(out, "torque_mpc_node")
+    _, _, out = build(launch_mod, wheel_limit_scale="0.85,1,1.1,1")
+    assert list(_node_params(out, "torque_mpc_node")["wheel_limit_scale"]) == [0.85, 1.0, 1.1, 1.0]
+    for bad in ("1,1,1", "0,1,1,1", "1,1,1,2"):
+        with pytest.raises(RuntimeError):
+            build(launch_mod, wheel_limit_scale=bad)
+
+
 def test_real_all_passes_model_switches():
     """amrall(real_all.launch.py) 이 정지 마찰·w 항 스위치를 torque_experiment 로 넘긴다."""
     spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     assert "use_w" in m._PASS and "stiction_comp" in m._PASS and "disturbance" in m._PASS
+    assert "surface" in m._PASS and "wheel_limit_scale" in m._PASS
     assert "use_wheel_inertia" not in m._PASS                # 실차에는 플랜트가 없다
     assert "controller" in m._PASS                           # 비교군 A (2026-11-16 전에는 빠져 있어 늘 MPC 가 떴다)
 

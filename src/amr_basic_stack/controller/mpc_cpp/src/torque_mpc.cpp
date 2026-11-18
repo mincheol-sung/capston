@@ -144,6 +144,9 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
   if (!(tu_.dist_alpha > 0.0 && tu_.dist_alpha <= 1.0)) {throw std::invalid_argument("0 < disturbance.alpha ≤ 1");}
   if (!(tu_.rate_fraction > 0.0)) {throw std::invalid_argument("rate_fraction > 0 이어야 한다");}
   if (md_.tau_motor_limit() <= 0.0) {throw std::invalid_argument("τ_lim − τ_fric,max ≤ 0 — 모터 여유가 없다");}
+  if (!((md_.wheel_limit_scale.array() > 0.0).all() && (md_.wheel_limit_scale.array() <= 1.5).all())) {
+    throw std::invalid_argument("surface.wheel_limit_scale 는 바퀴마다 0 < s ≤ 1.5 여야 한다 [FL, FR, RL, RR]");
+  }
   if (!(tu_.w_delta >= 0.0 && tu_.r_u >= 0.0 && tu_.q_null >= 0.0)) {
     throw std::invalid_argument("w_delta, r_u, q_null ≥ 0 이어야 한다");
   }
@@ -202,10 +205,13 @@ void TorqueMPC::reset()
 
 TVec4 TorqueMPC::tau_bar() const
 {
-  double base = md_.tau_motor_limit();
-  if (tu_.limit_mode == TorqueLimitMode::Friction) {base = std::min(base, md_.tau_friction_limit());}
-  TVec4 out = TVec4::Constant(base);
+  const double motor = md_.tau_motor_limit();
+  TVec4 out = TVec4::Constant(motor);
   for (int i = 0; i < 4; ++i) {
+    // C: 바퀴별 배율 (wheel_limit_scale, 2026-11-18). B(motor_only) 에는 안 쓴다
+    if (tu_.limit_mode == TorqueLimitMode::Friction) {
+      out(i) = std::min(motor, md_.tau_friction_limit() * md_.wheel_limit_scale(i));
+    }
     if (tau_bar_override_(i) >= 0.0) {out(i) = std::min(tau_bar_override_(i), md_.tau_motor_limit());}
   }
   return out;

@@ -110,6 +110,12 @@ public:
     md.tau_fric_max = yp["friction"]["tau_fric_max_Nm"].as<double>();
     md.mu_hat = declare_parameter<double>("mu_hat", yp["surface"]["mu_hat"].as<double>());
     md.c_s = yp["surface"]["c_s"].as<double>();
+    // 바퀴별 마찰 상한 배율 [FL, FR, RL, RR] (2026-11-18). YAML 에 없으면 1 — 예전과 같다. C 에서만 쓰인다
+    const std::vector<double> ws = declare_parameter<std::vector<double>>(
+      "wheel_limit_scale", yp["surface"]["wheel_limit_scale"] ?
+      yp["surface"]["wheel_limit_scale"].as<std::vector<double>>() : std::vector<double>{1.0, 1.0, 1.0, 1.0});
+    if (ws.size() != 4) {throw std::invalid_argument("wheel_limit_scale 는 4 개여야 한다 [FL, FR, RL, RR]");}
+    for (int i = 0; i < 4; ++i) {md.wheel_limit_scale(i) = ws[i];}
     md.gravity = yp["model"]["gravity"].as<double>();
 
     TorqueTuning tu;
@@ -194,6 +200,10 @@ public:
       ref_topic.c_str(), state_topic.c_str(), cmd_topic.c_str(), tu.Ts * 1e3, tu.Np, tu.Nc, md.mass, md.inertia_z,
       md.mu(), md.use_w ? "켬" : "끔", limit_mode_.c_str(), tb(0), mpc_->dtau_bar_of(tb(0)),
       md.tau_motor_limit(), md.tau_friction_limit(), md.mu_hat, tu.dist_enable ? "켬" : "끔", tu.dist_alpha);
+    RCLCPP_INFO(
+      get_logger(), "  바퀴별 τ̄ [FL FR RL RR] = %.4f %.4f %.4f %.4f N·m  (배율 %.2f %.2f %.2f %.2f, C 에서만)",
+      tb(0), tb(1), tb(2), tb(3), md.wheel_limit_scale(0), md.wheel_limit_scale(1), md.wheel_limit_scale(2),
+      md.wheel_limit_scale(3));
     RCLCPP_INFO(
       get_logger(), "  선형화 %s (%s)", linearization_.c_str(),
       tu.linearization == amr_mpc_cpp::TorqueLinearization::CurrentState ?
