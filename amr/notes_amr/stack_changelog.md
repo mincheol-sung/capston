@@ -61,6 +61,36 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-19 (10) — 추정기 모드 `est_mode:=kf|slam` (기본 kf) + 시뮬 포즈 튐 흉내 `sim_slam_jump` + `trip_on_pose_jump` 인자
+- 왜: 사용자 "원래 설계 의도(휠 오돔 없이 IMU + 라이다 SLAM, SLAM 값을 튀어도 그대로 믿기)를 모드로 고를 수 있게. 지금 kf 버전은 논의로 채택 여부를 정한다".
+  속도는 사용자 선택 (a) 두 포즈 차분 + 저역통과 (구조도 v3 "포즈 미분 + LPF"). pose_jump 정지는 "시뮬로 판단".
+- 바꾼 파일 (`controller/mpc`):
+  - `amr_mpc/torque/estimator.py`: `mode` kf | slam. slam = 포즈 시각의 위치·방향을 SLAM 으로 덮어쓰고(게인 1) 기존 이력 전파식으로 지금까지 옮김
+    (늦은 포즈를 지금 상태에 그대로 쓰면 0.7 m/s 에서 9.1 cm, 1.4 rad/s 에서 10.4° 뒤처짐), 속도 = (z_k − z_{k−1})/Δt 를 1 차 저역통과 `slam_v_lpf_hz`,
+    바이어스는 기동 값 고정, 튐(> jump_xy·jump_yaw)도 따르되 개수는 셈(`jump_used`), 튄 쌍의 차분은 속도로 안 씀. kf 보정 경로는 `_apply()` 로 묶었을 뿐 식은 그대로.
+  - `nodes/state_estimator.py`: ROS 파라미터 `est_mode` (param dump 에 남음), 기동 로그에 모드, `jump_used` 로그.
+  - `config/torque_estimator.yaml`: `mode: kf`, `slam_v_lpf_hz: 2.0`, `slam_v_max_dt: 0.5`.
+  - `launch/torque_experiment.launch.py`·`real_all.launch.py`: `est_mode`, `trip_on_pose_jump`(fault_monitor), `sim_slam_jump`(시뮬 플랜트) 인자.
+  - `amr_mpc/torque/sim_sensors.py`·`nodes/sim_plant_torque.py`: 포즈 튐 흉내 `slam_jump "t,dx,dy[,dyaw_deg[,once]]"` (처음 움직인 뒤 t 초부터, once 1 = 스캔 하나만).
+  - 시험: `test_torque_estimator.py` slam 7 개 (덮어쓰기·튐 따름·튄 쌍 속도 제외·지연 보상·잡음·시뮬 튐 kf vs slam·튐 흉내), `test_launch_modes.py` 인자 전달 7 개.
+- 속도 저역통과 2 Hz 를 고른 근거 (`test_torque_estimator` 원 주행, 실측 수준 잡음 3 판 평균 속도 RMS): 없음 77 · 5 Hz 74 · 3 Hz 70 · **2 Hz 69** · 1 Hz 87 mm/s (kf 54).
+- 시뮬 (도메인 93, circles8 W 2.0 tangent 0.7 m/s, C μ̂ 0.6, 잡음 1 배, 각 1 판, 참값 기준):
+
+  | 조건 | 모드 | 참값 추종 \|e\| RMS / 최대 | 추정기−참값 위치 RMS / 최대, 속도 RMS | 토크 떨림 | 튐 |
+  |---|---|---|---|---|---|
+  | 튐 없음 | kf | 3.3 / 6.9 cm | 0.8 / 2.7 cm, 4.5 cm/s | 0.0090 | 0 |
+  | 튐 없음 | slam | 5.2 / 7.9 | 1.8 / 4.2, 9.6 | 0.0138 | 0 |
+  | 0.3 m 스캔 하나 | kf | 3.1 / 5.6 | 0.9 / 2.3, 5.0 | 0.0090 | 1 (버림) |
+  | 0.3 m 스캔 하나 | slam | 5.0 / 7.8 | 3.2 / **29.7**, 9.5 | 0.0143 | 2 (갔다 옴) |
+  | 0.2 m 계속 옮김 | kf | 13.0 / 22.0 | 15.2 / 29.9, 7.4 | 0.0107 | 5 (0.5 s 뒤 따라감) |
+  | 0.2 m 계속 옮김 | slam | 12.8 / 24.3 | 15.5 / 23.7, 9.3 | 0.0135 | 1 (바로 따라감) |
+  | 0.8 m 계속 옮김 | kf | 49.8 / 81.6 | 60.1 / 89.4, 6.9 | 0.0099 | 5 |
+  | 0.8 m 계속 옮김 | slam | 51.8 / 82.9 | 62.4 / 83.4, 9.8 | 0.0138 | 1 |
+
+  "계속 옮김" 은 SLAM 자체가 다른 자리로 간 것이라 두 모드 다 결국 그 자리를 따르고 참값 오차가 그만큼 남는다 (정상). 위 판은 모두 `trip_on_pose_jump:=false`.
+  `trip_on_pose_jump` 기본(true) 으로는 0.2 m 계속 옮김에서 kf·slam 둘 다 첫 튐에 `pose_jump` 로 정지 (kf 는 그 포즈를 버렸는데도 선다).
+- 결정 (같은 날, 사용자): slam 모드에서도 `trip_on_pose_jump` 는 지금처럼 켜 둔다 (기본 true 그대로, 코드 변경 없음). 끄는 것은 시험용 인자로만.
+
 ### 2026-11-16 (18) — 잘못된 yaw_mode·shape 을 launch 에서 거부, circles8 tangent 교차점 헤딩 완화 `crossing_blend_m`
 - 왜: 접선 판 분석 (`analysis/torque_mpc_real/2026-11-16_circles8/tools/crossing.py`·`halves.py`).
   ① `yaw_mode:=true` 로 띄운 판 6 개(142227, 185214, 185603, 185707, 185814, 185918)에서 figure8_reference_node 가 시작하자마자

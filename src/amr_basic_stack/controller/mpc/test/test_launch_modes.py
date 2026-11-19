@@ -209,3 +209,28 @@ def test_invalid_track_rejected_before_can_setup_on_real(launch_mod, monkeypatch
     with pytest.raises(RuntimeError, match="허용값"):
         build(launch_mod, plant="real", auto_setup_can="true", yaw_mode="true")
     assert not called
+
+
+@pytest.mark.parametrize("given, expect", [({}, None), ({"est_mode": "slam"}, "slam"), ({"est_mode": "kf"}, "kf")])
+def test_estimator_mode_reaches_node(launch_mod, given, expect):
+    """2026-11-19: est_mode 가 state_estimator_node est_mode 로 (비우면 torque_estimator.yaml mode, 기본 kf)."""
+    _, _, out = build(launch_mod, **given)
+    v = _node_params(out, "state_estimator_node").get("est_mode")
+    if isinstance(v, (tuple, list)):                   # 문자열 파라미터는 YAML 문서('slam\n...\n')를 담은 TextSubstitution 으로 온다
+        import yaml
+        v = yaml.safe_load("".join(s.text for s in v))
+    assert v == expect
+
+
+@pytest.mark.parametrize("given, expect", [({}, None), ({"trip_on_pose_jump": "false"}, False), ({"trip_on_pose_jump": "true"}, True)])
+def test_trip_on_pose_jump_reaches_fault_monitor(launch_mod, given, expect):
+    """2026-11-19: trip_on_pose_jump 가 fault_monitor_node 로 (비우면 노드 기본 true)."""
+    _, _, out = build(launch_mod, **given)
+    assert _node_params(out, "fault_monitor_node").get("trip_on_pose_jump") == expect
+
+
+def test_real_all_passes_estimator_mode():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "est_mode" in m._PASS and "trip_on_pose_jump" in m._PASS

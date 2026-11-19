@@ -55,12 +55,19 @@ class StateEstimatorNode(Node):
             ("base_frame", "base_footprint"),
             ("pose_source", str(cfg.get("pose_source", "stamped"))),     # stamped | after_scan_match
             ("pose_period", 0.1),                                        # [s] 게인 설계에 쓰는 스캔 매칭 주기
+            # 2026-11-19: kf (고정 게인 칼만, 기본) | slam (원래 설계: SLAM 으로 덮어쓰기). launch 인자 est_mode.
+            # ROS 파라미터로 둬야 record_all.sh 의 param dump(run_info/params) 에 어느 모드였는지 남는다
+            ("est_mode", str(cfg.get("mode", "kf"))),
         ])
         g = lambda n: self.get_parameter(n).value
         self.pose_source = str(g("pose_source")).strip().lower()
         if self.pose_source not in ("stamped", "after_scan_match"):
             raise SystemExit(f"[state_estimator] pose_source={self.pose_source!r} — stamped | after_scan_match")
-        self.est = PlanarStateEstimator(cfg, pose_period=float(g("pose_period")))
+        cfg["mode"] = str(g("est_mode")).strip().lower()
+        try:
+            self.est = PlanarStateEstimator(cfg, pose_period=float(g("pose_period")))
+        except ValueError as e:
+            raise SystemExit(f"[state_estimator] {e}")
         self.period = float(cfg.get("publish_period", 0.01))
         self.map_frame, self.base_frame = str(g("map_frame")), str(g("base_frame"))
         self.last_pub = None
@@ -89,12 +96,18 @@ class StateEstimatorNode(Node):
         self.create_timer(float(g("input_check_period")), self.check_inputs)
         self.imu_topic, self.pose_topic = str(g("imu_topic")), str(g("pose_topic"))
         e = self.est
+        if e.mode == "kf":
+            mode_txt = (f"  모드 kf (고정 게인 칼만)  K_p {e.K_xy[0]:.3f}  K_v {e.K_xy[1]:.2f} 1/s  K_b {e.K_xy[2]:.2f} 1/s²   "
+                        f"K_psi {e.K_yaw[0]:.3f}  K_bg {e.K_yaw[1]:.4f} 1/s   튐 (> {e.jump_xy*100:.0f} cm·"
+                        f"{math.degrees(e.jump_yaw):.0f}°) 버림, 연속 {e.jump_reset_count} 번이면 따라감")
+        else:
+            mode_txt = (f"  모드 slam (SLAM 덮어쓰기): 포즈 시각의 위치·방향 = SLAM, 속도 = 두 포즈 차분 + 저역통과 "
+                        f"{e.slam_v_lpf_hz:g} Hz, 바이어스는 기동 값 고정, 튐도 따름 (개수만 셈)")
         self.get_logger().info(
             f"state_estimator: {g('imu_topic')} + {g('pose_topic')} [{self.pose_source}] → {g('output_topic')} "
             f"({1/self.period:.0f} Hz)\n"
             f"  IMU·포즈 기준점 ({e.r[0]:.3f}, {e.r[1]:.3f}) m (base_footprint 기준)\n"
-            f"  게인  K_p {e.K_xy[0]:.3f}  K_v {e.K_xy[1]:.2f} 1/s  K_b {e.K_xy[2]:.2f} 1/s²   "
-            f"K_psi {e.K_yaw[0]:.3f}  K_bg {e.K_yaw[1]:.4f} 1/s\n"
+            f"{mode_txt}\n"
             f"  정지 상태에서 {e.init_s:.1f} s 동안 바이어스를 잡는다 — 그동안 로봇을 움직이지 말 것")
 
     def now_s(self):
@@ -138,13 +151,18 @@ class StateEstimatorNode(Node):
             self.get_logger().warning(
                 f"SLAM 포즈 튐: 잔차 {math.hypot(e[0], e[1])*100:.1f} cm, {math.degrees(e[2]):.1f}° — 버림 "
                 f"(누적 {self.est.jump_count})", throttle_duration_sec=1.0)
+        elif r == "jump_used":
+            e = self.est.last_residual
+            self.get_logger().warning(
+                f"SLAM 포즈 튐: 잔차 {math.hypot(e[0], e[1])*100:.1f} cm, {math.degrees(e[2]):.1f}° — slam 모드라 그대로 따름 "
+                f"(누적 {self.est.jump_count})", throttle_duration_sec=1.0)
         elif r == "reset":
             self.get_logger().error("SLAM 포즈가 계속 다른 곳을 가리킨다 — 그 포즈로 다시 초기화했다")
         elif r == "old":
             self.get_logger().warning(
                 f"너무 오래된 stamp 의 포즈 ({self.est.t - t:.3f} s 전 > {self.est.max_pose_age} s) — 버림. "
                 f"계속되면 SLAM 지연이나 두 센서의 시각 기준 차이", throttle_duration_sec=2.0)
-        if r in ("used", "jump", "reset") and self.est.t is not None:
+        if r in ("used", "jump", "reset", "jump_used") and self.est.t is not None:
             e, s = self.est.last_residual, Float64MultiArray()
             s.data = [float(self.est.t), float(e[0]), float(e[1]), float(e[2]), float(self.est.b_a[0]),
                       float(self.est.b_a[1]), float(self.est.b_g), float(self.est.jump_count),

@@ -326,3 +326,97 @@ def test_sim_imu_is_published_best_effort_like_real_robot():
         n.destroy_node()
     finally:
         rclpy.shutdown()
+
+
+# ── slam 모드 (2026-11-19, 원래 설계: SLAM 으로 덮어쓰기) ────────────────────────────
+SLAM = {**CFG, "mode": "slam", "slam_v_lpf_hz": 2.0}
+
+
+def test_mode_is_validated():
+    with pytest.raises(ValueError):
+        PlanarStateEstimator({**CFG, "mode": "kalman"})
+    assert PlanarStateEstimator(CFG).mode == "kf"                      # 기본은 kf
+
+
+def test_slam_mode_overwrites_and_follows_jumps():
+    est = PlanarStateEstimator(SLAM)
+    simulate(est, T=1.6)
+    t = 1.6
+
+    def run(n_poses, x):
+        nonlocal t
+        res = []
+        for k in range(n_poses * 20):
+            t += 0.005
+            if k % 20 == 0:
+                res.append(est.pose(t - 0.13, R_IMU[0] + x, R_IMU[1], 0.0))
+            est.imu(t, -0.15, 0.13, 0.002)
+        return res
+
+    assert run(3, 0.0) == ["used"] * 3
+    assert run(1, 0.5) == ["jump_used"]               # kf 는 버리지만 slam 은 그대로 따른다
+    assert est.state()[1] == pytest.approx(0.5, abs=1e-3)
+    assert abs(est.v[0]) < 1e-3                       # 튄 쌍의 차분(0.5 m / 0.1 s = 5 m/s)은 속도로 쓰지 않는다
+    assert run(2, 0.5) == ["used"] * 2
+    assert est.state()[1] == pytest.approx(0.5, abs=1e-3) and abs(est.v[0]) < 1e-3
+    assert est.jump_count == 1                        # fault_monitor 의 pose_jump 용으로 개수는 센다
+
+
+def test_slam_mode_compensates_pose_delay():
+    # 잡음 없는 원 주행 (0.3~0.9 m/s), 포즈 0.13 s 늦게 도착. 늦은 포즈를 지금 상태에 그대로 썼다면 v·0.13 ≈ 4~12 cm 뒤처진다.
+    # 포즈 시각에 덮어쓰고 지금까지 전파하므로 남는 것은 차분 속도의 T/2 지연과 저역통과 지연에서 오는 오차뿐이다.
+    est = PlanarStateEstimator(SLAM)
+    o = simulate(est, T=14.0)
+    m = o[:, 0] > 4.0
+    pos = float(np.sqrt(np.mean(o[m, 1] ** 2 + o[m, 2] ** 2)))
+    vel = float(np.sqrt(np.mean(o[m, 4] ** 2 + o[m, 5] ** 2)))
+    print(f"\n  slam 모드, 잡음 없음: 위치 RMS {pos*1e3:.2f} mm, 속도 RMS {vel*1e3:.1f} mm/s")
+    assert pos < 0.012 and vel < 0.06
+    assert est.jump_count == 0
+
+
+def test_slam_mode_realistic_noise_is_bounded_but_worse_than_kf():
+    noise = dict(accel=0.95, gyro=0.09, xy=0.003, yaw=math.radians(0.2))
+    res = {}
+    for mode, cfg in (("kf", CFG), ("slam", SLAM)):
+        est = PlanarStateEstimator(cfg)
+        o = simulate(est, T=30.0, noise=noise, seed=3)
+        m = o[:, 0] > 4.0
+        res[mode] = (float(np.sqrt(np.mean(o[m, 1] ** 2 + o[m, 2] ** 2))), float(np.sqrt(np.mean(o[m, 4] ** 2 + o[m, 5] ** 2))))
+    print(f"\n  실측 수준 잡음: kf 위치 {res['kf'][0]*1e3:.1f} mm 속도 {res['kf'][1]*1e3:.0f} mm/s | "
+          f"slam 위치 {res['slam'][0]*1e3:.1f} mm 속도 {res['slam'][1]*1e3:.0f} mm/s")
+    assert res["slam"][0] < 0.02 and res["slam"][1] < 0.1
+    assert res["kf"][1] < res["slam"][1]               # 속도는 kf 가 낫다 (2026-11-06 에 kf 로 바꾼 이유)
+
+
+@pytest.mark.parametrize("once", [False, True])
+def test_sim_pose_jump_kf_vs_slam(once):
+    """시뮬 포즈 튐 흉내 (sim_sensors slam_jump_*, 2026-11-19). 출발 3 s 뒤 SLAM 이 옆으로 0.3 m 옮겨 간다.
+    계속 옮겨 간 경우 kf 는 4 번 버리고 5 번째에 따라가고(reset), slam 은 첫 포즈부터 따라간다.
+    스캔 하나만 틀린 경우 kf 는 버리고(jump) 원래 자리를 지키지만, slam 은 0.3 m 갔다가 다음 스캔에 돌아온다."""
+    jump = dict(slam_jump_t=3.0, slam_jump_dx=0.0, slam_jump_dy=0.3, slam_jump_once=once)
+    res = {}
+    for mode in ("kf", "slam"):
+        o, est = run_with_sim_sensors({**QUIET, **jump}, "stamped", T=9.0, est_cfg={"mode": mode})
+        m = (o[:, 0] > 5.0) & (o[:, 0] < 9.0)
+        res[mode] = (est.jump_count, float(np.abs(o[m, 2]).max()), float(np.abs(o[-1, 2])))
+    print(f"\n  튐 {'스캔 하나' if once else '계속'}: kf 튐 {res['kf'][0]} 회, 끝 y 오차 {res['kf'][2]*100:.1f} cm | "
+          f"slam 튐 {res['slam'][0]} 회, 끝 y 오차 {res['slam'][2]*100:.1f} cm")
+    # 참값 기준 오차: SLAM 이 계속 옮겨 갔으면 결국 둘 다 SLAM(= 참값 + 0.3 m) 을 따른다
+    if not once:
+        assert res["kf"][2] == pytest.approx(0.3, abs=0.02) and res["slam"][2] == pytest.approx(0.3, abs=0.02)
+        assert res["kf"][0] >= 4 and res["slam"][0] == 1     # slam 은 한 번 튀고 바로 새 자리 (잔차가 다시 작아진다)
+    else:
+        assert res["kf"][2] < 0.01 and res["slam"][2] < 0.01  # 둘 다 결국 참값으로
+        assert res["kf"][0] == 1 and res["slam"][0] == 2    # slam 은 갈 때·돌아올 때 두 번 튄다
+
+
+def test_sim_sensors_jump_injection():
+    s = SimSensors({**QUIET, "slam_jump_t": 0.5, "slam_jump_dx": 0.2, "slam_jump_once": True}, seed=0)
+    xs = []
+    for k in range(400):                                       # 2 s, 0.1 m/s 직진
+        t = k * 0.005
+        out = s.step(t, np.array([0.1 * t, 0.0, 0.0]), np.array([0.1, 0.0, 0.0]))
+        xs += [(ts, x - 0.1 * ts - s.r[0]) for (ts, x, y, yaw) in out["poses"]]
+    off = [round(d, 3) for _, d in xs]
+    assert off.count(0.2) == 1 and s.jumps_done == 1             # 스캔 하나만 0.2 m 옮겨졌다

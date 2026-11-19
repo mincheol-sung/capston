@@ -151,6 +151,7 @@ def _nodes(context):
                          "x0": float(g("x0")), "y0": float(g("y0")), "yaw0": float(g("yaw0")),
                          "sensors": source == "estimator", "slam_mode": slam_mode,
                          "sensor_noise_scale": float(g("sensor_noise_scale")),
+                         "slam_jump": g("sim_slam_jump"),                       # 2026-11-19 포즈 튐 흉내 (비우면 끔)
                          "surface_mu": float(g("surface_mu")) if g("surface_mu") else -1.0,
                          "friction_scale": float(g("friction_scale")),
                          "wheel_efficiency": [float(v) for v in g("wheel_eff").split(",")] if g("wheel_eff") else [1.0, 1.0, 1.0, 1.0],
@@ -204,7 +205,9 @@ def _nodes(context):
     if source == "estimator":
         nodes.append(Node(
             package="amr_mpc", executable="state_estimator_node", name="state_estimator_node", output="screen",
-            parameters=[{"pose_source": "stamped" if slam_mode == "scan_time" else "after_scan_match"}]))
+            parameters=[{"pose_source": "stamped" if slam_mode == "scan_time" else "after_scan_match",
+                         # 2026-11-19: 추정기 모드 kf | slam. 비우면 torque_estimator.yaml estimator.mode (기본 kf)
+                         **({"est_mode": g("est_mode")} if g("est_mode") else {})}]))
 
     if not _truthy(g("use_mpc")):
         return nodes
@@ -316,7 +319,9 @@ def _nodes(context):
     if source == "estimator":                         # 참값 모드에는 추정기 출력이 없어 끊김으로 오판한다
         nodes.append(Node(
             package="amr_mpc", executable="fault_monitor_node", name="fault_monitor_node", output="screen",
-            parameters=[{"max_track_error": float(g("max_track_error")), "track_status_topic": track_status}]))
+            parameters=[{"max_track_error": float(g("max_track_error")), "track_status_topic": track_status,
+                         # 2026-11-19: 포즈 튐 정지 스위치 (est_mode:=slam 과 같이 시뮬로 정하려고). 비우면 노드 기본 true
+                         **({"trip_on_pose_jump": _truthy(g("trip_on_pose_jump"))} if g("trip_on_pose_jump") else {})}]))
 
     # 슬립률 기록 (로깅 전용). 시뮬이면 참값으로 구한 슬립률도 같이 남긴다
     nodes.append(Node(
@@ -408,6 +413,9 @@ def generate_launch_description():
         A("mpc_w_delta", default_value="", description="MPC 토크 변화 벌점 r_Δ (비우면 torque_mpc.yaml tuning.w_delta)"),
         A("mpc_r_u", default_value="", description="MPC 입력 편차 벌점 r_U (비우면 torque_mpc.yaml tuning.r_u)"),
         A("mpc_dist_alpha", default_value="", description="외란 추정치 저역통과 α (비우면 torque_mpc.yaml disturbance.alpha)"),
+        A("est_mode", default_value="", description="추정기 모드 kf (고정 게인 칼만) | slam (SLAM 으로 덮어쓰기, 원래 설계). 비우면 torque_estimator.yaml (기본 kf)"),
+        A("trip_on_pose_jump", default_value="", description="fault_monitor 가 무장 중 SLAM 포즈 튐에 정지 true/false (비우면 true)"),
+        A("sim_slam_jump", default_value="", description="시뮬 포즈 튐 흉내 \"t,dx,dy[,dyaw_deg[,once]]\": 출발 t 초 뒤부터 SLAM 포즈를 옮긴다 (once 1 = 스캔 하나만)"),
         A("mpc_q_null", default_value="", description="MPC 영공간 벌점 (비우면 torque_mpc.yaml tuning.q_null)"),
         A("mu_hat", default_value="", description="제어기의 노면 마찰계수 (YAML 기본 0.3)"),
         A("log_prefix", default_value="", description="MPC CSV 접두. 비면 저장 안 함"),

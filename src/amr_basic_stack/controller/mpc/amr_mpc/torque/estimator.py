@@ -31,6 +31,17 @@
 
 포즈 튐: 잔차가 jump_xy / jump_yaw 를 넘으면 보정에 쓰지 않고 센다. 연속 jump_reset_count 번이면 SLAM 을 따라 다시 초기화.
 
+모드 (mode, launch 인자 est_mode, 2026-11-19 사용자 결정 — 기본 kf, 채택은 팀 논의 뒤)
+  kf   : 위 설명 그대로 (고정 게인 정상상태 칼만, 튐은 버림).
+  slam : 원래 설계 (구조도 v3 "SLAM 리셋 + IMU 적분"). SLAM 포즈가 오면
+           · 위치·방향을 그 포즈로 덮어쓴다 (게인 1). 포즈 시각에 덮어쓰고 지금까지는 위 전파식으로 옮긴다 —
+             늦게 온 포즈(약 0.13 s)를 지금 상태에 그대로 쓰면 0.7 m/s 에서 9 cm, 1.4 rad/s 에서 10° 뒤처진다.
+           · 속도는 두 포즈 차분 (z_k − z_{k−1}) / (t_k − t_{k−1}) 를 1 차 저역통과(slam_v_lpf_hz)한 값으로 덮어쓴다 (v3 "포즈 미분 + LPF").
+             차분은 두 포즈 가운데 시각의 속도라 T/2 = 0.05 s 늦다 (v3 와 같다).
+           · 바이어스는 기동 정지 구간 값 그대로 (온라인 추정 없음).
+           · 튐(잔차 > jump_xy / jump_yaw)도 그대로 믿는다. 개수는 센다 (로그·fault_monitor 의 pose_jump 용).
+             튄 포즈와 그 앞 포즈의 차분은 속도로 쓰지 않는다 (재측위 1.4 m 가 14 m/s 로 들어가지 않게).
+
 포즈 끊김 (R3 리뷰 2026-11-13): SLAM 이 멈춰도 IMU 는 계속 오므로 적분만으로 출력이 이어진다. 그러면 위치가 t² 로
   흘러가는데 MPC 는 그 추정값을 따라가므로 추종 오차 감시(fault_monitor)에도 안 걸린다. 마지막 보정 뒤 IMU 시간이
   max_dead_reckoning 초를 넘으면 ready_to_publish() 가 False → 노드가 출력을 멈추고, MPC state_timeout·fault_monitor 가 세운다.
@@ -82,9 +93,17 @@ def design_gains(T, accel_noise_density, accel_bias_walk, pose_noise_xy,
     return K_xy, K_yaw
 
 
+MODES = ("kf", "slam")
+
+
 class PlanarStateEstimator:
     def __init__(self, cfg, pose_period=0.1):
         g = cfg.get
+        self.mode = str(g("mode", "kf")).strip().lower()
+        if self.mode not in MODES:
+            raise ValueError(f"mode={self.mode!r} — kf | slam")
+        self.slam_v_lpf_hz = float(g("slam_v_lpf_hz", 2.0))        # slam 모드 속도 저역통과 [Hz] (≤ 0 이면 끔)
+        self.slam_v_max_dt = float(g("slam_v_max_dt", 0.5))        # [s] 두 포즈 간격이 이보다 길면 차분을 속도로 쓰지 않는다
         self.K_xy, self.K_yaw = design_gains(
             pose_period, float(g("accel_noise_density", 0.07)), float(g("accel_bias_walk", 0.02)),
             float(g("pose_noise_xy", 0.003)), float(g("gyro_noise_density", 0.0064)),
@@ -129,6 +148,8 @@ class PlanarStateEstimator:
         self.last_residual = np.zeros(3)
         self.n_corrections = 0
         self.last_fix_t = None          # 마지막으로 포즈를 반영한 IMU 시각 (보정·초기화·재초기화)
+        self._slam_prev = None          # slam 모드: 직전 포즈 (시각, IMU 점 위치) — 두 포즈 차분 속도용
+        self._v_slam = None             # slam 모드: 저역통과한 차분 속도 (map)
 
     @property
     def ready(self):
@@ -163,6 +184,8 @@ class PlanarStateEstimator:
         self.hist.clear()
         self.pose_ready = True
         self.last_fix_t = self.t
+        self._slam_prev = None
+        self._v_slam = None
 
     # ── 예측 ────────────────────────────────────────────────────
     def imu(self, t, ax, ay, wz):
@@ -198,13 +221,13 @@ class PlanarStateEstimator:
         return True
 
     # ── 보정 ────────────────────────────────────────────────────
-    def _state_at(self, tm):
-        """이력에서 tm 시각의 (p, psi). 이력보다 새 시각이면 최신 상태."""
+    def _hist_at(self, tm):
+        """이력에서 tm 시각의 (p, v, psi). 이력보다 새 시각이면 최신 상태."""
         h = self.hist
         if not h or tm >= h[-1][0]:
-            return self.p.copy(), self.psi
+            return self.p.copy(), self.v.copy(), self.psi
         if tm <= h[0][0]:
-            return np.array(h[0][1:3]), h[0][5]
+            return np.array(h[0][1:3]), np.array(h[0][3:5]), h[0][5]
         lo, hi = 0, len(h) - 1
         while hi - lo > 1:
             mid = (lo + hi) // 2
@@ -214,36 +237,16 @@ class PlanarStateEstimator:
                 hi = mid
         a, b = h[lo], h[hi]
         u = (tm - a[0]) / (b[0] - a[0]) if b[0] > a[0] else 0.0
-        return np.array([a[1] + u * (b[1] - a[1]), a[2] + u * (b[2] - a[2])]), a[5] + u * (b[5] - a[5])
+        lerp = lambda i: a[i] + u * (b[i] - a[i])
+        return np.array([lerp(1), lerp(2)]), np.array([lerp(3), lerp(4)]), lerp(5)
 
-    def pose(self, tm, x, y, yaw):
-        """SLAM 포즈 하나 (tm = 그 포즈의 시각). 반환: 'init' | 'used' | 'old' | 'jump' | 'reset'."""
-        if not self.pose_ready:
-            self._first_pose = (x, y, yaw)
-            if self.bias_ready:
-                self._init_pose(x, y, yaw)
-            return "init"
-        if self.t is not None and self.t - tm > self.max_pose_age:
-            return "old"
-        p_m, psi_m = self._state_at(tm)
-        e = self._to_imu_point(x, y, yaw) - p_m
-        e_psi = wrap(yaw - psi_m)
-        self.last_residual = np.array([e[0], e[1], e_psi])
-        if math.hypot(*e) > self.jump_xy or abs(e_psi) > self.jump_yaw:
-            self.jump_count += 1
-            self._jump_streak += 1
-            if self._jump_streak >= self.jump_reset_count:
-                v = self.v.copy()
-                self._init_pose(x, y, yaw)      # SLAM 이 계속 다른 곳을 가리킨다 → 따라간다
-                self.v = v
-                self._jump_streak = 0
-                return "reset"
-            return "jump"
-        self._jump_streak = 0
-        Kp, Kv, Kb = self.K_xy
-        dp, dv, db = Kp * e, Kv * e, Kb * e                       # map 좌표
-        dpsi, dbg = self.K_yaw[0] * e_psi, self.K_yaw[1] * e_psi
-        # 이력에 반영 (tm 이후 항목)
+    def _state_at(self, tm):
+        """이력에서 tm 시각의 (p, psi). 이력보다 새 시각이면 최신 상태."""
+        p, _, psi = self._hist_at(tm)
+        return p, psi
+
+    def _apply(self, tm, dp, dv, db, dpsi, dbg):
+        """tm 시각의 보정량을 이력(tm 이후)과 지금 상태로 전파해서 더한다 (머리주석 "보정" 식). dp·dv·db 는 map 좌표."""
         if self.hist:
             h = self.hist
             for i in range(len(h) - 1, -1, -1):
@@ -266,7 +269,58 @@ class PlanarStateEstimator:
         self.b_g += dbg
         self.n_corrections += 1
         self.last_fix_t = self.t
+
+    def pose(self, tm, x, y, yaw):
+        """SLAM 포즈 하나 (tm = 그 포즈의 시각).
+        반환: 'init' | 'used' | 'old' | 'jump' | 'reset' (kf) | 'jump_used' (slam: 튐인데 그대로 따름)."""
+        if not self.pose_ready:
+            self._first_pose = (x, y, yaw)
+            if self.bias_ready:
+                self._init_pose(x, y, yaw)
+            return "init"
+        if self.t is not None and self.t - tm > self.max_pose_age:
+            return "old"
+        p_m, v_m, psi_m = self._hist_at(tm)
+        z = self._to_imu_point(x, y, yaw)
+        e = z - p_m
+        e_psi = wrap(yaw - psi_m)
+        self.last_residual = np.array([e[0], e[1], e_psi])
+        jumped = math.hypot(*e) > self.jump_xy or abs(e_psi) > self.jump_yaw
+        if self.mode == "slam":
+            return self._pose_slam(tm, z, e, e_psi, v_m, jumped)
+        if jumped:
+            self.jump_count += 1
+            self._jump_streak += 1
+            if self._jump_streak >= self.jump_reset_count:
+                v = self.v.copy()
+                self._init_pose(x, y, yaw)      # SLAM 이 계속 다른 곳을 가리킨다 → 따라간다
+                self.v = v
+                self._jump_streak = 0
+                return "reset"
+            return "jump"
+        self._jump_streak = 0
+        Kp, Kv, Kb = self.K_xy
+        self._apply(tm, Kp * e, Kv * e, Kb * e, self.K_yaw[0] * e_psi, self.K_yaw[1] * e_psi)
         return "used"
+
+    def _pose_slam(self, tm, z, e, e_psi, v_m, jumped):
+        """slam 모드 (머리주석 "모드"): 포즈 시각의 위치·방향을 SLAM 으로, 속도를 두 포즈 차분 + 저역통과로 덮어쓴다."""
+        dv = np.zeros(2)
+        prev = self._slam_prev
+        if jumped:
+            self.jump_count += 1
+            self._v_slam = None                  # 튄 포즈의 차분은 속도가 아니다 — 다음 쌍부터 다시
+        elif prev is not None and 0.0 < tm - prev[0] <= self.slam_v_max_dt:
+            dt = tm - prev[0]
+            v_raw = (z - prev[1]) / dt
+            if self._v_slam is None or self.slam_v_lpf_hz <= 0.0:
+                self._v_slam = v_raw
+            else:
+                self._v_slam = self._v_slam + (1.0 - math.exp(-2.0 * math.pi * self.slam_v_lpf_hz * dt)) * (v_raw - self._v_slam)
+            dv = self._v_slam - v_m
+        self._slam_prev = (tm, z.copy())
+        self._apply(tm, e, dv, np.zeros(2), e_psi, 0.0)
+        return "jump_used" if jumped else "used"
 
     # ── 출력 ────────────────────────────────────────────────────
     def dead_reckoning_age(self):
