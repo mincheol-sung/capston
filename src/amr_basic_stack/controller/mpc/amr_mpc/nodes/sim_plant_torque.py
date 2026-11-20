@@ -85,6 +85,9 @@ class SimPlantTorqueNode(Node):
             ("slam_latency", SENSOR_DEFAULTS["slam_latency"]),    # [s] 스캔 시각 → 결과가 나오는 시각
             ("sensor_noise_scale", 1.0),                          # 0 이면 잡음 없음 (바이어스는 그대로)
             ("sensor_seed", 0),
+            # 포즈 튐 흉내 (2026-11-19, sim_sensors.py 머리주석). "t,dx,dy[,dyaw_deg[,once]]" — 출발 t 초 뒤부터 스캔 포즈를
+            # (dx, dy) m·dyaw° 옮긴다. once 1 이면 스캔 하나만. 비우면 끔
+            ("slam_jump", ""),
             ("surface_mu", -1.0),        # 바닥 마찰계수. ≤ 0 이면 슬립 없음 (기존 모델)
             ("slip_v_eps", 0.02),        # [m/s] 마찰력을 부드럽게 잇는 미끄럼 속도
             ("floor_efficiency", [1.0, 1.0, 1.0]),   # 바닥 효율 [η_x, η_y, η_ψ] (model.py step eff, 슬립 없는 판만). 실차 5-2 (0.15 N·m 가속 맞춤): 0.65, 0.40, 0.40
@@ -140,6 +143,16 @@ class SimPlantTorqueNode(Node):
             for key in ("accel_noise_still", "accel_noise_moving", "gyro_noise_still", "gyro_noise_moving",
                         "slam_noise_xy", "slam_noise_yaw_deg"):
                 scfg[key] = SENSOR_DEFAULTS[key] * k
+            jump = [float(v) for v in str(g("slam_jump")).replace(" ", "").split(",") if v]
+            if jump:
+                if not 3 <= len(jump) <= 5:
+                    raise SystemExit(f"[sim_plant] slam_jump={g('slam_jump')!r} — \"t,dx,dy[,dyaw_deg[,once]]\"")
+                jump += [0.0] * (5 - len(jump))
+                scfg.update(slam_jump_t=jump[0], slam_jump_dx=jump[1], slam_jump_dy=jump[2],
+                            slam_jump_dyaw_deg=jump[3], slam_jump_once=bool(jump[4]))
+                self.get_logger().warning(
+                    f"포즈 튐 흉내: 출발 {jump[0]:g} s 뒤 SLAM 포즈 ({jump[1]:+.2f}, {jump[2]:+.2f}) m, {jump[3]:+.1f}° "
+                    f"{'스캔 하나만' if jump[4] else '그 뒤 계속'}")
             self.sensors = SimSensors(scfg, seed=int(g("sensor_seed")))
             self.pub_div = max(1, int(round(float(g("imu_rate_hz")) / float(g("rate_hz")))))
             self.dt = self.dt / self.pub_div                  # 물리 틱 = IMU 주기

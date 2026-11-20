@@ -11,6 +11,15 @@
 estimator:
   publish_period: 0.01          # [s] 출력 주기 = MPC Ts. IMU stamp 가 이만큼 지날 때마다 낸다
 
+  # ── 모드 (2026-11-19 사용자 결정: 기본 kf, 채택은 팀 논의 뒤). 한 번만 바꿀 때 launch 인자 est_mode:=slam (amrall 도 같음)
+  #   kf   : 아래 잡음 값으로 계산한 고정 게인 칼만 보정. 튐(jump_xy·jump_yaw_deg 초과)은 버린다
+  #   slam : 원래 설계(구조도 v3) — 포즈 시각의 위치·방향을 SLAM 으로 덮어쓰고, 속도는 두 포즈 차분 + 저역통과.
+  #          튐도 그대로 따른다(개수만 센다). 바이어스는 기동 정지 값 고정. 아래 게인·잡음 값은 쓰지 않는다
+  mode: kf
+  slam_v_lpf_hz: 2.0            # [Hz] slam 모드 속도 저역통과 (≤ 0 이면 끔). 시뮬 비교(2026-11-19, test_torque_estimator 원 주행,
+                                #   실측 수준 잡음 3 판 평균) 속도 RMS: 없음 77 · 5 Hz 74 · 3 Hz 70 · 2 Hz 69 · 1 Hz 87 mm/s (kf 54)
+  slam_v_max_dt: 0.5            # [s] 두 포즈 간격이 이보다 길면 차분을 속도로 쓰지 않는다
+
   # ── SLAM 포즈를 어떻게 고르나
   #   stamped          : stamp 가 새로 바뀐 포즈는 모두 그 stamp 시각의 측정값으로 쓴다.
   #                      Cartographer 외삽을 끈 설정(use_pose_extrapolator = false → 스캔 시각 stamp, 약 0.13 s 늦게 도착)과 시뮬용.

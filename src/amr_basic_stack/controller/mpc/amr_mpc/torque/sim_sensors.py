@@ -6,6 +6,10 @@
   · IMU 200 Hz. 가속도계에 일정한 바이어스(기울어진 장착의 중력 성분, 약 0.15 m/s²)와,
     움직일 때 커지는 진동 잡음(정지 0.015 → 주행 0.95 m/s², 자이로 0.003 → 0.09 rad/s)이 있다.
   · 스캔 매칭은 10 Hz, 결과는 스캔 시각보다 slam_latency(실측 0.13 s) 늦게 나온다.
+  · 포즈 튐 흉내 (2026-11-19, 추정기 est_mode kf/slam 과 fault_monitor pose_jump 판단용). slam_jump_t ≥ 0 이면
+    로봇이 처음 움직인 뒤(속도 > 0.05 m/s) slam_jump_t 초부터 스캔 포즈에 (slam_jump_dx, dy) [m, map], slam_jump_dyaw_deg 를 더한다.
+      slam_jump_once false : 그 뒤로 계속 (전역 최적화·재측위처럼 SLAM 이 다른 자리로 옮겨 간 꼴)
+      slam_jump_once true  : 스캔 하나에만 (스캔 매칭이 한 번 틀린 꼴)
   · slam_mode
       scan_time    : 스캔 시각 stamp 의 포즈를 늦게 한 번 낸다 (Cartographer use_pose_extrapolator = false 꼴)
       extrapolated : 100 Hz 로 stamp = 지금 인 포즈를 낸다. 마지막 두 스캔 포즈의 차로 구한 일정 속도로 위치를 외삽하고
@@ -27,6 +31,7 @@ DEFAULTS = dict(
     slam_noise_xy=0.002, slam_noise_yaw_deg=0.1,
     pose_pub_period=0.01,               # extrapolated 모드의 발행 주기
     gravity=9.81,
+    slam_jump_t=-1.0, slam_jump_dx=0.0, slam_jump_dy=0.0, slam_jump_dyaw_deg=0.0, slam_jump_once=False,   # 포즈 튐 (머리주석)
 )
 
 
@@ -44,6 +49,8 @@ class SimSensors:
         self.next_pose_pub = None
         self.pending = deque()              # (release_t, t_scan, x, y, yaw, theta_true)
         self.scans = deque(maxlen=2)        # 외삽기가 가진 스캔 포즈 (t_scan, p[2], yaw, theta_true)
+        self.t_moved = None                 # 처음 움직인 시각 (포즈 튐 흉내 기준)
+        self.jumps_done = 0                 # 튐을 넣은 스캔 수
 
     def _point(self, X):
         c, s = math.cos(X[2]), math.sin(X[2])
@@ -79,9 +86,16 @@ class SimSensors:
         # ── 스캔: 지금의 tracking_frame 포즈를 재고, slam_latency 뒤에 나오게 넣어 둔다
         if self.next_scan is None:
             self.next_scan = t
+        if self.t_moved is None and math.hypot(Xd[0], Xd[1]) > 0.05:
+            self.t_moved = t
         if t >= self.next_scan:
             p = self._point(X) + self.rng.normal(0, c["slam_noise_xy"], 2)
             yaw = X[2] + self.rng.normal(0, math.radians(c["slam_noise_yaw_deg"]))
+            if (c["slam_jump_t"] >= 0.0 and self.t_moved is not None and t >= self.t_moved + c["slam_jump_t"]
+                    and not (c["slam_jump_once"] and self.jumps_done > 0)):
+                p = p + np.array([c["slam_jump_dx"], c["slam_jump_dy"]])
+                yaw += math.radians(c["slam_jump_dyaw_deg"])
+                self.jumps_done += 1
             self.pending.append((t + c["slam_latency"], t, p[0], p[1], yaw, float(X[2])))
             self.next_scan += c["slam_period"]
         while self.pending and self.pending[0][0] <= t:
