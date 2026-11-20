@@ -61,6 +61,15 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-20 (jjm) — smc 18f0816 (NUC 작업 트리 11-19~20) 을 jjm 에 병합: 바퀴별 상한 두 갈래를 하나로, 기하는 새 하부 값
+- 바퀴별 C 상한: τ̄_i = min(모터, τ_μ,i·s_i). τ_μ,i 는 smc 쪽 (`surface.mu_hat_wheels` 가 있으면 그 값, 없으면 μ̂ × `body.wheel_load_share`),
+  s_i 는 jjm 쪽 추가 배율 `surface.wheel_limit_scale` (기본 1 — 하중 몫을 두 번 세지 않게 보통 1, 모터 차이 같은 남는 몫에만).
+  C++ `TorqueMPC::tau_bar()`, Python `TorquePlant.tau_bar_friction()` 이 같은 식. launch 인자 `mu_hat_wheels`·`wheel_load_share`·`wheel_limit_scale`·`surface` 모두 남김
+- 기하: 새 하부(11-19 (7)) 172.4 / 214.0 mm (k 0.1932) 를 따름. jjm 11-17 실측 169 / 220 (k 0.1945) 은 새 하부 전 치수라 주석으로만 남김 — 새 하부에서 다시 잴 것
+- 충돌 7 파일 손으로: torque_plant.yaml (기하), torque_mpc.cpp·model.py (상한 식), torque_experiment·real_all launch (인자 합집합), 체크리스트·이 파일 (양쪽 항목)
+- 확인 (PC WSL): gtest torque 32 통과, pytest 336 중 실패 4 (test_can_setup CRLF, Windows 체크아웃만). 시뮬 launch
+  `limit_mode:=friction mu_hat:=0.4 wheel_limit_scale:=0.85,1,1.1,1` → 바퀴별 τ̄ 0.0929 / 0.0721 / 0.1269 / 0.0886 N·m (mu_hat_wheels × 배율)
+
 ### 2026-11-20 (4) — 정사각형 기준 `shape:=square` (변 가운데 최고속도, 꼭짓점 0.1 m/s) + 시뮬 비교
 - 왜: 사용자 "정사각형 경로 중앙에서 낼 수 있는 최고속도, 꼭짓점에서는 0.1 m/s". 시나리오 문서의 "PP 는 코너커팅, MPC 는 따라감" 확인용.
 - 무엇: `amr_mpc/core/square.py` (새) — 출발 포즈가 꼭짓점, 첫 변 = 출발 헤딩, 왼쪽으로. 변마다 accel 로 가속·감속 →
@@ -488,6 +497,38 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
   C μ̂ 0.6, 한 판씩): PP RMS 9.4 / 최대 39.2 mm, τ RMS 0.047, Δτ RMS 0.0038 | **MPC 새 가중치 27.4 / 68.7 mm**, τ RMS 0.047, Δτ RMS 0.0033 |
   MPC 예전 11.4 / 32.2 mm, τ RMS 0.070, Δτ RMS 0.0179. → 토크 크기·떨림은 A 와 같아졌지만 **추종은 A 의 3 배로 나빠졌다** (외란 추정치 d̂ 끔 —
   A 는 바퀴 PI 의 적분과 엔코더 안쪽 루프가 모델 오차를 지운다. pole 은 추종 동역학만 맞추고 외란 억제는 안 맞춘다). 실차 미확인.
+### 2026-11-18 (jjm) — 노면별 μ̂ 표·절차·도구, C 상한을 바퀴별로 (`surface:=`, `wheel_limit_scale`)
+- 왜: 비교군 C 의 μ̂ 를 판마다 바꿔 쓰고 있었다(0.55·0.6 은 미측정 가정값). 노면마다 잰 값을 상수로 쓰고, 근거를 남긴다.
+  또 11-17 램프 기록에서 FL·RR(대각)이 같은 토크에서 먼저 미끄러졌다 (슬립 시작 모터 토크 중앙 FL 0.181·RR 0.182 vs FR 0.270·RL 0.256 N·m,
+  모터 보고 토크/명령은 0.94~0.96 으로 2 % 안) → 바퀴별 상한이 필요하다.
+- 노면 μ̂:
+  - `amr_mpc/core/surfaces.py` (ROS 없음) — 판정(slip / no_slip 하한 / unconfirmed 버림), 대표값 = 주 방향(앞·뒤) 중앙값 중 작은 쪽, 5 판 이상이면 `확정`
+  - `tools/mu_surface.py list|summarize` — `mu_ramp_test` 의 `_summary.csv`·`torque_ramp_node` CSV 를 모아 `config/surfaces.yaml` 에 쓴다 (`--write`)
+  - `config/surfaces.yaml` — `lab_floor` 는 **미측정**으로 둠
+  - launch `surface:=<이름>` (`torque_experiment`·`amrall`): 표의 μ̂, 표에 없거나 미측정이면 실행 거부. `mu_hat:=` 가 우선
+- 바퀴별 상한: τ̄_i = min(모터, τ_μ·s_i), `torque_plant.yaml surface.wheel_limit_scale: [FL, FR, RL, RR]` (**기본 1 = 예전과 같음**)
+  - C++ `TorqueModel::wheel_limit_scale`·`TorqueMPC::tau_bar()` (C 에서만, 0 < s ≤ 1.5 검사), 노드 파라미터 `wheel_limit_scale`, 시작 로그 `바퀴별 τ̄`
+  - Python `TorquePlant.wheel_limit_scale`·`tau_bar_friction()`, launch 인자 `wheel_limit_scale:=0.85,1,1.1,1`
+  - `tools/mu_surface.py wheels --loads … --ramp-node …` — s_i = (N_i/N̄)/g_i (하중, 모터 비), 바퀴별 램프 슬립 시작으로 검산
+- 문서: `notes_amr/mu_surface_procedure.md` (절차·원리), `notes_amr/mu_experiment_2026-11-18.md` (오늘 실험 명령), 체크리스트 μ̂ 항목에 안내
+- 잠정 분석 (11-17 스텝·램프 11 판, 미끄러지는 구간의 몸체 가속): 앞 μ̂ 중앙 0.49 (0.40~0.53, 5 판), 옆 0.28 (0.24~0.29, 5 판) —
+  뒤 방향·바퀴별 하중은 아직. 표에는 안 씀
+- 확인 (PC WSL): gtest torque 28 통과(새 1), pytest 242 중 실패 5 (기존 CAN 시험 4 + KeyError 'controller' 1, 위 11-17 항목과 같음).
+  시뮬 launch `wheel_limit_scale:=0.85,1,1.1,1` → 바퀴별 τ̄ 0.0860 / 0.1012 / 0.1113 / 0.1012 N·m (μ̂ 0.4). 실차 미확인
+
+### 2026-11-17 (jjm) — 차체 기하를 AK40 교체 뒤 실측 치수로: 앞뒤 169 mm, 좌우 220 mm (k 0.19835 → 0.1945)
+- 왜: 모터를 AK40 으로 바꾸면서 바퀴 위치가 바뀌었다. **169 / 220 mm 는 실차 실측값**(전준민 실측·전달). 기존 0.1897 / 0.207 m 는 RoboClaw 시절 치수.
+  메카넘 기구학 T⁻¹ 의 회전 항 k = lx + ly 와 바퀴 관성 항 I_eff = I_z + μk² 가 이 값에 기댄다.
+- 바꾼 파일:
+  - `controller/mpc/config/torque_plant.yaml` — `wheel_base_m` 0.1897 → 0.169, `robot_width_m` 0.207 → 0.220 (lx 0.0845, ly 0.110, k 0.1945).
+    토크 MPC(C++ 노드도 이 파일을 읽음)·시뮬 플랜트·추정기·slip_logger·torque_output·도구가 모두 여기서 읽는다
+  - `sensors/amr_description/urdf/amr_basic.urdf` — 바퀴 joint 4 개 (±0.09491, ±0.10352) → (±0.0845, ±0.110). 센서 위치는 그대로
+- 안 바꾼 것: `mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp`·`wheel_mpc.hpp` 기본값(1판 수치 예 검산 시험이 기댐, 실행 땐 yaml 값),
+  `config/plant.yaml`·`plant_wheel.yaml`(구조 A·B), `controller/sys_id/`, `amcl_wiggle_node.py`, `tools/diag_fig8.py` 의 0.19835 — 모두 RoboClaw 시절 경로
+- 확인 (PC WSL): 모델 k = 0.1945 읽음, URDF `check_urdf` 통과, gtest torque 27·wheel 11 통과, pytest 227 중 실패 5 —
+  `test_can_setup` CRLF 4 개(Windows 체크아웃, 기존)와 `test_real_launch_does_not_start_nodes_if_setup_fails` `KeyError: 'controller'`
+  (이 변경 전 smc a48d513 에서도 같은 실패 — launch 의 `controller` 인자에 시험의 가짜 context 가 안 따라옴). 실차 미확인
+- 실차에서 볼 것: 제자리 회전 효율(11-15 4-4 0.98~1.05 는 옛 k 기준)·회전 중심, 시뮬 8자 B·A 오차 재기준
 
 ### 2026-11-16 (18) — 잘못된 yaw_mode·shape 을 launch 에서 거부, circles8 tangent 교차점 헤딩 완화 `crossing_blend_m`
 - 왜: 접선 판 분석 (`analysis/torque_mpc_real/2026-11-16_circles8/tools/crossing.py`·`halves.py`).

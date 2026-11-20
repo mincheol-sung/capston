@@ -67,7 +67,7 @@
     <axis xyz="0 1 0"/>
     <parent link="base_link"/>
     <child link="front_left_wheel_link"/>
-    <origin rpy="0 0 0" xyz="0.09491 0.10352 0"/>
+    <origin rpy="0 0 0" xyz="0.0845 0.110 0"/>
   </joint>
   <gazebo reference="front_left_wheel_link">
     <collision>
@@ -116,7 +116,7 @@
     <axis xyz="0 1 0"/>
     <parent link="base_link"/>
     <child link="front_right_wheel_link"/>
-    <origin rpy="0 0 0" xyz="0.09491 -0.10352 0"/>
+    <origin rpy="0 0 0" xyz="0.0845 -0.110 0"/>
   </joint>
   <gazebo reference="front_right_wheel_link">
     <collision>
@@ -165,7 +165,7 @@
     <axis xyz="0 1 0"/>
     <parent link="base_link"/>
     <child link="rear_left_wheel_link"/>
-    <origin rpy="0 0 0" xyz="-0.09491 0.10352 0"/>
+    <origin rpy="0 0 0" xyz="-0.0845 0.110 0"/>
   </joint>
   <gazebo reference="rear_left_wheel_link">
     <collision>
@@ -214,7 +214,7 @@
     <axis xyz="0 1 0"/>
     <parent link="base_link"/>
     <child link="rear_right_wheel_link"/>
-    <origin rpy="0 0 0" xyz="-0.09491 -0.10352 0"/>
+    <origin rpy="0 0 0" xyz="-0.0845 -0.110 0"/>
   </joint>
   <gazebo reference="rear_right_wheel_link">
     <collision>

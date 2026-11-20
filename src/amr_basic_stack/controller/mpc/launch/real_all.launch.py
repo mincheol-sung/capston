@@ -34,7 +34,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 # torque_experiment.launch.py 로 그대로 넘기는 인자 (비우면 넘기지 않는다 → 그쪽 기본값·YAML)
-_PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_hat", "mu_hat_wheels", "wheel_load_share", "disturbance", "stiction_comp", "use_w",
+_PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_hat", "surface", "wheel_limit_scale", "mu_hat_wheels", "wheel_load_share", "disturbance", "stiction_comp", "use_w",
          "origin_mode", "shape", "crossing_blend_m", "load_budget", "spin_rate",
          "width", "height", "yaw_mode", "align_s",
          "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_out_and_back", "seg_pause_s", "speed",

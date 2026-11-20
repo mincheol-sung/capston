@@ -18,7 +18,7 @@
 바퀴 관성 항의 부호는 몸체 좌표식 m_eff·v̇ = F − m·ω_z·S·v 를 관성 좌표로 옮겨 확인했다:
 Ẍ_xy = R v̇ + ω_z S Ẋ_xy 이므로 m_eff·Ẍ_xy = R F + (m_eff − m)·ω_z·S·Ẋ_xy.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 
 import numpy as np
@@ -73,11 +73,17 @@ class TorquePlant:
     c_s: float
     g: float
     wheel_load_share: np.ndarray = None      # 바퀴별 수직력 몫 (합 1). None 이면 1/4 씩 (2026-11-19)
+    # 바퀴별 추가 배율 [FL, FR, RL, RR] (2026-11-18, 기본 1) — C 의 τ̄_i = min(모터, τ_μ,i·s_i). torque_plant.yaml surface.wheel_limit_scale.
+    #   하중 몫은 wheel_load_share 가 맡으니 보통 1 로 두고, 모터 차이(g_i) 같은 남는 몫에만 쓴다
+    wheel_limit_scale: np.ndarray = field(default_factory=lambda: np.ones(4))
 
     def __post_init__(self):
         self.wheel_load_share = load_share(self.wheel_load_share)
         self.fric_coulomb = wheel_coefficients(self.fric_coulomb, "coulomb_Nm")
         self.fric_viscous = wheel_coefficients(self.fric_viscous, "viscous_Nms_per_rad")
+        self.wheel_limit_scale = wheel_coefficients(self.wheel_limit_scale, "wheel_limit_scale")
+        if not ((self.wheel_limit_scale > 0).all() and (self.wheel_limit_scale <= 1.5).all()):
+            raise ValueError("wheel_limit_scale 는 바퀴마다 0 < s ≤ 1.5 [FL, FR, RL, RR]")
 
     @classmethod
     def from_yaml(cls, filename=PLANT_FILE, **override):
@@ -101,6 +107,7 @@ class TorquePlant:
             c_s=float(surf["c_s"]),
             g=float(model["gravity"]),
             wheel_load_share=body.get("wheel_load_share") or None,
+            wheel_limit_scale=surf.get("wheel_limit_scale", [1.0, 1.0, 1.0, 1.0]),
         )
         p.update(override)
         return cls(**p)
@@ -167,6 +174,10 @@ class TorquePlant:
     def tau_friction_limits(self):
         """바퀴별 τ_μ,i = (r/√2)·μ̂·N_i·c_s (4,) — torque_mpc_node 의 friction 상한과 같다 (2026-11-19)."""
         return self.r / math.sqrt(2.0) * self.mu_hat * self.wheel_normal_force * self.c_s
+
+    def tau_bar_friction(self):
+        """C 의 바퀴별 상한 [FL, FR, RL, RR] = min(모터, τ_μ,i·s_i) — 하중 몫 × 추가 배율 (mu_hat_wheels 는 C++ 노드만 읽는다)."""
+        return np.minimum(self.tau_motor_limit(), self.tau_friction_limits() * self.wheel_limit_scale)
 
     def tau_motor_limit(self):
         """τ_lim − τ_fric,max  — 비교군 B 는 이것만 둔다."""

@@ -391,6 +391,47 @@ TEST(TorqueMPC, LimitDropBeyondRateStaysFeasible)
   EXPECT_NEAR(tau(0), 0.05, 1e-6);
 }
 
+// 바퀴별 마찰 상한 배율 (2026-11-18): C 에서만 τ̄_i = τ_μ·s_i, 모터 상한을 넘지 않고, 해도 바퀴별로 그 안
+TEST(TorqueMPC, WheelLimitScalePerWheelInFrictionModeOnly)
+{
+  TorqueModel md;
+  md.mu_hat = 0.4;
+  md.wheel_limit_scale << 0.8, 1.0, 1.2, 1.0;
+  TorqueTuning tf;
+  tf.limit_mode = TorqueLimitMode::Friction;
+  TorqueMPC c(md, tf);
+  const double tmu = md.tau_friction_limit();
+  const TVec4 tb = c.tau_bar();
+  EXPECT_NEAR(tb(0), 0.8 * tmu, 1e-12);
+  EXPECT_NEAR(tb(1), tmu, 1e-12);
+  EXPECT_NEAR(tb(2), 1.2 * tmu, 1e-12);
+
+  Plant plant{md};
+  TVec4 tau = TVec4::Zero();
+  double peak[4] = {0, 0, 0, 0};
+  for (int k = 0; k < 60; ++k) {
+    tau = c.step(plant.x, hold_ref(TVec3(2.0, 0, 0), 51));       // 멀리 앞 → 상한에 붙는다
+    plant.step(tau, 0.01);
+    for (int i = 0; i < 4; ++i) {
+      EXPECT_LE(std::abs(tau(i)), tb(i) + 1e-9);
+      peak[i] = std::max(peak[i], std::abs(tau(i)));
+    }
+  }
+  EXPECT_NEAR(peak[0], tb(0), 1e-6);                              // 낮춘 바퀴는 낮춘 상한까지만
+
+  md.mu_hat = 10.0;                                               // τ_μ·s 가 모터보다 크면 모터 상한
+  TorqueMPC big(md, tf);
+  EXPECT_NEAR(big.tau_bar()(2), md.tau_motor_limit(), 1e-12);
+
+  TorqueTuning tb_mode;                                           // B(motor_only) 는 배율과 상관없다
+  tb_mode.limit_mode = TorqueLimitMode::MotorOnly;
+  TorqueMPC b(md, tb_mode);
+  EXPECT_NEAR(b.tau_bar()(0), md.tau_motor_limit(), 1e-12);
+
+  md.wheel_limit_scale(3) = 0.0;
+  EXPECT_THROW(TorqueMPC(md, tf), std::invalid_argument);
+}
+
 // 식-9 수치 예: 모델에 없는 1 N → d̂ = [7.8e-6, 0, 0, 0.00156, 0, 0]  (m_eff 6.425 kg)
 TEST(TorqueMPC, DisturbanceResidualMatchesDesignExample)
 {

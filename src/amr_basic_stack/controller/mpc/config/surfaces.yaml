@@ -1,0 +1,17 @@
+# 노면별 마찰계수 μ̂ — 비교군 C 의 토크 상한 τ_μ = (r/√2)·μ̂·(m g/4)·c_s 에 쓴다 (torque_plant.yaml surface.mu_hat 대신).
+# 쓰는 법:  amrall … limit_mode:=friction surface:=<이름>      (mu_hat:=값 을 같이 주면 그 값이 이긴다)
+# 고치는 법: 손으로 고치지 말고 tools/mu_surface.py summarize … --write 로 (측정 근거가 같이 남는다).
+#            절차·판정 규칙: amr/notes_amr/mu_surface_procedure.md,  계산: amr_mpc/core/surfaces.py
+# 항목: mu_hat (추천값, 없으면 null = 미측정 → surface:= 로 쓰면 거부), status (확정 | 부족 | 미측정),
+#       dirs (방향별 판 수·중앙값·최소·최대, 슬립 없는 판의 하한), measured (날짜), method, sources (기록 파일), note
+surfaces:
+  lab_floor:
+    dirs: {}
+    measured: null
+    method: null
+    mu_hat: null
+    note: 'smoc_lab 실험실 바닥. 공식 절차(mu_surface_procedure.md)로는 아직 미측정. 참고만: 2026-11-15 5-2 앞뒤
+      0.2 N·m 까지 슬립 없음 → μ ≥ 0.33 (롤러 기준), 2026-11-17 torque_ramp_node 앞 3 판 거친 판정 0.45~0.53,
+      실차 비교에 쓴 가정값 0.55 (5-3)·0.6 (A·B·C, 미측정)'
+    sources: []
+    status: 미측정

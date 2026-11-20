@@ -17,6 +17,8 @@
 #    ω_i = (v_x ± v_y ± k ω_z)/r,  k = (wheel_base + width)/2 = 0.1932 m
 #    2026-11-19 새 하부 (frame + AK40-10 + 커플러): 축간 172.4 mm (문서 "AMR 하부 변경 전달 사항"의 CAD), 트랙 214.0 mm (사용자 지정 —
 #      plant.yaml 과 같게. 문서 CAD 는 231.9) → l_x 0.0862, l_y 0.1070. 예전 하부: 0.1897 / 0.207 (k 0.19835)
+#    참고: 2026-11-17 jjm 실측 169 / 220 mm (k 0.1945, 전준민 실측) — 11-19 새 하부 전 치수. 2026-11-20 병합에서 새 하부 값을 따름.
+#      새 하부에서 다시 재면 이 값을 고친다 (두 값 차이 k 0.7 %)
 geometry:
   wheel_radius_m: 0.04
   wheel_base_m:   0.1724
@@ -102,6 +104,12 @@ surface:
   #   끄기: launch mu_hat_wheels:=off.  한 번만 다른 값: mu_hat_wheels:="a,b,c,d".  시뮬 플랜트(surface_mu)에는 안 쓰인다
   mu_hat_wheels: [0.432, 0.285, 0.456, 0.350]
   c_s: 0.8                   # 안전계수
+  # 바퀴별 마찰 상한 배율 [FL, FR, RL, RR] (2026-11-18) — C 에서 τ̄_i = min(모터, τ_μ·s_i). 노면이 아니라 차체 성질:
+  #   바퀴마다 실린 무게 N_i, 롤러·접지 상태, 모터 출력 차이로 먼저 미끄러지는 바퀴를 낮춘다. μ̂ 는 노면마다(surfaces.yaml),
+  #   이 배율은 차체마다 한 번. 정하는 법: tools/mu_surface.py wheels (바퀴별 하중 + 바퀴별 램프 슬립 시작) — mu_surface_procedure.md 4절.
+  #   2026-11-17 램프 7 판: FL 이 거의 매번 먼저 미끄러짐, RL 은 거의 안 미끄러짐. 모터 보고 토크/명령은 0.94~0.96 (차이 2 % 안).
+  #   하중·바퀴별 램프 측정 전이라 1 로 둔다 (= 예전과 같음). launch 인자 wheel_limit_scale:=0.85,1,1.1,1 로 실행마다 바꿀 수 있다
+  wheel_limit_scale: [1.0, 1.0, 1.0, 1.0]
 
 # ── 모델 스위치 — 2026-11-16 부터 시뮬 플랜트(Python TorquePlant·sim_plant_torque) 물리만 정한다.
 #    제어기(torque_mpc_node)는 이 값을 안 읽는다: M 에 m_w 를 늘 넣고, w 항만 torque_mpc.yaml model_terms.use_w 로 켜고 끈다

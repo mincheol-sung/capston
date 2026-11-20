@@ -91,6 +91,9 @@ struct TorqueModel
   TVec4 mu_hat_wheels = TVec4::Constant(-1.0);
   double c_s = 0.8;
   double gravity = 9.81;
+  // 바퀴별 마찰 상한 배율 [FL, FR, RL, RR] (2026-11-18). C(friction) 에서 τ̄_i = min(모터, τ_μ·s_i).
+  // 바퀴마다 실린 무게·접지·모터 차이로 먼저 미끄러지는 바퀴를 낮춘다. 1 이면 예전과 같다 (네 바퀴 같은 τ_μ)
+  TVec4 wheel_limit_scale = TVec4::Ones();
 
   double k() const {return 0.5 * (wheel_base + robot_width);}
   double mu() const {return 4.0 * J_w / (wheel_radius * wheel_radius);}     // m_w (식-3)

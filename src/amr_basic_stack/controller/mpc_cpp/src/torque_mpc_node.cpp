@@ -143,6 +143,12 @@ public:
       }
     }
     md.c_s = yp["surface"]["c_s"].as<double>();
+    // 바퀴별 마찰 상한 배율 [FL, FR, RL, RR] (2026-11-18). YAML 에 없으면 1 — 예전과 같다. C 에서만 쓰인다
+    const std::vector<double> ws = declare_parameter<std::vector<double>>(
+      "wheel_limit_scale", yp["surface"]["wheel_limit_scale"] ?
+      yp["surface"]["wheel_limit_scale"].as<std::vector<double>>() : std::vector<double>{1.0, 1.0, 1.0, 1.0});
+    if (ws.size() != 4) {throw std::invalid_argument("wheel_limit_scale 는 4 개여야 한다 [FL, FR, RL, RR]");}
+    for (int i = 0; i < 4; ++i) {md.wheel_limit_scale(i) = ws[i];}
     md.gravity = yp["model"]["gravity"].as<double>();
 
     TorqueTuning tu;
@@ -280,6 +286,10 @@ public:
       get_logger(), "  속도 상태: %s", velocity_source_ == "wheels" ?
       ("v_x·v_y = 바퀴 기구학 T ω (" + wheel_topic + ", 묵음 " + std::to_string(int(wheel_timeout_ * 1e3)) +
       " ms 넘으면 추정기), ω_z = 추정기").c_str() : "추정기 그대로");
+    RCLCPP_INFO(
+      get_logger(), "  바퀴별 τ̄ [FL FR RL RR] = %.4f %.4f %.4f %.4f N·m  (배율 %.2f %.2f %.2f %.2f, C 에서만)",
+      tb(0), tb(1), tb(2), tb(3), md.wheel_limit_scale(0), md.wheel_limit_scale(1), md.wheel_limit_scale(2),
+      md.wheel_limit_scale(3));
     RCLCPP_INFO(
       get_logger(), "  선형화 %s (%s)", linearization_.c_str(),
       tu.linearization == amr_mpc_cpp::TorqueLinearization::CurrentState ?
