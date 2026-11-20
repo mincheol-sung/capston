@@ -33,10 +33,10 @@ model:
 # amr_bringup/config/base.yaml 과 같아야 한다 (드라이버가 같은 값으로 역기구학을 푼다).
 #   V_LIMIT = wheel_radius_m × limits.max_wheel_rad_per_sec
 #   K_GEOM  = (wheel_base_m + robot_width_m) / 2      L1 부하식에서 ω 를 환산하는 팔 길이
-geometry:
+geometry:                 # 2026-11-19 새 하부 (torque_plant.yaml 머리주석). 예전 0.1897 / 0.207
   wheel_radius_m: 0.04
-  wheel_base_m:   0.1897
-  robot_width_m:  0.207
+  wheel_base_m:   0.1724
+  robot_width_m:  0.2140
 
 # ── 제약: 하드웨어 한계와 예산 ───────────────────────────────────
 limits:
@@ -70,9 +70,14 @@ limits:
   max_pose_error: [.inf, .inf, .inf]   # ← 껐다. 근거는 위 주석 (추종 이득 0, step 3배)
 
   # 기준 부하 |vx|+|vy|+K_GEOM·|ω| 가 이 비율을 넘으면 경고(운용)·거부(자기시험).
-  #   남는 35 % 가 되먹임 보정 몫이다. 교재 대응은 튜브 MPC 의 제약 축소율 λ
-  #   (Mayne et al. 2005, Rawlings–Mayne–Diehl Ch.3) 이지만 튜브 폭을 재서 정한 값은 아니다.
-  load_budget: 0.65
+  #   교재 대응은 튜브 MPC 의 제약 축소율 λ (Mayne et al. 2005, Rawlings–Mayne–Diehl Ch.3) 이지만
+  #   튜브 폭을 재서 정한 값은 아니다.
+  # 2026-11-20 0.65 → 1.0 (사용자 결정: 각속도·몸체속도 MPC 는 더 안 쓴다). 지금 이 값을 읽는 운용 경로는
+  #   토크 실험의 figure8_reference_node 기동 검사뿐이다 (V_LIMIT = r × 정격 38.75 rad/s = 1.55 m/s).
+  #   1.0 = 기준이 정격 바퀴속도까지 쓸 수 있고 보정 몫은 정격 위 여유뿐 — 실측 전압 한계 42 rad/s(저토크)까지 8.4 %.
+  #   예전 0.65 는 RoboClaw 속도 명령 시절 값 (남는 35 % 가 되먹임 보정 몫, 34 rad/s 이상은 PWM 88~92 %).
+  #   검사는 마찰(원심 μ)을 안 본다. 퓨어 퍼슛 v_max 는 같은 날 1.7 로 올림 (torque_baseline_a.yaml).
+  load_budget: 1.0
 
 # ── 튜닝: 제어기 설계값 ─────────────────────────────────────────
 tuning:

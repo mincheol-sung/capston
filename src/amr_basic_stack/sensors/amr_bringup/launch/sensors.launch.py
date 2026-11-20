@@ -56,6 +56,13 @@ def depth_camera_include():
                 LaunchConfiguration("depth_camera_enable_imu"), value_type=bool),
             "unite_imu_method": ParameterValue(
                 LaunchConfiguration("depth_camera_unite_imu_method"), value_type=int),
+            # IMU 표본 주기 (2026-11-19). 0 = 장치 기본. D455 fw 5.17.0.10: accel 400/200/100 Hz, gyro 400/200 Hz
+            # (rs-enumerate-devices). 2026-11-18 bag 에서 가속도계 a_x 가 바퀴보다 +55 ms, 자이로는 +15 ms 늦었다 —
+            # 표본 주기를 올리면 linear_interpolation 의 대기·센서 내부 필터 지연이 줄어드는지 시험용 (torque_estimator 속도 지연).
+            "accel_fps": ParameterValue(
+                LaunchConfiguration("depth_camera_accel_fps"), value_type=int),
+            "gyro_fps": ParameterValue(
+                LaunchConfiguration("depth_camera_gyro_fps"), value_type=int),
             # 카메라 프레임(camera_link->optical)은 URDF가 정의하므로 드라이버 TF는 끔
             # (안 끄면 robot_state_publisher와 TF 충돌)
             "publish_tf": ParameterValue(
@@ -172,6 +179,11 @@ def generate_launch_description():
                               description="D455 내장 IMU(gyro+accel) 활성화 -> /camera/imu"),
         DeclareLaunchArgument("depth_camera_unite_imu_method", default_value="2",
                               description="gyro+accel 결합: 0=none 1=copy 2=linear_interpolation"),
+        # 2026-11-19 사용자 결정: 최대로 (가속도계 지연 줄이기, stack_changelog 2026-11-19 (4)). 예전 동작은 0 (장치 기본, IMU 메시지 200 Hz)
+        DeclareLaunchArgument("depth_camera_accel_fps", default_value="400",
+                              description="가속도계 표본 주기 [Hz]. 0 = 장치 기본. D455: 100 | 200 | 400"),
+        DeclareLaunchArgument("depth_camera_gyro_fps", default_value="400",
+                              description="자이로 표본 주기 [Hz]. 0 = 장치 기본. D455: 200 | 400"),
         DeclareLaunchArgument("depth_camera_publish_tf", default_value="false",
                               description="realsense 드라이버 TF 발행 여부. URDF가 카메라 프레임 소유 시 false"),
         DeclareLaunchArgument("depth_camera_initial_reset", default_value="false",

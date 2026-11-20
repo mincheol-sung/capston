@@ -133,6 +133,21 @@ TEST_P(TargetInput, SteadyTurnMinimumNorm)
 }
 INSTANTIATE_TEST_SUITE_P(WTerm, TargetInput, ::testing::Values(false, true));
 
+// 2026-11-18 velocity_source wheels: 바퀴 기구학 T ω 가 force_map 의 T⁻¹ 와 짝 — v → ω = T⁻¹ v → T ω = v,
+//   전진 0.5 m/s 면 네 바퀴 모두 +12.5 rad/s (WheelStates 부호 규약: 전진 시 ω > 0)
+TEST(TorqueModel, WheelKinematicsInvertsForceMap)
+{
+  TorqueModel md;
+  const TMat34 Ft = md.force_map();             // (T⁻¹)ᵀ
+  for (const TVec3 & v : {TVec3(0.5, 0, 0), TVec3(0, 0.3, 0), TVec3(0, 0, 1.2), TVec3(0.7, -0.2, 1.4)}) {
+    const TVec4 omega = Ft.transpose() * v;     // T⁻¹ v
+    EXPECT_LT((md.wheel_body_velocity(omega) - v).cwiseAbs().maxCoeff(), 1e-12);
+  }
+  const TVec4 fwd = md.force_map().transpose() * TVec3(0.5, 0, 0);
+  EXPECT_NEAR(fwd.minCoeff(), 12.5, 1e-9);
+  EXPECT_NEAR(fwd.maxCoeff(), 12.5, 1e-9);
+}
+
 // w 항 지시서 W1: w (식-6) — 4 kg, θ_r = 90°, ṗ_r = [0, 1, 0.417] → [−0.1574, 0, 0] m/s² (원 중심 쪽 = 서쪽).
 //   use_w 가 꺼지면 w() 는 더하지 않는 0, 실제 값은 w_value() (기록·잔차 저장용)
 TEST(TorqueModel, WTermSwitch)
@@ -252,6 +267,73 @@ TEST_P(SteadyTurn, MinimumNormTorqueAndZeroError)
 }
 INSTANTIATE_TEST_SUITE_P(WTerm, SteadyTurn, ::testing::Values(false, true));
 
+// 바퀴별 하중 몫 (2026-11-19): friction 모드에서 τ̄_i = (r/√2)·μ̂·(몫_i·m g)·c_s. 몫 1/4 이면 예전 식-21 과 같다.
+//   토크·변화율이 바퀴마다 자기 상한 안에 있고, 가벼운 바퀴(FL)는 자기 상한에 붙는다. motor_only 에서는 안 쓰인다
+TEST(TorqueMPC, WheelLoadShare)
+{
+  TorqueModel md;
+  md.mu_hat = 0.4;
+  const TVec4 even = md.tau_friction_limits();
+  for (int i = 0; i < 4; ++i) {EXPECT_NEAR(even(i), md.tau_friction_limit(), 1e-12);}   // 기본 1/4 = mg/4
+  md.wheel_load_share = TVec4(0.2388, 0.2392, 0.2608, 0.2612);                        // 2026-11-18 저울
+  const double per_kg = md.wheel_radius / std::sqrt(2.0) * md.mu_hat * md.mass * md.gravity * md.c_s;
+  const TVec4 tf = md.tau_friction_limits();
+  for (int i = 0; i < 4; ++i) {EXPECT_NEAR(tf(i), per_kg * md.wheel_load_share(i), 1e-12);}
+  EXPECT_NEAR(tf.mean(), md.tau_friction_limit(), 1e-12);      // 몫 합 1 → 평균은 그대로
+  EXPECT_LT(tf(0), tf(2));                                    // 앞(가벼움) < 뒤
+  TorqueTuning tu;
+  tu.limit_mode = TorqueLimitMode::Friction;
+  TorqueMPC mpc(md, tu);
+  for (int i = 0; i < 4; ++i) {EXPECT_NEAR(mpc.tau_bar()(i), std::min(tf(i), md.tau_motor_limit()), 1e-12);}
+  Plant plant{md};
+  TVec4 prev = TVec4::Zero();
+  bool fl_saturated = false;
+  for (int k = 0; k < 100; ++k) {
+    const TVec4 tau = mpc.step(plant.x, hold_ref(TVec3(1.0, 0, 0), 51));     // 1 m 앞: 급가속 요구
+    for (int i = 0; i < 4; ++i) {
+      EXPECT_LE(std::abs(tau(i)), tf(i) + 1e-9) << "k=" << k << " i=" << i;
+      EXPECT_LE(std::abs(tau(i) - prev(i)), tf(i) / 3.0 + 1e-9) << "k=" << k << " i=" << i;
+    }
+    EXPECT_EQ(mpc.stats().fallback, 0);
+    if (std::abs(std::abs(tau(0)) - tf(0)) < 1e-9) {fl_saturated = true;}
+    plant.step(tau, tu.Ts);
+    prev = tau;
+  }
+  EXPECT_TRUE(fl_saturated);
+  TorqueTuning tub;                             // motor_only: 하중 몫을 안 쓴다
+  TorqueMPC mpcb(md, tub);
+  EXPECT_NEAR(mpcb.tau_bar()(0), md.tau_motor_limit(), 1e-12);
+  EXPECT_NEAR(mpcb.tau_bar()(3), md.tau_motor_limit(), 1e-12);
+}
+
+// 바퀴별 μ̂ (2026-11-19 (11)): 값이 있는 바퀴는 (r/√2)·μ̂_i·(mg/4)·c_s — mu_hat·하중 몫을 안 쓴다. 0 이하인 바퀴는 mu_hat × 하중 몫
+TEST(TorqueMPC, MuHatWheelsOverrideLoadShare)
+{
+  TorqueModel md;
+  md.mu_hat = 0.4;
+  md.wheel_load_share = TVec4(0.2388, 0.2392, 0.2608, 0.2612);
+  md.mu_hat_wheels = TVec4(0.432, 0.285, -1.0, 0.350);
+  const double quarter = md.wheel_radius / std::sqrt(2.0) * md.mass * md.gravity / 4.0 * md.c_s;   // μ̂ 1 일 때 mg/4 기준
+  const TVec4 tf = md.tau_friction_limits();
+  EXPECT_NEAR(tf(0), 0.432 * quarter, 1e-12);
+  EXPECT_NEAR(tf(1), 0.285 * quarter, 1e-12);
+  EXPECT_NEAR(tf(2), 0.4 * 4.0 * 0.2608 * quarter, 1e-12);    // RL: mu_hat × 하중 몫
+  EXPECT_NEAR(tf(3), 0.350 * quarter, 1e-12);
+  TorqueTuning tu;
+  tu.limit_mode = TorqueLimitMode::Friction;
+  TorqueMPC mpc(md, tu);
+  for (int i = 0; i < 4; ++i) {EXPECT_NEAR(mpc.tau_bar()(i), tf(i), 1e-12);}
+  Plant plant{md};
+  TVec4 prev = TVec4::Zero();
+  for (int k = 0; k < 60; ++k) {
+    const TVec4 tau = mpc.step(plant.x, hold_ref(TVec3(1.0, 0, 0), 51));
+    for (int i = 0; i < 4; ++i) {EXPECT_LE(std::abs(tau(i)), tf(i) + 1e-9) << "k=" << k << " i=" << i;}
+    EXPECT_EQ(mpc.stats().fallback, 0);
+    plant.step(tau, tu.Ts);
+    prev = tau;
+  }
+}
+
 // 통과시험 3 (제약 부분): 비교군 C 상한에서 토크가 τ̄ 에 붙고, 변화율이 Δτ̄ 를 넘지 않는다
 TEST(TorqueMPC, FrictionLimitAndRateAreRespected)
 {
@@ -353,6 +435,59 @@ TEST(TorqueMPC, DisturbanceEstimateRemovesSteadyStateOffset)
   EXPECT_LT(off, 1e-3);
   EXPECT_LT(std::abs(on), 0.05 * off);       // d̂: 오프셋 제거 (1/20 미만)
   std::printf("            정상상태 오차  d̂ 끔 %.3f mm   d̂ 켬 %.4f mm\n", off * 1e3, on * 1e3);
+}
+
+// 2026-11-18 가속도 외란 모델 (dist_accel_only): 진짜 힘이면 식-9 와 같은 d̂, 위치만 튄 잔차는 d̂ 로 안 들어가고, 오프셋도 없앤다
+TEST(TorqueMPC, DisturbanceAccelOnly)
+{
+  TorqueModel md;
+  {   // (a) 모델에 없는 1 N — 식-9 수치 예와 같은 값 (위치 성분 ½Ts·0.00156 = 7.8e-6)
+    TorqueTuning tu;
+    tu.dist_accel_only = true;
+    TorqueMPC mpc(md, tu);
+    Plant plant{md};
+    plant.force_ext << 1.0, 0, 0;
+    plant.x << 0, 0, 0, 0.5, 0, 0;
+    const auto ref = hold_ref(TVec3::Zero(), 51);
+    plant.step(mpc.step(plant.x, ref), 0.01);
+    mpc.step(plant.x, ref);
+    EXPECT_NEAR(mpc.d_hat()(0), 7.8e-6, 2e-7);
+    EXPECT_NEAR(mpc.d_hat()(3), 0.00156, 2e-5);
+  }
+  for (bool accel : {false, true}) {   // (b) 속도 그대로 위치만 0.5 mm (skip_xy 1 mm 아래): 식-9 는 d̂_x 로, 가속도 모델은 0
+    TorqueTuning tu;
+    tu.dist_accel_only = accel;
+    TorqueMPC mpc(md, tu);
+    TVec6 x = TVec6::Zero();
+    mpc.step(x, hold_ref(TVec3::Zero(), 51));
+    x(0) = 5e-4;
+    mpc.step(x, hold_ref(TVec3::Zero(), 51), nullptr, tu.Ts);
+    EXPECT_EQ(mpc.stats().d_skipped, 0);
+    EXPECT_NEAR(mpc.d_hat()(0), accel ? 0.0 : 5e-4, 1e-9);
+  }
+  // (c) 모르는 일정한 힘 아래 등속 직진: 가속도 모델로도 오프셋이 사라진다
+  auto run = [&md](bool enable) {
+      TorqueTuning tu;
+      tu.dist_enable = enable;
+      tu.dist_accel_only = true;
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      plant.force_ext << -1.0, 0, 0;
+      const double v = 0.5;
+      plant.x << 0, 0, 0, v, 0, 0;
+      double err = 0.0;
+      for (int k = 0; k < 500; ++k) {
+        std::vector<TorqueRefPoint> ref;
+        for (int j = 0; j <= tu.Np; ++j) {ref.push_back({TVec3(v * (k + j) * tu.Ts, 0, 0), TVec3(v, 0, 0)});}
+        plant.step(mpc.step(plant.x, ref), tu.Ts);
+        err = v * (k + 1) * tu.Ts - plant.x(0);
+      }
+      return err;
+    };
+  const double off = run(false), on = run(true);
+  EXPECT_GT(off, 2e-4);
+  EXPECT_LT(std::abs(on), 0.05 * off);
+  std::printf("            가속도 외란 모델  d̂ 끔 %.3f mm   d̂ 켬 %.4f mm\n", off * 1e3, on * 1e3);
 }
 
 TEST(TorqueMPC, RejectsBadConfig)

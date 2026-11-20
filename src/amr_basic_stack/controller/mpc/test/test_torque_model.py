@@ -98,9 +98,9 @@ def test_slip_model_saturates_at_friction_limit():
     # 마찰 한계를 넘는 토크: 몸체 가속은 μ g 로 묶이고 바퀴는 헛돈다
     p = TorquePlant.from_yaml()
     sp = SlipPlant(p, mu=0.3)
-    tau_lim = p.r / math.sqrt(2.0) * sp.Fmax                          # 1판 식-21 (c_s 없이)
-    X, Xd, w = run_slip(sp, [3.0 * tau_lim] * 4, T=0.5)
-    a_max = 4 * sp.Fmax / math.sqrt(2.0) / p.mass                    # 네 바퀴 힘의 전방 성분 합 / m
+    tau_lim = p.r / math.sqrt(2.0) * sp.Fmax                          # 1판 식-21 (c_s 없이), 바퀴별 (4,)
+    X, Xd, w = run_slip(sp, [3.0 * float(np.max(tau_lim))] * 4, T=0.5)
+    a_max = np.sum(sp.Fmax) / math.sqrt(2.0) / p.mass                # 네 바퀴 힘의 전방 성분 합 / m (Σ N_i = m g)
     assert Xd[0] == pytest.approx(a_max * 0.5, rel=0.05)
     assert a_max == pytest.approx(0.3 * 9.81 / math.sqrt(2.0), rel=1e-6)   # 메카넘 전진 최대 가속 = μg/√2 (힘이 45° 로 나간다)
     v_nom = p.wheel_speeds(X, Xd)
@@ -108,9 +108,43 @@ def test_slip_model_saturates_at_friction_limit():
 
 
 def test_slip_model_rotation_and_strafe_signs():
-    p = TorquePlant.from_yaml()
+    # 하중이 같아야 게걸음·회전이 서로 안 섞인다 (몫이 다르면 바퀴별 미끄럼이 달라 아주 작게 섞인다 — 아래 시험)
+    p = TorquePlant.from_yaml(wheel_load_share=None)
     sp = SlipPlant(p, mu=1.0)
     _, Xd, _ = run_slip(sp, [-0.01, 0.01, 0.01, -0.01], T=0.3)       # 왼쪽 게걸음
     assert Xd[1] > 0 and abs(Xd[0]) < 1e-6 and abs(Xd[2]) < 1e-6
     _, Xd, _ = run_slip(sp, [-0.002, 0.002, -0.002, 0.002], T=0.3)   # 반시계 회전
     assert Xd[2] > 0 and abs(Xd[0]) < 1e-6 and abs(Xd[1]) < 1e-6
+
+
+# ── 바퀴별 수직력 몫 (2026-11-19, torque_plant.yaml body.wheel_load_share) ──
+def test_wheel_load_share_default_and_limits():
+    from amr_mpc.torque.model import load_share
+    p = TorquePlant.from_yaml()
+    assert p.wheel_load_share.sum() == pytest.approx(1.0)
+    assert p.wheel_normal_force.sum() == pytest.approx(p.mass * p.g)
+    tl = p.tau_friction_limits()
+    assert tl.mean() == pytest.approx(p.tau_friction_limit())        # 몫 합 1 → 평균 바퀴 = 예전 mg/4
+    assert np.allclose(tl / p.tau_friction_limit(), 4 * p.wheel_load_share)
+    even = TorquePlant.from_yaml(wheel_load_share=None)
+    assert np.allclose(even.tau_friction_limits(), even.tau_friction_limit())
+    assert np.allclose(load_share([0.24, 0.24, 0.26, 0.27]), np.array([0.24, 0.24, 0.26, 0.27]) / 1.01)   # 합 1 로 맞춘다
+    for bad in ([0.25, 0.25, 0.5], [0.05, 0.3, 0.3, 0.35], [0.3, 0.3, 0.3, 0.3], [np.nan, 0.25, 0.25, 0.25]):
+        with pytest.raises(ValueError):
+            load_share(bad)
+
+
+def test_slip_plant_light_wheels_creep_more():
+    """같은 토크를 네 바퀴에 주면 가벼운 앞바퀴의 미끄럼이 더 크다 (F_i/N_i 가 크다) — 11-17 램프에서 FL·FR 이 먼저 헛돈 것과 같은 방향.
+    하중이 같으면 네 바퀴 미끄럼이 같다."""
+    for share, front_more in (([0.25] * 4, False), ([0.2388, 0.2392, 0.2608, 0.2612], True)):
+        p = TorquePlant.from_yaml(wheel_load_share=share)
+        sp = SlipPlant(p, mu=0.4)
+        assert np.allclose(sp.Fmax, 0.4 * p.wheel_load_share * p.mass * p.g)
+        tau = p.r / math.sqrt(2.0) * 0.4 * 0.245 * p.mass * p.g              # 앞 한계(0.2388)와 뒤 한계 사이
+        X, Xd, w = run_slip(sp, [tau] * 4, T=0.5)
+        ex = w - p.wheel_speeds(X, Xd)
+        if front_more:
+            assert min(ex[0], ex[1]) > 1.1 * max(ex[2], ex[3]) > 0
+        else:
+            assert np.allclose(ex, ex[0], rtol=1e-3)

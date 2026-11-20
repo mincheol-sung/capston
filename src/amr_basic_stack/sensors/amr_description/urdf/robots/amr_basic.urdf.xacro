@@ -64,13 +64,17 @@
     <!-- Sensor frames: positions from amr_basic.urdf (relative to base_link
          at axle height). Verified on the real robot: the front lidar is
          mounted facing forward, and the rear lidar is mounted rotated
-         180 degrees relative to base_link. -->
+         180 degrees relative to base_link.
+         2026-11-19 새 하부: base_link(네 바퀴 중심, 차축 높이)가 몸체 기준 (−11.3, 0, +7.5) mm 옮겨지고 센서는 그대로
+         (문서 "AMR 하부 변경 전달 사항"). 그래서 아래 센서 위치는 예전 실측값에 (+0.0113, 0, −0.0075) 를 더한 값이다.
+         예전: laser_front (0.086291, −0.020494, 0.177797), laser_rear (−0.091392, 0.02052, 0.177797),
+               base_scan z 0.177797, camera (0.11398, 0.0475, 0.092772). -->
 
     <xacro:lidar_sensor
       prefix="$(arg prefix)"
       parent="base_link"
       frame_id="laser_front"
-      xyz_offset="0.086291 -0.020494 0.177797"
+      xyz_offset="0.097591 -0.020494 0.170297"
       rpy_offset="0 0 0"
       mesh_xyz_offset="0 0 -0.00805"
       mesh_rpy_offset="${-M_PI/2} 0 ${M_PI}"
@@ -80,7 +84,7 @@
       prefix="$(arg prefix)"
       parent="base_link"
       frame_id="laser_rear"
-      xyz_offset="-0.091392 0.02052 0.177797"
+      xyz_offset="-0.080092 0.02052 0.170297"
       rpy_offset="0 0 ${M_PI}"
       mesh_xyz_offset="0 0 -0.00805"
       mesh_rpy_offset="${-M_PI/2} 0 ${M_PI}"
@@ -94,7 +98,7 @@
     <joint name="$(arg prefix)base_scan_joint" type="fixed">
       <parent link="$(arg prefix)base_link"/>
       <child link="$(arg prefix)base_scan"/>
-      <origin xyz="0 0 0.177797" rpy="0 0 0"/>
+      <origin xyz="0 0 0.170297" rpy="0 0 0"/>
     </joint>
 
     <!-- camera_link = left IR imager (depth origin, Intel convention). The
@@ -108,7 +112,7 @@
       mesh_scale="0.001 0.001 0.001"
       mesh_xyz_offset="0.00192 -0.0475 0"
       mesh_rpy_offset="${M_PI/2} 0 ${M_PI/2}"
-      xyz_offset="0.11398 0.0475 0.092772"
+      xyz_offset="0.12528 0.0475 0.085272"
       rpy_offset="0 0 0"/>
 
     <xacro:include filename="../control/gazebo_sim_ros2_control.urdf.xacro" />

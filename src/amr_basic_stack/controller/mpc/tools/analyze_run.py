@@ -145,7 +145,8 @@ def main():
         pf = os.path.join(ri, "params", "torque_mpc_node.yaml")
         if os.path.isfile(pf):
             p = list(yaml.safe_load(open(pf)).values())[0]["ros__parameters"]
-            print(f"  MPC: W {p.get('W')}  w_delta {p.get('w_delta')}  r_u {p.get('r_u')}  q_null {p.get('q_null')}  "
+            # w_delta 는 스텝 단위 (2026-11-18 (5) 부터 −1 이면 w_dudt [(N·m/s)⁻²] / Ts² 를 썼다)
+            print(f"  MPC: W {p.get('W')}  w_delta {p.get('w_delta')}  w_dudt {p.get('w_dudt')}  r_u {p.get('r_u')}  q_null {p.get('q_null')}  "
                   f"외란 {p.get('disturbance_enable')} α {p.get('disturbance_alpha')}  상한 {p.get('limit_mode')} μ̂ {p.get('mu_hat')}")
     else:
         print("  run_info/ 없음 (record_all.sh 로 녹화한 bag 이 아니다) — MPC 파라미터 모름")

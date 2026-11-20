@@ -121,7 +121,9 @@ def test_real_launch_does_not_start_nodes_if_setup_fails(monkeypatch):
     values = dict(plant='real', state_source='estimator', slam_mode='scan_time',
                   state_topic='', auto_setup_can='true', can_interface='', can_device='',
                   armed='false',   # R10: 실차 즉시 무장 금지 검사가 CAN 준비 전에 armed 를 읽는다
-                  use_mpc='false', use_figure8='true')   # 2026-11-16: 트랙 문자열 검사가 CAN 준비 전에 읽는다 (MPC 끄면 건너뜀)
+                  use_mpc='false', use_figure8='true',   # 2026-11-16: 트랙 문자열 검사가 CAN 준비 전에 읽는다 (MPC 끄면 건너뜀)
+                  controller='mpc',   # 2026-11-17 (79ce6b1 ramp·step): 기준궤적 쓸지 정할 때 CAN 준비 전에 읽는다
+                  wheel_load_share='', mu_hat_wheels='', load_budget='')   # 2026-11-19: 하중 몫·바퀴별 μ̂·부하 예산 검사도 CAN 준비 전에 읽는다
     class Configuration:
         def __init__(self, key): self.key = key
         def perform(self, context): return values[self.key]

@@ -2,6 +2,9 @@
 // ---------------------------------------------------------------
 //   reference_topic   PlanarReferenceArray   기준열 (figure8_reference_node, 10 Hz, 0.05 s × 80 — torque_track.yaml)
 //   state_topic       nav_msgs/Odometry      상태 추정값 x̂.  pose = map 좌표 [x, y, yaw],  twist = 몸체 [v_x, v_y, ω_z]
+//   /wheel_states     WheelStates            velocity_source:=wheels 일 때만 (2026-11-18). 몸체 v_x·v_y 를 바퀴 기구학 T ω 로 바꾼다.
+//                                            ω_z 는 추정기 값(자이로) 그대로. 실차 bag 에서 추정기 v_x 가 바퀴보다 90~120 ms 늦었다.
+//                                            바퀴 값이 wheel_timeout 보다 오래되면 그 주기는 추정기 속도로 (로그).
 //      ↓ ReferenceHorizon 보간 (Ts 격자, Np+1 점) → TorqueMPC (DAQP)
 //   cmd_topic         WheelTorqueCommand     MPC 순토크 τ* → torque_output → 게이트 → /wheel_torque_cmd
 //   /torque_mpc/status, /torque_mpc/reference_horizon
@@ -30,7 +33,10 @@
 #include "amr_mpc_cpp/torque_mpc.hpp"
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
+#include <cstdio>
+#include <string>
 #include <amr_interfaces/msg/planar_reference_array.hpp>
+#include <amr_interfaces/msg/wheel_states.hpp>
 #include <amr_interfaces/msg/wheel_torque_command.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -109,6 +115,33 @@ public:
     md.tau_rated = yp["motor"]["tau_rated_Nm"].as<double>();
     md.tau_fric_max = yp["friction"]["tau_fric_max_Nm"].as<double>();
     md.mu_hat = declare_parameter<double>("mu_hat", yp["surface"]["mu_hat"].as<double>());
+    // 바퀴별 수직력 몫 [FL, FR, RL, RR] (2026-11-19, torque_plant.yaml body.wheel_load_share — 정지 저울 측정).
+    //   비우면 1/4 씩. 합이 1 ± 5 % 밖이거나 0.1~0.4 밖이면 기동 실패, 안이면 합 1 로 맞춘다
+    const std::vector<double> share = declare_parameter<std::vector<double>>(
+      "wheel_load_share", yp["body"]["wheel_load_share"] ? yp["body"]["wheel_load_share"].as<std::vector<double>>() :
+      std::vector<double>{});
+    if (!share.empty()) {
+      if (share.size() != 4) {throw std::invalid_argument("wheel_load_share 는 4 개 [FL, FR, RL, RR] 이거나 비어 있어야 한다");}
+      double sum = 0.0;
+      for (int i = 0; i < 4; ++i) {
+        if (!(share[i] >= 0.1 && share[i] <= 0.4)) {throw std::invalid_argument("wheel_load_share 값은 0.1 ~ 0.4");}
+        sum += share[i];
+      }
+      if (std::abs(sum - 1.0) > 0.05) {throw std::invalid_argument("wheel_load_share 합이 1 ± 0.05 밖");}
+      for (int i = 0; i < 4; ++i) {md.wheel_load_share(i) = share[i] / sum;}
+    }
+    // 바퀴별 μ̂ (2026-11-19 (11), torque_plant.yaml surface.mu_hat_wheels). mg/4 기준이라 그 바퀴는 mu_hat·하중 몫 대신 쓴다.
+    //   비우거나 0 이하(launch mu_hat_wheels:=off → −1) 인 바퀴는 mu_hat × 하중 몫
+    const std::vector<double> muw = declare_parameter<std::vector<double>>(
+      "mu_hat_wheels", yp["surface"]["mu_hat_wheels"] ? yp["surface"]["mu_hat_wheels"].as<std::vector<double>>() :
+      std::vector<double>{});
+    if (!muw.empty()) {
+      if (muw.size() != 4) {throw std::invalid_argument("mu_hat_wheels 는 4 개 [FL, FR, RL, RR] 이거나 비어 있어야 한다");}
+      for (int i = 0; i < 4; ++i) {
+        if (muw[i] > 2.0) {throw std::invalid_argument("mu_hat_wheels 값은 2 이하 (0 이하 = 그 바퀴는 mu_hat × 하중 몫)");}
+        md.mu_hat_wheels(i) = muw[i];
+      }
+    }
     md.c_s = yp["surface"]["c_s"].as<double>();
     md.gravity = yp["model"]["gravity"].as<double>();
 
@@ -120,7 +153,20 @@ public:
     const std::vector<double> W = declare_parameter<std::vector<double>>("W", yt["W"].as<std::vector<double>>());
     if (W.size() != 6) {throw std::invalid_argument("tuning.W 는 6개여야 한다 [x, y, θ, ẋ, ẏ, θ̇]");}
     for (int i = 0; i < 6; ++i) {tu.W(i) = W[i];}
-    tu.w_delta = declare_parameter<double>("w_delta", yt["w_delta"].as<double>());
+    // 입력 변화 벌점 (2026-11-18 교수님 지시: Δτ 를 시간 미분으로). w_dudt = r_τ̇ [(N·m/s)⁻²] 로 ‖Δτ/Ts‖² 에 건다
+    //   → r_τ̇ ‖Δτ/Ts‖² = (r_τ̇/Ts²) ‖Δτ‖² 이므로 코어(식-16·18)에는 스텝 단위 r_Δ = r_τ̇/Ts² 로 넘긴다 (코어·1판 수치 시험은 그대로).
+    //   예전 스텝 단위 w_delta [(N·m)⁻²] 를 주면(launch mpc_w_delta, 옛 yaml) 그 값이 우선한다.
+    const double w_dudt = declare_parameter<double>("w_dudt", yt["w_dudt"] ? yt["w_dudt"].as<double>() : -1.0);
+    const double w_step = declare_parameter<double>("w_delta", yt["w_delta"] ? yt["w_delta"].as<double>() : -1.0);
+    if (w_step >= 0.0) {
+      tu.w_delta = w_step;
+      w_delta_src_ = "w_delta (스텝 단위) 직접";
+    } else if (w_dudt >= 0.0) {
+      tu.w_delta = w_dudt / (tu.Ts * tu.Ts);
+      w_delta_src_ = "w_dudt " + std::to_string(w_dudt) + " (N·m/s)⁻² / Ts²";
+    } else {
+      throw std::invalid_argument("tuning.w_dudt (≥ 0) 또는 w_delta 가 있어야 한다");
+    }
     tu.q_null = declare_parameter<double>("q_null", yt["q_null"].as<double>(0.0));
     tu.r_u = declare_parameter<double>("r_u", yt["r_u"].as<double>(0.0));
     acc_dt_ = declare_parameter<double>("acc_dt", yt["acc_dt"].as<double>(0.2));     // 기준 가속도 중앙 차분 창 (지시서 3.9)
@@ -137,12 +183,22 @@ public:
     tu.dist_alpha = declare_parameter<double>("disturbance_alpha", ym["disturbance"]["alpha"].as<double>());
     tu.dist_dt_tol = declare_parameter<double>("disturbance_dt_tol", ym["disturbance"]["dt_tol"].as<double>(0.002));
     tu.dist_skip_xy = declare_parameter<double>("disturbance_skip_xy", ym["disturbance"]["skip_xy"].as<double>(1e-3));
+    tu.dist_accel_only = declare_parameter<bool>("disturbance_accel_only", ym["disturbance"]["accel_only"].as<bool>(false));
     mpc_ = std::make_unique<TorqueMPC>(md, tu);
 
     const auto ref_topic = declare_parameter<std::string>("reference_topic", "/dra_mppi/reference_trajectory");
     const auto state_topic = declare_parameter<std::string>("state_topic", "/state_estimator/odom");
     const auto cmd_topic = declare_parameter<std::string>("cmd_topic", "/torque_mpc/cmd_raw");
     const auto armed_topic = declare_parameter<std::string>("armed_topic", "/mpc/armed");
+    // 속도 상태 출처 (2026-11-18): estimator | wheels.  yaml state_input 절이 없으면 estimator
+    const YAML::Node ys = ym["state_input"];
+    velocity_source_ = declare_parameter<std::string>(
+      "velocity_source", ys ? ys["velocity_source"].as<std::string>("estimator") : "estimator");
+    if (velocity_source_ != "estimator" && velocity_source_ != "wheels") {
+      throw std::invalid_argument("velocity_source 는 estimator | wheels — " + velocity_source_);
+    }
+    wheel_timeout_ = declare_parameter<double>("wheel_timeout", ys ? ys["wheel_timeout"].as<double>(0.05) : 0.05);
+    const auto wheel_topic = declare_parameter<std::string>("wheel_states_topic", "/wheel_states");
     state_timeout_ = declare_parameter<double>("state_timeout", ym["safety"]["state_timeout"].as<double>());
     ref_timeout_ = declare_parameter<double>("ref_timeout", ym["safety"]["ref_timeout"].as<double>());
     debug_ = declare_parameter<bool>("publish_debug", true);
@@ -169,6 +225,13 @@ public:
       state_topic, 20, [this](nav_msgs::msg::Odometry::ConstSharedPtr m) {on_state(*m);});
     sub_ref_ = create_subscription<amr_interfaces::msg::PlanarReferenceArray>(
       ref_topic, 5, [this](amr_interfaces::msg::PlanarReferenceArray::ConstSharedPtr m) {on_ref(*m);});
+    if (velocity_source_ == "wheels") {
+      sub_wheels_ = create_subscription<amr_interfaces::msg::WheelStates>(
+        wheel_topic, 20, [this](amr_interfaces::msg::WheelStates::ConstSharedPtr m) {
+          wheel_v_ = mpc_->model().wheel_body_velocity(TVec4(m->velocity[0], m->velocity[1], m->velocity[2], m->velocity[3]));
+          wheel_rx_ = now_s();
+        });
+    }
     if (armed_topic.empty()) {
       armed_ = true;
       RCLCPP_WARN(get_logger(), "armed_topic 이 비어 있다 — 게이트 무장 여부를 보지 않고 바로 푼다 (단독 시험 전용)");
@@ -190,10 +253,33 @@ public:
       get_logger(),
       "토크 MPC (C++/DAQP).  기준 %s  상태 %s → %s\n"
       "  Ts %.0f ms  Np %d  Nc %d   m %.2f kg  I_z %.3f  바퀴 등가 질량 m_w %.3f kg (M 에 늘)  w 항 %s\n"
-      "  상한 모드 %s: τ̄ %.4f N·m, Δτ̄ %.4f N·m/스텝  (모터 %.3f, 마찰 τ_μ %.4f @ μ̂ %.2f)   외란 추정치 %s (α %.2f)",
+      "  상한 모드 %s: τ̄ %.4f N·m, Δτ̄ %.4f N·m/스텝  (모터 %.3f, 마찰 τ_μ %.4f @ μ̂ %.2f)   외란 추정치 %s (α %.2f%s)",
       ref_topic.c_str(), state_topic.c_str(), cmd_topic.c_str(), tu.Ts * 1e3, tu.Np, tu.Nc, md.mass, md.inertia_z,
       md.mu(), md.use_w ? "켬" : "끔", limit_mode_.c_str(), tb(0), mpc_->dtau_bar_of(tb(0)),
-      md.tau_motor_limit(), md.tau_friction_limit(), md.mu_hat, tu.dist_enable ? "켬" : "끔", tu.dist_alpha);
+      md.tau_motor_limit(), md.tau_friction_limit(), md.mu_hat, tu.dist_enable ? "켬" : "끔", tu.dist_alpha,
+      tu.dist_accel_only ? ", 가속도 외란 모델" : "");
+    if ((md.wheel_load_share.array() - 0.25).abs().maxCoeff() > 1e-9 || (md.mu_hat_wheels.array() > 0.0).any()) {
+      const TVec4 tf = md.tau_friction_limits();
+      std::string muw_s = "바퀴별 μ̂ [";
+      for (int i = 0; i < 4; ++i) {
+        char b[16];
+        std::snprintf(b, sizeof(b), "%.3f", md.mu_hat_wheels(i));
+        muw_s += (md.mu_hat_wheels(i) > 0.0 ? std::string(b) : std::string("-")) + (i < 3 ? " " : "]");
+      }
+      RCLCPP_INFO(
+        get_logger(), "  %s (mg/4 기준, - = μ̂ %.2f × 하중 몫)  하중 몫 FL %.4f FR %.4f RL %.4f RR %.4f\n"
+        "  → 마찰 τ_μ,i [%.4f %.4f %.4f %.4f] N·m, 쓰는 τ̄ [%.4f %.4f %.4f %.4f]%s",
+        muw_s.c_str(), md.mu_hat, md.wheel_load_share(0), md.wheel_load_share(1), md.wheel_load_share(2), md.wheel_load_share(3),
+        tf(0), tf(1), tf(2), tf(3), tb(0), tb(1), tb(2), tb(3),
+        limit_mode_ == "friction" ? "" : "  (상한 모드가 friction 이 아니라 안 쓰인다)");
+    }
+    RCLCPP_INFO(
+      get_logger(), "  가중: W [%g, %g, %g, %g, %g, %g]  r_Δ %g /스텝 (= %s)  r_U %g  q_null %g",
+      tu.W(0), tu.W(1), tu.W(2), tu.W(3), tu.W(4), tu.W(5), tu.w_delta, w_delta_src_.c_str(), tu.r_u, tu.q_null);
+    RCLCPP_INFO(
+      get_logger(), "  속도 상태: %s", velocity_source_ == "wheels" ?
+      ("v_x·v_y = 바퀴 기구학 T ω (" + wheel_topic + ", 묵음 " + std::to_string(int(wheel_timeout_ * 1e3)) +
+      " ms 넘으면 추정기), ω_z = 추정기").c_str() : "추정기 그대로");
     RCLCPP_INFO(
       get_logger(), "  선형화 %s (%s)", linearization_.c_str(),
       tu.linearization == amr_mpc_cpp::TorqueLinearization::CurrentState ?
@@ -309,7 +395,18 @@ private:
     }
     const auto & p = m.pose.pose;
     const double yaw = yaw_of(p.orientation);
-    const TVec3 vb(m.twist.twist.linear.x, m.twist.twist.linear.y, m.twist.twist.angular.z);
+    TVec3 vb(m.twist.twist.linear.x, m.twist.twist.linear.y, m.twist.twist.angular.z);
+    if (velocity_source_ == "wheels") {      // 몸체 v_x·v_y 만 바퀴 기구학으로 (ω_z 는 추정기 = 자이로)
+      if (wheel_rx_ > 0.0 && now - wheel_rx_ <= wheel_timeout_) {
+        vb(0) = wheel_v_(0);
+        vb(1) = wheel_v_(1);
+      } else {
+        ++wheel_fallback_;
+        RCLCPP_WARN_THROTTLE(
+          get_logger(), *get_clock(), 2000, "바퀴 상태 %.0f ms 묵음 — 이 주기는 추정기 속도 (누적 %ld 회)",
+          wheel_rx_ > 0.0 ? (now - wheel_rx_) * 1e3 : -1.0, wheel_fallback_);
+      }
+    }
     const double c = std::cos(yaw), s = std::sin(yaw);
     TVec6 x;
     x << p.position.x, p.position.y, yaw, vb(0) * c - vb(1) * s, vb(0) * s + vb(1) * c, vb(2);   // 식-1: Ẋ = R(θ) v
@@ -436,6 +533,12 @@ private:
   std::optional<HoldLatch> latch_;
   std::optional<ReferenceHorizon> ref_;
   std::string limit_mode_, linearization_, ref_frame_, csv_path_;
+  std::string w_delta_src_;   // r_Δ 를 어디서 정했나 (기동 로그)
+  std::string velocity_source_ = "estimator";
+  double wheel_timeout_ = 0.05, wheel_rx_ = 0.0;
+  TVec3 wheel_v_ = TVec3::Zero();
+  long wheel_fallback_ = 0;
+  rclcpp::Subscription<amr_interfaces::msg::WheelStates>::SharedPtr sub_wheels_;
   double last_state_rx_ = 0.0, last_state_stamp_ = 0.0, ref_rx_ = 0.0, armed_since_ = 0.0;
   double state_timeout_ = 0.3, ref_timeout_ = 0.5, hold_stopped_speed_ = 0.04;
   double acc_dt_ = 0.2;

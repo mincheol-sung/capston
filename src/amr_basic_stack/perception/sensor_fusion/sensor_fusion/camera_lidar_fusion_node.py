@@ -166,8 +166,9 @@ class CameraLidarFusionNode(Node):
         # 반드시 0.0 으로 되돌릴 것 — 안 그러면 이중 보정이 된다.
         self.lidar_yaw = float(self.declare_parameter('lidar_yaw_correction', -0.043670).value)
         # laser_front 장착 위치(URDF). 회전 중심이 base_link 원점이 아니다.
+        # 2026-11-19 새 하부: base_link 가 몸체 기준 −11.3 mm 앞뒤로 옮겨져 x 0.086291 → 0.097591 (URDF 와 같게. y 는 그대로)
         self.laser_xy = np.array([
-            float(self.declare_parameter('laser_origin_x', 0.086291).value),
+            float(self.declare_parameter('laser_origin_x', 0.097591).value),
             float(self.declare_parameter('laser_origin_y', -0.020494).value)])
 
         self.pub = self.create_publisher(DetectedObjectArray, self.out_topic, 10)

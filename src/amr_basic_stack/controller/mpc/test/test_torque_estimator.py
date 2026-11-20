@@ -75,6 +75,39 @@ def test_static_init_finds_biases():
     assert est.b_g == pytest.approx(0.002, abs=1e-9)
 
 
+def _feed_static(est, T, ax, ay, wz, hz=400.0):
+    for i in range(int(T * hz)):
+        t = i / hz
+        est.imu(t, ax(t), ay(t), wz(t))
+
+
+def test_static_init_passes_with_body_vibration():
+    """2026-11-19 실차: 서 있어도 차체가 30~200 Hz 로 떨려 (a_x 77 Hz, a_y 100 Hz) 원신호 std 0.12~0.17 m/s² → 문턱 0.10 을 못 넘어
+    추정값이 안 나왔다 (bag 174603~175042). 50 ms 평균으로 재면 통과하고, 바이어스는 원신호 평균 그대로."""
+    rng = np.random.default_rng(1)
+    ax = lambda t: -0.15 + 0.24 * math.sin(2 * math.pi * 77 * t) + rng.normal(0, 0.02)     # std ≈ 0.17
+    ay = lambda t: 0.13 + 0.15 * math.sin(2 * math.pi * 100 * t + 0.3) + rng.normal(0, 0.02)
+    wz = lambda t: 0.002 + rng.normal(0, 0.0026)
+    est = PlanarStateEstimator(CFG)
+    _feed_static(est, 1.5, ax, ay, wz)
+    assert est.bias_ready
+    assert est.b_a == pytest.approx([-0.15, 0.13], abs=0.01)
+    old = PlanarStateEstimator({**CFG, "init_block_s": 0.0})                                # 예전 판정 (원신호) — 재현
+    _feed_static(old, 3.0, ax, ay, wz)
+    assert not old.bias_ready
+
+
+def test_static_init_still_rejects_motion():
+    """저주파 움직임 (밀거나 출발: 1 Hz ±0.3 m/s², 50 ms 평균 std ≈ 0.21) 은 진동이 섞여도 그대로 거부한다."""
+    rng = np.random.default_rng(2)
+    ax = lambda t: -0.15 + 0.3 * math.sin(2 * math.pi * 1.0 * t) + 0.24 * math.sin(2 * math.pi * 77 * t) + rng.normal(0, 0.02)
+    ay = lambda t: 0.13 + rng.normal(0, 0.02)
+    wz = lambda t: 0.002 + rng.normal(0, 0.0026)
+    est = PlanarStateEstimator(CFG)
+    _feed_static(est, 3.0, ax, ay, wz)
+    assert not est.bias_ready
+
+
 def test_noise_free_tracks_truth_with_delayed_poses():
     # 포즈가 0.13 s 늦게 와도 (0.9 m/s 면 12 cm 어긋난 값) 그 시각의 추정과 비교하므로 오차가 없어야 한다
     est = PlanarStateEstimator(CFG)

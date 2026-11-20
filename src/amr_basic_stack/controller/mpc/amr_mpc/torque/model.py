@@ -40,6 +40,21 @@ def wheel_coefficients(value, name="friction coefficient"):
     return values.copy()
 
 
+def load_share(values):
+    """바퀴별 수직력 몫 [FL, FR, RL, RR] → 합 1 로 맞춘 (4,) (2026-11-19). None·빈 값이면 1/4 씩.
+    값마다 0.1~0.4, 합 1 ± 0.05 가 아니면 ValueError (C++ torque_mpc_node 와 같은 검사)."""
+    if values is None or len(values) == 0:
+        return np.full(4, 0.25)
+    v = np.asarray(values, float).reshape(-1)
+    if v.size != 4 or not np.all(np.isfinite(v)):
+        raise ValueError(f"wheel_load_share 는 4 개 [FL, FR, RL, RR] — {values!r}")
+    if np.any(v < 0.1) or np.any(v > 0.4):
+        raise ValueError(f"wheel_load_share 값은 0.1 ~ 0.4 — {values!r}")
+    if abs(v.sum() - 1.0) > 0.05:
+        raise ValueError(f"wheel_load_share 합이 1 ± 0.05 밖 ({v.sum():.3f}) — {values!r}")
+    return v / v.sum()
+
+
 @dataclass
 class TorquePlant:
     r: float
@@ -57,8 +72,10 @@ class TorquePlant:
     mu_hat: float
     c_s: float
     g: float
+    wheel_load_share: np.ndarray = None      # 바퀴별 수직력 몫 (합 1). None 이면 1/4 씩 (2026-11-19)
 
     def __post_init__(self):
+        self.wheel_load_share = load_share(self.wheel_load_share)
         self.fric_coulomb = wheel_coefficients(self.fric_coulomb, "coulomb_Nm")
         self.fric_viscous = wheel_coefficients(self.fric_viscous, "viscous_Nms_per_rad")
 
@@ -83,6 +100,7 @@ class TorquePlant:
             mu_hat=float(surf["mu_hat"]),
             c_s=float(surf["c_s"]),
             g=float(model["gravity"]),
+            wheel_load_share=body.get("wheel_load_share") or None,
         )
         p.update(override)
         return cls(**p)
@@ -138,8 +156,17 @@ class TorquePlant:
 
     # ── 토크 상한 (1판 식-21) ───────────────────────────────
     def tau_friction_limit(self):
-        """τ_μ = (r/√2)·μ̂·(m g/4)·c_s  — 비교군 C 의 마찰 한계."""
+        """τ_μ = (r/√2)·μ̂·(m g/4)·c_s  — 비교군 C 의 마찰 한계 (평균 바퀴, N = mg/4)."""
         return self.r / math.sqrt(2.0) * self.mu_hat * self.mass * self.g / 4.0 * self.c_s
+
+    @property
+    def wheel_normal_force(self):
+        """바퀴별 수직력 N_i = 몫_i·m g [N] (4,). 정지 상태 — 가속·회전에 따른 하중 이동은 없다."""
+        return self.wheel_load_share * self.mass * self.g
+
+    def tau_friction_limits(self):
+        """바퀴별 τ_μ,i = (r/√2)·μ̂·N_i·c_s (4,) — torque_mpc_node 의 friction 상한과 같다 (2026-11-19)."""
+        return self.r / math.sqrt(2.0) * self.mu_hat * self.wheel_normal_force * self.c_s
 
     def tau_motor_limit(self):
         """τ_lim − τ_fric,max  — 비교군 B 는 이것만 둔다."""
@@ -199,7 +226,8 @@ if __name__ == "__main__":
 #   미끄러지지 않으면 F_i = √2 τ_i / r  → 몸체 힘 Σ F_i u_i = (T⁻¹)ᵀ τ  (기존 모델과 같아진다)
 # 상태:  X, Ẋ (map),  ω_i (바퀴 4개)
 #   미끄럼 속도 (u_i 방향):   Δ_i = (r/√2) (ω_i − (T⁻¹ v_body)_i)
-#   바닥 마찰력:              F_i = μ N tanh(Δ_i / v_ε),   N = m g / 4   (하중 이동 없음 — 1판 식-21 과 같은 가정)
+#   바닥 마찰력:              F_i = μ N_i tanh(Δ_i / v_ε),  N_i = 몫_i·m g  (torque_plant.yaml body.wheel_load_share,
+#                             기본 1/4 = 1판 식-21 의 mg/4. 정지 하중이라 가속·회전에 따른 하중 이동은 없다 — 2026-11-19)
 #   바퀴:                     J_w ω̇_i = τ_i − (r/√2) F_i
 #   몸체 (관성 좌표):          m Ẍ_xy = R(θ) Σ F_i u_i,    I_z θ̈ = Σ (c_i k/√2) F_i
 # 단순화: 롤러 축 방향 마찰(롤러 베어링), 하중 이동, 바퀴별 μ 차이는 넣지 않았다. tanh 는 Coulomb 마찰을
@@ -252,8 +280,8 @@ class SlipPlant:
         self.fric = fric                     # 구동계 마찰 (DrivetrainFriction) 또는 None
         self.mu = float(mu)
         self.v_eps = float(v_eps)
-        self.N = plant.mass * plant.g / 4.0
-        self.Fmax = self.mu * self.N
+        self.N = plant.wheel_normal_force              # (4,) 바퀴별 수직력
+        self.Fmax = self.mu * self.N                   # (4,) 바퀴별 최대 마찰력
 
     def contact_speed(self, X, Xd):
         """무슬립이라면 바퀴가 돌아야 할 각속도 (T⁻¹ v_body)."""
@@ -291,7 +319,7 @@ class SlipPlant:
 
     def stable_dt(self):
         """RK4 가 안정한 적분 간격의 대략값 (바퀴–바닥 마찰 시정수의 절반)."""
-        tc = self.p.J_w * 2.0 * self.v_eps / (self.p.r ** 2 * max(self.Fmax, 1e-9))
+        tc = self.p.J_w * 2.0 * self.v_eps / (self.p.r ** 2 * max(float(np.max(self.Fmax)), 1e-9))
         dt = 0.5 * tc
         if self.fric is not None:                # 두 마찰이 같은 바퀴에 붙으므로 강성이 더해진다 → 간격의 조화합
             dt = 1.0 / (1.0 / dt + 1.0 / self.fric.stable_dt(self.p, slip=True))

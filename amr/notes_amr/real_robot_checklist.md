@@ -230,4 +230,10 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
 - [ ] μ̂: 노면마다 토크 램프 시험 — 도구 `amrmu` (`tools/mu_ramp_test.py`, stack_changelog 2026-11-16 (12)).
   `amrall` (MPC 없이) 띄운 뒤 다른 터미널에서 `amrmu --dirs fwd,back --repeat 5 --csv …` → 앞·뒤 중앙값을 `torque_plant.yaml surface.mu_hat`
   (또는 `amrall mu_hat:=`). 기존 데이터 추정 0.33 이상 ~ 0.45. 옆·대각은 참고(`--dirs left,right,fl`)
+- [x] 바퀴별 수직력 몫 — 2026-11-18 저울 (두 바퀴씩 3 회): FL 0.2388 FR 0.2392 RL 0.2608 RR 0.2612 → `torque_plant.yaml body.wheel_load_share`
+  (MPC friction 상한 τ_μ,i, 시뮬 슬립 모델 N_i — stack_changelog 2026-11-19 (10), `analysis/torque_mpc_real/2026-11-18_load`).
+  - [ ] 새 frame(2026-11-19 (7)) 이 측정 뒤에 조립됐으면 다시 잰다. 적재 5 kg 판은 실은 채로 따로 잰다
+  - [ ] 8자 같은 조건에서 몫 켬 / 끔(`wheel_load_share:="0.25,0.25,0.25,0.25"`) 비교: 앞바퀴 슬립·상한 닿음 비율
+- [ ] 바퀴별 μ̂ `surface.mu_hat_wheels [0.432, 0.285, 0.456, 0.350]` (2026-11-19 (11), 기본 켬 — mu_hat:= 무시) 의 출처·계산 확인,
+  8자에서 켬 / `mu_hat_wheels:=off` 비교 (FR 상한 0.0721 — 0.7 m/s 는 use_w:=true 로)
 - [ ] 8자 트랙 공간 약 10 × 5 m + 여유

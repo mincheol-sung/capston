@@ -6,7 +6,7 @@ import pytest
 
 from amr_mpc.core.figure8 import Figure8, wrap
 
-MODES = ("tangent", "fixed")
+MODES = ("tangent", "fixed", "spin")
 
 
 def make(mode="tangent", **kw):
@@ -79,7 +79,7 @@ def test_triangular_profile_when_path_too_short_to_cruise():
 
 def test_rejects_bad_parameters():
     for kw in ({"width": 0.0}, {"height": -1.0}, {"speed": 0.0}, {"accel": -0.1},
-               {"laps": 0.0}, {"yaw_mode": "spin"}):
+               {"laps": 0.0}, {"yaw_mode": "spiral"}):   # "spin" 은 2026-11-19 부터 허용값
         with pytest.raises(ValueError):
             make(**kw)
 
@@ -228,3 +228,26 @@ def test_crossing_blend_only_circles_tangent_and_internal_crossings():
     assert [c[1] for c in f.crossings] == [1.0, -1.0, 1.0]                                      # 출발·끝(속도 0) 은 빼고
     with pytest.raises(ValueError):
         Figure8(width=2.0, yaw_mode="tangent", curve="circles", crossing_blend=-0.1)
+
+
+def test_spin_mode_turns_whole_revolutions_independent_of_path():
+    """2026-11-19 spin: 경로는 fixed 와 같고, 헤딩은 정수 바퀴 돌아 출발값으로 온다. 순항 ω ≈ spin_rate, 몸체 속력 = 경로 속력."""
+    for curve, w in (("circles", 3.0), ("gerono", 1.4)):
+        sp = make("spin", curve=curve, width=w, speed=0.5, spin_rate=1.0)
+        fx = make("fixed", curve=curve, width=w, speed=0.5)
+        assert sp.spin_turns >= 1 and sp.T_align == 0.0
+        assert abs(sp.kappa_spin * sp.L - 2 * math.pi * sp.spin_turns) < 1e-9
+        assert abs(sp.kappa_spin * sp.V - 1.0) < 0.5            # 정수 바퀴로 맞춘 값이 spin_rate 근처
+        tot, prev = 0.0, sp.at(0.0)[0][2]
+        for t in np.linspace(0.0, sp.T_total, 3001):
+            Xs, us = sp.at(t); Xf, uf = fx.at(t)
+            assert np.allclose(Xs[:2], Xf[:2], atol=1e-12)       # 위치 기준은 그대로
+            assert abs(math.hypot(us[0], us[1]) - math.hypot(uf[0], uf[1])) < 1e-9
+            tot += wrap(Xs[2] - prev); prev = Xs[2]
+        assert abs(tot - 2 * math.pi * sp.spin_turns) < 1e-6     # 정확히 n 바퀴
+        assert abs(sp.at(sp.T_total + 1.0)[1]).max() < 1e-12      # 끝에서 정지
+
+
+def test_spin_rejects_nonpositive_rate():
+    with pytest.raises(ValueError):
+        make("spin", spin_rate=0.0)

@@ -57,6 +57,7 @@ from amr_mpc.core import node_main
 from amr_mpc.body import mpc as mpc_mod
 from amr_mpc.core.figure8 import Figure8, lead_in, lead_in_duration, ramp_elapsed, ramp_rate
 from amr_mpc.core.segment import Segment
+from amr_mpc.core.square import Square
 K_GEOM = mpc_mod.K_GEOM
 
 
@@ -79,7 +80,8 @@ class Figure8ReferenceNode(Node):
             ("speed", 0.25),                          # 순항 접선속도 [m/s]
             ("accel", 0.4),                           # 호길이 축 가감속 [m/s²]
             ("laps", 1.0),                            # 바퀴 수. 1 바퀴마다 기동 포즈로 돌아온다
-            ("yaw_mode", "tangent"),                  # tangent = 접선 추종 | fixed = 헤딩 고정(게걸음)
+            ("yaw_mode", "tangent"),                  # tangent = 접선 추종 | fixed = 헤딩 고정(게걸음) | spin = 경로와 따로 회전
+            ("spin_rate", 1.0),                       # spin 순항 요레이트 [rad/s] — 정수 바퀴로 맞춘다 (core/figure8.py)
             ("align_s", 1.5),                         # tangent 모드 앞뒤 제자리 회전 시간 [s]
             ("crossing_blend_m", 0.0),                # circles8 + tangent 교차점 헤딩 완화 길이 [m] (core/figure8.py, 0 = 끔)
             ("start_delay", 3.0),                     # 첫 odom 뒤 이만큼 기동 포즈를 유지하다 출발 (실차에서 손 뺄 시간)
@@ -113,6 +115,11 @@ class Figure8ReferenceNode(Node):
             ("seg_distance", 0.5), ("seg_dir_deg", 0.0),
             ("seg_angle_deg", 90.0), ("seg_yaw_rate", 0.8), ("seg_yaw_accel", 1.6),
             ("seg_out_and_back", True), ("seg_pause_s", 1.0),
+            # 정사각형 (2026-11-20, core/square.py). shape:=square — 출발 포즈가 꼭짓점, 첫 변이 출발 헤딩, 왼쪽으로 돈다.
+            #   변마다 accel 로 가속·감속, 가운데에서 최고 √(v_c² + a·side) (square_v_max > 0 이면 그 값에서 자름,
+            #   0 이면 부하 예산 load_budget·V_LIMIT 에서 자름). 꼭짓점 속도 square_corner_speed. speed 는 안 쓴다.
+            #   yaw_mode tangent | fixed (spin 거부). tangent 는 꼭짓점 ±square_yaw_blend/2 [m] 에서 헤딩을 스무스스텝으로 돌린다
+            ("square_side", 1.5), ("square_corner_speed", 0.1), ("square_v_max", 0.0), ("square_yaw_blend", 0.3),
         ])
         g = lambda n: self.get_parameter(n).value
         self.dt, self.T, self.frame = float(g("dt")), int(g("horizon_steps")), str(g("frame_id"))
@@ -128,20 +135,29 @@ class Figure8ReferenceNode(Node):
                                     speed=g("speed"), accel=g("accel"), angle_deg=g("seg_angle_deg"),
                                     yaw_rate=g("seg_yaw_rate"), yaw_accel=g("seg_yaw_accel"),
                                     out_and_back=bool(g("seg_out_and_back")), pause_s=g("seg_pause_s"))
+            elif self.shape == "square":
+                vmax = float(g("square_v_max"))
+                self.path = Square(side=g("square_side"), corner_speed=g("square_corner_speed"), accel=g("accel"),
+                                   v_max=vmax if vmax > 0.0 else budget * V_LIMIT, laps=g("laps"),
+                                   yaw_mode=str(g("yaw_mode")), yaw_blend=g("square_yaw_blend"), align_s=g("align_s"))
             elif self.shape not in ("figure8", "circles8"):
-                raise ValueError(f"shape={self.shape!r} — figure8 | circles8 | line | rotate")
+                raise ValueError(f"shape={self.shape!r} — figure8 | circles8 | line | rotate | square")
             else:
                 self.path = Figure8(width=g("width"), height=g("height"), speed=g("speed"),
                                     accel=g("accel"), laps=g("laps"), yaw_mode=str(g("yaw_mode")),
                                     align_s=g("align_s"),
                                     lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None,
                                     curve="circles" if self.shape == "circles8" else "gerono",
-                                    crossing_blend=float(g("crossing_blend_m")))
+                                    crossing_blend=float(g("crossing_blend_m")), spin_rate=float(g("spin_rate")))
         except ValueError as e:
             raise SystemExit(f"[figure8] 파라미터 오류: {e}")
 
         run, spin = self.path.peak_load(K_GEOM)
         cap = budget * V_LIMIT
+        if run > cap and self.shape == "square":
+            raise SystemExit(
+                f"[figure8] 정사각형 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "
+                f"square_v_max 를 낮추거나 (tangent 면) square_yaw_blend 를 늘려라 — 꼭짓점 헤딩 회전이 부하에 더해진다.")
         if run > cap:                                 # 주행 부하는 speed 에 선형
             raise SystemExit(
                 f"[figure8] 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "
@@ -184,6 +200,17 @@ class Figure8ReferenceNode(Node):
             self.publish_path(self.track_origin)
 
         p = self.path
+        if self.shape == "square":
+            edges = "  ".join(f"[{i}] {vs:.2f}→{vp:.2f}→{ve:.2f} m/s {T:.1f} s" for i, vs, vp, ve, T in p.edge_summary()[:4])
+            self.get_logger().info(
+                f"정사각형 한 변 {p.side:.2f} m × {p.n} 변 (왼쪽으로), yaw {p.yaw_mode}"
+                f"{f' (꼭짓점 헤딩 완화 {p.b:.2f} m)' if p.tangent else ''}, 꼭짓점 {p.vc:.2f} m/s, 가감속 {p.A:.2f} m/s²\n"
+                f"  변별 시작→최고→끝: {edges}{' …' if p.n > 4 else ''}\n"
+                f"  시간  대기 {self.delay:.1f} s + 주행 {p.T_path:.1f} s"
+                f"{f' + 정렬 {p.T_align:.1f} s' if p.T_align > 0.0 else ''}"
+                f"{'' if self.hold < 0 else f' + 유지 {self.hold:.1f} s'}   "
+                f"부하 주행 {run/V_LIMIT*100:.0f} %  정렬 {spin/V_LIMIT*100:.0f} % (예산 {budget*100:.0f} %, V_LIMIT {V_LIMIT:.2f} m/s)")
+            return
         if self.shape not in ("figure8", "circles8"):
             what = (f"직선 {p.L:.2f} m, 방향 {math.degrees(math.atan2(p.u[1], p.u[0])):.0f}°, 최고 {p.V_peak():.2f} m/s, "
                     f"가감속 {p.A:.2f} m/s²" if self.shape == "line" else
@@ -198,7 +225,8 @@ class Figure8ReferenceNode(Node):
         self.get_logger().info(
             (f"두 원 8자: 지름 {2*p.R:.2f} m 원 두 개, 좌우 폭 {p.W:.2f} m (앞뒤 {2*p.R:.2f} m), 왼쪽 원 먼저"
              if p.curve == "circles" else f"8자 {p.W:.2f} × {p.H:.2f} m (Gerono 렘니스케이트)")
-            + f"  yaw {p.yaw_mode}  {p.laps:g} 바퀴\n"
+            + f"  yaw {p.yaw_mode}  {p.laps:g} 바퀴"
+            + (f"  (헤딩 {p.spin_turns} 바퀴 회전, 순항 {p.kappa_spin * p.V:.2f} rad/s)" if p.kappa_spin > 0.0 else "") + "\n"
             f"  호길이 {p.L:.2f} m  순항 {p.V:.2f} m/s  가감속 {p.A:.2f} m/s²  "
             f"최대곡률 {p.max_curvature():.2f} 1/m (R_min {1/p.max_curvature():.3f} m)\n"
             f"  시간  대기 {self.delay:.1f} s + 정렬 {p.T_align:.1f} s ×2 + 주행 {p.T_path:.1f} s = {p.T_total:.1f} s"

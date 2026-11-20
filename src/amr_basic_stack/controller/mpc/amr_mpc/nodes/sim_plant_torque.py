@@ -75,6 +75,7 @@ class SimPlantTorqueNode(Node):
             # 아래는 비우면 torque_plant.yaml 값. 적재 조건 바꿀 때 launch 인자로 덮어쓴다.
             ("payload_kg", -1.0),
             ("use_wheel_inertia", base.use_wheel_inertia),
+            ("wheel_load_share", [float(v) for v in base.wheel_load_share]),   # 바퀴별 수직력 몫 (슬립 모델 N_i, 2026-11-19)
             # 센서 흉내
             ("sensors", True),
             ("imu_rate_hz", 200.0),
@@ -101,7 +102,8 @@ class SimPlantTorqueNode(Node):
             ("can_reply_delay", 0.0),
         ])
         g = lambda n: self.get_parameter(n).value
-        override = {"use_wheel_inertia": bool(g("use_wheel_inertia"))}
+        override = {"use_wheel_inertia": bool(g("use_wheel_inertia")),
+                    "wheel_load_share": [float(v) for v in g("wheel_load_share")]}
         if float(g("payload_kg")) >= 0.0:
             override["mass"] = float(config.section("body", "torque_plant.yaml")["mass_kg"]) + float(g("payload_kg"))
         self.p = TorquePlant.from_yaml(**override)
@@ -190,7 +192,8 @@ class SimPlantTorqueNode(Node):
             f"바퀴관성 {'켬' if self.p.use_wheel_inertia else '끔'} (μ={self.p.mu:.3f} kg)  "
             f"kd={self.p.damping_kd}  피크 {self.p.tau_peak} N·m  물리 틱 {1/self.dt:.0f} Hz  "
             + ("슬립 없음" if self.slip is None else
-               f"슬립 모델 μ {self.slip.mu:.2f} (바퀴당 최대 {self.slip.Fmax:.2f} N, 토크로 {self.p.r/math.sqrt(2)*self.slip.Fmax:.3f} N·m)")
+               f"슬립 모델 μ {self.slip.mu:.2f} (바퀴별 최대 [FL FR RL RR] {np.array2string(self.slip.Fmax, precision=2)} N, "
+               f"토크로 {np.array2string(self.p.r / math.sqrt(2) * self.slip.Fmax, precision=3)} N·m)")
             + ("  구동계 마찰 없음" if self.fric is None else
                f"  구동계 마찰 [FL FR RL RR] coulomb {np.array2string(self.fric.coulomb, precision=4)} N·m"
                f" + viscous {np.array2string(self.fric.viscous, precision=5)}·ω (ω_s {self.fric.smooth} rad/s)")

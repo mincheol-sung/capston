@@ -24,7 +24,8 @@ track:
   # 8자 모양 (Gerono 렘니스케이트, core/figure8.py). 임시값 — 실제 공간을 잰 뒤 정한다
   width: 3.0              # [m] 경계상자 가로
   height: 1.5             # [m] 경계상자 세로. 곡률을 정한다 (최소 곡률반경 ≈ W²/(16H))
-  yaw_mode: tangent       # tangent = 접선 방향 주행 | fixed = 헤딩 고정 게걸음
+  yaw_mode: tangent       # tangent = 접선 방향 주행 | fixed = 헤딩 고정 게걸음 | spin = 경로와 따로 헤딩 회전 (MPC 만, 2026-11-19)
+  spin_rate: 1.0          # [rad/s] spin 순항 요레이트. 끝에서 출발 헤딩으로 오게 정수 바퀴로 맞춘다 (실제 값은 기동 로그)
 
   # 속도 (잠정. 모터 무부하 속도 실측 뒤 확정 — torque_mpc_todo.md "속도 프로파일")
   speed: 0.5              # [m/s] 순항 접선 속도
@@ -54,6 +55,17 @@ track:
   seg_yaw_accel: 1.6      # [rad/s²]
   seg_out_and_back: true  # 갔다가 seg_pause_s 쉬고 같은 길로 돌아온다
   seg_pause_s: 1.0        # [s]
+
+  # ── 정사각형 (2026-11-20, core/square.py). shape:=square. 출발점(origin)이 꼭짓점, 첫 변이 origin_yaw 방향, 왼쪽으로 돈다
+  #   (fixed 출발이면 origin 이 그 꼭짓점 — 정사각형은 origin 의 앞·왼쪽 side × side). laps 바퀴 = 4·laps 변, 속도는 accel 로 정해진다:
+  #   변 가운데 최고 √(v_c² + accel·side) — side 1.5: accel 0.4 → 0.78, 1.0 → 1.23 m/s (C 상한 대비 가속 토크 38 % / 94 %).
+  #   꼭짓점은 속도 크기 v_c 로 지나며 방향만 90° 꺾인다 (속도 계단 √2·v_c, 0 이면 정지 꼭짓점 = 정확한 정사각형). speed 는 안 쓴다.
+  #   yaw_mode: tangent (퓨어 퍼슛도 가능) | fixed (옆걸음, MPC 만) — spin 은 거부.
+  #   예) amrall shape:=square yaw_mode:=tangent accel:=1.0 controller:=pure_pursuit
+  square_side: 1.5          # [m]
+  square_corner_speed: 0.1  # [m/s] 꼭짓점 속도 (첫 출발·마지막 도착은 0)
+  square_v_max: 0.0         # [m/s] > 0 이면 변 최고속도를 이 값에서 자름. 0 = 가속으로 낼 수 있는 최고 (부하 예산 V_LIMIT·load_budget 에서만 자름)
+  square_yaw_blend: 0.3     # [m] tangent: 꼭짓점 앞뒤 합친 헤딩 회전 구간 (호길이). 0 < 값 ≤ side. 마지막 꼭짓점은 서서 align_s 동안 돌아 출발 헤딩으로
 
   # 기준열 간격 (R4 리뷰 2026-11-13). MPC·퓨어 퍼슛은 행 사이를 직선으로 보간한다 → 곡선 안쪽으로 줄이 생긴다
   # (현 오차 ≈ v²·dt²/(8R)). 3 × 1.5 m 8자(R_min 0.31 m)에서 최대 보간 오차:

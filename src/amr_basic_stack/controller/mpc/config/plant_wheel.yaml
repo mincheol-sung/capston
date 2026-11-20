@@ -31,10 +31,10 @@ model_100hz:
   theta: 0.0                                             # [s]  1차 근사 — dead time 상태 없음
 
 # ── 기하: 드라이버 twist_to_wheels 와 같은 식.  ω_i = (v_x ± v_y ± k ω)/r,  k = (wheel_base + width)/2
-geometry:
+geometry:                 # 2026-11-19 새 하부 (torque_plant.yaml 머리주석). 예전 0.1897 / 0.207
   wheel_radius_m: 0.04
-  wheel_base_m:   0.1897
-  robot_width_m:  0.207
+  wheel_base_m:   0.1724
+  robot_width_m:  0.2140
 
 # ── 제약: 바퀴별 (정확한 하드웨어 한계 — 몸체 단위의 L1 마름모는 이것의 대리였다)
 limits:

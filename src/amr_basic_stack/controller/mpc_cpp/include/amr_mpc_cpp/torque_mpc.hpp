@@ -26,6 +26,9 @@
 // 외란 추정치 (식-9~11):  d̂(k) = x̂(k) − A x̂(k−1) − B(θ̂(k−1)) τ(k−1) − s_w·E ŵ(k−1)
 //   ŵ(k−1) 은 추정 속도 x̂(k−1) 로 쓰는 시점에 계산한다 (s_w 도 그때 — 지시서 6절의 "실제 값 저장, 쓸 때 s_w" 와 같다).
 //   항상 계산해 d_hat() 으로 내주고(로그), dist_enable 일 때만 예측에 더한다 (기본 끔, 지시서 2026-11-16).
+//   dist_accel_only (2026-11-18, 시험용, 기본 끔): 위치 성분 [x, y, θ] 잔차를 버리고 0.5·Ts·(속도 잔차) 로 바꾼다
+//   — 일정한 가속도 a 의 ZOH 한 스텝 Δp = ½Ts²a, Δv = Ts a 와 같은 꼴 (input disturbance model). 추정기 위치·속도가
+//   서로 안 맞아 생기는 위치 잔차가 지평에서 j 배로 쌓이지 않게. 건너뛰기 판단은 원래 위치 잔차로 한다.
 //
 // 선형화 방식 (TorqueTuning::linearization, torque_mpc.yaml 의 linearization.mode)
 //   reference      1판 그대로. 위 B(k), w(k) 에 지평 각 스텝의 기준 방향 θ_r(k)·기준 속도를 넣는다 (기준궤적 따라 LTV).
@@ -80,6 +83,12 @@ struct TorqueModel
   double tau_rated = 1.3;            // τ_lim [N·m]
   double tau_fric_max = 0.0;         // [N·m]
   double mu_hat = 0.3;
+  // 바퀴별 수직력 몫 [FL, FR, RL, RR] (합 1, 2026-11-19). N_i = 몫_i·m g. 기본 1/4 씩 = 1판 식-21 의 mg/4.
+  //   상한 모드 friction 의 τ_μ,i 에만 쓰인다 (동역학 M 은 무게중심이 가운데라고 그대로 둔다)
+  TVec4 wheel_load_share = TVec4::Constant(0.25);
+  // 바퀴별 μ̂ [FL, FR, RL, RR] (2026-11-19 (11)). mg/4 기준 값 — τ_μ,i = (r/√2)·μ̂_i·(m g/4)·c_s 로, 하중 몫이 이미 들어 있다고 본다
+  //   (실측 |τ_i| / ((r/√2)(mg/4)) 로 낸 값). 0 이하인 바퀴는 mu_hat × 하중 몫
+  TVec4 mu_hat_wheels = TVec4::Constant(-1.0);
   double c_s = 0.8;
   double gravity = 9.81;
 
@@ -89,6 +98,16 @@ struct TorqueModel
   double I_eff() const {return inertia_z + mu() * k() * k();}
   // (T⁻¹)ᵀ : 바퀴 토크 → 몸체 [F_x, F_y, M_z]
   TMat34 force_map() const;
+  // 바퀴 기구학 v = T ω (몸체 [v_x, v_y, ω_z], 바퀴 [FL, FR, RL, RR] rad/s, 미끄럼 없음 가정).
+  //   T = (r/4)[1 1 1 1; −1 1 1 −1; (−1 1 −1 1)/k] — force_map 의 T⁻¹ 의 유사역행렬 (2026-11-18, velocity_source wheels)
+  TVec3 wheel_body_velocity(const TVec4 & omega) const
+  {
+    const double q = 0.25 * wheel_radius;
+    return TVec3(
+      q * (omega(0) + omega(1) + omega(2) + omega(3)),
+      q * (-omega(0) + omega(1) + omega(2) - omega(3)),
+      q / k() * (-omega(0) + omega(1) - omega(2) + omega(3)));
+  }
   // G(θ) = M⁻¹ R(θ) (T⁻¹)ᵀ
   TMat34 G(double theta) const;
   // w = M⁻¹ [μ ω_z S Ẋ_xy; 0]   (Xdot = [ẋ, ẏ, θ̇]).  use_w 가 꺼지면 0 (계산하지 않는다)
@@ -96,7 +115,8 @@ struct TorqueModel
   // use_w 와 상관없이 w 의 실제 값 (기록·시험용)
   TVec3 w_value(const TVec3 & Xdot) const;
   double tau_motor_limit() const {return tau_rated - tau_fric_max;}                       // 비교군 B
-  double tau_friction_limit() const;                                                      // τ_μ, 식-21
+  double tau_friction_limit() const;                                                      // τ_μ, 식-21 (N = mg/4, 평균 바퀴)
+  TVec4 tau_friction_limits() const;                                                      // 바퀴별 τ_μ,i (mu_hat_wheels > 하중 몫)
 };
 
 // 선형 모델  ẋ = A x + B τ + c (연속)  또는  x(k+1) = A x(k) + B τ(k) + c (이산)
@@ -135,6 +155,7 @@ struct TorqueTuning
   // 외란 추정치 갱신 건너뛰기 (지시서 4절·7.4절). 건너뛰면 d̂_f 를 그대로 두고 x̂_prev 는 갱신한다
   double dist_dt_tol = 0.002;        // [s] 상태 간격이 Ts ± 이 값을 벗어나면 (step 의 dt_state 로 판단, ≤ 0 이면 검사 안 함)
   double dist_skip_xy = 1e-3;        // [m] 잔차 위치 성분 |d̂_x|·|d̂_y| 가 이보다 크면 (SLAM 보정 계단). ≤ 0 이면 검사 안 함
+  bool dist_accel_only = false;      // true: 위치 잔차 = ½Ts·속도 잔차 (가속도 외란 모델, 머리주석). false: 1판 식-9 그대로
   int daqp_iter_limit = 1000;
 };
 

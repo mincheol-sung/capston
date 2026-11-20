@@ -26,6 +26,9 @@
 #              [정렬 회전] → [8자 주행] → [역정렬 회전] → [정지 유지].
 #   "fixed"    헤딩 고정.  메카넘이므로 몸체를 안 돌리고 게걸음으로 8자를 그린다.  정렬 구간이
 #              필요 없고 ω≡0 이라 부하가 |vx|+|vy| 뿐이다.  헤딩 오차 없이 위치 추종만 보고 싶을 때.
+#   "spin"     (2026-11-19, 발표용 — 퓨어 퍼슛은 v_y = 0 이라 못 한다) 경로는 그대로, 헤딩을 경로와 따로 돌린다.
+#              θ = κ_s·σ (σ = 호길이), κ_s = 2πn/L 이고 n = round(spin_rate·L/V / 2π) ≥ 1 바퀴 → 끝에서 헤딩이 출발값으로 돌아온다.
+#              ω = κ_s·v 라 속도 프로파일을 그대로 따른다 (출발·정지에서 0, 요 가속 ≤ κ_s·A). 순항 ω ≈ spin_rate. 정렬 구간 없음.
 #
 # 두 원 8자 (curve="circles", 2026-11-16 사용자 요청 "로봇 기준 좌우 8자, 원 지름 1 m, 가로 2 m")
 #   반지름 R = width/4 인 원 두 개가 기동 포즈(교차점)에서 맞닿는다. 원 중심은 로컬 (0, +R)·(0, −R) —
@@ -99,7 +102,7 @@ def ramp_rate(tau, rate0, ramp_s):
 class Figure8:
     def __init__(self, width=1.4, height=0.8, speed=0.25, accel=0.4,
                  laps=1.0, yaw_mode="tangent", align_s=1.5, samples=8000, lap_speeds=None, curve="gerono",
-                 crossing_blend=0.0):
+                 crossing_blend=0.0, spin_rate=1.0):
         if curve not in ("gerono", "circles"):
             raise ValueError(f"curve 는 gerono | circles (받은 값 {curve!r})")
         self.curve = curve
@@ -117,8 +120,10 @@ class Figure8:
             speed = max(self.lap_speeds)
         if laps <= 0.0:
             raise ValueError("laps 는 양수")
-        if yaw_mode not in ("tangent", "fixed"):
-            raise ValueError(f"yaw_mode 는 tangent | fixed (받은 값 {yaw_mode!r})")
+        if yaw_mode not in ("tangent", "fixed", "spin"):
+            raise ValueError(f"yaw_mode 는 tangent | fixed | spin (받은 값 {yaw_mode!r})")
+        if yaw_mode == "spin" and not spin_rate > 0.0:
+            raise ValueError(f"spin_rate 는 양수 [rad/s] (받은 값 {spin_rate!r})")
         self.W, self.H, self.laps = float(width), float(height), float(laps)
         self.yaw_mode, self.tangent = yaw_mode, (yaw_mode == "tangent")
 
@@ -159,6 +164,12 @@ class Figure8:
         self.T_path = 2.0 * self.t_acc + self.t_cru
         if self.lap_speeds is not None:
             self._build_lap_profile()
+
+        # ---- spin: 헤딩 = κ_s·σ, 정수 바퀴 n 으로 맞춰 끝에서 출발 헤딩 (머리주석 "spin")
+        self.spin_turns, self.kappa_spin = 0, 0.0
+        if yaw_mode == "spin":
+            self.spin_turns = max(1, round(float(spin_rate) * self.L / self.V / (2.0 * math.pi)))
+            self.kappa_spin = 2.0 * math.pi * self.spin_turns / self.L
 
         # ---- 제자리 정렬 회전 (tangent 모드만)
         self.dtheta = float(self.th_tab[0]) if self.tangent else 0.0
@@ -265,7 +276,12 @@ class Figure8:
             s = float(np.interp(sig, self.arc_tab, self.s_tab))
             p = self._point(s)
             th = float(np.interp(s, self.s_tab, self.th_tab))
-            yl, wl = (th, self._kappa(s) * v) if self.tangent else (0.0, 0.0)
+            if self.tangent:
+                yl, wl = th, self._kappa(s) * v
+            elif self.kappa_spin > 0.0:                                   # spin: 헤딩이 경로와 따로 돈다
+                yl, wl = self.kappa_spin * sig, self.kappa_spin * v
+            else:
+                yl, wl = 0.0, 0.0
             if self.Lb > 0.0:                                             # 교차점 헤딩 완화 — 경로(p, th)는 그대로
                 d, kh = self._heading_blend(sig)
                 if kh is not None:
@@ -318,7 +334,7 @@ if __name__ == "__main__":
     except ImportError:
         from mpc import K_GEOM, V_LIMIT
 
-    for mode in ("tangent", "fixed"):
+    for mode in ("tangent", "fixed", "spin"):
         f = Figure8(width=1.4, height=0.8, speed=0.25, accel=0.40, yaw_mode=mode, align_s=1.5)
         print(f"\n=== yaw_mode={mode}  W×H {f.W}×{f.H} m  V {f.V:.2f} m/s  a {f.A} m/s² ===")
         print(f"호길이 L = {f.L:.4f} m    정렬 {f.T_align:.2f}s ×2 + 주행 {f.T_path:.2f}s "
