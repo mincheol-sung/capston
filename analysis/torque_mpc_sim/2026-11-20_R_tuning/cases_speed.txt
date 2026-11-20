@@ -1,0 +1,18 @@
+pp_v0.6|speed:=0.6 controller:=pure_pursuit
+mpcB_v0.6|speed:=0.6 limit_mode:=motor_only use_w:=true
+mpcC_v0.6|speed:=0.6 limit_mode:=friction use_w:=true
+pp_v0.7|speed:=0.7 controller:=pure_pursuit
+mpcB_v0.7|speed:=0.7 limit_mode:=motor_only use_w:=true
+mpcC_v0.7|speed:=0.7 limit_mode:=friction use_w:=true
+pp_v0.8|speed:=0.8 controller:=pure_pursuit
+mpcB_v0.8|speed:=0.8 limit_mode:=motor_only use_w:=true
+mpcC_v0.8|speed:=0.8 limit_mode:=friction use_w:=true
+pp_v0.9|speed:=0.9 controller:=pure_pursuit
+mpcB_v0.9|speed:=0.9 limit_mode:=motor_only use_w:=true
+mpcC_v0.9|speed:=0.9 limit_mode:=friction use_w:=true
+pp_v1.0|speed:=1.0 controller:=pure_pursuit
+mpcB_v1.0|speed:=1.0 limit_mode:=motor_only use_w:=true
+mpcC_v1.0|speed:=1.0 limit_mode:=friction use_w:=true
+pp_v1.1|speed:=1.1 controller:=pure_pursuit
+mpcB_v1.1|speed:=1.1 limit_mode:=motor_only use_w:=true
+mpcC_v1.1|speed:=1.1 limit_mode:=friction use_w:=true

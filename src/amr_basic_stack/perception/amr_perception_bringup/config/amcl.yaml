@@ -166,10 +166,11 @@ amcl_wiggle_node:
     wheel_cmd_topic: /wheel_mpc/cmd_raw
     arm_topic: /mpc/arm
 
-    # plant_wheel.yaml geometry 와 반드시 같은 값. k = (base + width)/2 = 0.19835
+    # plant_wheel.yaml geometry 와 반드시 같은 값. k = (base + width)/2 = 0.1932
+    # 2026-11-19 새 하부 (frame + AK40-10 + 커플러). 예전 0.1897 / 0.207 (k 0.19835)
     wheel_radius: 0.04
-    wheel_base: 0.1897
-    robot_width: 0.207
+    wheel_base: 0.1724
+    robot_width: 0.2140
 
     # rotate_only: 병진 없이 제자리 회전만 한다. 로봇 주변을 비울 필요가 없고
     #   출발점에서 한 발짝도 안 움직인다. min_travel 0 이 전제다.

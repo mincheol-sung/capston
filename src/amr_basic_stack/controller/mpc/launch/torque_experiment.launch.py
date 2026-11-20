@@ -60,14 +60,55 @@ def _truthy(s):
     return str(s).strip().lower() in ("true", "1", "yes", "on")
 
 
+def _load_share(text):
+    """wheel_load_share:="0.2388,0.2392,0.2608,0.2612" → [FL, FR, RL, RR]. 개수·범위가 틀리면 시작 전에 멈춘다 (2026-11-19).
+    검사는 model.load_share 와 같다 (값 0.1~0.4, 합 1 ± 0.05). 넘기는 값은 적은 그대로 — 노드가 합 1 로 맞춘다."""
+    from amr_mpc.torque.model import load_share
+    try:
+        vals = [float(v) for v in str(text).strip("[] ").split(",")]
+        load_share(vals)
+    except ValueError as e:
+        raise RuntimeError(f"wheel_load_share 는 4 개 \"FL,FR,RL,RR\", 값 0.1~0.4, 합 1 ± 0.05 — {text!r} ({e})")
+    return vals
+
+
+def _mu_wheels(text):
+    """mu_hat_wheels:="0.432,0.285,0.456,0.350" → [FL, FR, RL, RR], "off" → [−1]*4 (네 바퀴 모두 mu_hat × 하중 몫).
+    4 개가 아니거나 2 를 넘으면 시작 전에 멈춘다. 0 이하는 그 바퀴만 mu_hat × 하중 몫 (2026-11-19 (11))."""
+    if str(text).strip().lower() in ("off", "false", "none"):
+        return [-1.0] * 4
+    try:
+        vals = [float(v) for v in str(text).strip("[] ").split(",")]
+    except ValueError:
+        raise RuntimeError(f"mu_hat_wheels 는 숫자 4 개 \"FL,FR,RL,RR\" 또는 off — {text!r}")
+    if len(vals) != 4 or any(v > 2.0 for v in vals):
+        raise RuntimeError(f"mu_hat_wheels 는 4 개 [FL, FR, RL, RR], 값 ≤ 2 (0 이하 = 그 바퀴 mu_hat) 또는 off — {text!r}")
+    return vals
+
+
+def _budget(text):
+    """load_budget:=0.9 → 0.9. 기준 바퀴 부하 |vx|+|vy|+k|ω| 의 허용 비율 (× V_LIMIT = r × max_wheel_rad_per_sec).
+    0 < 값 ≤ 1 이 아니면 시작 전에 멈춘다 — 1 을 넘으면 기준 자체가 정격 바퀴 속도를 넘는다 (2026-11-19 (12))."""
+    try:
+        v = float(text)
+    except ValueError:
+        raise RuntimeError(f"load_budget 은 0 < 값 ≤ 1 — {text!r}")
+    if not 0.0 < v <= 1.0:
+        raise RuntimeError(f"load_budget 은 0 < 값 ≤ 1 (1 이면 보정 여유 0) — {text!r}")
+    return v
+
+
 # config/torque_track.yaml 의 키. launch 인자 이름이 같고, 비워 두면 YAML 값을 쓴다
 _TRACK_KEYS = ["origin_mode", "origin_x", "origin_y", "origin_yaw_deg", "start_tolerance_xy",
                "start_tolerance_yaw_deg", "lead_speed", "lead_yaw_rate", "width", "height", "yaw_mode", "crossing_blend_m",
+               "spin_rate",                                  # 2026-11-19 yaw_mode:=spin 의 순항 요레이트 [rad/s]
                "speed", "accel", "laps", "align_s", "start_delay", "abort_error", "hold_s", "lap_speeds",
                "dt", "horizon_steps",
                # 5-3 단일 축 기준 (2026-11-16): shape:=line|rotate 와 seg_* (figure8_reference.py)
                "shape", "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_yaw_accel",
-               "seg_out_and_back", "seg_pause_s"]
+               "seg_out_and_back", "seg_pause_s",
+               # 정사각형 (2026-11-20): shape:=square 와 square_* (core/square.py)
+               "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend"]
 
 
 def _track(context, share):
@@ -93,10 +134,12 @@ def _track(context, share):
     for k, allowed in _TRACK_CHOICES.items():
         if out[k] not in allowed:
             raise RuntimeError(f"{k}:={out[k]!r} — 허용값은 {' | '.join(allowed)} (torque_track.yaml 또는 launch 인자)")
+    if out["shape"] == "square" and out["yaw_mode"] == "spin":        # 2026-11-20: 노드 기동 오류는 bag 에 안 남는다 (위 주석)
+        raise RuntimeError("shape:=square 는 yaw_mode:=tangent | fixed (spin 은 figure8·circles8 만)")
     return out
 
 
-_TRACK_CHOICES = {"yaw_mode": ("tangent", "fixed"), "shape": ("figure8", "circles8", "line", "rotate"),
+_TRACK_CHOICES = {"yaw_mode": ("tangent", "fixed", "spin"), "shape": ("figure8", "circles8", "line", "rotate", "square"),
                   "origin_mode": ("robot", "fixed")}
 
 
@@ -110,6 +153,12 @@ def _nodes(context):
     use_ref = _truthy(g("use_figure8")) and g("controller") not in ("ramp", "step")   # 램프·스텝은 기준궤적 없이 (2026-11-17)
     if _truthy(g("use_mpc")) and use_ref:
         _track(context, share)                        # 잘못된 yaw_mode·shape·origin_mode 면 CAN 준비·노드보다 먼저 멈춘다
+    if g("wheel_load_share"):
+        _load_share(g("wheel_load_share"))              # 잘못된 바퀴 하중 몫도 CAN 준비 전에 (2026-11-19)
+    if g("mu_hat_wheels"):
+        _mu_wheels(g("mu_hat_wheels"))                  # 잘못된 바퀴별 μ̂ 도 CAN 준비 전에 (2026-11-19 (11))
+    if g("load_budget"):
+        _budget(g("load_budget"))                       # 잘못된 부하 예산도 CAN 준비 전에 (2026-11-19 (12))
     # Run before returning any motor/controller actions. Never runs for simulation.
     if plant == "real":
         if source != "estimator":
@@ -158,7 +207,9 @@ def _nodes(context):
                          "wheel_efficiency": [float(v) for v in g("wheel_eff").split(",")] if g("wheel_eff") else [1.0, 1.0, 1.0, 1.0],
                          "floor_efficiency": [float(v) for v in g("floor_eff").split(",")] if g("floor_eff") else [1.0, 1.0, 1.0],
                          "can_interface": can_if if plant == "sim_can" else "",
-                         "can_reply_delay": float(g("can_reply_delay"))}]))
+                         "can_reply_delay": float(g("can_reply_delay")),
+                         # 2026-11-19 바퀴별 수직력 몫 (슬립 모델 N_i). 비우면 노드가 torque_plant.yaml body.wheel_load_share
+                         **({"wheel_load_share": _load_share(g("wheel_load_share"))} if g("wheel_load_share") else {})}]))
         if plant == "sim_can":
             nodes.append(Node(
                 package="amr_mpc", executable="ak40_can_node", name="ak40_can_node", output="screen",
@@ -207,6 +258,8 @@ def _nodes(context):
         nodes.append(Node(
             package="amr_mpc", executable="state_estimator_node", name="state_estimator_node", output="screen",
             parameters=[{"pose_source": "stamped" if slam_mode == "scan_time" else "after_scan_match",
+                         # 2026-11-19: 게인 설계의 포즈 주기. 비우면 노드 기본 0.1 s (스캔 두 개 누적, 10 Hz)
+                         **({"pose_period": float(g("est_pose_period"))} if g("est_pose_period") else {}),
                          # 2026-11-19: 추정기 모드 kf | slam. 비우면 torque_estimator.yaml estimator.mode (기본 kf)
                          **({"est_mode": g("est_mode")} if g("est_mode") else {})}]))
 
@@ -223,6 +276,8 @@ def _nodes(context):
                 "wait_for_arm": True, "armed_topic": "/mpc/armed",   # 무장된 동안만 기준 시간이 흐른다
                 # 기준 부하 검사: 정격 속도 370 rpm ≈ 38.746 rad/s를 기본 운용 상한으로 사용.
                 "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec")),
+                # 2026-11-19 (12) 부하 예산. 비우면 노드 기본 (plant.yaml limits.load_budget — 2026-11-20 0.65 → 1.0)
+                **({"load_budget": _budget(g("load_budget"))} if g("load_budget") else {}),
             }]))
 
     # ── 노면 μ̂ (2026-11-17): mu_hat:=값 이 있으면 그 값, 없고 surface:=이름 이면 config/surfaces.yaml 의 값,
@@ -248,8 +303,22 @@ def _nodes(context):
             ctrl["disturbance_enable"] = _truthy(g("disturbance"))
         if g("linearization"):
             ctrl["linearization"] = g("linearization")
-        if mu_arg:
+        if mu_arg:                                   # mu_hat:= 또는 surface:= (config/surfaces.yaml)
             ctrl["mu_hat"] = float(mu_arg)
+        # 2026-11-19 (11) 바퀴별 μ̂ (mg/4 기준). 비우면 torque_plant.yaml surface.mu_hat_wheels, off 면 끈다
+        if g("mu_hat_wheels"):
+            ctrl["mu_hat_wheels"] = _mu_wheels(g("mu_hat_wheels"))
+        with open(os.path.join(share, "config", "torque_plant.yaml")) as f:
+            yaml_muw = (yaml.safe_load(f).get("surface") or {}).get("mu_hat_wheels") or []
+        muw = ctrl.get("mu_hat_wheels", yaml_muw)
+        if muw and all(v > 0 for v in muw) and g("mu_hat") and (g("limit_mode") or "") == "friction":
+            nodes.append(LogInfo(msg=f"mu_hat:={g('mu_hat')} 는 MPC 상한에 안 쓰인다 — 바퀴별 μ̂ {list(muw)} 가 있다 "
+                                     "(torque_plant.yaml surface.mu_hat_wheels). mu_hat 로 돌리려면 mu_hat_wheels:=off"))
+        if g("wheel_load_share"):                     # 2026-11-19 바퀴별 수직력 몫 — limit_mode friction 상한에만 쓰인다
+            ctrl["wheel_load_share"] = _load_share(g("wheel_load_share"))
+            if (g("limit_mode") or "") != "friction":
+                nodes.append(LogInfo(msg=f"wheel_load_share 를 줬지만 limit_mode:={g('limit_mode') or '(YAML 기본)'} — "
+                                         "friction 이 아니면 MPC 상한에는 안 쓰인다 (시뮬 슬립 모델에는 쓰인다)"))
         # 바퀴별 마찰 상한 배율 (2026-11-18): wheel_limit_scale:="0.85,1,1.1,1" [FL, FR, RL, RR]. 비우면 torque_plant.yaml
         if g("wheel_limit_scale"):
             ws = [float(v) for v in g("wheel_limit_scale").strip("[] ").split(",")]
@@ -262,21 +331,27 @@ def _nodes(context):
             if len(W) != 6:
                 raise RuntimeError(f"mpc_W 는 6 개 [x, y, θ, ẋ, ẏ, θ̇] — {g('mpc_W')!r}")
             ctrl["W"] = W
-        if g("mpc_w_delta"):
+        if g("mpc_w_delta"):                          # 스텝 단위 r_Δ [(N·m)⁻²] — 주면 w_dudt 보다 우선 (torque_mpc_node)
             ctrl["w_delta"] = float(g("mpc_w_delta"))
+        if g("mpc_w_dudt"):                           # 2026-11-18 교수님 지시: 시간 미분 단위 r_τ̇ [(N·m/s)⁻²] = r_Δ·Ts²
+            ctrl["w_dudt"] = float(g("mpc_w_dudt"))
         if g("mpc_r_u"):
             ctrl["r_u"] = float(g("mpc_r_u"))
         if g("mpc_q_null"):
             ctrl["q_null"] = float(g("mpc_q_null"))
         if g("mpc_dist_alpha"):
             ctrl["disturbance_alpha"] = float(g("mpc_dist_alpha"))
+        if g("velocity_source"):                      # 2026-11-18: estimator | wheels (torque_mpc.yaml state_input)
+            ctrl["velocity_source"] = g("velocity_source")
+        if g("mpc_dist_accel_only"):                  # 2026-11-18 시험용 (torque_mpc.yaml disturbance.accel_only)
+            ctrl["disturbance_accel_only"] = _truthy(g("mpc_dist_accel_only"))
         nodes.append(Node(
             package="amr_mpc_cpp", executable="torque_mpc_node", name="torque_mpc_node", output="screen",
             parameters=[ctrl]))
         torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"
     elif controller == "pure_pursuit":
         # 비교군 A: 퓨어 퍼슛 (v_x, ω_z) → 바퀴별 PI → 토크. 게인은 config/torque_baseline_a.yaml
-        ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "wheel_limit_scale", "ctrl_payload_kg",
+        ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "mu_hat_wheels", "wheel_limit_scale", "ctrl_payload_kg",
                                "log_prefix")
                    if g(k)]
         if ignored:
@@ -285,9 +360,16 @@ def _nodes(context):
         nodes.append(Node(
             package="amr_mpc", executable="pure_pursuit_node", name="pure_pursuit_node", output="screen",
             parameters=[{"state_topic": state_topic, "armed_topic": "/mpc/armed"}]))
+        # 2026-11-19: pp_speed_source:=estimator 면 PI 되먹임이 추정기 속도 (MPC 와 같은 정보). pp_kp·pp_ki 로 게인 덮어쓰기
+        pi = {"armed_topic": "/mpc/armed", "speed_topic": state_topic}
+        if g("pp_speed_source"):
+            pi["speed_source"] = g("pp_speed_source")
+        for arg, par in (("pp_kp", "kp"), ("pp_ki", "ki")):
+            if g(arg):
+                pi[par] = float(g(arg))
         nodes.append(Node(
             package="amr_mpc", executable="wheel_pi_node", name="wheel_pi_node", output="screen",
-            parameters=[{"armed_topic": "/mpc/armed"}]))
+            parameters=[pi]))
         torque_in, track_status = "/wheel_pi/cmd_raw", "/pure_pursuit/status"
     elif controller == "ramp":
         # 바닥 토크 램프 시험 (2026-11-17, torque_ramp.py): MPC 자리에서 τ* = τ_g + 관성 ff 를 /torque_mpc/cmd_raw 로.
@@ -427,20 +509,33 @@ def generate_launch_description():
         A("disturbance", default_value="", description="외란 추정치 d̂ true/false (YAML 기본 false)"),
         A("linearization", default_value="", description="reference | current_state (YAML 기본 reference)"),
         A("mpc_W", default_value="", description="MPC 상태 가중 'x,y,θ,ẋ,ẏ,θ̇' (비우면 torque_mpc.yaml tuning.W)"),
-        A("mpc_w_delta", default_value="", description="MPC 토크 변화 벌점 r_Δ (비우면 torque_mpc.yaml tuning.w_delta)"),
+        A("mpc_w_delta", default_value="", description="MPC 토크 변화 벌점 r_Δ 스텝 단위 [(N·m)⁻²] (주면 w_dudt 보다 우선)"),
+        A("mpc_w_dudt", default_value="", description="MPC 토크 변화율 벌점 r_τ̇ [(N·m/s)⁻²] = r_Δ·Ts² (비우면 torque_mpc.yaml tuning.w_dudt)"),
         A("mpc_r_u", default_value="", description="MPC 입력 편차 벌점 r_U (비우면 torque_mpc.yaml tuning.r_u)"),
         A("mpc_dist_alpha", default_value="", description="외란 추정치 저역통과 α (비우면 torque_mpc.yaml disturbance.alpha)"),
+        A("pp_speed_source", default_value="", description="비교군 A 바퀴 PI 속도 되먹임 wheels(엔코더, 기본) | estimator(추정기, MPC 와 같은 정보)"),
+        A("pp_kp", default_value="", description="비교군 A 바퀴 PI K_p (비우면 torque_baseline_a.yaml)"),
+        A("pp_ki", default_value="", description="비교군 A 바퀴 PI K_i (비우면 torque_baseline_a.yaml)"),
+        A("est_pose_period", default_value="", description="추정기 게인 설계의 SLAM 포즈 주기 [s] (비우면 0.1. 스캔 하나씩 매칭하는 lua 면 0.05)"),
         A("est_mode", default_value="", description="추정기 모드 kf (고정 게인 칼만) | slam (SLAM 으로 덮어쓰기, 원래 설계). 비우면 torque_estimator.yaml (기본 kf)"),
         A("trip_on_pose_jump", default_value="", description="fault_monitor 가 무장 중 SLAM 포즈 튐에 정지 true/false (비우면 true)"),
         A("sim_slam_jump", default_value="", description="시뮬 포즈 튐 흉내 \"t,dx,dy[,dyaw_deg[,once]]\": 출발 t 초 뒤부터 SLAM 포즈를 옮긴다 (once 1 = 스캔 하나만)"),
+        A("velocity_source", default_value="", description="MPC 속도 상태 estimator | wheels (바퀴 기구학 v_x·v_y). 비우면 torque_mpc.yaml state_input"),
+        A("mpc_dist_accel_only", default_value="", description="외란 추정치 위치 잔차를 ½Ts·속도 잔차로 true/false (비우면 torque_mpc.yaml disturbance.accel_only)"),
         A("mpc_q_null", default_value="", description="MPC 영공간 벌점 (비우면 torque_mpc.yaml tuning.q_null)"),
         A("mu_hat", default_value="", description="제어기의 노면 마찰계수 (YAML 기본 0.3). surface:= 보다 우선"),
+        A("mu_hat_wheels", default_value="",
+          description="바퀴별 μ̂ \"FL,FR,RL,RR\" (mg/4 기준, MPC friction 상한) 또는 off. 비우면 torque_plant.yaml surface.mu_hat_wheels"),
+        A("wheel_load_share", default_value="",
+          description="바퀴별 수직력 몫 \"FL,FR,RL,RR\" (합 1). 비우면 torque_plant.yaml body.wheel_load_share. MPC friction 상한·시뮬 슬립 모델"),
         A("surface", default_value="", description="노면 이름 → config/surfaces.yaml 의 μ̂ (mu_hat 이 비었을 때). 미측정이면 실행 거부"),
         A("wheel_limit_scale", default_value="",
           description="바퀴별 마찰 상한 배율 FL,FR,RL,RR (예 0.85,1,1.1,1). C 에서만. 비우면 torque_plant.yaml surface.wheel_limit_scale"),
         A("log_prefix", default_value="", description="MPC CSV 접두. 비면 저장 안 함"),
         # 8자 트랙: 비우면 config/torque_track.yaml
         *[A(k, default_value="", description=f"트랙 {k} (비우면 torque_track.yaml)") for k in _TRACK_KEYS],
+        A("load_budget", default_value="",
+          description="기준 바퀴 부하 예산 (× r·max_wheel_rad_per_sec). 비우면 plant.yaml 1.0 (정격까지, 2026-11-20). circles8 tangent 최고 W2.0 1.11 · W3.0 1.23 m/s"),
         A("max_wheel_rad_per_sec", default_value=str(rated_rad_s), description="기준 궤적 부하 검사 상한 [rad/s]. 기본은 torque_plant.yaml 정격 370 rpm; 모터 과속 차단 기능은 아님"),
         A("x0", default_value="0.0"), A("y0", default_value="0.0"), A("yaw0", default_value="0.0"),
         A("use_rviz", default_value="true"),

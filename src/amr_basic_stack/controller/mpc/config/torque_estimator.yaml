@@ -34,6 +34,8 @@ estimator:
   init_s: 1.0                   # [s]
   init_max_accel_std: 0.10      # [m/s²] 이보다 흔들리면 정지가 아니라고 보고 다시 모은다
   init_max_gyro_std: 0.02       # [rad/s]
+  init_block_s: 0.05            # [s] 위 두 std 를 이 길이 평균으로 잰다 (≤ 0 이면 원신호). 2026-11-19: 서 있어도 차체가 30~200 Hz 로
+                                #   떨려 원신호 std 0.12~0.17 → 추정값이 안 나와 4 판이 안 움직였다. 50 ms 평균이면 0.006~0.018
 
   # ── IMU 와 포즈 기준점의 위치 (base_footprint 기준 [m])
   #    Cartographer 의 /tracked_pose 는 로봇 중심이 아니라 tracking_frame(camera_gyro_frame = IMU 위치)의 포즈다
@@ -43,7 +45,9 @@ estimator:
   #        (0, 0) 50 mm/s  →  (0.098, −0.030) 28 mm/s  →  (0.098, +0.017) 16 mm/s
   #    ★ 지금 리포의 URDF 는 camera_link y = 0 이라 (0.098, −0.030) 이 된다. bag 때와 장착이 달라졌는지 미확인
   #      → 실차에서 제자리 회전으로 다시 확인 (To do)
-  imu_offset_x: 0.098
+  #    2026-11-19 새 하부: base_link 가 몸체 기준 (−11.3, 0, +7.5) mm 옮겨지고 센서는 그대로 (문서 "AMR 하부 변경 전달 사항")
+  #      → base_link 기준 IMU x 가 +11.3 mm: 0.098 → 0.1093 (URDF camera_link x 0.11398 → 0.12528 과 같은 이동). y 는 그대로
+  imu_offset_x: 0.1093
   imu_offset_y: 0.017
   # pose_offset_x / pose_offset_y: 포즈 기준점이 IMU 와 다를 때만 적는다 (없으면 IMU 위치와 같다고 본다)
 

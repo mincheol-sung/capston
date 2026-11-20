@@ -207,8 +207,10 @@ def test_wheel_slip_onsets_finds_the_light_wheel(tmp_path):
 
 def test_plant_per_wheel_friction_limit():
     p = TorquePlant.from_yaml(mu_hat=0.4, wheel_limit_scale=[0.8, 1.0, 1.2, 1.0])
-    tb = p.tau_bar_friction()
-    assert tb[0] == pytest.approx(0.8 * p.tau_friction_limit()) and tb[2] == pytest.approx(1.2 * p.tau_friction_limit())
+    tb = p.tau_bar_friction()                                                   # 하중 몫(τ_μ,i) × 추가 배율
+    assert tb[0] == pytest.approx(0.8 * p.tau_friction_limits()[0]) and tb[2] == pytest.approx(1.2 * p.tau_friction_limits()[2])
+    q = TorquePlant.from_yaml(mu_hat=0.4, wheel_load_share=[0.25] * 4)
+    assert np.allclose(q.tau_bar_friction(), q.tau_friction_limit())            # 몫 1/4·배율 1 이면 예전 τ_μ
     assert np.allclose(TorquePlant.from_yaml().wheel_limit_scale, 1.0)          # 리포 기본값은 1 (예전과 같다)
     with pytest.raises(ValueError):
         TorquePlant.from_yaml(wheel_limit_scale=[0.0, 1, 1, 1])

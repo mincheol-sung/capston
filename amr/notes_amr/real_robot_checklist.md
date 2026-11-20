@@ -232,4 +232,10 @@ ros2 launch amr_mpc torque_experiment.launch.py plant:=real use_rviz:=false
   (또는 `amrall mu_hat:=`). 기존 데이터 추정 0.33 이상 ~ 0.45. 옆·대각은 참고(`--dirs left,right,fl`)
   2026-11-17 부터: 여러 판을 `tools/mu_surface.py summarize --surface <노면> --summary … --write` 로 모아 `config/surfaces.yaml` 에 두고
   `amrall … limit_mode:=friction surface:=<노면>` 으로 쓴다 — 절차 `notes_amr/mu_surface_procedure.md`. `lab_floor` 아직 미측정
+- [x] 바퀴별 수직력 몫 — 2026-11-18 저울 (두 바퀴씩 3 회): FL 0.2388 FR 0.2392 RL 0.2608 RR 0.2612 → `torque_plant.yaml body.wheel_load_share`
+  (MPC friction 상한 τ_μ,i, 시뮬 슬립 모델 N_i — stack_changelog 2026-11-19 (10), `analysis/torque_mpc_real/2026-11-18_load`).
+  - [ ] 새 frame(2026-11-19 (7)) 이 측정 뒤에 조립됐으면 다시 잰다. 적재 5 kg 판은 실은 채로 따로 잰다
+  - [ ] 8자 같은 조건에서 몫 켬 / 끔(`wheel_load_share:="0.25,0.25,0.25,0.25"`) 비교: 앞바퀴 슬립·상한 닿음 비율
+- [ ] 바퀴별 μ̂ `surface.mu_hat_wheels [0.432, 0.285, 0.456, 0.350]` (2026-11-19 (11), 기본 켬 — mu_hat:= 무시) 의 출처·계산 확인,
+  8자에서 켬 / `mu_hat_wheels:=off` 비교 (FR 상한 0.0721 — 0.7 m/s 는 use_w:=true 로)
 - [ ] 8자 트랙 공간 약 10 × 5 m + 여유

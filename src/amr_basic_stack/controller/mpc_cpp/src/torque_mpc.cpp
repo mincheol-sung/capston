@@ -67,6 +67,18 @@ double TorqueModel::tau_friction_limit() const
   return wheel_radius / std::sqrt(2.0) * mu_hat * mass * gravity / 4.0 * c_s;
 }
 
+TVec4 TorqueModel::tau_friction_limits() const
+{
+  // 식-21 을 바퀴마다: τ_μ,i = (r/√2)·μ̂·N_i·c_s,  N_i = 몫_i·m g  (몫 1/4 이면 mg/4 — 위와 같다) (2026-11-19 (10))
+  // 바퀴별 μ̂_i 가 있으면 (> 0) 그 바퀴는 (r/√2)·μ̂_i·(m g/4)·c_s — 하중 몫을 다시 곱하지 않는다 (2026-11-19 (11))
+  const double unit = wheel_radius / std::sqrt(2.0) * mass * gravity * c_s;
+  TVec4 out;
+  for (int i = 0; i < 4; ++i) {
+    out(i) = mu_hat_wheels(i) > 0.0 ? unit * mu_hat_wheels(i) / 4.0 : unit * mu_hat * wheel_load_share(i);
+  }
+  return out;
+}
+
 // ── 현재 상태 기준 선형화 ───────────────────────────────────────
 TorqueLinearization parse_linearization(const std::string & s)
 {
@@ -205,13 +217,12 @@ void TorqueMPC::reset()
 
 TVec4 TorqueMPC::tau_bar() const
 {
-  const double motor = md_.tau_motor_limit();
-  TVec4 out = TVec4::Constant(motor);
+  TVec4 out = TVec4::Constant(md_.tau_motor_limit());
+  // C: 바퀴별 τ_μ,i (mu_hat_wheels > 하중 몫, 2026-11-19) × 추가 배율 wheel_limit_scale (기본 1, 2026-11-18). B 에는 안 쓴다
+  if (tu_.limit_mode == TorqueLimitMode::Friction) {
+    out = out.cwiseMin(md_.tau_friction_limits().cwiseProduct(md_.wheel_limit_scale));
+  }
   for (int i = 0; i < 4; ++i) {
-    // C: 바퀴별 배율 (wheel_limit_scale, 2026-11-18). B(motor_only) 에는 안 쓴다
-    if (tu_.limit_mode == TorqueLimitMode::Friction) {
-      out(i) = std::min(motor, md_.tau_friction_limit() * md_.wheel_limit_scale(i));
-    }
     if (tau_bar_override_(i) >= 0.0) {out(i) = std::min(tau_bar_override_(i), md_.tau_motor_limit());}
   }
   return out;
@@ -246,6 +257,9 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat, double dt_state)
   if (tu_.dist_skip_xy > 0.0 && std::max(std::abs(d(0)), std::abs(d(1))) > tu_.dist_skip_xy) {
     stats_.d_skipped = 2;
     return;
+  }
+  if (tu_.dist_accel_only) {     // 가속도 외란 모델 (머리주석, 2026-11-18): 위치 잔차를 속도 잔차에서 만든다
+    d.head<3>() = 0.5 * tu_.Ts * d.tail<3>();
   }
   d_hat_ = (1.0 - tu_.dist_alpha) * d_hat_ + tu_.dist_alpha * d;     // 식-11
 }

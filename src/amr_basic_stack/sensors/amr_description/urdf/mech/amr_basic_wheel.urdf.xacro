@@ -5,10 +5,11 @@
   <xacro:property name="amr_wheel_radius" value="0.04" />
   <xacro:property name="amr_wheel_width"  value="0.0448" />
   <xacro:property name="amr_wheel_mass"   value="0.5" />
-  <!-- Joint positions relative to base_link (axle height), symmetrized from
-       the amr_basic.urdf source values (+-0.09491, +-0.10352). -->
-  <xacro:property name="amr_wheel_xoff"   value="0.09491" />
-  <xacro:property name="amr_wheel_yoff"   value="0.10352" />
+  <!-- Joint positions relative to base_link (axle height).
+       2026-11-19 새 하부 (frame + AK40-10 + 커플러): 축간 172.4 mm (CAD) / 트랙 214.0 mm (사용자 지정, CAD 는 231.9) → (+-0.0862, +-0.1070).
+       예전: amr_basic.urdf source values (+-0.09491, +-0.10352). 바퀴 visual 메시 위치(robots/amr_basic.urdf.xacro)는 예전 그대로. -->
+  <xacro:property name="amr_wheel_xoff"   value="0.0862" />
+  <xacro:property name="amr_wheel_yoff"   value="0.1070" />
 
   <!-- Mecanum wheel via anisotropic friction (official Gazebo approach, PR
        gazebosim/gz-sim#683). Requires the DART (dartsim) physics engine.

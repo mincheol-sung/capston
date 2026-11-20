@@ -13,19 +13,29 @@
 #   - 외란 추정치 d̂            → torque_mpc.yaml (3단계에서 만든다, 기본 끔)
 # ===================================================================
 
-# ── 기하: ω_i = (v_x ± v_y ± k ω_z)/r,  k = (wheel_base + width)/2 = 0.1945 m
-#    2026-11-17 AK40 모터 교체 뒤 실측 치수로 갱신 (전준민 실측): 앞뒤 축 간격 169 mm, 좌우 바퀴 간격 220 mm
-#    → lx 0.0845, ly 0.110 m. 이전 값 0.1897 / 0.207 (k 0.19835) 은 RoboClaw 시절 치수로,
-#    plant.yaml·plant_wheel.yaml(구조 A·B)·sys_id 에는 그대로 남아 있다. torque_mpc.hpp 기본값도 1판 수치 예 검산용으로 이전 값
+# ── 기하: 드라이버 twist_to_wheels 와 같은 값 (plant_wheel.yaml geometry 와 같다)
+#    ω_i = (v_x ± v_y ± k ω_z)/r,  k = (wheel_base + width)/2 = 0.1932 m
+#    2026-11-19 새 하부 (frame + AK40-10 + 커플러): 축간 172.4 mm (문서 "AMR 하부 변경 전달 사항"의 CAD), 트랙 214.0 mm (사용자 지정 —
+#      plant.yaml 과 같게. 문서 CAD 는 231.9) → l_x 0.0862, l_y 0.1070. 예전 하부: 0.1897 / 0.207 (k 0.19835)
+#    참고: 2026-11-17 jjm 실측 169 / 220 mm (k 0.1945, 전준민 실측) — 11-19 새 하부 전 치수. 2026-11-20 병합에서 새 하부 값을 따름.
+#      새 하부에서 다시 재면 이 값을 고친다 (두 값 차이 k 0.7 %)
 geometry:
   wheel_radius_m: 0.04
-  wheel_base_m:   0.169
-  robot_width_m:  0.220
+  wheel_base_m:   0.1724
+  robot_width_m:  0.2140
 
 # ── 차체
 body:
   mass_kg: 4.56          # 2026-11-15 저울 실측 (AK40 장착, 배터리 포함, 적재 없음). 이전 4.0 은 1판 추정
   payload_kg: 0.0        # 적재 조건: 0 또는 5 (2차 발표). 실제 질량 = mass_kg + payload_kg
+  # 바퀴별 수직력 몫 [FL, FR, RL, RR] (합 1) — N_i = 몫_i·m g. 2026-11-18 정지 저울 측정 (저울 1 개, 두 바퀴씩 3 회 평균,
+  #   analysis/torque_mpc_real/2026-11-18_load/RESULTS_KO.md): 앞 합 2199 g · 뒤 2401 g → 앞 비율 0.478,
+  #   왼쪽 2280 g · 오른쪽 2283 g → 0.4997. 대각(FL+RR vs FR+RL)은 두 바퀴씩으로는 못 재서 0 으로 둔 값
+  #   (네 바퀴 받침은 static indeterminate — 바닥 평탄도에 따라 바뀐다). 무게중심은 가운데서 뒤로 3.8 mm.
+  #   쓰는 곳: torque_mpc_node 의 friction 상한 τ_μ,i = (r/√2)·μ̂·N_i·c_s, 시뮬 SlipPlant 의 F_i = μ N_i tanh(·).
+  #   μ̂ 는 바닥 값(surface.mu_hat) 하나 — 바닥을 바꿔도 이 몫은 그대로. 적재(payload)를 싣거나 하부를 바꾸면 다시 잰다.
+  #   비우면 1/4 씩 (예전 mg/4). 한 번만 바꿀 때 launch 인자 wheel_load_share:="0.25,0.25,0.25,0.25"
+  wheel_load_share: [0.2388, 0.2392, 0.2608, 0.2612]
   inertia_z_kgm2: 0.06   # 추정. 리포에 값 없음. 0.3 × 0.3 m 균일판 4 kg 근사 m(a²+b²)/12.
                          #   CAD 또는 제자리 회전 가속 시험으로 바꾼다 (To do 2절)
 
@@ -87,6 +97,12 @@ friction:
 # ── 노면 (C 비교군의 마찰 토크 상한 τ_μ = (r/√2)·μ̂·(m g/4)·c_s, 1판 식-21)
 surface:
   mu_hat: 0.3                # 추정. 노면마다 토크 램프 시험 (To do 2절)
+  # 바퀴별 μ̂ [FL, FR, RL, RR] (2026-11-19 (11), 사용자 제공 값 — 출처 bag·계산은 이 리포에 없다). mg/4 기준:
+  #   τ_μ,i = (r/√2)·μ̂_i·(m g/4)·c_s — 실측 |τ_i| / ((r/√2)(mg/4)) 로 낸 값이라 하중 몫(body.wheel_load_share)을 다시 곱하지 않는다.
+  #   값이 있으면 MPC friction 상한에서 mu_hat 대신 쓰인다 (mu_hat:= 를 줘도 안 바뀐다). 0 이하인 바퀴는 mu_hat × 하중 몫.
+  #   잰 사분면 (ω·τ 부호): FL 3, FR 1, RL 3, RR 3 — 한 방향에서 잰 값을 양쪽 |τ_i| ≤ τ̄_i 에 같이 쓴다.
+  #   끄기: launch mu_hat_wheels:=off.  한 번만 다른 값: mu_hat_wheels:="a,b,c,d".  시뮬 플랜트(surface_mu)에는 안 쓰인다
+  mu_hat_wheels: [0.432, 0.285, 0.456, 0.350]
   c_s: 0.8                   # 안전계수
   # 바퀴별 마찰 상한 배율 [FL, FR, RL, RR] (2026-11-18) — C 에서 τ̄_i = min(모터, τ_μ·s_i). 노면이 아니라 차체 성질:
   #   바퀴마다 실린 무게 N_i, 롤러·접지 상태, 모터 출력 차이로 먼저 미끄러지는 바퀴를 낮춘다. μ̂ 는 노면마다(surfaces.yaml),

@@ -34,14 +34,20 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 # torque_experiment.launch.py 로 그대로 넘기는 인자 (비우면 넘기지 않는다 → 그쪽 기본값·YAML)
-_PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_hat", "surface", "wheel_limit_scale", "disturbance", "stiction_comp", "use_w",
-         "origin_mode", "shape", "crossing_blend_m",
+_PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_hat", "surface", "wheel_limit_scale", "mu_hat_wheels", "wheel_load_share", "disturbance", "stiction_comp", "use_w",
+         "origin_mode", "shape", "crossing_blend_m", "load_budget", "spin_rate",
          "width", "height", "yaw_mode", "align_s",
          "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_out_and_back", "seg_pause_s", "speed",
+         "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend",
          "accel", "laps", "hold_s", "max_track_error",
          "ramp_dir", "ramp_tau_max", "ramp_rate", "ramp_distance", "ramp_stop_distance", "ramp_inertia_ff", "ramp_log_dir",
-         "step_dir", "step_tau", "step_distance", "step_max_time", "step_inertia_ff", "step_log_dir", "mpc_W", "mpc_w_delta", "mpc_r_u", "mpc_q_null", "mpc_dist_alpha",
+         "step_dir", "step_tau", "step_distance", "step_max_time", "step_inertia_ff", "step_log_dir", "mpc_W", "mpc_w_delta", "mpc_w_dudt", "mpc_r_u", "mpc_q_null", "mpc_dist_alpha", "mpc_dist_accel_only", "velocity_source", "est_pose_period", "pp_speed_source", "pp_kp", "pp_ki",
          "est_mode", "trip_on_pose_jump"]
+
+
+# sensors.launch.py 로 넘기는 인자 (이름 바꿔서). 비우면 넘기지 않는다
+_SENSOR_PASS = {"imu_accel_fps": "depth_camera_accel_fps", "imu_gyro_fps": "depth_camera_gyro_fps",
+                "imu_unite": "depth_camera_unite_imu_method"}
 
 
 def _truthy(v):
@@ -72,7 +78,9 @@ def _nodes(context):
         else:
             out.append(LogInfo(msg=f"[real_all] {rec} 없음 — 녹화하지 않는다"))
     if _truthy(g("sensors")):
-        out.append(_inc("amr_bringup", "sensors.launch.py"))
+        # D455 IMU 설정 (2026-11-19, 가속도계 지연 시험): 비우면 sensors.launch.py 기본값
+        sens = {dst: g(src) for src, dst in _SENSOR_PASS.items() if g(src)}
+        out.append(_inc("amr_bringup", "sensors.launch.py", sens))
     if _truthy(g("localization")):
         out.append(_inc("amr_perception_bringup", "cartographer.launch.py",
                         {"mode": "localization", "map": g("map"), "lua_basename": g("lua")}))
@@ -81,6 +89,10 @@ def _nodes(context):
         if g(k):
             torque[k] = g(k)
     torque.setdefault("use_mpc", "false")
+    # 2026-11-19: 스캔 하나씩 매칭하는 lua (localization_torque_acc1_2d.lua) 면 포즈가 20 Hz — 추정기 게인 설계 주기도 0.05 s
+    if "acc1" in g("lua") and "est_pose_period" not in torque:
+        torque["est_pose_period"] = "0.05"
+        out.append(LogInfo(msg=f"[real_all] lua {g('lua')} → 추정기 est_pose_period 0.05 s (포즈 20 Hz)"))
     # 실차 5-3·8자는 무장한 자리가 출발점 (amr8 과 같다). torque_track.yaml 기본 fixed 는 지도 (0, 0) 이라 0.30 m 밖이면
     # "출발 거부" — 2026-11-16 첫 실행에서 a 를 눌러도 안 움직였다. 지도 고정으로 쓰려면 origin_mode:=fixed
     torque.setdefault("origin_mode", "robot")
@@ -112,5 +124,8 @@ def generate_launch_description():
         A("localize_delay", default_value="15.0", description="⑤ 까지 기다리는 시간 [s] (지도 불러오기·IMU 준비)"),
         A("bag", default_value="", description="⑥ 모든 토픽 녹화. true → bags/<날짜>/<시분초>, 이름 → bags/<날짜>/<시분초>_<이름> (비우면 녹화 안 함)"),
         *[A(k, default_value="", description="torque_experiment.launch.py 로 넘긴다 (비우면 그쪽 기본값)") for k in _PASS],
+        A("imu_accel_fps", default_value="", description="① D455 가속도계 Hz (100|200|400, 비우면 장치 기본)"),
+        A("imu_gyro_fps", default_value="", description="① D455 자이로 Hz (200|400, 비우면 장치 기본)"),
+        A("imu_unite", default_value="", description="① gyro+accel 결합 0|1 copy|2 linear_interpolation (비우면 2)"),
         OpaqueFunction(function=_nodes),
     ])

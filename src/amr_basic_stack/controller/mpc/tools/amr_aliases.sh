@@ -19,6 +19,9 @@
 #   amrall  [인자...]        위 센서·측위·CAN(+MPC)·표시·측위 맞추기를 터미널 하나로 (bag:=true 면 녹화도, 폴더 이름 자동)   real_all.launch.py
 #   amrramp [인자...]        바닥 토크 램프 (amrall 스택 + MPC 대신 램프, dir:=fwd|left mu_hat:= bag:=true)  torque_ramp.launch.py
 #   amrstep [인자...]        바닥 토크 스텝 (amrramp 와 같은 스택, dir:=fwd|left tau:= distance:= bag:=)  torque_step.launch.py
+#   amrbuild [패키지...]     빌드 (기본 amr_mpc amr_mpc_cpp). 설치본이 소스 링크라 yaml·launch·Python 은 고치면 바로 반영 — C++ 만 다시 빌드
+#   amrcmp  bag... [--csv f] A(퓨어 퍼슛)·MPC 판을 같은 잣대로: SLAM(IMU 점 → 중심) 기준 오차·요·토크·슬립 표   tools/compare_slam.py
+#   amrlag  bag...           자이로·가속도계·추정기·SLAM 이 바퀴 엔코더보다 몇 ms 늦나 (D455 imu_accel_fps 등 비교)   tools/sensor_lag.py
 #   amrhelp                  이 표
 #   예) amrmpc shape:=line seg_distance:=0.4 seg_dir_deg:=45 speed:=0.10 limit_mode:=friction mu_hat:=0.55
 #       amrmove --dirs fwd,back --amps 0.1 --time 0.5
@@ -74,4 +77,15 @@ amrstep()   ( _amr_env && sudo -v && exec ros2 launch amr_mpc torque_step.launch
 amrrec() (   # 이름 생략 가능 — 폴더는 record_all.sh 가 bags/<날짜>/<시분초>[_이름] 로 정한다
   _amr_env && exec bash "$AMR_MPC_DIR/tools/record_all.sh" "${1:-}" "amrrec $*"
 )
-amrhelp() { sed -n '6,27p' "$AMR_MPC_DIR/tools/amr_aliases.sh" | sed 's/^# \{0,1\}//'; }
+# 2026-11-18: ~/.local 의 setuptools 83 에는 'develop --editable' 이 없어 colcon 이 --symlink-install 을 말없이 복사 설치로 바꾼다
+#   (colcon_core/task/python/build.py). 빌드 때만 사용자 site-packages 를 꺼 시스템 setuptools 68 을 쓰게 하면 설치본이 소스 링크가 된다.
+#   PYTHONNOUSERSITE 없이 빌드해도 소스는 안 깨진다 (복사가 링크를 먼저 지운다) — 다시 복사본이 될 뿐.
+amrbuild() (
+  cd "$AMR_WS" || exit 1
+  source /opt/ros/jazzy/setup.bash || exit 1
+  [ $# -eq 0 ] && set -- amr_mpc amr_mpc_cpp
+  PYTHONNOUSERSITE=1 exec colcon build --symlink-install --packages-select "$@"
+)
+amrcmp()   ( _amr_env && exec /usr/bin/python3 "$AMR_MPC_DIR/tools/compare_slam.py" "$@" )   # 2026-11-19 A·MPC 비교 (발표)
+amrlag()   ( _amr_env && exec /usr/bin/python3 "$AMR_MPC_DIR/tools/sensor_lag.py" "$@" )     # 2026-11-19 센서 지연
+amrhelp() { sed -n '6,30p' "$AMR_MPC_DIR/tools/amr_aliases.sh" | sed 's/^# \{0,1\}//'; }

@@ -11,6 +11,12 @@
 #                                                 (MPC 의 /torque_mpc/cmd_raw 자리. 뒤 경로는 MPC 와 똑같다)
 #   /wheel_pi/status        (Float64MultiArray)   [t, ω_ref×4, ω×4, τ×4, 포화 바퀴 수]
 #
+# 속도 되먹임 출처 speed_source (2026-11-19, 사용자 결정 — MPC 와 위치·속도 정보 출처를 같게)
+#   wheels    (기본) 엔코더 ω_i — 표준 퓨어 퍼슛 + 바퀴 PI
+#   estimator 추정기 몸체 속도 [v_x, v_y, ω_z] (speed_topic, 기본 /state_estimator/odom) 를 T⁻¹ 로 바퀴 속도로 바꿔 ω_i 자리에.
+#             MPC 와 같은 정보 (추정기 v_x 는 바퀴보다 약 0.09 s 늦다 — 2026-11-18 bag). 실행 시각은 그대로 /wheel_states 마다.
+#             추정기 값이 wheel_timeout 보다 묵으면 DAMPING. PI 게인은 엔코더 기준으로 맞춘 값이라 진동하면 낮춘다.
+#
 # 공정성 (비교군 B 와 같게 — torque_mpc_todo.md "비교군 A")
 #   같은 주기 100 Hz · 같은 출력 경로(torque_output 마찰 보상·안전 클램프, 게이트) ·
 #   같은 토크 상한 τ̄ = τ_lim − τ_fric,max 와 변화율 Δτ̄ = τ̄·rate_fraction (torque_plant.yaml, torque_mpc.yaml 을 그대로 읽는다) ·
@@ -24,6 +30,7 @@
 import numpy as np
 import rclpy
 from geometry_msgs.msg import TwistStamped
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
@@ -53,6 +60,8 @@ class WheelPINode(Node):
             ("Ts", float(ym["tuning"]["Ts"])),
             ("cmd_timeout", float(ya.get("cmd_timeout", 0.05))),
             ("wheel_timeout", float(ym["safety"]["state_timeout"])),
+            ("speed_source", str(ya.get("speed_source", "wheels"))),   # wheels | estimator (머리주석)
+            ("speed_topic", "/state_estimator/odom"),
         ])
         g = lambda n: self.get_parameter(n).value
         tau_max = float(g("tau_max_Nm"))
@@ -66,6 +75,10 @@ class WheelPINode(Node):
         self.Tinv = plant.Tinv
         self.cmd_timeout, self.wheel_timeout = float(g("cmd_timeout")), float(g("wheel_timeout"))
 
+        self.speed_source = str(g("speed_source")).strip().lower()
+        if self.speed_source not in ("wheels", "estimator"):
+            raise SystemExit(f"[wheel_pi] speed_source={self.speed_source!r} — wheels | estimator")
+        self.v_est, self.est_rx = np.zeros(3), 0.0
         self.v_cmd, self.cmd_rx = np.zeros(3), 0.0
         self.last_stamp, self.wheel_rx = None, 0.0
         self.armed, self.armed_since, self.active = False, 0.0, False
@@ -74,6 +87,8 @@ class WheelPINode(Node):
         self.pub_status = self.create_publisher(Float64MultiArray, "/wheel_pi/status", 10)
         self.create_subscription(TwistStamped, str(g("cmd_topic")), self.on_cmd, 10)
         self.create_subscription(WheelStates, str(g("wheel_states_topic")), self.on_wheels, 10)
+        if self.speed_source == "estimator":
+            self.create_subscription(Odometry, str(g("speed_topic")), self.on_est, 20)
         armed_topic = str(g("armed_topic"))
         if armed_topic:
             latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
@@ -86,7 +101,14 @@ class WheelPINode(Node):
         self.get_logger().info(
             f"바퀴별 PI (비교군 A). {g('cmd_topic')} + {g('wheel_states_topic')} → {g('output_topic')}\n"
             f"  K_p {self.pi.kp:g} N·m/(rad/s)  K_i {self.pi.ki:g} N·m/rad   상한 τ̄ {tau_max:.4f} N·m, "
-            f"Δτ̄ {tau_max * rf:.4f} N·m/{self.Ts*1e3:.0f} ms (비교군 B 와 같다)   명령 끊김 {self.cmd_timeout:g} s")
+            f"Δτ̄ {tau_max * rf:.4f} N·m/{self.Ts*1e3:.0f} ms (비교군 B 와 같다)   명령 끊김 {self.cmd_timeout:g} s\n"
+            f"  속도 되먹임: " + ("엔코더 ω (표준)" if self.speed_source == "wheels" else
+                               f"추정기 {g('speed_topic')} 의 몸체 속도 → T⁻¹ (MPC 와 같은 정보)"))
+
+    def on_est(self, m):
+        tw = m.twist.twist
+        self.v_est = np.array([tw.linear.x, tw.linear.y, tw.angular.z], float)
+        self.est_rx = self.now_s()
 
     def now_s(self):
         return self.get_clock().now().nanoseconds * 1e-9
@@ -137,7 +159,12 @@ class WheelPINode(Node):
             dt = self.Ts
             self.get_logger().info("PI 시작")
 
-        omega = np.asarray(m.velocity, float)
+        if self.speed_source == "estimator":
+            if now - self.est_rx > self.wheel_timeout:
+                return self.damping("추정기 속도 끊김")
+            omega = wheel_targets(self.Tinv, self.v_est)        # 추정기 몸체 속도 → 바퀴 속도 (T⁻¹ v)
+        else:
+            omega = np.asarray(m.velocity, float)
         omega_ref = wheel_targets(self.Tinv, self.v_cmd)
         tau = self.pi.step(omega_ref, omega, dt)
         out = WheelTorqueCommand()

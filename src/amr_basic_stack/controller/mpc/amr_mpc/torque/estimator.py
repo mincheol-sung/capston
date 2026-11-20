@@ -123,6 +123,7 @@ class PlanarStateEstimator:
         self.init_s = float(g("init_s", 1.0))
         self.init_max_accel_std = float(g("init_max_accel_std", 0.10))
         self.init_max_gyro_std = float(g("init_max_gyro_std", 0.02))
+        self.init_block_s = float(g("init_block_s", 0.05))   # 흔들림 판정은 이 길이 평균으로 (≤ 0 이면 원신호) — 2026-11-19
         self.jump_xy = float(g("jump_xy", 0.15))
         self.jump_yaw = math.radians(float(g("jump_yaw_deg", 15.0)))
         self.jump_reset_count = int(g("jump_reset_count", 5))
@@ -161,7 +162,11 @@ class PlanarStateEstimator:
         if t - self._static[0][0] < self.init_s:
             return
         s = np.array(self._static)
-        if max(s[:, 1].std(), s[:, 2].std()) > self.init_max_accel_std or s[:, 3].std() > self.init_max_gyro_std:
+        # 흔들림 판정은 init_block_s (50 ms) 평균의 std 로 — 서 있어도 차체가 30~200 Hz 로 떨려 원신호 std 가 0.12~0.17 m/s² 라
+        # 문턱 0.10 을 못 넘고 추정값이 한 번도 안 나왔다 (bag 2026-11-19/174603~175042, 50 ms 평균이면 0.006~0.018).
+        # 움직임은 저주파라 50 ms 평균에 그대로 남는다 (173910 출발 1 s 0.20, 주행 0.33~1.5). 바이어스는 원신호 평균 그대로.
+        b = self._block_means(s) if self.init_block_s > 0.0 else s
+        if max(b[:, 1].std(), b[:, 2].std()) > self.init_max_accel_std or b[:, 3].std() > self.init_max_gyro_std:
             self._static = []           # 움직였다 — 다시 모은다
             return
         self.b_a = np.array([s[:, 1].mean(), s[:, 2].mean()])
@@ -170,6 +175,14 @@ class PlanarStateEstimator:
         self._static = []
         if self._first_pose is not None:
             self._init_pose(*self._first_pose)
+
+    def _block_means(self, s):
+        """정지 표본 s (N×4: t, a_x, a_y, ω_z) 를 init_block_s 길이 칸마다 평균 (마지막 덜 찬 칸은 버린다)."""
+        idx = np.floor((s[:, 0] - s[0, 0]) / self.init_block_s).astype(int)
+        n = np.bincount(idx)
+        keep = n[:-1] > 0 if len(n) > 1 else n > 0
+        cols = [np.bincount(idx, weights=s[:, j])[:len(keep)][keep] / n[:len(keep)][keep] for j in range(s.shape[1])]
+        return np.stack(cols, 1)
 
     def _to_imu_point(self, x, y, yaw):
         """포즈 기준점의 위치 → IMU 점의 위치."""
