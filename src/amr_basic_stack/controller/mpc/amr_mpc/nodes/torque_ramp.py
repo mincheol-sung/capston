@@ -42,7 +42,9 @@ from amr_interfaces.msg import PlanarReference, PlanarReferenceArray, WheelState
 from amr_mpc.core import config, node_main
 from amr_mpc.torque.model import TorquePlant
 
-DIRS = {"fwd": np.array([1.0, 0.0, 0.0]), "left": np.array([0.0, 1.0, 0.0])}
+# 2026-11-20 back·right 추가 — 앞뒤·좌우를 번갈아 돌면 로봇이 출발점 근처를 오가고, 바퀴마다 두 사분면 (구동 ω·τ 부호 +·−) 을 잰다
+DIRS = {"fwd": np.array([1.0, 0.0, 0.0]), "back": np.array([-1.0, 0.0, 0.0]),
+        "left": np.array([0.0, 1.0, 0.0]), "right": np.array([0.0, -1.0, 0.0])}
 
 
 def ramp_pattern(p, e):
@@ -94,7 +96,7 @@ class TorqueRampNode(Node):
         plant_yaml = config.load("torque_plant.yaml")
         rated = float(plant_yaml["motor"]["rated_speed_rpm"]) * 2.0 * math.pi / 60.0
         self.declare_parameters("", [
-            ("direction", "fwd"),          # fwd | left
+            ("direction", "fwd"),          # fwd | back | left | right
             ("tau_max", 1.0),              # 바퀴–바닥 토크 끝값 [N·m]
             ("rate", 0.0),                 # [N·m/s], 0 = distance·mu_hat 로 자동
             ("distance", 3.0),             # 자동 기울기의 목표 거리 [m]
@@ -110,7 +112,7 @@ class TorqueRampNode(Node):
         g = lambda n: self.get_parameter(n).value
         key = str(g("direction"))
         if key not in DIRS:
-            raise ValueError(f"direction {key!r} — fwd 또는 left")
+            raise ValueError(f"direction {key!r} — fwd | back | left | right")
         self.key, self.e = key, DIRS[key]
         self.p = p
         self.pat = ramp_pattern(p, self.e)

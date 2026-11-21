@@ -1,0 +1,133 @@
+[INFO] [launch]: All log files can be found below /home/smoc/.ros/log/2026-11-20-17-47-13-246372-smoc-NUC-146097
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [sim_plant_torque_node-1]: process started with pid [146112]
+[INFO] [state_estimator_node-2]: process started with pid [146113]
+[INFO] [torque_ramp_node-3]: process started with pid [146114]
+[INFO] [torque_output_node-4]: process started with pid [146115]
+[INFO] [fault_monitor_node-5]: process started with pid [146116]
+[INFO] [slip_logger_node-6]: process started with pid [146117]
+[INFO] [keyboard_command_gate-7]: process started with pid [146118]
+[torque_output_node-4] [INFO] [1795164433.604539398] [torque_output_node]: torque_output: /torque_mpc/cmd_raw → /torque_output/cmd_raw   마찰 보상 coulomb [0.01566 0.01854 0.01395 0.01413] N·m, viscous [0.0009594 0.0010422 0.0010008 0.0010593] N·m·s/rad (실측 × 0.9)   정지 마찰 끔   안전 클램프 ±1.3 N·m
+[fault_monitor_node-5] [INFO] [1795164433.641313704] [fault_monitor_node]: fault_monitor: 무장 중 검사 — 포즈 튐 켬, 추종 오차 > 150 cm, 모터 에러, 센서 끊김 > 0.3 s → /mpc/arm false
+[keyboard_command_gate-7] [WARN] [1795164433.643326081] [torque_command_gate]: Keyboard arming unavailable: cannot open /dev/tty ([Errno 6] No such device or address: '/dev/tty'). Use std_msgs/Bool on /mpc/arm instead.
+[keyboard_command_gate-7] [WARN] [1795164433.644019300] [torque_command_gate]: MPC command gate is DISARMED. Press 'a' to arm; press 's' or SPACE to stop.
+[keyboard_command_gate-7] [INFO] [1795164433.644561268] [torque_command_gate]: Command gate [torques]: /torque_output/cmd_raw -> /wheel_torque_cmd, arm topic=/mpc/arm, forward on receive.
+[torque_ramp_node-3] [INFO] [1795164433.739713791] [torque_ramp_node]: torque_ramp: back 패턴 [-1. -1. -1. -1.], τ_g 0 → 1.0 N·m, 기울기 0.431 N·m/s (자동: μ̂ 0.6, 목표 3.0 m) → 2.32 s, 모델 예상 이동 3.00 m.  관성 ff 켬 τ* = (I+K)τ_g, 앞·옆 ×1.488.  끊는 거리 3.45 m.  'a' = 한 판 시작
+[sim_plant_torque_node-1] [INFO] [1795164433.746200332] [sim_plant_torque_node]: 시뮬 플랜트: m=4.56 kg  I_z=0.060  바퀴관성 켬 (μ=2.225 kg)  kd=0.02  피크 4.1 N·m  물리 틱 200 Hz  슬립 모델 μ 0.45 (바퀴별 최대 [FL FR RL RR] [4.81 4.82 5.25 5.26] N, 토크로 [0.136 0.136 0.148 0.149] N·m)  구동계 마찰 [FL FR RL RR] coulomb [0.0174 0.0206 0.0155 0.0157] N·m + viscous [0.00107 0.00116 0.00111 0.00118]·ω (ω_s 0.05 rad/s)
+[sim_plant_torque_node-1]   센서 흉내: IMU 200 Hz @ (0.109, 0.017) m, SLAM scan_time 지연 130 ms, 잡음 배율 1
+[slip_logger_node-6] [INFO] [1795164433.747211209] [slip_logger_node]: slip_logger: 바퀴 /wheel_states + 차체 /state_estimator/odom + 참값 /sim/ground_truth → /slip_logger/slip (ω_ε 2.5 rad/s, 잡음 바닥 |λ| 0.1)
+[state_estimator_node-2] [INFO] [1795164433.793774937] [state_estimator_node]: state_estimator: /imu/base_link + /tracked_pose [stamped] → /state_estimator/odom (100 Hz)
+[state_estimator_node-2]   IMU·포즈 기준점 (0.109, 0.017) m (base_footprint 기준)
+[state_estimator_node-2]   모드 kf (고정 게인 칼만)  K_p 0.711  K_v 4.16 1/s  K_b -1.13 1/s²   K_psi 0.440  K_bg -0.0339 1/s   튐 (> 15 cm·15°) 버림, 연속 5 번이면 따라감
+[state_estimator_node-2]   정지 상태에서 1.0 s 동안 바이어스를 잡는다 — 그동안 로봇을 움직이지 말 것
+[state_estimator_node-2] [INFO] [1795164434.971789127] [state_estimator_node]: 준비 끝. 바이어스: 가속도 (-0.152, +0.129) m/s², 자이로 +0.0002 rad/s — 출력 시작
+[keyboard_command_gate-7] [WARN] [1795164440.897566186] [torque_command_gate]: MPC command gate ARMED by ROS arm topic.
+[torque_ramp_node-3] [INFO] [1795164440.898119536] [torque_ramp_node]: [run 1] CSV /home/smoc/capston/capston/analysis/torque_mpc_sim/2026-11-20_ramp_back_check/ramp_back_174720_run1.csv
+[torque_ramp_node-3] [INFO] [1795164440.898573457] [torque_ramp_node]: [run 1] 시작 — back, 0.431 N·m/s
+[torque_output_node-4] [WARN] [1795164442.229787215] [torque_output_node]: 안전 클램프 ±1.3 N·m 에 걸림
+[keyboard_command_gate-7] [WARN] [1795164442.569917186] [torque_command_gate]: MPC command gate DISARMED by ROS arm topic.
+[torque_ramp_node-3] [INFO] [1795164442.570059462] [torque_ramp_node]: [run 1] 끝: 이동 3.45 m ≥ 3.45 m. τ_g 0.720 N·m, 이동 3.45 m.  바퀴–추정기 속도 차가 0.15 m/s 넘은 τ_g 0.186 N·m → μ̂ (롤러 모델 √2·4τ_g/(r m g)) ≈ 0.587 [참고 — 추정기 지연만큼 이르다]
+[torque_ramp_node-3]     피드백 − 모터 명령 [FL FR RL RR]: 평균 [0. 0. 0. 0.], 최소 [0. 0. 0. 0.] N·m (|명령| 최대 [1.3 1.3 1.3 1.3])
+[state_estimator_node-2] [WARN] [1795164455.080186182] [state_estimator_node]: IMU stamp 가 시스템 시각과 +0.169 s 어긋남 (허용 0.1 s) — MPC 가 기준열을 그만큼 밀린 시각에서 고른다. RealSense global_time_enabled, 시각 동기 확인
+[state_estimator_node-2] [WARN] [1795164455.217008882] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -11.1° — 버림 (누적 1)
+[state_estimator_node-2] [WARN] [1795164456.306934923] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.3 cm, -10.9° — 버림 (누적 13)
+[state_estimator_node-2] [WARN] [1795164457.308947549] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -11.0° — 버림 (누적 23)
+[state_estimator_node-2] [WARN] [1795164458.407165703] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -11.0° — 버림 (누적 34)
+[state_estimator_node-2] [WARN] [1795164459.507170064] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -10.8° — 버림 (누적 45)
+[state_estimator_node-2] [WARN] [1795164460.607256341] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -11.0° — 버림 (누적 56)
+[state_estimator_node-2] [WARN] [1795164461.707366423] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -10.7° — 버림 (누적 67)
+[torque_ramp_node-3] [INFO] [1795164462.065492257] [torque_ramp_node]: [run 2] CSV /home/smoc/capston/capston/analysis/torque_mpc_sim/2026-11-20_ramp_back_check/ramp_back_174742_run2.csv
+[torque_ramp_node-3] [INFO] [1795164462.065936540] [torque_ramp_node]: [run 2] 시작 — back, 0.431 N·m/s
+[torque_ramp_node-3] [INFO] [1795164462.069737371] [torque_ramp_node]: [run 2] 끝: 이동 7.92 m ≥ 3.45 m. τ_g 0.001 N·m, 이동 7.92 m
+[state_estimator_node-2] [WARN] [1795164462.807388511] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -11.0° — 버림 (누적 78)
+[state_estimator_node-2] [WARN] [1795164463.807964357] [state_estimator_node]: SLAM 포즈 튐: 잔차 791.8 cm, -11.1° — 버림 (누적 88)
+[state_estimator_node-2] [WARN] [1795164464.902686154] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -10.9° — 버림 (누적 99)
+[state_estimator_node-2] [WARN] [1795164465.902756757] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -10.9° — 버림 (누적 109)
+[state_estimator_node-2] [WARN] [1795164466.903129723] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.8° — 버림 (누적 119)
+[state_estimator_node-2] [WARN] [1795164468.007320708] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.3 cm, -10.9° — 버림 (누적 130)
+[state_estimator_node-2] [WARN] [1795164469.107186636] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -10.9° — 버림 (누적 141)
+[state_estimator_node-2] [WARN] [1795164470.107950153] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.8 cm, -11.0° — 버림 (누적 151)
+[state_estimator_node-2] [WARN] [1795164471.202484885] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -11.0° — 버림 (누적 162)
+[state_estimator_node-2] [WARN] [1795164472.207023033] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -10.9° — 버림 (누적 172)
+[state_estimator_node-2] [WARN] [1795164473.207126094] [state_estimator_node]: SLAM 포즈 튐: 잔차 793.0 cm, -11.2° — 버림 (누적 182)
+[state_estimator_node-2] [WARN] [1795164474.207279965] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -10.9° — 버림 (누적 192)
+[state_estimator_node-2] [WARN] [1795164475.307330238] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.3 cm, -11.0° — 버림 (누적 203)
+[state_estimator_node-2] [WARN] [1795164476.407228600] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -11.0° — 버림 (누적 214)
+[state_estimator_node-2] [WARN] [1795164477.502602083] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -11.1° — 버림 (누적 225)
+[state_estimator_node-2] [WARN] [1795164478.502940927] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.9° — 버림 (누적 235)
+[state_estimator_node-2] [WARN] [1795164479.507164961] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.9° — 버림 (누적 245)
+[state_estimator_node-2] [WARN] [1795164480.507185576] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.8 cm, -11.1° — 버림 (누적 255)
+[state_estimator_node-2] [WARN] [1795164481.507393190] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.8° — 버림 (누적 265)
+[state_estimator_node-2] [WARN] [1795164482.607527666] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -11.0° — 버림 (누적 276)
+[state_estimator_node-2] [WARN] [1795164483.607664699] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -11.0° — 버림 (누적 286)
+[state_estimator_node-2] [WARN] [1795164484.607967737] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.0 cm, -11.0° — 버림 (누적 296)
+[state_estimator_node-2] [WARN] [1795164485.707217527] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.1 cm, -10.8° — 버림 (누적 307)
+[state_estimator_node-2] [WARN] [1795164486.807117683] [state_estimator_node]: SLAM 포즈 튐: 잔차 791.8 cm, -10.9° — 버림 (누적 318)
+[state_estimator_node-2] [WARN] [1795164487.902510485] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.3 cm, -11.1° — 버림 (누적 329)
+[state_estimator_node-2] [WARN] [1795164489.007254789] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.3 cm, -11.0° — 버림 (누적 340)
+[state_estimator_node-2] [WARN] [1795164490.102535866] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.3 cm, -10.9° — 버림 (누적 351)
+[state_estimator_node-2] [WARN] [1795164491.202163952] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -11.0° — 버림 (누적 362)
+[state_estimator_node-2] [WARN] [1795164492.202345779] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.1 cm, -10.9° — 버림 (누적 372)
+[state_estimator_node-2] [WARN] [1795164493.207239357] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.8 cm, -11.1° — 버림 (누적 382)
+[state_estimator_node-2] [WARN] [1795164494.307283882] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -11.1° — 버림 (누적 393)
+[state_estimator_node-2] [WARN] [1795164495.407187027] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.9° — 버림 (누적 404)
+[state_estimator_node-2] [WARN] [1795164496.507783696] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -10.9° — 버림 (누적 415)
+[state_estimator_node-2] [WARN] [1795164497.603205841] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -11.0° — 버림 (누적 426)
+[state_estimator_node-2] [WARN] [1795164498.607082149] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.9 cm, -10.9° — 버림 (누적 436)
+[state_estimator_node-2] [WARN] [1795164499.702238572] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -10.9° — 버림 (누적 447)
+[state_estimator_node-2] [WARN] [1795164500.702427610] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -10.9° — 버림 (누적 457)
+[state_estimator_node-2] [WARN] [1795164501.702478134] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -11.0° — 버림 (누적 467)
+[state_estimator_node-2] [WARN] [1795164502.702501441] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.3 cm, -11.0° — 버림 (누적 477)
+[state_estimator_node-2] [WARN] [1795164503.802435071] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -10.7° — 버림 (누적 488)
+[state_estimator_node-2] [WARN] [1795164504.807201719] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.8 cm, -10.8° — 버림 (누적 498)
+[state_estimator_node-2] [WARN] [1795164505.808022495] [state_estimator_node]: SLAM 포즈 튐: 잔차 791.9 cm, -10.8° — 버림 (누적 508)
+[state_estimator_node-2] [WARN] [1795164506.902331908] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.9° — 버림 (누적 519)
+[state_estimator_node-2] [WARN] [1795164507.906929373] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.1 cm, -10.9° — 버림 (누적 529)
+[state_estimator_node-2] [WARN] [1795164508.907228621] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.9° — 버림 (누적 539)
+[state_estimator_node-2] [WARN] [1795164510.007238689] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -10.8° — 버림 (누적 550)
+[state_estimator_node-2] [WARN] [1795164511.107160003] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -11.0° — 버림 (누적 561)
+[state_estimator_node-2] [WARN] [1795164512.202704139] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.1 cm, -11.0° — 버림 (누적 572)
+[state_estimator_node-2] [WARN] [1795164513.307278191] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.1 cm, -11.0° — 버림 (누적 583)
+[state_estimator_node-2] [WARN] [1795164514.402436515] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.0 cm, -10.9° — 버림 (누적 594)
+[state_estimator_node-2] [WARN] [1795164515.402767336] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -10.9° — 버림 (누적 604)
+[state_estimator_node-2] [WARN] [1795164516.503321465] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -11.0° — 버림 (누적 615)
+[state_estimator_node-2] [WARN] [1795164517.603058576] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -11.0° — 버림 (누적 626)
+[state_estimator_node-2] [WARN] [1795164518.606935766] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -10.9° — 버림 (누적 636)
+[state_estimator_node-2] [WARN] [1795164519.607955911] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.3 cm, -11.0° — 버림 (누적 646)
+[state_estimator_node-2] [WARN] [1795164520.707079936] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -10.8° — 버림 (누적 657)
+[state_estimator_node-2] [WARN] [1795164521.807966973] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -10.8° — 버림 (누적 668)
+[state_estimator_node-2] [WARN] [1795164522.902343376] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -11.1° — 버림 (누적 679)
+[state_estimator_node-2] [WARN] [1795164523.902403305] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -11.2° — 버림 (누적 689)
+[state_estimator_node-2] [WARN] [1795164524.902655389] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.7° — 버림 (누적 699)
+[state_estimator_node-2] [WARN] [1795164525.907034945] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -10.9° — 버림 (누적 709)
+[state_estimator_node-2] [WARN] [1795164526.907679730] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -10.9° — 버림 (누적 719)
+[state_estimator_node-2] [WARN] [1795164528.003256203] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.7 cm, -11.0° — 버림 (누적 730)
+[state_estimator_node-2] [WARN] [1795164529.107058541] [state_estimator_node]: SLAM 포즈 튐: 잔차 791.9 cm, -10.8° — 버림 (누적 741)
+[state_estimator_node-2] [WARN] [1795164530.107193939] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -11.0° — 버림 (누적 751)
+[state_estimator_node-2] [WARN] [1795164531.202817631] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.9° — 버림 (누적 762)
+[state_estimator_node-2] [WARN] [1795164532.207195868] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -10.8° — 버림 (누적 772)
+[state_estimator_node-2] [WARN] [1795164533.302454563] [state_estimator_node]: SLAM 포즈 튐: 잔차 793.0 cm, -11.0° — 버림 (누적 783)
+[state_estimator_node-2] [WARN] [1795164534.307380426] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.9° — 버림 (누적 793)
+[state_estimator_node-2] [WARN] [1795164535.407234431] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.2 cm, -11.0° — 버림 (누적 804)
+[state_estimator_node-2] [WARN] [1795164536.507478003] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.4 cm, -10.9° — 버림 (누적 815)
+[state_estimator_node-2] [WARN] [1795164537.607730328] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.6 cm, -10.8° — 버림 (누적 826)
+[state_estimator_node-2] [WARN] [1795164538.702196536] [state_estimator_node]: SLAM 포즈 튐: 잔차 792.5 cm, -11.1° — 버림 (누적 837)
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [keyboard_command_gate-7]: sending signal 'SIGINT' to process[keyboard_command_gate-7]
+[INFO] [slip_logger_node-6]: sending signal 'SIGINT' to process[slip_logger_node-6]
+[INFO] [fault_monitor_node-5]: sending signal 'SIGINT' to process[fault_monitor_node-5]
+[INFO] [torque_output_node-4]: sending signal 'SIGINT' to process[torque_output_node-4]
+[INFO] [torque_ramp_node-3]: sending signal 'SIGINT' to process[torque_ramp_node-3]
+[INFO] [state_estimator_node-2]: sending signal 'SIGINT' to process[state_estimator_node-2]
+[INFO] [sim_plant_torque_node-1]: sending signal 'SIGINT' to process[sim_plant_torque_node-1]
+[slip_logger_node-6] [slip_logger] 18908행, 움직인 구간 340행 (차체 속도 > 0.05 m/s)
+[slip_logger_node-6]   FL: λ 평균 -0.137  RMS 0.737  최대 |λ| 0.945  |λ|>0.1 비율 95.0 %   | 참값 λ RMS 0.735  최대 0.945
+[slip_logger_node-6]   FR: λ 평균 -0.085  RMS 0.694  최대 |λ| 0.946  |λ|>0.1 비율 94.7 %   | 참값 λ RMS 0.688  최대 0.944
+[slip_logger_node-6]   RL: λ 평균 -0.089  RMS 0.687  최대 |λ| 0.939  |λ|>0.1 비율 92.1 %   | 참값 λ RMS 0.679  최대 0.937
+[slip_logger_node-6]   RR: λ 평균 -0.138  RMS 0.722  최대 |λ| 0.939  |λ|>0.1 비율 94.7 %   | 참값 λ RMS 0.720  최대 0.938
+[INFO] [torque_ramp_node-3]: process has finished cleanly [pid 146114]
+[INFO] [fault_monitor_node-5]: process has finished cleanly [pid 146116]
+[INFO] [keyboard_command_gate-7]: process has finished cleanly [pid 146118]
+[INFO] [sim_plant_torque_node-1]: process has finished cleanly [pid 146112]
+[INFO] [slip_logger_node-6]: process has finished cleanly [pid 146117]
+[INFO] [state_estimator_node-2]: process has finished cleanly [pid 146113]

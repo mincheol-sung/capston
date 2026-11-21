@@ -1,0 +1,60 @@
+[INFO] [launch]: All log files can be found below /home/smoc/.ros/log/2026-11-20-18-11-54-315718-smoc-NUC-209582
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [sim_plant_torque_node-1]: process started with pid [209787]
+[INFO] [state_estimator_node-2]: process started with pid [209788]
+[INFO] [figure8_reference_node-3]: process started with pid [209789]
+[INFO] [torque_mpc_node-4]: process started with pid [209790]
+[INFO] [torque_output_node-5]: process started with pid [209791]
+[INFO] [fault_monitor_node-6]: process started with pid [209792]
+[INFO] [slip_logger_node-7]: process started with pid [209793]
+[INFO] [keyboard_command_gate-8]: process started with pid [209794]
+[torque_mpc_node-4] [INFO] [1795165914.411829373] [torque_mpc_node]: 토크 MPC (C++/DAQP).  기준 /dra_mppi/reference_trajectory  상태 /state_estimator/odom → /torque_mpc/cmd_raw
+[torque_mpc_node-4]   Ts 10 ms  Np 50  Nc 5   m 4.56 kg  I_z 0.060  바퀴 등가 질량 m_w 2.225 kg (M 에 늘)  w 항 켬
+[torque_mpc_node-4]   상한 모드 friction: τ̄ 0.1093 N·m, Δτ̄ 0.0364 N·m/스텝  (모터 1.200, 마찰 τ_μ 0.0759 @ μ̂ 0.30)   외란 추정치 끔 (α 0.10)
+[torque_mpc_node-4] [INFO] [1795165914.411950611] [torque_mpc_node]:   바퀴별 μ̂ [0.432 0.440 0.456 0.417] (mg/4 기준, - = μ̂ 0.30 × 하중 몫)  하중 몫 FL 0.2388 FR 0.2392 RL 0.2608 RR 0.2612
+[torque_mpc_node-4]   → 마찰 τ_μ,i [0.1093 0.1113 0.1154 0.1055] N·m, 쓰는 τ̄ [0.1093 0.1113 0.1154 0.1055]
+[torque_mpc_node-4] [INFO] [1795165914.411963678] [torque_mpc_node]:   가중: W [5, 5, 2.5, 2, 2, 1]  r_Δ 100 /스텝 (= w_dudt 0.010000 (N·m/s)⁻² / Ts²)  r_U 10  q_null 0
+[torque_mpc_node-4] [INFO] [1795165914.411971997] [torque_mpc_node]:   속도 상태: 추정기 그대로
+[torque_mpc_node-4] [INFO] [1795165914.411974847] [torque_mpc_node]:   선형화 reference (1판: 지평의 기준 방향 θ_r 을 대입)
+[torque_mpc_node-4] [WARN] [1795165914.463529579] [torque_mpc_node]: 상태 추정값 대기/끊김
+[keyboard_command_gate-8] [WARN] [1795165914.743331367] [torque_command_gate]: MPC command gate is DISARMED. Press 'a' to arm; press 's' or SPACE to stop.
+[keyboard_command_gate-8] [WARN] [1795165914.744111143] [torque_command_gate]: Keyboard arming unavailable: cannot open /dev/tty ([Errno 6] No such device or address: '/dev/tty'). Use std_msgs/Bool on /mpc/arm instead.
+[keyboard_command_gate-8] [INFO] [1795165914.744849250] [torque_command_gate]: Command gate [torques]: /torque_output/cmd_raw -> /wheel_torque_cmd, arm topic=/mpc/arm, forward on receive.
+[slip_logger_node-7] [INFO] [1795165914.744898436] [slip_logger_node]: slip_logger: 바퀴 /wheel_states + 차체 /state_estimator/odom + 참값 /sim/ground_truth → /slip_logger/slip (ω_ε 2.5 rad/s, 잡음 바닥 |λ| 0.1)
+[torque_output_node-5] [INFO] [1795165914.758098373] [torque_output_node]: torque_output: /torque_mpc/cmd_raw → /torque_output/cmd_raw   마찰 보상 coulomb [0.01566 0.01854 0.01395 0.01413] N·m, viscous [0.0009594 0.0010422 0.0010008 0.0010593] N·m·s/rad (실측 × 0.9)   정지 마찰 끔   안전 클램프 ±1.3 N·m
+[fault_monitor_node-6] [INFO] [1795165914.845459464] [fault_monitor_node]: fault_monitor: 무장 중 검사 — 포즈 튐 켬, 추종 오차 > 150 cm, 모터 에러, 센서 끊김 > 0.3 s → /mpc/arm false
+[state_estimator_node-2] [INFO] [1795165914.851965249] [state_estimator_node]: state_estimator: /imu/base_link + /tracked_pose [stamped] → /state_estimator/odom (100 Hz)
+[state_estimator_node-2]   IMU·포즈 기준점 (0.109, 0.017) m (base_footprint 기준)
+[state_estimator_node-2]   모드 kf (고정 게인 칼만)  K_p 0.711  K_v 4.16 1/s  K_b -1.13 1/s²   K_psi 0.440  K_bg -0.0339 1/s   튐 (> 15 cm·15°) 버림, 연속 5 번이면 따라감
+[state_estimator_node-2]   정지 상태에서 1.0 s 동안 바이어스를 잡는다 — 그동안 로봇을 움직이지 말 것
+[figure8_reference_node-3] Traceback (most recent call last):
+[figure8_reference_node-3]   File "/home/smoc/capston/capston/install/amr_mpc/lib/amr_mpc/figure8_reference_node", line 33, in <module>
+[figure8_reference_node-3]     sys.exit(load_entry_point('amr-mpc', 'console_scripts', 'figure8_reference_node')())
+[figure8_reference_node-3]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[figure8_reference_node-3]   File "/home/smoc/capston/capston/build/amr_mpc/amr_mpc/nodes/figure8_reference.py", line 392, in main
+[figure8_reference_node-3]     node = Figure8ReferenceNode()
+[figure8_reference_node-3]            ^^^^^^^^^^^^^^^^^^^^^^
+[figure8_reference_node-3]   File "/home/smoc/capston/capston/build/amr_mpc/amr_mpc/nodes/figure8_reference.py", line 180, in __init__
+[figure8_reference_node-3]     self.ramp_s = (self.path.V_peak / self.path.A) if rr < 0.0 else rr
+[figure8_reference_node-3]                    ^^^^^^^^^^^^^^^^
+[figure8_reference_node-3] AttributeError: 'Square' object has no attribute 'V_peak'
+[sim_plant_torque_node-1] [INFO] [1795165914.879660714] [sim_plant_torque_node]: 시뮬 플랜트: m=4.56 kg  I_z=0.060  바퀴관성 켬 (μ=2.225 kg)  kd=0.02  피크 4.1 N·m  물리 틱 200 Hz  슬립 없음  구동계 마찰 [FL FR RL RR] coulomb [0.0174 0.0206 0.0155 0.0157] N·m + viscous [0.00107 0.00116 0.00111 0.00118]·ω (ω_s 0.05 rad/s)
+[sim_plant_torque_node-1]   센서 흉내: IMU 200 Hz @ (0.109, 0.017) m, SLAM scan_time 지연 130 ms, 잡음 배율 1
+[ERROR] [figure8_reference_node-3]: process has died [pid 209789, exit code 1, cmd '/home/smoc/capston/capston/install/amr_mpc/lib/amr_mpc/figure8_reference_node --ros-args -r __node:=figure8_reference_node --params-file /tmp/launch_params_w_nv5mhi'].
+[state_estimator_node-2] [INFO] [1795165915.944497535] [state_estimator_node]: 준비 끝. 바이어스: 가속도 (-0.152, +0.129) m/s², 자이로 +0.0003 rad/s — 출력 시작
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [keyboard_command_gate-8]: sending signal 'SIGINT' to process[keyboard_command_gate-8]
+[INFO] [slip_logger_node-7]: sending signal 'SIGINT' to process[slip_logger_node-7]
+[INFO] [fault_monitor_node-6]: sending signal 'SIGINT' to process[fault_monitor_node-6]
+[INFO] [torque_output_node-5]: sending signal 'SIGINT' to process[torque_output_node-5]
+[INFO] [torque_mpc_node-4]: sending signal 'SIGINT' to process[torque_mpc_node-4]
+[INFO] [state_estimator_node-2]: sending signal 'SIGINT' to process[state_estimator_node-2]
+[INFO] [sim_plant_torque_node-1]: sending signal 'SIGINT' to process[sim_plant_torque_node-1]
+[INFO] [torque_mpc_node-4]: process has finished cleanly [pid 209790]
+[slip_logger_node-7] [slip_logger] 3924행, 움직인 구간 0행 (차체 속도 > 0.05 m/s)
+[INFO] [sim_plant_torque_node-1]: process has finished cleanly [pid 209787]
+[INFO] [torque_output_node-5]: process has finished cleanly [pid 209791]
+[INFO] [fault_monitor_node-6]: process has finished cleanly [pid 209792]
+[INFO] [keyboard_command_gate-8]: process has finished cleanly [pid 209794]
+[INFO] [slip_logger_node-7]: process has finished cleanly [pid 209793]
+[INFO] [state_estimator_node-2]: process has finished cleanly [pid 209788]

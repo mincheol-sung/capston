@@ -101,6 +101,7 @@ def _budget(text):
 _TRACK_KEYS = ["origin_mode", "origin_x", "origin_y", "origin_yaw_deg", "start_tolerance_xy",
                "start_tolerance_yaw_deg", "lead_speed", "lead_yaw_rate", "width", "height", "yaw_mode", "crossing_blend_m",
                "spin_rate",                                  # 2026-11-19 yaw_mode:=spin 의 순항 요레이트 [rad/s]
+               "speed_mod_amp", "speed_mod_cycles",
                "speed", "accel", "laps", "align_s", "start_delay", "abort_error", "hold_s", "lap_speeds",
                "dt", "horizon_steps",
                # 5-3 단일 축 기준 (2026-11-16): shape:=line|rotate 와 seg_* (figure8_reference.py)
@@ -287,7 +288,7 @@ def _nodes(context):
         ctrl = {"state_topic": state_topic, "armed_topic": "/mpc/armed",
                 "payload_kg": float(g("ctrl_payload_kg")) if g("ctrl_payload_kg") else payload,
                 "log_prefix": g("log_prefix")}
-        if g("use_w"):                                # w 항 (식-6). 비우면 torque_mpc.yaml model_terms.use_w (기본 false)
+        if g("use_w"):                                # w 항 (식-6). 비우면 torque_mpc.yaml model_terms.use_w (기본 true, 2026-11-20)
             ctrl["use_w"] = _truthy(g("use_w"))
         if g("limit_mode"):
             ctrl["limit_mode"] = g("limit_mode")
@@ -329,6 +330,8 @@ def _nodes(context):
             ctrl["disturbance_alpha"] = float(g("mpc_dist_alpha"))
         if g("velocity_source"):                      # 2026-11-18: estimator | wheels (torque_mpc.yaml state_input)
             ctrl["velocity_source"] = g("velocity_source")
+        if g("mpc_acc_window_shift"):                 # 2026-11-20 기준 가속도 차분 창 밀기 (기본 true, false = 예전 동작 비교용)
+            ctrl["acc_window_shift"] = _truthy(g("mpc_acc_window_shift"))
         if g("mpc_dist_accel_only"):                  # 2026-11-18 시험용 (torque_mpc.yaml disturbance.accel_only)
             ctrl["disturbance_accel_only"] = _truthy(g("mpc_dist_accel_only"))
         nodes.append(Node(
@@ -472,11 +475,11 @@ def generate_launch_description():
           description="시뮬 플랜트의 바퀴 관성 (torque_plant.yaml model.use_wheel_inertia). 2026-11-16 부터 플랜트만 — "
                       "제어기는 M 에 m_w 를 늘 넣는다"),
         A("use_w", default_value="",
-          description="제어기 w 항 (식-6) true/false. 비우면 torque_mpc.yaml model_terms.use_w (기본 false, 2026-11-16 지시서)"),
+          description="제어기 w 항 (식-6) true/false. 비우면 torque_mpc.yaml model_terms.use_w (기본 true, 2026-11-20 — 11-16 지시서는 false)"),
         A("controller", default_value="mpc", choices=["mpc", "pure_pursuit", "ramp", "step"],
           description="mpc = torque_mpc_node (비교군 B·C), pure_pursuit = 퓨어 퍼슛 + 바퀴별 PI (비교군 A), "
                       "ramp = 바닥 토크 램프 시험 torque_ramp_node, step = 스텝 시험 torque_step_node (8자 기준 없음)"),
-        A("ramp_dir", default_value="", description="ramp: fwd (직진) | left (왼쪽 90°). 비우면 fwd"),
+        A("ramp_dir", default_value="", description="ramp: fwd (직진) | back | left (왼쪽 90°) | right. 비우면 fwd"),
         A("ramp_tau_max", default_value="", description="ramp: 바퀴–바닥 토크 끝값 [N·m] (기본 1.0)"),
         A("ramp_rate", default_value="", description="ramp: 기울기 [N·m/s]. 비우면 ramp_distance·mu_hat 로 자동"),
         A("ramp_distance", default_value="", description="ramp: 자동 기울기의 목표 이동 거리 [m] (기본 3.0)"),
@@ -495,6 +498,7 @@ def generate_launch_description():
         A("mpc_W", default_value="", description="MPC 상태 가중 'x,y,θ,ẋ,ẏ,θ̇' (비우면 torque_mpc.yaml tuning.W)"),
         A("mpc_w_delta", default_value="", description="MPC 토크 변화 벌점 r_Δ 스텝 단위 [(N·m)⁻²] (주면 w_dudt 보다 우선)"),
         A("mpc_w_dudt", default_value="", description="MPC 토크 변화율 벌점 r_τ̇ [(N·m/s)⁻²] = r_Δ·Ts² (비우면 torque_mpc.yaml tuning.w_dudt)"),
+        A("mpc_acc_window_shift", default_value="", description="기준 가속도 차분 창을 첫 행으로 밀기 true(기본)/false(예전, 앞먹임 평균 75 %)"),
         A("mpc_r_u", default_value="", description="MPC 입력 편차 벌점 r_U (비우면 torque_mpc.yaml tuning.r_u)"),
         A("mpc_dist_alpha", default_value="", description="외란 추정치 저역통과 α (비우면 torque_mpc.yaml disturbance.alpha)"),
         A("pp_speed_source", default_value="", description="비교군 A 바퀴 PI 속도 되먹임 wheels(엔코더, 기본) | estimator(추정기, MPC 와 같은 정보)"),

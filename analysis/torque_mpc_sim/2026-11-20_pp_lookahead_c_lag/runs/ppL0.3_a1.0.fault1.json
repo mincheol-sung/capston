@@ -1,0 +1,1 @@
+{"label": "ppL0.3_a1.0", "samples": 83, "fault": "wheel_timeout: 0.32 s 동안 안 옴 / state_timeout: 0.33 s 동안 안 옴", "rms_mm": 0.972136721231293, "max_mm": 1.112959903337636, "yaw_rms_deg": 0.03928942868339118, "tau_max": 0.0071672933026160675, "tau_rms": 0.0041593784122373745, "dtau_rms": 0.0008050612841228012, "n_torque": 83, "n_damping_while_armed": 1}

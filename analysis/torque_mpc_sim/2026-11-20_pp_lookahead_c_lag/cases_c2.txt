@@ -1,0 +1,4 @@
+mpcC_muhat0.45_a1.5|accel:=1.5 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.45
+mpcC_muhat0.5625_a1.5|accel:=1.5 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5625
+mpcC_ru1_a1.5|accel:=1.5 limit_mode:=friction mpc_r_u:=1
+mpcC_ru1_muhat0.5625_a1.5|accel:=1.5 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5625 mpc_r_u:=1

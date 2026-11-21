@@ -1,0 +1,21 @@
+pp_r1|surface_mu:=0.4 controller:=pure_pursuit
+mpcB_wd0.003_ru10_r1|surface_mu:=0.4 limit_mode:=motor_only use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcC04_wd0.003_ru10_r1|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcC05_wd0.003_ru10_r1|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5 use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcB_wd0.01_ru10_r1|surface_mu:=0.4 limit_mode:=motor_only use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10
+mpcC04_wd0.01_ru10_r1|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10
+mpcC05_wd0.01_ru10_r1|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5 use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10
+pp_r2|surface_mu:=0.4 controller:=pure_pursuit
+mpcB_wd0.003_ru10_r2|surface_mu:=0.4 limit_mode:=motor_only use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcC04_wd0.003_ru10_r2|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcC05_wd0.003_ru10_r2|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5 use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcB_wd0.01_ru10_r2|surface_mu:=0.4 limit_mode:=motor_only use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10
+mpcC04_wd0.01_ru10_r2|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10
+mpcC05_wd0.01_ru10_r2|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5 use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10
+pp_r3|surface_mu:=0.4 controller:=pure_pursuit
+mpcB_wd0.003_ru10_r3|surface_mu:=0.4 limit_mode:=motor_only use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcC04_wd0.003_ru10_r3|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcC05_wd0.003_ru10_r3|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5 use_w:=true mpc_w_dudt:=0.003 mpc_r_u:=10
+mpcB_wd0.01_ru10_r3|surface_mu:=0.4 limit_mode:=motor_only use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10
+mpcC04_wd0.01_ru10_r3|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10
+mpcC05_wd0.01_ru10_r3|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5 use_w:=true mpc_w_dudt:=0.01 mpc_r_u:=10

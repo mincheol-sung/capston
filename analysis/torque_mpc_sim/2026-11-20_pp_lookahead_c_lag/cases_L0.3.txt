@@ -1,0 +1,2 @@
+ppL0.3_a1.5|accel:=1.5 controller:=pure_pursuit
+ppL0.3_a1.0|accel:=1.0 controller:=pure_pursuit

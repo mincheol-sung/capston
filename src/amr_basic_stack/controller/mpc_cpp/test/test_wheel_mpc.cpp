@@ -260,3 +260,27 @@ TEST(Pose, ExtrapolationExactOnArc)
   const Vec3 X = extrapolate_pose(Vec3(1.0, 2.0, M_PI / 2), Vec3(0.0, 0.4, 0.0), 0.5);
   EXPECT_LT((X - Vec3(0.8, 2.0, M_PI / 2)).cwiseAbs().maxCoeff(), 1e-12);
 }
+
+
+// 2026-11-20 기준 가속도 차분 창: 등가속 a 기준열 (첫 행 = t0 + dt) 에서 상태 시각이 첫 행 근처일 때
+//   acc_window_start 로 민 창은 a 를 그대로, 예전 창 [t − h, t + h] 는 a·(h + (t − t_first))/(2h) 를 낸다 (첫 행 앞 상수 외삽).
+TEST(Reference, AccelWindowShiftedPastFirstRow)
+{
+  const double t0 = 10.0, dt = 0.05, a = 1.5, v0 = 0.2, h = 0.1;
+  std::vector<ReferenceHorizon::Row> rows;
+  for (int i = 0; i < 80; ++i) {
+    const double tau = dt * (i + 1), v = v0 + a * tau, x = v0 * tau + 0.5 * a * tau * tau;
+    rows.push_back({x, 0.0, 0.0, v, 0.0, 0.0});
+  }
+  ReferenceHorizon ref(t0, dt, rows);
+  const double t_first = t0 + dt;
+  for (double age : {0.05, 0.08, 0.10, 0.12, 0.149, 0.2}) {         // age = t_state − header.stamp (실차 53~149 ms)
+    const double t = t0 + age;
+    const double lo = acc_window_start(t, h, t_first);
+    const double acc = (ref.at(lo + 2 * h).second(0) - ref.at(lo).second(0)) / (2 * h);
+    EXPECT_NEAR(acc, a, 1e-9) << "age " << age;
+    const double old = (ref.at(t + h).second(0) - ref.at(t - h).second(0)) / (2 * h);
+    const double expect_old = (age - dt < h) ? a * (h + (t - t_first)) / (2 * h) : a;
+    EXPECT_NEAR(old, expect_old, 1e-9) << "age " << age;
+  }
+}

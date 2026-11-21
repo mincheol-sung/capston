@@ -83,6 +83,8 @@ class Figure8ReferenceNode(Node):
             ("yaw_mode", "tangent"),                  # tangent = 접선 추종 | fixed = 헤딩 고정(게걸음) | spin = 경로와 따로 회전
             ("spin_rate", 1.0),                       # spin 순항 요레이트 [rad/s] — 정수 바퀴로 맞춘다 (core/figure8.py)
             ("align_s", 1.5),                         # tangent 모드 앞뒤 제자리 회전 시간 [s]
+            ("speed_mod_amp", 0.0),                   # 순항 속도 sin 변조 진폭 ε (0 = 등속 순항, core/figure8.py). v = speed·(1 + ε sin(2πnσ/ℓ_lap))
+            ("speed_mod_cycles", 2.0),                # 랩당 변조 주기 수 n (circles8 는 2 면 원 하나에 한 주기)
             ("crossing_blend_m", 0.0),                # circles8 + tangent 교차점 헤딩 완화 길이 [m] (core/figure8.py, 0 = 끔)
             ("start_delay", 3.0),                     # 첫 odom 뒤 이만큼 기동 포즈를 유지하다 출발 (실차에서 손 뺄 시간)
             ("abort_error", 1.6),                     # 로봇이 기준에서 이만큼 벌어지면 발행 중단 → MPC 타임아웃 정지.
@@ -148,7 +150,8 @@ class Figure8ReferenceNode(Node):
                                     align_s=g("align_s"),
                                     lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None,
                                     curve="circles" if self.shape == "circles8" else "gerono",
-                                    crossing_blend=float(g("crossing_blend_m")), spin_rate=float(g("spin_rate")))
+                                    crossing_blend=float(g("crossing_blend_m")), spin_rate=float(g("spin_rate")),
+                                    speed_mod_amp=float(g("speed_mod_amp")), speed_mod_cycles=float(g("speed_mod_cycles")))
         except ValueError as e:
             raise SystemExit(f"[figure8] 파라미터 오류: {e}")
 
@@ -174,7 +177,8 @@ class Figure8ReferenceNode(Node):
         self.t_last_tick = None
         self.rate = 0.0 if self.wait_for_arm else 1.0  # 기준 시간 배속 (기다리지 않으면 늘 1)
         rr = float(g("resume_ramp_s"))
-        self.ramp_s = (self.path.V / self.path.A) if rr < 0.0 else rr
+        v_top = self.path.V_peak if isinstance(self.path, Figure8) else self.path.V   # Figure8: sin 변조 최고 속도 (2026-11-20). Square 에는 없고 Segment 의 V_peak() 는 메서드
+        self.ramp_s = (v_top / self.path.A) if rr < 0.0 else rr
         self.resync_window = max(0.0, float(g("resync_window_s")))
         self.pose_full = None
         mode = str(g("origin_mode")).strip().lower()
@@ -228,6 +232,8 @@ class Figure8ReferenceNode(Node):
             + f"  yaw {p.yaw_mode}  {p.laps:g} 바퀴"
             + (f"  (헤딩 {p.spin_turns} 바퀴 회전, 순항 {p.kappa_spin * p.V:.2f} rad/s)" if p.kappa_spin > 0.0 else "") + "\n"
             f"  호길이 {p.L:.2f} m  순항 {p.V:.2f} m/s  가감속 {p.A:.2f} m/s²  "
+            + (f"속도 변조 ε {p.mod_eps:.2f} × 랩당 {p.mod_n:g} 주기 → {p.V*(1-p.mod_eps):.2f}~{p.V_peak:.2f} m/s, 접선 가속 최대 {p.max_tangential_accel():.2f} m/s²  "
+               if p.mod_eps > 0.0 else "") +
             f"최대곡률 {p.max_curvature():.2f} 1/m (R_min {1/p.max_curvature():.3f} m)\n"
             f"  시간  대기 {self.delay:.1f} s + 정렬 {p.T_align:.1f} s ×2 + 주행 {p.T_path:.1f} s = {p.T_total:.1f} s"
             f"{'' if self.hold < 0 else f' + 유지 {self.hold:.1f} s'}\n"

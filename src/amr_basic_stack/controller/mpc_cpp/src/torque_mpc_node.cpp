@@ -170,6 +170,8 @@ public:
     tu.q_null = declare_parameter<double>("q_null", yt["q_null"].as<double>(0.0));
     tu.r_u = declare_parameter<double>("r_u", yt["r_u"].as<double>(0.0));
     acc_dt_ = declare_parameter<double>("acc_dt", yt["acc_dt"].as<double>(0.2));     // 기준 가속도 중앙 차분 창 (지시서 3.9)
+    // 2026-11-20: 창이 기준열 첫 행 앞에 걸치면 민다 (reference.hpp acc_window_start). false = 예전 동작 (비교 시험용)
+    acc_window_shift_ = declare_parameter<bool>("acc_window_shift", yt["acc_window_shift"] ? yt["acc_window_shift"].as<bool>() : true);
     if (!(acc_dt_ > 0.0)) {throw std::invalid_argument("acc_dt > 0 이어야 한다");}
     tu.daqp_iter_limit = declare_parameter<int>("daqp_iter_limit", yt["daqp_iter_limit"].as<int>(1000));
     limit_mode_ = declare_parameter<std::string>("limit_mode", ym["torque_limit"]["mode"].as<std::string>());
@@ -460,11 +462,14 @@ private:
 
     const auto t_c = std::chrono::steady_clock::now();
     // 기준 가속도 p̈_r,j (관성 좌표): 기준 속도의 중앙 차분, 창 acc_dt (지시서 3.9 — 0.2 s 계단을 사다리꼴로 편다)
+    //   2026-11-20: 창 아래끝이 기준열 첫 행보다 앞이면 첫 행으로 민다 (reference.hpp acc_window_start 주석).
+    //   예전에는 t − h 가 늘 첫 행 앞(상수 외삽)이라 앞먹임이 필요량의 50~100 %, 평균 75 % 였다.
     acc_ref_.resize(mpc_->tuning().Nc);
     {
       const double Ts = mpc_->tuning().Ts, h = 0.5 * acc_dt_;
-      const auto lo = ref_->horizon(t_state - h, Ts, mpc_->tuning().Nc);
-      const auto hi = ref_->horizon(t_state + h, Ts, mpc_->tuning().Nc);
+      const double t_lo = acc_window_shift_ ? amr_mpc_cpp::acc_window_start(t_state, h, ref_->t0() + ref_->dt()) : t_state - h;
+      const auto lo = ref_->horizon(t_lo, Ts, mpc_->tuning().Nc);
+      const auto hi = ref_->horizon(t_lo + acc_dt_, Ts, mpc_->tuning().Nc);
       auto inertial = [](const amr_mpc_cpp::TorqueRefPoint & p) {
         const double c = std::cos(p.first(2)), s = std::sin(p.first(2));
         const TVec3 & u = p.second;
@@ -542,6 +547,7 @@ private:
   double last_state_rx_ = 0.0, last_state_stamp_ = 0.0, ref_rx_ = 0.0, armed_since_ = 0.0;
   double state_timeout_ = 0.3, ref_timeout_ = 0.5, hold_stopped_speed_ = 0.04;
   double acc_dt_ = 0.2;
+  bool acc_window_shift_ = true;
   std::vector<TVec3> acc_ref_;
   bool debug_ = true, active_ = false, done_ = false, armed_ = false;
   std::vector<std::vector<double>> rows_;

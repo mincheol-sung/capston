@@ -1,0 +1,1 @@
+{"label": "B_old_r1", "samples": 0, "fault": "state_timeout: 0.32 s 동안 안 옴", "tau_max": 0.033322472856815305, "tau_rms": 0.006675240470664356, "dtau_rms": 0.0006693387940859364, "n_torque": 166, "n_damping_while_armed": 8}

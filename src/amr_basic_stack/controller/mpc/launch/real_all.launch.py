@@ -29,13 +29,15 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, ExecuteProcess, GroupAction, IncludeLaunchDescription, LogInfo,
+                            RegisterEventHandler,
                             OpaqueFunction, TimerAction)
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 # torque_experiment.launch.py 로 그대로 넘기는 인자 (비우면 넘기지 않는다 → 그쪽 기본값·YAML)
 _PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_hat", "mu_hat_wheels", "wheel_load_share", "disturbance", "stiction_comp", "use_w",
-         "origin_mode", "shape", "crossing_blend_m", "load_budget", "spin_rate",
+         "origin_mode", "shape", "crossing_blend_m", "load_budget", "spin_rate", "speed_mod_amp", "speed_mod_cycles",
          "width", "height", "yaw_mode", "align_s",
          "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_out_and_back", "seg_pause_s", "speed",
          "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend",
@@ -104,12 +106,30 @@ def _nodes(context):
         ws = os.path.realpath(os.path.join(get_package_share_directory("amr_mpc"), "..", "..", "..", ".."))
         tool = os.path.join(ws, "src", "amr_basic_stack", "controller", "mpc", "tools", "check_localization.py")
         if os.path.isfile(tool):
+            check = ExecuteProcess(cmd=["/usr/bin/python3", tool, "--apply"], output="screen", name="check_localization")
             out.append(TimerAction(period=float(g("localize_delay")), actions=[
-                LogInfo(msg="[real_all] 측위 맞추기 (check_localization.py --apply)"),
-                ExecuteProcess(cmd=["/usr/bin/python3", tool, "--apply"], output="screen", name="check_localization")]))
+                LogInfo(msg="[real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것"),
+                check]))
+            # 2026-11-20: 끝났다는 줄이 Cartographer 로그에 묻혀 그 전에 무장했다가 측위 보정(1.6 m 튐)에 fault_monitor 가 섰다
+            #   → 종료 코드 (check_localization.py: 0 맞음, 1 측위 결과 없음, 2 찾았지만 안 넣음, 3 지도 어디에도 안 맞음, 4 넣었는데 아직 안 맞음)
+            #   로 눈에 띄는 배너를 찍는다
+            out.append(RegisterEventHandler(OnProcessExit(target_action=check, on_exit=_localize_banner)))
         else:
             out.append(LogInfo(msg=f"[real_all] {tool} 없음 — 측위는 다른 터미널에서 amrcheck"))
     return out
+
+
+def _localize_banner(event, context):
+    """check_localization 종료 코드 → 배너 (ANSI 색: 맞음 초록, 그 밖 빨강)."""
+    code = event.returncode
+    why = {1: "측위 결과(/tracked_pose·스캔)를 못 받음", 2: "위치를 찾았지만 넣지 않음", 3: "지도 어디에도 안 맞음 — 위치를 손으로",
+           4: "/initialpose 를 넣었는데 아직 안 맞음"}.get(code, f"종료 코드 {code}")
+    if code == 0:
+        line, color = "측위 맞추기 끝: 맞음 — 이제 'a' 로 무장해도 된다", "\033[1;30;42m"
+    else:
+        line, color = f"측위 맞추기 실패: {why} — 무장하지 말 것 (위 check_localization 출력 확인)", "\033[1;37;41m"
+    bar = "█" * 72
+    return [LogInfo(msg=f"\n{color}{bar}\033[0m\n{color}██  {line}\033[0m\n{color}{bar}\033[0m")]
 
 
 def generate_launch_description():

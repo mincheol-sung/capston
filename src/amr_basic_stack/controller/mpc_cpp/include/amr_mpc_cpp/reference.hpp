@@ -7,6 +7,7 @@
 
 #include <Eigen/Dense>
 
+#include <algorithm>
 #include <array>
 #include <utility>
 #include <vector>
@@ -15,6 +16,13 @@ namespace amr_mpc_cpp
 {
 
 double wrap_angle(double a);
+
+// 기준 가속도 중앙 차분 창 [lo, lo + 2h] 의 시작 시각 (2026-11-20).
+//   창 아래끝 t − h 가 기준열 첫 행 시각 t_first (= header.stamp + dt) 보다 앞이면 첫 행으로 민다.
+//   첫 행 앞은 첫 행 속도로 상수 외삽이라 (아래 at()) 창이 걸치면 가속도가 a·(h + (t − t_first))/(2h) 로 작게 나왔다 —
+//   실차 bag (190506·171531) 직선 가속에서 앞먹임 U_s 가 필요량의 평균 0.76·0.74 (a/2 ~ a 톱니, 기준열 10 Hz 마다).
+//   미는 만큼 (최대 h) 차분 중심이 앞으로 간다 — 가속도를 그 시간만큼 미리 보는 것.
+inline double acc_window_start(double t, double h, double t_first) {return std::max(t - h, t_first);}
 
 class ReferenceHorizon
 {

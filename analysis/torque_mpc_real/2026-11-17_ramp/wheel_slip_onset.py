@@ -4,11 +4,12 @@
 그 순간 접지 토크 τ_c = |τ_fb| − (C_i + V_i|ω|) − J_w·|ω̇| (11-16 마찰표, J_w 8.9e-4) → μ_i = τ_c / ((r/√2)(mg/4)).
 몸체 수준 슬립 (v_wheel_dir − v_est_dir, IMU) 시작 시각도 같이."""
 import sys, csv, numpy as np
-W = ("FL", "FR", "RL", "RR"); PAT = {"fwd": np.array([1, 1, 1, 1]), "left": np.array([-1, 1, 1, -1])}
+W = ("FL", "FR", "RL", "RR"); PAT = {"fwd": np.array([1, 1, 1, 1]), "left": np.array([-1, 1, 1, -1]),
+       "back": np.array([-1, -1, -1, -1]), "right": np.array([1, -1, -1, 1])}   # 2026-11-20 back·right
 C = np.array([0.0174, 0.0206, 0.0155, 0.0157]); V = np.array([0.001066, 0.001158, 0.001112, 0.001177]); Jw = 8.9e-4
 den = 0.04 / np.sqrt(2) * 4.56 * 9.81 / 4
 for p in sys.argv[1:]:
-    rows = list(csv.DictReader(open(p))); d = "fwd" if "_fwd_" in p else "left"; s = PAT[d]
+    rows = list(csv.DictReader(open(p))); d = next(k for k in PAT if f"_{k}_" in p); s = PAT[d]
     t = np.array([float(x["t"]) for x in rows]); om = np.array([[float(x[f"omega_{w}"]) for w in W] for x in rows])
     fb = np.array([[float(x[f"tau_fb_{w}"]) for w in W] for x in rows]); st = np.array([[float(x[f"tau_star_{w}"]) for w in W] for x in rows])
     vw = np.array([float(x["v_wheel_dir"]) for x in rows]); ve = np.array([float(x["v_est_dir"]) for x in rows])

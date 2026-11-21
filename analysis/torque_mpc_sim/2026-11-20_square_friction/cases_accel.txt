@@ -1,0 +1,18 @@
+pp_a1.0_mu0.3|accel:=1.0 surface_mu:=0.3 controller:=pure_pursuit
+mpcB_a1.0_mu0.3|accel:=1.0 surface_mu:=0.3 limit_mode:=motor_only use_w:=true
+mpcC_a1.0_mu0.3|accel:=1.0 surface_mu:=0.3 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.3 use_w:=true
+pp_a1.0_mu0.4|accel:=1.0 surface_mu:=0.4 controller:=pure_pursuit
+mpcB_a1.0_mu0.4|accel:=1.0 surface_mu:=0.4 limit_mode:=motor_only use_w:=true
+mpcC_a1.0_mu0.4|accel:=1.0 surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true
+pp_a1.5_mu0.3|accel:=1.5 surface_mu:=0.3 controller:=pure_pursuit
+mpcB_a1.5_mu0.3|accel:=1.5 surface_mu:=0.3 limit_mode:=motor_only use_w:=true
+mpcC_a1.5_mu0.3|accel:=1.5 surface_mu:=0.3 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.3 use_w:=true
+pp_a1.5_mu0.4|accel:=1.5 surface_mu:=0.4 controller:=pure_pursuit
+mpcB_a1.5_mu0.4|accel:=1.5 surface_mu:=0.4 limit_mode:=motor_only use_w:=true
+mpcC_a1.5_mu0.4|accel:=1.5 surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true
+pp_a2.0_mu0.3|accel:=2.0 surface_mu:=0.3 controller:=pure_pursuit
+mpcB_a2.0_mu0.3|accel:=2.0 surface_mu:=0.3 limit_mode:=motor_only use_w:=true
+mpcC_a2.0_mu0.3|accel:=2.0 surface_mu:=0.3 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.3 use_w:=true
+pp_a2.0_mu0.4|accel:=2.0 surface_mu:=0.4 controller:=pure_pursuit
+mpcB_a2.0_mu0.4|accel:=2.0 surface_mu:=0.4 limit_mode:=motor_only use_w:=true
+mpcC_a2.0_mu0.4|accel:=2.0 surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true

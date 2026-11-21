@@ -61,6 +61,92 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-20 (12) — 토크 MPC 기준 가속도 차분 창을 기준열 첫 행 뒤로 밀기 (`acc_window_shift`, 기본 켬)
+- 왜: 실차 C 판 분석 중 앞먹임 U_s 가 직선 등가속에서도 10 Hz 톱니 (필요량의 a/2 ~ a). `torque_mpc_node` 는 p̈_r 을 기준 속도의
+  [t − 0.1, t + 0.1] 중앙 차분으로 내는데, 기준열 첫 행이 "지금"(header.stamp + dt, figure8 2026-11-11 결정)이라 t − 0.1 이 늘 첫 행 앞 →
+  첫 행 속도로 상수 외삽 → p̈ = a·(h + ref_age − dt)/(2h). 실차 bag 190506·171531 직선 가속 213 표본씩: 측정 ρ 0.76·0.74,
+  이 식 0.77·0.75 (평균 차 0.02, ref_age 와 상관 0.83·0.85). `analysis/torque_mpc_real/2026-11-20_why_c/verify_ff.py`.
+- 바꾼 파일: `mpc_cpp/include/amr_mpc_cpp/reference.hpp` (`acc_window_start(t, h, t_first) = max(t − h, t_first)`),
+  `mpc_cpp/src/torque_mpc_node.cpp` (창 [t_lo, t_lo + acc_dt], 파라미터 `acc_window_shift`), `mpc_cpp/test/test_wheel_mpc.cpp`
+  (`Reference.AccelWindowShiftedPastFirstRow`: 등가속 기준열에서 민 창 = a, 예전 창 = a(h + t − t_first)/(2h)),
+  `mpc/config/torque_mpc.yaml` (`tuning.acc_window_shift: true`), `mpc/launch/torque_experiment.launch.py` (`mpc_acc_window_shift:=`).
+- 확인: amr_mpc_cpp 재빌드, gtest 12 + 31, pytest 326 통과. 시뮬 (정사각형 가속 1.5 · 1.5 m/s, 바닥 μ 0.45, 2 판씩,
+  `analysis/torque_mpc_sim/2026-11-20_acc_window/`): 직선 가속 ρ 0.70~0.73 → 0.92~0.93 (고쳐짐).
+  **추종은 거의 그대로** — C 뒤처짐 −58~−60 → −54~−58 mm, 윤곽 56~57 → 57~59. B 뒤처짐 −6~−9 → −1~−5, 윤곽 24~25 → 26~29, 헛돎 0~0.3 → 0.9~1.8 %.
+  B 는 피드백이 모자란 앞먹임을 메워 왔고, C 는 꼭짓점에서 앞먹임 자체가 상한을 넘어 (실차 꼭짓점 구간 54 %) 어차피 상한에 잘린다 →
+  C 가 못 따라가는 주원인은 이 버그가 아니라 기준이 마찰 상한을 넘는 것. 실차 판 없음. 예전 동작: `mpc_acc_window_shift:=false`.
+
+### 2026-11-20 (11) — 바퀴별 μ̂ FR 0.285 → 0.44, RR 0.350 → 0.417 (`torque_plant.yaml surface.mu_hat_wheels`)
+- 왜: 사용자 "바꿔". C 가 FR 상한(τ̄ 0.072)에 묶여 정사각형 가속 1.5 를 못 따라 13 cm 뒤처졌다.
+- 근거 (`analysis/torque_mpc_real/2026-11-20_fr_mu/RESULTS_KO.md`): 실차 토크 램프 2 판 (fwd 175004 = FR 1사분면, right 180622 = 3사분면,
+  right 판은 측위 겹침 64 % 인 채로 — 사용자 결정) 모두 FR 이 먼저 헛돎, 그 순간 접지 토크 명령 τ_g 0.139 / 0.204 N·m → mg/4 기준 0.44 / 0.64 (작은 쪽).
+  RR 은 정사각형 bag 4 판의 미끄럼 없는 접지 토크 하한 0.417. FL·RL 그대로 (bag 하한 0.318·0.478 과 모순 없음).
+- 결과: C τ̄ [0.1093 0.0721 0.1154 0.0886] → [0.1093 0.1113 0.1154 0.1055] N·m, 앞 방향 최대 가속 (LP) 1.18 → 1.58 m/s².
+- 확인: 시뮬 기동 로그 "바퀴별 μ̂ [0.432 0.440 0.456 0.417] … 쓰는 τ̄ [0.1093 0.1113 0.1154 0.1055]". pytest 326 통과. 실차 C 판 없음.
+- 같이: `wheel_slip_onset.py` 의 피드백 τ_c 는 헛돎 시작 순간 값이라 (표 제목 "30 ms 전" 과 다름) J_w·ω̇ 로 크게 깎인다 — 이번에는 τ_g 기준을 썼다.
+  `analysis/torque_mpc_real/2026-11-20_ramp/run_one.sh` (원격 램프 한 판) — 띄운 상태에서 측위를 반복 적용하면 Cartographer 가
+  "Non-sorted data added to queue" 로 죽어서 그 루프는 뺐다.
+
+### 2026-11-20 (10) — 토크 램프에 back·right 방향 + 실차 램프 1 판 (FR 재측정 시작, 사용자 지시로 1 판에서 멈춤)
+- 왜: FR μ̂ 재측정. fwd↔back, left↔right 를 번갈아 돌면 판마다 되돌려 놓지 않아도 되고 바퀴마다 두 사분면을 잰다.
+- 바꾼 파일: `mpc/amr_mpc/nodes/torque_ramp.py` (DIRS back [−1,0,0]·right [0,−1,0]), `mpc/launch/torque_ramp.launch.py` (허용값·사용법),
+  `mpc/launch/torque_experiment.launch.py` (ramp_dir 설명), `analysis/torque_mpc_real/2026-11-17_ramp/wheel_slip_onset.py` (back·right 패턴).
+- 확인: 시뮬 back 한 판 3.45 m 뒤로 (right 는 앞 판과 겹쳐 판정 못 함). pytest 317 통과.
+- 실차 (Claude 원격, 사용자 "로봇 옆 사람 있음" 확인 뒤): `analysis/torque_mpc_real/2026-11-20_ramp/run_one.sh fwd 2.0` 1 판 —
+  2.06 m, τ_g 1.0 N·m 도달. wheel_slip_onset: **FR 이 먼저** 헛돎 (t 0.22 s), 접지 τ_c [0.095 0.042 0.104 0.126] → μ [0.30 0.13 0.33 0.40].
+  1 판뿐이라 값으로 쓰지 않는다. 사용자 "이제 그만" 으로 나머지 판은 안 돌렸다.
+
+### 2026-11-20 (9) — 퓨어 퍼슛 룩어헤드 상수 0.30 m (`torque_baseline_a.yaml` lookahead_min = max = 0.30)
+- 왜: 사용자 "PP 룩어헤드 상수로". 속도 비례(0.15~0.60)는 정사각형 꼭짓점(기준 0.1 m/s)에서 0.15 로 줄며 교점이 넘어가 κ 가 뒤집혔다.
+- 시뮬 (정사각형 1.5 m, 최고 1.5 m/s, 바닥 μ 0.45, 참값, `analysis/torque_mpc_sim/2026-11-20_pp_lookahead_c_lag/`):
+  가속 1.5 에서 비례 → 상수 0.3: 윤곽 RMS 50~63 → 32 mm, τ max 0.50~0.72 → 0.43, Δτ RMS 0.022 → 0.014, 꼭짓점 머뭇 0.73 → 0.53 s.
+  0.2 는 윤곽은 작지만 토크 튐 (λ max 1.9), 0.4 는 윤곽 48 mm. 가속 1.0 에서 0.3: 윤곽 22 mm (비례 44), λ max 0.52 (1.80).
+- 바꾼 파일: `mpc/config/torque_baseline_a.yaml` (값 + 근거 표). 확인: 설치본 적재 L_d 0.3 (v_ref 0.1·0.8·1.5 모두). pytest 317 통과. 실차 판 없음.
+- 같은 날 C 뒤처짐 원인 분리 (코드 변경 없음, 같은 폴더): 측정 μ̂ 의 FR 0.285 × c_s 0.8 이 앞 방향 최대 가속을 1.18 m/s² 로 묶는다
+  (힘 분배 LP) → 기준 1.5 를 못 따라 뒤처짐 −130 mm. μ̂·c_s = 바닥이면 윤곽 84 → 22 mm · 뒤처짐 −37, 여기에 r_u 1 이면 −6 (윤곽 38).
+  기준 가속 1.0 만 낮추면 −46. 실차 bag (171640·171531·171735): 퓨어 퍼슛은 1.51~1.63 m/s 를 내지만 최고점이 기준보다 0.18~0.64 m 뒤,
+  C 는 위치·시각은 맞지만 1.04~1.16 m/s (72~81 %).
+
+### 2026-11-20 (8) — 측위 맞추기 종료 배너 (real_all) + check_localization 종료 코드
+- 왜: 실차 17:12 판에서 측위 맞추기(--apply)가 끝나기 전에 무장 → 보정으로 SLAM 포즈 158 cm·−67° 튐 → fault_monitor pose_jump 정지,
+  다시 무장하자 출발점이 보정 전 좌표라 figure8 abort (163.8 cm). 사용자 "측위 맞추기 끝나는 게 다른 로그에 묻혀 안 보인다".
+- 바꾼 파일:
+  - `mpc/tools/check_localization.py`: 종료 코드 0 맞음 · 1 측위 결과 없음 · 2 찾았지만 안 넣음 · 3 지도 어디에도 안 맞음 · 4 넣었는데 아직 안 맞음
+    (예전에는 결과와 상관없이 0, 결과 없음만 1).
+  - `mpc/launch/real_all.launch.py`: check_localization 종료 시 OnProcessExit → 72 칸 배너 (0 이면 초록 "이제 a", 그 밖 빨강 "무장하지 말 것" + 이유).
+    시작 줄에도 "끝나면 큰 배너, 그 전에 a 누르지 말 것".
+- 확인: launch API 로 가짜 프로세스(exit 0 / exit 3)에 같은 핸들러 → 두 배너 출력 확인. pytest 317 통과. 실차 판 없음 (다음 amrall 부터).
+- 같이 본 것 (171406 PP 판 bag): 퓨어 퍼슛은 정사각형 한 바퀴 완주 (출발점 9 mm 로 hold). 꼭짓점마다 0.3~0.5 s 머뭇거림 —
+  v 명령 0.00~0.08 m/s, κ −6 ~ −11 (룩어헤드 교점이 지금 변으로 되돌아가고, 기준점이 로봇 뒤 → v = v_ref + k_along·e_along ≈ 0, v ≥ 0 클램프).
+  CAN 응답 빠짐: 기동 직후 "응답 1/4 — 빠진 바퀴 [1, 2, 3]" 1 회, 주행 중 [3]·[2, 3].
+
+### 2026-11-20 (7) — w 항 기본 켬 (`torque_mpc.yaml model_terms.use_w: true`)
+- 왜: 사용자 "켜" — (5)(6) 의 R 튜닝을 use_w 켬으로 했다. ※ 교수님 11-16 지시("구현하되 끈 채로 제어")와 다르다 → 보고 필요.
+- 바꾼 파일: `mpc/config/torque_mpc.yaml` (값 + 주석), `mpc/launch/torque_experiment.launch.py` (주석·인자 설명). 끌 때: `use_w:=false`.
+- 확인: 인자 없이 시뮬 기동 → torque_mpc_node "w 항 켬", w_dudt 0.01, r_U 10. pytest 317 통과. 실차 판 없음.
+
+### 2026-11-20 (6) — MPC R 기본값 w_dudt 0.001 → 0.01, r_u 0.1 → 10 (`torque_mpc.yaml`, Q 그대로)
+- 왜: 사용자 "넣어" — (5) 의 R 튜닝 결과 (정사각형 1.5 m/s · 가속 1.5 · μ 0.4 · use_w 시뮬: B 윤곽 22~26 mm · 헛돎 2~6 %,
+  C μ̂ 0.4 윤곽 72~96 mm (예전 128~137) · 헛돎 0 %, Δτ RMS 0.005~0.006 = 11-16 실차 떨림 없음 수준의 절반).
+- 바꾼 파일: `mpc/config/torque_mpc.yaml` tuning.w_dudt·r_u + 근거 표 주석. 되돌리기: launch 인자 `mpc_w_dudt:=0.001 mpc_r_u:=0.1`.
+- 확인: 기본 인자만으로 시뮬 기동 → torque_mpc_node 로그 "w_dudt 0.010000 … r_U 10", W [5, 5, 2.5, 2, 2, 1]. pytest 317 통과
+  (C++ gtest 는 자기 튜닝값을 써서 yaml 과 무관). 빌드 불필요 (설정 링크). 실차 판 없음.
+- 주의: 튜닝은 use_w 켬으로 했다 — 같은 날 (7) 에서 기본 켬으로.
+
+### 2026-11-20 (5) — MPC R 튜닝 시뮬 (Q 고정, use_w, 정사각형 1.5 m/s) + 마찰 초과 비교 (코드 변경 없음)
+- 왜: 사용자 "Q 는 그대로 두고 R(QR 비율)로 헤딩 있을 때 최적 가중치", "MPC 는 잘 따라가고 PP 는 미끄러지는 조합", "사각형으로, 1.5 m/s".
+  구조는 퓨어 퍼슛 = 엔코더, MPC = 추정기 (지금 기본값 그대로).
+- 결과 (`analysis/torque_mpc_sim/2026-11-20_R_tuning/RESULTS_KO.md`, `2026-11-20_square_friction/`):
+  - Q·R 같은 배율에 해 불변 (유계 QP 검산 3.6e-16) → R 만 훑어도 Q:R 비율은 다 본다 (Q 안의 비율은 아님).
+  - circles8 W2.0 μ 0.4: 1.1 m/s 도 필요 μ 0.349 < 0.4 라 퓨어 퍼슛은 안 미끄러짐 (정상), MPC 가 스스로 미끄러짐 (B 5~47 %).
+  - 정사각형 가속 2.5: 셋 다 경로 붕괴. 가속 1.5 · 최고 1.5 m/s · μ 0.4 에서 R 스윕 40 판 → R 을 키울수록 B 헛돎·C 코너 밀림이 준다.
+  - 최종 (2~3 회): 퓨어 퍼슛 윤곽 71~74 mm · 헛돎(|λ|>0.5) 30~33 % · λ max 1.4, MPC B (w_dudt 0.01, r_u 10) 22~26 mm · 2~6 % · 0.7~1.0,
+    MPC C μ̂ 0.5 (μ̂·c_s = 바닥) 39~49 mm · 0 % · 0.45, C μ̂ 0.4 72~96 mm · 0 %.
+  - 퓨어 퍼슛 꼭짓점 토크 튐 원인 = 룩어헤드 교점이 다음 변 ↔ 지금 변으로 한 틱에 넘어감 (κ +1.2 → −12.3), 고치지 않음.
+- 후보 가중치 w_dudt 0.01 · r_u 10 은 **torque_mpc.yaml 에 안 넣었다** (사용자 결정 대기). 실차 판 없음.
+- 시뮬 병렬 실행: sim_plant_torque 가 numpy BLAS 스레드로 판마다 3.4 코어 → 실행 스크립트에서 OMP/OPENBLAS 스레드 1 (26 %).
+  `tools/run_compare.sh` 에는 아직 안 넣었다.
+
 ### 2026-11-20 (4) — 정사각형 기준 `shape:=square` (변 가운데 최고속도, 꼭짓점 0.1 m/s) + 시뮬 비교
 - 왜: 사용자 "정사각형 경로 중앙에서 낼 수 있는 최고속도, 꼭짓점에서는 0.1 m/s". 시나리오 문서의 "PP 는 코너커팅, MPC 는 따라감" 확인용.
 - 무엇: `amr_mpc/core/square.py` (새) — 출발 포즈가 꼭짓점, 첫 변 = 출발 헤딩, 왼쪽으로. 변마다 accel 로 가속·감속 →

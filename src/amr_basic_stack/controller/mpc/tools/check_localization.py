@@ -134,20 +134,20 @@ def main():
               f"라이다 점 {len(p)} 개, 지도 벽 겹침 ±5 cm {100*sc:.1f} % (지도 안 {100*inside:.0f} %)")
         if sc >= a.min:
             print(f"→ 맞음 (기준 {100*a.min:.0f} %). 무장해도 된다 — 단 10 s 넘게 안정인지도 볼 것")
-            return
+            return 0
         print("→ 안 맞음. 지도 전체에서 찾는 중 (1~2 분)...")
         bs, bx, by, bth = search(occ2, occ1, res, ox, oy, p, pose)
         print(f"찾은 위치 ({bx:+.2f}, {by:+.2f}) m, {math.degrees(bth):+.1f}°: 겹침 ±5 cm {100*bs:.1f} %")
         if bs < a.min:
             print("★ 지도 어디에도 잘 안 맞음 — 다른 방이거나, 주변이 지도 때와 많이 달라졌다. 위치를 손으로 정해야 한다")
-            return
+            return 3
         qz, qw = math.sin(bth / 2), math.cos(bth / 2)
         cmd = (f'ros2 topic pub --once --qos-reliability best_effort /initialpose geometry_msgs/msg/PoseWithCovarianceStamped '
                f'"{{header: {{frame_id: map}}, pose: {{pose: {{position: {{x: {bx:.2f}, y: {by:.2f}}}, '
                f'orientation: {{z: {qz:.4f}, w: {qw:.4f}}}}}}}}}"')
         if not a.apply:
             print("넣는 명령 (같은 ROS_DOMAIN_ID 터미널에서):\n  " + cmd + "\n또는 이 도구를 --apply 로 다시 실행")
-            return
+            return 2
         m = PoseWithCovarianceStamped()
         m.header.frame_id = "map"
         m.pose.pose.position.x, m.pose.pose.position.y = bx, by
@@ -162,10 +162,13 @@ def main():
             x, y, th = n.pose
             print(f"다시: ({x:+.3f}, {y:+.3f}) m, {math.degrees(th):+.1f}°, 겹침 ±5 cm {100*sc2:.1f} % → "
                   + ("맞음" if sc2 >= a.min else "★ 아직 안 맞음"))
+            return 0 if sc2 >= a.min else 4
+        print("★ /initialpose 뒤 10 s 동안 측위 결과를 못 받음")
+        return 1
     finally:
         n.destroy_node()
         rclpy.shutdown()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

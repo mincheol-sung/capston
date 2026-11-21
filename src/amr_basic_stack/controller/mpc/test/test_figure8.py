@@ -251,3 +251,46 @@ def test_spin_mode_turns_whole_revolutions_independent_of_path():
 def test_spin_rejects_nonpositive_rate():
     with pytest.raises(ValueError):
         make("spin", spin_rate=0.0)
+
+
+# ── 순항 속도 sin 변조 (2026-11-20) ──────────────────────────────────────
+def test_speed_mod_zero_is_old_behavior():
+    kw = dict(width=1.2, speed=0.45, accel=0.4, yaw_mode="tangent", curve="circles")
+    a, b = Figure8(**kw), Figure8(**kw, speed_mod_amp=0.0, speed_mod_cycles=3.0)
+    for t in np.linspace(0, a.T_total, 60):
+        assert np.allclose(a.at(t)[0], b.at(t)[0]) and np.allclose(a.at(t)[1], b.at(t)[1])
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_speed_mod_follows_sine_closes_and_is_consistent(mode):
+    """순항 중 v = V(1+ε sin(2πnσ/ℓ)), 닫힘, 속도 = 포즈 미분 (유한차분, 독립 경로)."""
+    V, eps, n = 0.45, 0.3, 2.0
+    f = Figure8(width=1.2, speed=V, accel=0.4, yaw_mode=mode, curve="circles", laps=2, speed_mod_amp=eps, speed_mod_cycles=n)
+    s, v, t = f._lap_s, f._lap_v, f._lap_t
+    cruise = (t > 2.0) & (t < t[-1] - 2.0)
+    want = V * (1 + eps * np.sin(2 * math.pi * n * s[cruise] * f.laps / f.L))
+    assert np.abs(v[cruise] - want).max() < 2e-3
+    assert v.max() == pytest.approx(V * (1 + eps), abs=2e-3) and f.V_peak == pytest.approx(V * (1 + eps))
+    assert np.abs(np.diff(v) / np.diff(t)).max() <= max(0.4, f.max_tangential_accel()) + 1e-9
+    X0, _ = f.at(0.0); Xe, ue = f.at(f.T_total + 0.5)
+    assert np.hypot(*(Xe[:2] - X0[:2])) < 1e-6 and abs(wrap(Xe[2] - X0[2])) < 1e-6 and np.abs(ue).max() < 1e-9
+    h = 1e-4
+    for tt in np.linspace(h, f.T_total - h, 800):
+        Xm, _ = f.at(tt - h); Xp, _ = f.at(tt + h); X, u = f.at(tt)
+        c, sn = math.cos(X[2]), math.sin(X[2])
+        assert np.allclose([c * u[0] - sn * u[1], sn * u[0] + c * u[1]], (Xp[:2] - Xm[:2]) / (2 * h), atol=2e-3)
+
+
+def test_speed_mod_peak_enters_load_check():
+    kw = dict(width=1.2, speed=0.45, accel=0.4, yaw_mode="tangent", curve="circles")
+    run0, _ = Figure8(**kw).peak_load(0.2)
+    run1, _ = Figure8(**kw, speed_mod_amp=0.3).peak_load(0.2)
+    assert run1 == pytest.approx(1.3 * run0, rel=0.01)
+
+
+@pytest.mark.parametrize("kw", [{"speed_mod_amp": -0.1}, {"speed_mod_amp": 1.0},
+                                {"speed_mod_amp": 0.2, "speed_mod_cycles": 0.0},
+                                {"speed_mod_amp": 0.2, "lap_speeds": [0.3, 0.4]}])
+def test_speed_mod_rejects_bad_args(kw):
+    with pytest.raises(ValueError):
+        Figure8(width=1.2, speed=0.45, accel=0.4, curve="circles", **kw)

@@ -1,0 +1,10 @@
+mpcC_muhat0.4_r1|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true
+mpcC_muhat0.4_r2|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.4 use_w:=true
+mpcC_muhat0.45_r1|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.45 use_w:=true
+mpcC_muhat0.45_r2|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.45 use_w:=true
+mpcC_muhat0.5_r1|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5 use_w:=true
+mpcC_muhat0.5_r2|surface_mu:=0.4 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.5 use_w:=true
+pp_r1|surface_mu:=0.4 controller:=pure_pursuit
+mpcB_r1|surface_mu:=0.4 limit_mode:=motor_only use_w:=true
+pp_r2|surface_mu:=0.4 controller:=pure_pursuit
+mpcB_r2|surface_mu:=0.4 limit_mode:=motor_only use_w:=true

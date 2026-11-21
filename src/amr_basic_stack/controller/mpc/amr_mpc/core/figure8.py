@@ -19,6 +19,11 @@
 #   lap_speeds=[V₁, V₂, …] (2026-11-11, 토크 MPC 실험): 랩마다 순항 속도를 바꾼다. 랩 경계(교차점)를 지나면서
 #   가감속 a 로 다음 랩 속도로 바꾸고, 끝에서는 정확히 멈추게 감속한다. 1 ms 격자로 미리 적분한 표를 보간한다.
 #   주지 않으면 위 사다리꼴 그대로 (기존 사용처 동작 불변).
+#   speed_mod_amp=ε, speed_mod_cycles=n (2026-11-20, 슬립 실험 "등속이 아닌 기준"): 순항 속도를 호길이에 따라 sin 으로 바꾼다.
+#     v_target(σ) = V·(1 + ε·sin(2π·n·σ / ℓ_lap)),   ℓ_lap = L / laps  (랩마다 같은 모양, n 은 랩당 주기 수)
+#     v(t) = min(A·t, v_target(σ), √(2A(L − σ)))   — 출발은 accel 로 올라가 v_target 에 붙고, 끝은 accel 로 정확히 선다.
+#     순항 중 접선 가속 a_t = v·dv/dσ = v·V·ε·(2πn/ℓ_lap)·cos(…) 는 accel 과 따로 정해진다 (max_tangential_accel()).
+#     최고 속도 V·(1+ε) 가 기준 부하 검사에 들어간다. lap_speeds 와 같이 쓸 수 없다. ε = 0 이면 위 사다리꼴 그대로.
 #
 # 헤딩 (yaw_mode)
 #   "tangent"  접선 추종.  경로 시작 접선각 θ(0)=atan2(H, W/2) 만큼 기동 헤딩과 어긋나므로,
@@ -102,7 +107,7 @@ def ramp_rate(tau, rate0, ramp_s):
 class Figure8:
     def __init__(self, width=1.4, height=0.8, speed=0.25, accel=0.4,
                  laps=1.0, yaw_mode="tangent", align_s=1.5, samples=8000, lap_speeds=None, curve="gerono",
-                 crossing_blend=0.0, spin_rate=1.0):
+                 crossing_blend=0.0, spin_rate=1.0, speed_mod_amp=0.0, speed_mod_cycles=2.0):
         if curve not in ("gerono", "circles"):
             raise ValueError(f"curve 는 gerono | circles (받은 값 {curve!r})")
         self.curve = curve
@@ -120,6 +125,13 @@ class Figure8:
             speed = max(self.lap_speeds)
         if laps <= 0.0:
             raise ValueError("laps 는 양수")
+        self.mod_eps, self.mod_n = float(speed_mod_amp), float(speed_mod_cycles)
+        if not (0.0 <= self.mod_eps < 1.0):
+            raise ValueError(f"speed_mod_amp {speed_mod_amp} — 0 이상 1 미만 (1 이면 순항 중 속도 0 에 닿는다)")
+        if self.mod_eps > 0.0 and self.mod_n <= 0.0:
+            raise ValueError(f"speed_mod_cycles {speed_mod_cycles} — 양수")
+        if self.mod_eps > 0.0 and self.lap_speeds is not None:
+            raise ValueError("speed_mod_amp 와 lap_speeds 는 같이 쓸 수 없다")
         if yaw_mode not in ("tangent", "fixed", "spin"):
             raise ValueError(f"yaw_mode 는 tangent | fixed | spin (받은 값 {yaw_mode!r})")
         if yaw_mode == "spin" and not spin_rate > 0.0:
@@ -162,8 +174,11 @@ class Figure8:
         self.t_acc = V / A
         self.t_cru = (self.L - V * V / A) / V
         self.T_path = 2.0 * self.t_acc + self.t_cru
+        self.V_peak = V * (1.0 + self.mod_eps)
         if self.lap_speeds is not None:
             self._build_lap_profile()
+        elif self.mod_eps > 0.0:
+            self._build_mod_profile()
 
         # ---- spin: 헤딩 = κ_s·σ, 정수 바퀴 n 으로 맞춰 끝에서 출발 헤딩 (머리주석 "spin")
         self.spin_turns, self.kappa_spin = 0, 0.0
@@ -215,6 +230,31 @@ class Figure8:
         self._lap_t, self._lap_s, self._lap_v = np.array(ts), np.array(sig), np.array(vel)
         self.T_path = float(ts[-1])
 
+    def _v_target(self, s):
+        return self.V * (1.0 + self.mod_eps * math.sin(2.0 * math.pi * self.mod_n * s * self.laps / self.L))
+
+    def _build_mod_profile(self, h=1e-3):
+        """sin 변조 순항 속도: v = min(A·t, v_target(σ), √(2A(L−σ))) 를 1 ms 격자로 적분한 σ(t), v(t) 표."""
+        A, L = self.A, self.L
+        ts, sig, vel = [0.0], [0.0], [0.0]
+        t = s = v = 0.0
+        while s < L - 1e-9:
+            v_new = max(0.0, min(A * (t + h), self._v_target(s + v * h), math.sqrt(max(0.0, 2.0 * A * (L - s - v * h)))))
+            if v_new <= 1e-9 and s > 0.5 * L:
+                break
+            s = min(L, s + 0.5 * (v + v_new) * h)
+            v, t = v_new, t + h
+            ts.append(t); sig.append(s); vel.append(v)
+        sig[-1], vel[-1] = L, 0.0
+        self._lap_t, self._lap_s, self._lap_v = np.array(ts), np.array(sig), np.array(vel)
+        self.T_path = float(ts[-1])
+
+    def max_tangential_accel(self):
+        """주행 구간 접선 가속 |dv/dt| 최대 [m/s²] (출발·정지 accel 포함)."""
+        if self.lap_speeds is None and self.mod_eps == 0.0:
+            return self.A
+        return float(np.abs(np.diff(self._lap_v) / np.diff(self._lap_t)).max())
+
     def lap_profile_summary(self):
         """[(랩 번호, 목표 속도, 실제 최고 속도, 랩 시작 시각)]"""
         if self.lap_speeds is None:
@@ -227,7 +267,7 @@ class Figure8:
 
     def _profile(self, t):
         """주행 구간 경과시간 t → (호길이 σ, 접선속도 v)."""
-        if self.lap_speeds is not None:
+        if self.lap_speeds is not None or self.mod_eps > 0.0:
             if t <= 0.0:
                 return 0.0, 0.0
             if t >= self.T_path:

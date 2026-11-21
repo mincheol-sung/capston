@@ -1,0 +1,9 @@
+pp_var_a1.5_r1|accel:=1.5 controller:=pure_pursuit
+pp_var_a1.5_r2|accel:=1.5 controller:=pure_pursuit
+mpcC_a1.5_r1|accel:=1.5 limit_mode:=friction
+mpcC_a1.5_r2|accel:=1.5 limit_mode:=friction
+mpcC_a1.0_r1|accel:=1.0 limit_mode:=friction
+mpcC_a1.0_r2|accel:=1.0 limit_mode:=friction
+mpcC_a1.15_r1|accel:=1.15 limit_mode:=friction
+mpcC_a1.15_r2|accel:=1.15 limit_mode:=friction
+pp_var_a1.0_r1|accel:=1.0 controller:=pure_pursuit

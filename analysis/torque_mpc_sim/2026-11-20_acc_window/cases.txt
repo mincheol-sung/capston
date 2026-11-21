@@ -1,0 +1,8 @@
+C_shift_r1|limit_mode:=friction mpc_acc_window_shift:=true
+C_old_r1|limit_mode:=friction mpc_acc_window_shift:=false
+B_shift_r1|limit_mode:=motor_only mpc_acc_window_shift:=true
+B_old_r1|limit_mode:=motor_only mpc_acc_window_shift:=false
+C_shift_r2|limit_mode:=friction mpc_acc_window_shift:=true
+C_old_r2|limit_mode:=friction mpc_acc_window_shift:=false
+B_shift_r2|limit_mode:=motor_only mpc_acc_window_shift:=true
+B_old_r2|limit_mode:=motor_only mpc_acc_window_shift:=false

@@ -36,6 +36,8 @@ track:
   # 0.31 m)은 작아서 그 속도면 기준 부하 검사에서 거부된다. 실제 트랙 크기를 정한 뒤 넣는다.
   lap_speeds: []
   align_s: 1.5            # [s] tangent 모드 앞뒤 제자리 회전
+  speed_mod_amp: 0.0      # 순항 속도 sin 변조 진폭 ε (0 = 등속). v = speed·(1 + ε·sin(2π·n·σ/ℓ_lap)), 최고 speed·(1+ε) 가 부하 검사에 들어감. 2026-11-20
+  speed_mod_cycles: 2.0   # 랩당 주기 수 n (circles8 에서 2 = 원 하나에 한 주기)
   crossing_blend_m: 0.0   # [m] circles8 + tangent 교차점 헤딩 완화 (0 = 끔). 요 가속 최대 2v²/(R·Lb), 헤딩 최대 Lb/(4R) 덜 돔.
                           #   예 R 0.5: v 0.7 → 0.2 (9.8 rad/s², 5.7°), v 0.4 → 0.1 (6.4 rad/s², 2.9°). 2026-11-16
   start_delay: 3.0        # [s] 무장 뒤 출발까지 최소 대기 (진입 구간이 더 길면 그 시간)

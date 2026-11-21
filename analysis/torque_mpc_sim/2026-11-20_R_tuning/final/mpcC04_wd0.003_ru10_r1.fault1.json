@@ -1,0 +1,1 @@
+{"label": "mpcC04_wd0.003_ru10_r1", "samples": 0, "fault": "wheel_timeout: 0.31 s 동안 안 옴 / state_timeout: 0.31 s 동안 안 옴", "tau_max": 0.005485388868604703, "tau_rms": 0.002768101878153616, "dtau_rms": 0.0006840346972448923, "n_torque": 44, "n_damping_while_armed": 6}

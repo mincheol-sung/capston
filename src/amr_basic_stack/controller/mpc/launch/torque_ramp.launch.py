@@ -8,6 +8,7 @@
 
 사용 (NUC):  amrramp dir:=fwd mu_hat:=0.6 bag:=true          직진
              amrramp dir:=left mu_hat:=0.6 bag:=ramp_left     왼쪽 90° (게걸음)
+             dir:=back · dir:=right (2026-11-20) — fwd↔back, left↔right 를 번갈아 돌면 되돌려 놓지 않아도 출발점 근처를 오간다
   준비 로그 뒤 'a' = 한 판. 끝나면 스스로 무장 해제 → 로봇을 되돌려 놓고 다시 'a'. 's'/스페이스 = 즉시 정지.
   판마다 CSV: analysis/torque_mpc_real/<날짜>_ramp/ramp_<dir>_<시분초>_run<n>.csv  (ramp_log_dir:= 로 바꿈)
   bag: bag:=true → bags/<날짜>/<시분초>, bag:=<이름> → bags/<날짜>/<시분초>_<이름> (real_all ⑥, record_all.sh)
@@ -37,8 +38,8 @@ def _include(context):
         v = LaunchConfiguration(k).perform(context).strip()
         if v:
             args[dst] = v
-    if args.get("ramp_dir") not in ("fwd", "left"):
-        raise RuntimeError(f"dir:={args.get('ramp_dir')!r} — fwd 또는 left")
+    if args.get("ramp_dir") not in ("fwd", "back", "left", "right"):          # 2026-11-20 back·right 추가
+        raise RuntimeError(f"dir:={args.get('ramp_dir')!r} — fwd | back | left | right")
     args.setdefault("ramp_log_dir",
                     os.path.join(ws, "analysis", "torque_mpc_real", time.strftime("%Y-%m-%d") + "_ramp"))
     src = PythonLaunchDescriptionSource(os.path.join(share, "launch", "real_all.launch.py"))
