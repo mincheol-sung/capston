@@ -68,6 +68,16 @@
 //                  다음 주기에 새 x̂ 로 다시 선형화한다. 외란 추정치도 이 모델의 한 스텝 예측 잔차로 구한다.
 //                  θ̇ = 0, τ₀ = 0, 바퀴 관성 끔이면 A_d, B_d 가 위 식-8 의 A, B(θ̂) 와 같아진다.
 //   비용·제약·결정변수는 두 방식이 같다. 달라지는 것은 예측 행렬 Φ 와 영입력 응답뿐이다.
+//
+// 슬립 계수 η_s (2026-11-23, 교수님 회의 "η 토크 상한" — 선택 기능, 기본 끔. 위 ρ 절의 η = 1 − ρ 와 다른 기호다):
+//   바퀴별 상한 τ̄_i 에 η_s,i ∈ [0, 1] 을 곱한다 (지평 모든 스텝에 같은 값 — 앞으로의 슬립은 예측하지 않는다).
+//     λ_i  = (ω_i − ω_nom,i)·sgn(ω_nom,i) / max(|ω_i|, |ω_nom,i|, ω_ε),  ω_nom = T⁻¹ v_body (추정기 몸체 속도) — slip_logger 와 같은 식
+//     λ̃_i = 인과 1 차 LPF (f_c, y += α(λ − y), α = Δt/(τ + Δt), τ = 1/(2π f_c))
+//     η_s,i = 1 / (1 + exp((|λ̃_i| − λ_c)/s))   (logistic, λ_c 에 대칭: η 0.95 at λ_c − ln19·s, 0.05 at λ_c + ln19·s)
+//   계산은 SlipEta (아래), 적용은 TorqueMPC::set_slip_scale. 변화율 한계 Δτ̄ 는 곱하기 전 τ̄ 기준 그대로 (하중 이동과 같음),
+//   j=0 은 상자가 변화율보다 우선이라 η 가 한 주기에 떨어져도 해가 있다. slip_alloc 이면 목표 입력 U_s 도 η 로 가중 배분
+//   (min Σ (τ_i / (c_i η_i))², η 아래 한계 slip_alloc_floor — 두 바퀴가 0 이면 F W⁻¹ Fᵀ 가 특이). 세 바퀴만으로도 rank 3.
+//   값 근거: analysis/torque_mpc_real/2026-11-23_slip_lpf/RESULTS_KO.md 5~7 절 (λ_c 0.15, s 0.017, f_c 10 Hz, ω_ε 2.5).
 // ---------------------------------------------------------------
 #pragma once
 
@@ -144,6 +154,13 @@ struct TorqueModel
       q * (omega(0) + omega(1) + omega(2) + omega(3)),
       q * (-omega(0) + omega(1) + omega(2) - omega(3)),
       q / k() * (-omega(0) + omega(1) - omega(2) + omega(3)));
+  }
+  // 무슬립 바퀴 속도 ω_nom = T⁻¹ v (몸체 [v_x, v_y, ω_z] → [FL, FR, RL, RR] rad/s). wheel_body_velocity 의 역 (2026-11-23 슬립 계수 η_s).
+  //   ω_i = (v_x ∓ v_y ∓ k ω_z)/r — amr_mpc/torque/model.py TorquePlant.Tinv 와 같다. drive_yaw 는 안 쓴다 (slip_logger λ 정의 그대로)
+  TVec4 wheel_nominal_speeds(const TVec3 & v) const
+  {
+    const double kk = k();
+    return TVec4(v(0) - v(1) - kk * v(2), v(0) + v(1) + kk * v(2), v(0) + v(1) - kk * v(2), v(0) - v(1) + kk * v(2)) / wheel_radius;
   }
   // G(θ) = M⁻¹ R(θ) (T⁻¹)ᵀ
   TMat34 G(double theta) const;
@@ -236,6 +253,39 @@ struct TorqueTuning
   double load_min_frac = 0.2;        // N_i ≥ 이 값 × 정지 N_i (바퀴가 뜨는 것까지는 안 본다)
   bool load_weighted_alloc = true;
   bool load_dynamic_cap = true;
+  // 2026-11-23 슬립 계수 η_s (머리주석). 상한에 곱하는 값은 set_slip_scale 로 (기본 1 = 예전 그대로)
+  bool slip_alloc = true;            // η_s < 1 인 바퀴가 있으면 U_s 를 η_s 로 가중 배분
+  double slip_alloc_floor = 0.05;    // 가중 배분에서 η_s 아래 한계
+};
+
+// 슬립 계수 η_s 계산 (머리주석 "슬립 계수 η_s"). ROS 무관 — 노드가 /wheel_states 마다 update 를 부른다
+struct SlipEtaParams
+{
+  double lambda_c = 0.15;            // η_s = 0.5 인 |λ̃|
+  double s = 0.017;                  // logistic 폭 (η 0.95 → 0.05 구간 = 2·ln19·s)
+  double fc = 10.0;                  // [Hz] 1 차 LPF 차단 주파수
+  double omega_eps = 2.5;            // [rad/s] λ 분모 아래 한계 (slip_logger omega_eps 와 같게)
+};
+
+class SlipEta
+{
+public:
+  explicit SlipEta(const SlipEtaParams & p);
+  // slip_logger.slip_ratio 와 같은 식 (4,)
+  static TVec4 slip_ratio(const TVec4 & omega, const TVec4 & omega_nom, double omega_eps);
+  static double eta_of(double lambda_f, double lambda_c, double s);
+  // omega: 바퀴 각속도, omega_nom: T⁻¹ v_body, valid[i] false 인 바퀴 (응답 없음·에러·NaN) 는 λ̃ 를 그대로 둔다. dt [s] (≤ 0 이면 0.01)
+  const TVec4 & update(const TVec4 & omega, const TVec4 & omega_nom, const bool valid[4], double dt);
+  void reset();
+  const TVec4 & lambda() const {return lam_;}      // 이번 원신호 λ (valid 아닌 바퀴는 직전 값)
+  const TVec4 & lambda_f() const {return lam_f_;}  // LPF 뒤 λ̃
+  const TVec4 & eta() const {return eta_;}
+  const SlipEtaParams & params() const {return p_;}
+
+private:
+  SlipEtaParams p_;
+  double tau_ = 0.0;
+  TVec4 lam_ = TVec4::Zero(), lam_f_ = TVec4::Zero(), eta_ = TVec4::Ones();
 };
 
 struct TorqueStepStats
@@ -270,6 +320,9 @@ public:
 
   // 상한을 밖에서 줄 때 (MTTE 등 바퀴별 온라인 상한용 자리). 음수면 모드에서 계산한 값
   void set_tau_bar_override(const TVec4 & tau_bar) {tau_bar_override_ = tau_bar;}
+  // 2026-11-23 슬립 계수 η_s (머리주석): 다음 step 의 상자 τ̄_i,j 에 곱한다. [0, 1] 로 자른다. 1 이면 예전 그대로
+  void set_slip_scale(const TVec4 & eta) {slip_scale_ = eta.cwiseMax(0.0).cwiseMin(1.0);}
+  const TVec4 & slip_scale() const {return slip_scale_;}
 
   TVec4 tau_bar() const;                          // 이번에 쓰는 토크 상한 (바퀴별)
   double dtau_bar_of(double tau_bar) const {return tu_.rate_fraction * tau_bar;}
@@ -318,6 +371,8 @@ private:
   void joint_kalman_update(const TVec6 & d_body, double theta);
   bool us_clipped_ = false;          // 직전 주기 U_s 를 target_projection 이 잘랐다 (= 기준이 상한 밖) — 포화 중 멈춤에 쓴다
   TVec4 tau_bar_override_ = TVec4::Constant(-1.0);
+  TVec4 slip_scale_ = TVec4::Ones();                    // 2026-11-23 η_s (다음 step 에 쓸 값)
+  TVec4 slip_scale_used_ = TVec4::Ones();               // 직전 step 이 쓴 η_s (포화 중 멈춤 판단은 tau_prev_ 와 같은 상자로)
   Eigen::Matrix<double, 4, Eigen::Dynamic> tb_steps_;   // 2026-11-23 지평 스텝별 상한 (하중 이동)
   TVec4 n_now_ = TVec4::Zero();                         // 스텝 0 의 바퀴별 수직력
   TMat34 F_ = TMat34::Zero();                           // force_map (가중 배분용)

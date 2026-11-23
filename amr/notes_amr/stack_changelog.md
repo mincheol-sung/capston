@@ -61,6 +61,30 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-23 (15) — 토크 MPC 슬립 계수 η_s: 바퀴별 상한 × 1/(1+exp((|λ̃|−0.15)/0.017)) (`slip_eta`, 기본 끔)
+- 왜: 11-23 교수님 회의 "η 토크 상한" (선택 기능) — μ_max 를 1.0 으로 풀고 바퀴별 현재 슬립으로 상한을 줄이는 피드백. 사용자 요청 "에타 있는 모드랑 없는 모드 구분".
+  곡선 값은 사용자 결정 10·15·20 % (η 0.95 / 0.5 / 0.05), ω_ε 2.5 고정, 10 Hz LPF — 근거 analysis/torque_mpc_real/2026-11-23_slip_lpf/RESULTS_KO.md 5~7 절
+  (실차 μ–λ 곡선이 λ̃ 0.125~0.175 에서 꺾이고, 이 곡선이면 상한에 붙을 때 평형 슬립 0.14~0.17).
+- 바꾼 파일:
+  - `mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp`, `src/torque_mpc.cpp` — 머리주석 "슬립 계수 η_s". `SlipEta` (λ = slip_logger 와 같은 식,
+    인과 1 차 LPF, logistic), `TorqueModel::wheel_nominal_speeds` (T⁻¹ v), `TorqueMPC::set_slip_scale`. step 에서 상자 τ̄_i,j 에 η_s,i 를 곱한다
+    (지평 모든 스텝, 하중 이동 dynamic_cap 에도). 변화율 Δτ̄ 는 곱하기 전 τ̄ 기준. η_s < 1 이면 U_s 를 min Σ (τ_i/(c_i η_s,i))² 로 가중 배분
+    (아래 한계 0.05). 포화 중 멈춤 (d̂) 은 직전 주기에 곱한 η_s 로 견준다. η_s = 1 이면 예전과 같은 해 (시험).
+  - `mpc_cpp/src/torque_mpc_node.cpp` — /wheel_states 를 늘 받는다 (예전: velocity_source wheels 일 때만). 바퀴 메시지마다 추정기 몸체 속도로 λ → λ̃ → η_s.
+    켜면 step 전에 set_slip_scale (바퀴 값이 wheel_timeout 넘게 묵으면 1). 새 토픽 `/torque_mpc/slip` = [t, 켬, λ×4, λ̃×4, 계산한 η_s×4, 곱한 η_s×4]
+    — 꺼도 계산한 값은 낸다 (켬/끔 판을 같은 지표로). CSV 끝에 eta_fl~rr. 기동 로그에 곡선 세 점, friction + μ̂ < 1 이면 경고.
+  - `mpc/config/torque_mpc.yaml` — 새 절 `slip_eta` (enable false, lambda_c 0.15, s 0.017, fc_hz 10, omega_eps 2.5, weighted_alloc, alloc_floor).
+  - `mpc/launch/torque_experiment.launch.py` — 인자 `slip_eta` (true/false), `slip_eta_lambda_c`, `slip_eta_s`. friction 인데 mu_hat_wheels:=off 가 없으면 안내.
+    PP 분기는 slip_eta 를 안 쓴다고 알린다. `real_all.launch.py` — _PASS 에 세 인자.
+  - `mpc_cpp/test/test_torque_mpc.cpp` — 곡선 세 점, slip_logger 와 같은 λ, LPF 계단·응답 없는 바퀴 유지, T⁻¹ 가 T 의 역, η_s 1 이면 같은 해·FL 0 이면 |τ_FL| 0 (fallback 없음)·U_s 같은 몸체 힘.
+    `mpc/test/test_launch_modes.py` — 인자 전달·amrall _PASS.
+- 쓰는 법 (회의 결정대로): `slip_eta:=true limit_mode:=friction mu_hat_wheels:=off mu_hat:=1.0` (+ 보상항 끄려면 friction_comp:=false). 끔 = 인자 없음 또는 slip_eta:=false.
+- 확인: colcon 빌드, gtest 50/50 (새 5), pytest test_launch_modes·test_estimator_tuning_args 통과.
+  시뮬 끔/켬 한 판씩 (analysis/torque_mpc_sim/2026-11-23_slip_eta_smoke/: C, μ_max 1.0, 시뮬 바닥 μ 0.3, 직선 앞 1.0 m/s a 3.0 — 견인보다 큰 요구):
+  노드 λ 와 slip_logger λ 의 백분위 차 0 (같은 정의), |τ| > 상자 0 회, QP fallback 0. λ̃ > 0.5 26.9 → 2.3 %, > 0.25 42.6 → 16.0 %,
+  대신 추종 오차 RMS 19.6 → 79.1 mm (최대 46 → 188), 주행 8.9 → 13.3 s, η_s 가 0.5 를 바퀴당 7.8 회/s 가로지름 (≈ 4 Hz 떨림, 틱간 Δτ RMS 0.0062 → 0.0199).
+  시뮬 바닥 (μN tanh) 은 peak 뒤 힘이 안 줄어 η_s 로 얻는 힘이 없다 — 이 판은 동작 확인용이고 성능 판단 아님.
+
 ### 2026-11-23 (14) — 비교군 세 개를 `controller:=` 하나로: `pp` (룩어헤드 고정) · `adpp` (어댑티브 PP, 속도 비례, 새 값) · `mpc`
 - 왜: 11-23 교수님 회의 결정 (비교군 = 룩어헤드 고정 PP · 어댑티브 PP · MPC). 기본 PP 는 11-20 (9) 부터 L_d 0.30 m 고정이라,
   예전 속도 비례 PP 는 `pp_lookahead_min:=0.15 pp_lookahead_max:=0.60` 을 손으로 붙여야 했다 (11-22·11-23 PP bag 은 모두 고정으로 돎).

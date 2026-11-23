@@ -510,9 +510,15 @@ def _nodes(context):
             if g(arg):
                 ctrl[par] = _truthy(g(arg))
         for arg, par in (("mpc_ff_normal_scale", "ff_normal_scale"), ("mpc_ff_normal_q", "ff_normal_q"),
-                         ("mpc_com_height", "load_com_height")):
+                         ("mpc_com_height", "load_com_height"),
+                         ("slip_eta_lambda_c", "slip_eta_lambda_c"), ("slip_eta_s", "slip_eta_s")):
             if g(arg):
                 ctrl[par] = float(g(arg))
+        if g("slip_eta"):                             # 2026-11-23 슬립 계수 η_s 켬/끔 (torque_mpc.yaml slip_eta)
+            ctrl["slip_eta_enable"] = _truthy(g("slip_eta"))
+            if ctrl["slip_eta_enable"] and (g("limit_mode") or "") == "friction" and (g("mu_hat_wheels") or "") != "off":
+                nodes.append(LogInfo(msg="slip_eta:=true 인데 mu_hat_wheels:=off 가 없다 — 바퀴별 μ̂ 상한에 η_s 를 곱한다. "
+                                         "회의 결정 (μ_max 1.0 + η_s) 이면 mu_hat_wheels:=off mu_hat:=1.0"))
         nodes.append(Node(
             package="amr_mpc_cpp", executable="torque_mpc_node", name="torque_mpc_node", output="screen",
             parameters=[ctrl]))
@@ -522,7 +528,7 @@ def _nodes(context):
         #   pp (= 예전 이름 pure_pursuit)  룩어헤드 고정 (pure_pursuit.lookahead_min = max = 0.30 m, 11-20 (9))
         #   adpp                          속도 비례 룩어헤드 (torque_baseline_a.yaml pure_pursuit_adaptive 세 값으로 덮어씀, 2026-11-23). 나머지는 같다
         ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "mu_hat_wheels", "ctrl_payload_kg",
-                               "log_prefix")
+                               "log_prefix", "slip_eta")
                    if g(k)]
         if ignored:
             nodes.append(LogInfo(msg=f"controller:={controller} — MPC 인자 {ignored} 는 쓰지 않는다 "
@@ -742,6 +748,11 @@ def generate_launch_description():
         A("mpc_load_dynamic_cap", default_value="", description="하중 이동: friction 상한을 지평 스텝마다 N_i 에 맞춤 true/false (비우면 load_transfer.dynamic_cap)"),
         A("sim_com_height", default_value="", description="시뮬 플랜트 하중 이동 무게중심 높이 [m] (비우면 0 = 정지 하중, 2026-11-23). 제어기 mpc_com_height 와 따로"),
         A("mpc_target_projection", default_value="", description="U_s 를 토크 상한 상자에 사영 true/false (비우면 torque_mpc.yaml feedforward.target_projection)"),
+        A("slip_eta", default_value="",
+          description="슬립 계수 η_s true/false — 바퀴별 상한 × 1/(1+exp((|λ̃|−λ_c)/s)) (비우면 torque_mpc.yaml slip_eta.enable = false). "
+                      "회의 결정대로면 mu_hat_wheels:=off mu_hat:=1.0 과 같이 (2026-11-23)"),
+        A("slip_eta_lambda_c", default_value="", description="η_s = 0.5 인 |λ̃| (비우면 torque_mpc.yaml slip_eta.lambda_c 0.15)"),
+        A("slip_eta_s", default_value="", description="η_s logistic 폭 s, 0.95→0.05 구간 = 2·ln19·s (비우면 slip_eta.s 0.017)"),
         A("mpc_ff_normal_scale", default_value="", description="구심 feedforward 계수 ρ 고정값 (비우면 torque_mpc.yaml feedforward.normal_scale, 1)"),
         A("mpc_ff_normal_estimate", default_value="", description="ρ 를 d̂ 와 결합 Kalman 으로 추정 true/false — mpc_dist_observer:=kalman 필요 (비우면 feedforward.normal_estimate)"),
         A("mpc_ff_normal_q", default_value="", description="η = 1 − ρ random walk 세기 [1/√s] (비우면 torque_mpc.yaml feedforward.normal_q)"),

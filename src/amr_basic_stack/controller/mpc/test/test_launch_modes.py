@@ -802,3 +802,26 @@ def test_real_all_passes_friction_comp():
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     assert "friction_comp" in m._PASS
+
+
+@pytest.mark.parametrize("given, expect", [
+    ({}, {}),                                                                   # 비우면 torque_mpc.yaml slip_eta (끔)
+    ({"slip_eta": "true"}, {"slip_eta_enable": True}),
+    ({"slip_eta": "false"}, {"slip_eta_enable": False}),
+    ({"slip_eta": "true", "slip_eta_lambda_c": "0.2", "slip_eta_s": "0.0167"},
+     {"slip_eta_enable": True, "slip_eta_lambda_c": 0.2, "slip_eta_s": 0.0167}),
+])
+def test_slip_eta_args(launch_mod, given, expect):
+    """2026-11-23 슬립 계수 η_s 켬/끔·곡선 덮어쓰기. amrall 도 같은 인자를 넘긴다."""
+    import yaml
+    _, _, out = build(launch_mod, **given)
+    txt = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v)) if isinstance(v, (tuple, list)) else v
+    p = {k: txt(v) for k, v in _node_params(out, "torque_mpc_node").items()}
+    for k, v in expect.items():
+        assert p[k] == (pytest.approx(v) if isinstance(v, float) else v)
+    if not given:
+        assert not any(k.startswith("slip_eta") for k in p)
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert {"slip_eta", "slip_eta_lambda_c", "slip_eta_s"} <= set(m._PASS)

@@ -1186,3 +1186,96 @@ TEST(TorqueMPC, LoadTransferWeightsTargetInputAndCaps)
   EXPECT_GT(cap(1, 0), off.tau_bar()(1));                           // 바깥은 는다
   EXPECT_LT((off.tau_bar_steps().col(0) - off.tau_bar()).cwiseAbs().maxCoeff(), 1e-12);   // 끄면 정지 상한 그대로
 }
+
+// ── 2026-11-23 슬립 계수 η_s (torque_mpc.hpp 머리주석) ──────────────
+// 10·15·20 %: s = 0.05/ln19 이면 η 0.95 at 0.10, 0.5 at 0.15, 0.05 at 0.20 (부호 무관)
+TEST(SlipEta, CurvePoints)
+{
+  const double s = 0.05 / std::log(19.0);
+  EXPECT_NEAR(SlipEta::eta_of(0.10, 0.15, s), 0.95, 1e-12);
+  EXPECT_NEAR(SlipEta::eta_of(0.15, 0.15, s), 0.5, 1e-12);
+  EXPECT_NEAR(SlipEta::eta_of(0.20, 0.15, s), 0.05, 1e-12);
+  EXPECT_NEAR(SlipEta::eta_of(-0.20, 0.15, s), 0.05, 1e-12);
+  EXPECT_NEAR(SlipEta::eta_of(0.0, 0.15, s), 1.0, 1e-3);
+  EXPECT_LT(SlipEta::eta_of(1.0, 0.15, s), 1e-20);
+}
+
+// slip_logger.slip_ratio 와 같은 값 (구동 +, 제동 −, 역회전 −2, 음의 방향, ω_ε 아래)
+TEST(SlipEta, SlipRatioMatchesLogger)
+{
+  const TVec4 l = SlipEta::slip_ratio(TVec4(12, 0, -10, -12), TVec4(10, 10, 10, -10), 2.5);
+  EXPECT_NEAR(l(0), 2.0 / 12.0, 1e-12);
+  EXPECT_NEAR(l(1), -1.0, 1e-12);
+  EXPECT_NEAR(l(2), -2.0, 1e-12);
+  EXPECT_NEAR(l(3), 2.0 / 12.0, 1e-12);
+  EXPECT_NEAR(SlipEta::slip_ratio(TVec4(0.5, 0, 0, 0), TVec4::Zero(), 2.5)(0), 0.2, 1e-12);   // 분모 ω_ε
+}
+
+// 1 차 LPF: λ 계단 0.5 에 y_n = 0.5 (1 − (1 − α)^n), α = Δt/(τ + Δt). valid 아닌 바퀴는 그대로
+TEST(SlipEta, LowPassStepAndInvalidHold)
+{
+  SlipEta se(SlipEtaParams{});
+  const double tau = 1.0 / (2.0 * M_PI * 10.0), a = 0.01 / (tau + 0.01);
+  const bool all[4] = {true, true, true, true};
+  const bool fr_bad[4] = {true, false, true, true};
+  const TVec4 om = TVec4::Constant(20.0), nom = TVec4::Constant(10.0);   // λ = 10/20 = 0.5
+  for (int n = 1; n <= 5; ++n) {
+    se.update(om, nom, n <= 2 ? all : fr_bad, 0.01);
+    EXPECT_NEAR(se.lambda_f()(0), 0.5 * (1.0 - std::pow(1.0 - a, n)), 1e-12) << n;
+  }
+  EXPECT_NEAR(se.lambda_f()(1), 0.5 * (1.0 - std::pow(1.0 - a, 2)), 1e-12);   // 3 번째부터 멈춤
+  EXPECT_NEAR(se.eta()(0), SlipEta::eta_of(se.lambda_f()(0), 0.15, 0.017), 1e-12);
+  se.reset();
+  EXPECT_EQ(se.eta(), TVec4::Ones());
+  EXPECT_THROW(SlipEta(SlipEtaParams{0.15, 0.0}), std::invalid_argument);
+}
+
+// ω_nom = T⁻¹ v 는 wheel_body_velocity (T) 의 역이고 Python TorquePlant.Tinv (k/r = 4.83) 와 같다
+TEST(TorqueModel, WheelNominalSpeedsInvertKinematics)
+{
+  TorqueModel md;
+  md.wheel_base = 0.1724; md.robot_width = 0.214;
+  const TVec3 v(0.7, -0.3, 1.2);
+  EXPECT_LT((md.wheel_body_velocity(md.wheel_nominal_speeds(v)) - v).cwiseAbs().maxCoeff(), 1e-12);
+  const TVec4 w = md.wheel_nominal_speeds(TVec3(0, 0, 1));
+  EXPECT_NEAR(w(0), -4.83, 1e-12);
+  EXPECT_NEAR(w(1), 4.83, 1e-12);
+  EXPECT_NEAR(w(2), -4.83, 1e-12);
+  EXPECT_NEAR(w(3), 4.83, 1e-12);
+}
+
+// η_s = 1 이면 예전과 같은 해, η_s,FL = 0 이면 그 주기 |τ_FL| = 0 (변화율보다 상자 우선, QP 성공) 이고
+// U_s 는 같은 몸체 힘을 나머지 세 바퀴로 (가중 배분)
+TEST(TorqueMPC, SlipScaleCapsWheelAndShiftsTarget)
+{
+  TorqueModel md;
+  md.mass = 4.56; md.wheel_base = 0.1724; md.robot_width = 0.214;
+  md.mu_hat = 1.0;
+  TorqueTuning tu;
+  tu.limit_mode = TorqueLimitMode::Friction;
+  const double R = 0.6, v = 0.8;
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= tu.Np; ++j) {ref.push_back(circle(R, v, j * tu.Ts));}
+  TVec6 x;
+  x << 0.01, -0.01, 0.0, 0.5, 0.0, v / R;          // 기준보다 느리다 → 가속 토크
+  TorqueMPC a(md, tu), b(md, tu);
+  b.set_slip_scale(TVec4::Ones());
+  for (int k = 0; k < 5; ++k) {
+    const TVec4 ta = a.step(x, ref), tb = b.step(x, ref);
+    EXPECT_LT((ta - tb).cwiseAbs().maxCoeff(), 1e-12);
+  }
+  const TVec4 before = b.tau_prev();
+  ASSERT_GT(std::abs(before(0)), 0.05);
+  const TVec4 us_a = a.target_input().head<4>();
+  b.set_slip_scale(TVec4(0.0, 1.0, 1.0, 1.0));
+  const TVec4 t1 = b.step(x, ref);
+  a.step(x, ref);
+  EXPECT_EQ(b.stats().fallback, 0);
+  EXPECT_LE(std::abs(t1(0)), 1e-9);
+  EXPECT_LE(b.tau_bar_steps().col(0)(0), 1e-12);
+  EXPECT_NEAR(b.tau_bar_steps().col(0)(1), b.tau_bar()(1), 1e-12);
+  const TMat34 F = md.force_map();
+  const TVec4 us_b = b.target_input().head<4>();
+  EXPECT_LT((F * us_a - F * us_b).cwiseAbs().maxCoeff(), 1e-9);    // 같은 몸체 힘
+  EXPECT_LT(std::abs(us_b(0)), 0.01 * std::abs(us_a(0)) + 1e-9);   // FL 몫은 floor² 만큼만
+}

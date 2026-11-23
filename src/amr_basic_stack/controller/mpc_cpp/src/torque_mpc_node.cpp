@@ -2,7 +2,8 @@
 // ---------------------------------------------------------------
 //   reference_topic   PlanarReferenceArray   기준열 (figure8_reference_node, 10 Hz, 0.05 s × 80 — torque_track.yaml)
 //   state_topic       nav_msgs/Odometry      상태 추정값 x̂.  pose = map 좌표 [x, y, yaw],  twist = 몸체 [v_x, v_y, ω_z]
-//   /wheel_states     WheelStates            velocity_source:=wheels 일 때만 (2026-11-18). 몸체 v_x·v_y 를 바퀴 기구학 T ω 로 바꾼다.
+//   /wheel_states     WheelStates            늘 받는다 (2026-11-23 슬립 계수 η_s — 켜지 않아도 λ̃·η_s 를 /torque_mpc/slip 에 기록).
+//                                            velocity_source:=wheels 면 (2026-11-18) 몸체 v_x·v_y 를 바퀴 기구학 T ω 로 바꾼다.
 //                                            ω_z 는 추정기 값(자이로) 그대로. 실차 bag 에서 추정기 v_x 가 바퀴보다 90~120 ms 늦었다.
 //                                            바퀴 값이 wheel_timeout 보다 오래되면 그 주기는 추정기 속도로 (로그).
 //      ↓ ReferenceHorizon 보간 (Ts 격자, Np+1 점) → TorqueMPC (DAQP)
@@ -244,6 +245,18 @@ public:
       tu.ff_normal_P0 = declare_parameter<double>("ff_normal_P0", yf ? yf["normal_P0"].as<double>(0.04) : 0.04);
       tu.ff_normal_x_min = declare_parameter<double>("ff_normal_x_min", yf ? yf["normal_x_min"].as<double>(0.3) : 0.3);
     }
+    amr_mpc_cpp::SlipEtaParams sp;
+    {   // 2026-11-23 슬립 계수 η_s (torque_mpc.hpp 머리주석). yaml slip_eta 절이 없으면 끔. 꺼도 λ̃·η_s 는 계산해 /torque_mpc/slip 에 낸다
+      const auto ye = ym["slip_eta"];
+      slip_on_ = declare_parameter<bool>("slip_eta_enable", ye ? ye["enable"].as<bool>(false) : false);
+      sp.lambda_c = declare_parameter<double>("slip_eta_lambda_c", ye ? ye["lambda_c"].as<double>(sp.lambda_c) : sp.lambda_c);
+      sp.s = declare_parameter<double>("slip_eta_s", ye ? ye["s"].as<double>(sp.s) : sp.s);
+      sp.fc = declare_parameter<double>("slip_eta_fc", ye ? ye["fc_hz"].as<double>(sp.fc) : sp.fc);
+      sp.omega_eps = declare_parameter<double>("slip_eta_omega_eps", ye ? ye["omega_eps"].as<double>(sp.omega_eps) : sp.omega_eps);
+      tu.slip_alloc = declare_parameter<bool>("slip_eta_alloc", ye ? ye["weighted_alloc"].as<bool>(true) : true);
+      tu.slip_alloc_floor = declare_parameter<double>("slip_eta_alloc_floor", ye ? ye["alloc_floor"].as<double>(0.05) : 0.05);
+    }
+    slip_.emplace(sp);
     mpc_ = std::make_unique<TorqueMPC>(md, tu);
 
     const auto ref_topic = declare_parameter<std::string>("reference_topic", "/dra_mppi/reference_trajectory");
@@ -283,17 +296,14 @@ public:
     pub_status_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/status", 10);
     pub_adapt_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/adapt", 10);
     pub_load_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/load", 10);
+    pub_slip_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/slip", 10);
     sub_state_ = create_subscription<nav_msgs::msg::Odometry>(
       state_topic, 20, [this](nav_msgs::msg::Odometry::ConstSharedPtr m) {on_state(*m);});
     sub_ref_ = create_subscription<amr_interfaces::msg::PlanarReferenceArray>(
       ref_topic, 5, [this](amr_interfaces::msg::PlanarReferenceArray::ConstSharedPtr m) {on_ref(*m);});
-    if (velocity_source_ == "wheels") {
-      sub_wheels_ = create_subscription<amr_interfaces::msg::WheelStates>(
-        wheel_topic, 20, [this](amr_interfaces::msg::WheelStates::ConstSharedPtr m) {
-          wheel_v_ = mpc_->model().wheel_body_velocity(TVec4(m->velocity[0], m->velocity[1], m->velocity[2], m->velocity[3]));
-          wheel_rx_ = now_s();
-        });
-    }
+    // 바퀴 상태: velocity_source wheels 의 몸체 속도 + 슬립 계수 η_s (2026-11-23 — η_s 를 꺼도 기록용으로 늘 받는다)
+    sub_wheels_ = create_subscription<amr_interfaces::msg::WheelStates>(
+      wheel_topic, 20, [this](amr_interfaces::msg::WheelStates::ConstSharedPtr m) {on_wheels(*m);});
     if (armed_topic.empty()) {
       armed_ = true;
       RCLCPP_WARN(get_logger(), "armed_topic 이 비어 있다 — 게이트 무장 여부를 보지 않고 바로 푼다 (단독 시험 전용)");
@@ -376,6 +386,21 @@ public:
         md.drive_yaw * 180.0 / M_PI, md.slip_coef * 180.0 / M_PI, md.slip_ac_max,
         velocity_source_ == "wheels" ? "" : "  — velocity_source 가 wheels 가 아니라 엔코더 속도 보정은 안 쓰인다");
     }
+    {
+      const auto & p = slip_->params();
+      const double l19 = std::log(19.0) * p.s;
+      RCLCPP_INFO(
+        get_logger(), "  슬립 계수 η_s %s: λ̃ = %.0f Hz LPF(λ, ω_ε %.1f rad/s), η_s = 1/(1+exp((|λ̃| − %.3f)/%.4f)) — 0.95 at %.3f, 0.5 at %.3f, "
+        "0.05 at %.3f%s → /torque_mpc/slip", slip_on_ ? "켬 (상한 τ̄_i × η_s,i)" : "끔 (계산·기록만)", p.fc, p.omega_eps,
+        p.lambda_c, p.s, p.lambda_c - l19, p.lambda_c, p.lambda_c + l19,
+        slip_on_ ? (tu.slip_alloc ? ", U_s 도 η_s 가중 배분" : ", U_s 배분은 그대로") : "");
+      if (slip_on_ && limit_mode_ == "friction" && ((md.mu_hat_wheels.array() > 0.0).any() || md.mu_hat < 0.99)) {
+        const std::string which = (md.mu_hat_wheels.array() > 0.0).any() ? std::string("바퀴별") : std::to_string(md.mu_hat);
+        RCLCPP_WARN(
+          get_logger(), "  η_s 를 켰는데 friction 상한이 μ̂ %s 그대로다 — 회의 결정은 μ_max 1.0 으로 풀고 η_s 를 곱하는 것 "
+          "(launch mu_hat_wheels:=off mu_hat:=1.0)", which.c_str());
+      }
+    }
     RCLCPP_INFO(
       get_logger(), "  선형화 %s (%s)", linearization_.c_str(),
       tu.linearization == amr_mpc_cpp::TorqueLinearization::CurrentState ?
@@ -391,7 +416,7 @@ public:
     std::ofstream f(csv_path_);
     f.precision(15);
     f << "t,x,y,th,xd,yd,thd,xr,yr,thr,ex,ey,eth,tau_fl,tau_fr,tau_rl,tau_rr,tau_bar,active,qp_iters,fallback,"
-      "step_ms,ref_age,d_x,d_y,d_th,d_xd,d_yd,d_thd\n";
+      "step_ms,ref_age,d_x,d_y,d_th,d_xd,d_yd,d_thd,eta_fl,eta_fr,eta_rl,eta_rr\n";   // eta_*: 상한에 곱한 η_s (끄면 1)
     double se = 0.0, emax = 0.0, step_sum = 0.0, step_max = 0.0;
     for (const auto & r : rows_) {
       for (size_t i = 0; i < r.size(); ++i) {f << (i ? "," : "") << r[i];}
@@ -454,6 +479,28 @@ private:
     mpc_->reset();
   }
 
+  // /wheel_states: velocity_source wheels 면 몸체 속도 T ω, 그리고 슬립 계수 η_s 갱신 (2026-11-23).
+  //   λ 는 slip_logger 와 같게 — 이 바퀴 메시지와 가장 최근 추정기 몸체 속도 (est_vb_, 바퀴로 바꾸기 전). 응답 없음·에러 바퀴는 λ̃ 를 그대로 둔다
+  void on_wheels(const amr_interfaces::msg::WheelStates & m)
+  {
+    const TVec4 om(m.velocity[0], m.velocity[1], m.velocity[2], m.velocity[3]);
+    const double now = now_s();
+    if (velocity_source_ == "wheels") {
+      wheel_v_ = mpc_->model().wheel_body_velocity(om);
+      wheel_rx_ = now;
+    }
+    if (est_rx_ <= 0.0) {return;}
+    const double st = rclcpp::Time(m.header.stamp).seconds();
+    const double t = st > 0.0 ? st : now;
+    bool valid[4];
+    for (int i = 0; i < 4; ++i) {
+      valid[i] = (m.fresh.size() != 4 || m.fresh[i]) && (m.error.size() != 4 || m.error[i] == 0) && std::isfinite(om(i));
+    }
+    slip_->update(om, mpc_->model().wheel_nominal_speeds(est_vb_), valid, slip_t_ > 0.0 ? t - slip_t_ : -1.0);
+    slip_t_ = t;
+    slip_rx_ = now;
+  }
+
   // 상태가 끊기면 on_state 가 불리지 않으므로 여기서 정지 명령을 계속 낸다
   void on_watchdog()
   {
@@ -492,6 +539,8 @@ private:
     const auto & p = m.pose.pose;
     const double yaw = yaw_of(p.orientation);
     TVec3 vb(m.twist.twist.linear.x, m.twist.twist.linear.y, m.twist.twist.angular.z);
+    est_vb_ = vb;                            // 슬립 계수 η_s 의 기준 속도 (추정기 그대로, 2026-11-23)
+    est_rx_ = now;
     if (velocity_source_ == "wheels") {      // 몸체 v_x·v_y 만 바퀴 기구학으로 (ω_z 는 추정기 = 자이로)
       if (wheel_rx_ > 0.0 && now - wheel_rx_ <= wheel_timeout_) {
         // 2026-11-23 구동계 방향 보정: R(δ0 + c·a_c), a_c = |v|·ω_z (ω_z = 추정기 = 자이로). drive 값이 0 이면 그대로
@@ -573,6 +622,14 @@ private:
       };
       for (int j = 0; j < mpc_->tuning().Nc; ++j) {acc_ref_[j] = (inertial(hi[j]) - inertial(lo[j])) / acc_dt_;}
     }
+    if (slip_on_) {          // 2026-11-23 슬립 계수 η_s: 바퀴 값이 묵으면 깎지 않는다 (η_s 1)
+      const bool fresh = slip_rx_ > 0.0 && now - slip_rx_ <= wheel_timeout_;
+      mpc_->set_slip_scale(fresh ? slip_->eta() : TVec4::Ones());
+      if (!fresh) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "η_s: 바퀴 상태 %.0f ms 묵음 — 이 주기는 η_s 1",
+          slip_rx_ > 0.0 ? (now - slip_rx_) * 1e3 : -1.0);
+      }
+    }
     const TVec4 tau = mpc_->step(x, hz, &acc_ref_, dt_state);
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_c).count();
     publish_torque(tau, m.header.stamp);
@@ -584,11 +641,12 @@ private:
     const double ref_age = t_state - ref_->t0();
     const TVec6 & d = mpc_->d_hat();
     if (!csv_path_.empty()) {
+      const TVec4 & es = mpc_->slip_scale();
       rows_.push_back(
         {t_state, x(0), x(1), x(2), x(3), x(4), x(5), Xr(0), Xr(1), Xr(2), Xe(0), Xe(1), Xe(2),
           tau(0), tau(1), tau(2), tau(3), mpc_->tau_bar().maxCoeff(), static_cast<double>(stt.active),
           static_cast<double>(stt.iters), static_cast<double>(stt.fallback), ms, ref_age,
-          d(0), d(1), d(2), d(3), d(4), d(5)});
+          d(0), d(1), d(2), d(3), d(4), d(5), es(0), es(1), es(2), es(3)});
     }
     if (debug_) {
       TVec4 us = TVec4::Zero();                         // 이번 주기 목표 입력 U_s,0 (식-14, 지평 첫 스텝)
@@ -640,6 +698,13 @@ private:
     const auto & tbs = mpc_->tau_bar_steps();
     l.data = {now, nn(0), nn(1), nn(2), nn(3), tbs(0, 0), tbs(1, 0), tbs(2, 0), tbs(3, 0)};
     pub_load_->publish(l);
+    // 2026-11-23 /torque_mpc/slip = [t, 켬 0/1, λ×4, λ̃×4, 계산한 η_s×4, 상한에 곱한 η_s×4] (바퀴 FL FR RL RR).
+    //   끄면 "계산한 η_s" 는 켰을 때 곱했을 값, "곱한 η_s" 는 1 — 켬/끔 판을 같은 지표로 견준다
+    std_msgs::msg::Float64MultiArray sl;
+    const TVec4 & lr = slip_->lambda(), & lf = slip_->lambda_f(), & ec = slip_->eta(), & ea = mpc_->slip_scale();
+    sl.data = {now, slip_on_ ? 1.0 : 0.0, lr(0), lr(1), lr(2), lr(3), lf(0), lf(1), lf(2), lf(3),
+      ec(0), ec(1), ec(2), ec(3), ea(0), ea(1), ea(2), ea(3)};
+    pub_slip_->publish(sl);
   }
 
   std::unique_ptr<TorqueMPC> mpc_;
@@ -653,6 +718,12 @@ private:
   TVec3 wheel_v_ = TVec3::Zero();
   long wheel_fallback_ = 0;
   rclcpp::Subscription<amr_interfaces::msg::WheelStates>::SharedPtr sub_wheels_;
+  // 2026-11-23 슬립 계수 η_s
+  std::optional<amr_mpc_cpp::SlipEta> slip_;
+  bool slip_on_ = false;
+  TVec3 est_vb_ = TVec3::Zero();
+  double est_rx_ = 0.0, slip_rx_ = 0.0, slip_t_ = 0.0;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_slip_;
   double last_state_rx_ = 0.0, last_state_stamp_ = 0.0, ref_rx_ = 0.0, armed_since_ = 0.0;
   double state_timeout_ = 0.3, ref_timeout_ = 0.5, hold_stopped_speed_ = 0.04;
   double acc_dt_ = 0.2;

@@ -1,0 +1,111 @@
+2026-11-21/183827 C  square a1.5 vmax1.5  41.2 13.7
+2026-11-21/184008 PP 고정 0.30(기본) square a1.5 vmax1.5  67.3 49.5
+2026-11-21/190553 C  square a1.5 vmax1.5  47.1 21.1
+2026-11-21/192116 PP 고정 0.30(기본) square a1.5 vmax1.5  54.6 36.4
+2026-11-21/192220 C  square a1.5 vmax1.5  35.5 18.5
+2026-11-21/192323 PP 비례 0.15~0.60 square a1.5 vmax1.5  60.7 34.3
+2026-11-21/192457 C  square a1.5 vmax1.5  37.8 16.0
+2026-11-21/192815 PP 고정 0.30(기본) square a1.5 vmax1.5  55.1 40.4
+2026-11-21/194225 PP 비례 0.15~0.60 square a1.5 vmax1.5  54.6 38.4
+2026-11-21/195636 C  square a1.5 vmax1.5  40.9 17.7
+2026-11-21/200303 C  circles8 v1.1  84.1 80.6
+2026-11-21/200720 PP 고정 0.30(기본) circles8 v1.1  70.0 33.9
+2026-11-21/200944 PP 고정 0.30(기본) circles8 v[0.43,0.61,0.8]  60.1 21.9
+2026-11-21/201047 C  circles8 v[0.43,0.61,0.8]  84.2 55.3
+2026-11-21/201411 C  square a1.5 vmax1.5  42.6 17.8
+2026-11-21/201751 C  circles8 v[0.43,0.61,0.8]  81.0 50.5
+2026-11-21/201947 C  circles8 v[0.43,0.61,0.8]  78.4 48.8
+2026-11-21/203133 C  circles8 v[0.43,0.61,0.8]  76.3 41.6
+2026-11-21/204329 PP 고정 0.30(기본) circles8 v[0.43,0.61,0.8]  15.7 1.1
+2026-11-21/204536 C  circles8 v[0.43,0.61,0.8]  22.0 4.2
+2026-11-21/205044 C  circles8 v[0.43,0.61,0.8] disturbance 72.1 38.4
+2026-11-21/205817 C  circles8 v[0.43,0.61,0.8] disturbance 79.7 44.7
+2026-11-21/205937 PP 고정 0.30(기본) circles8 v[0.43,0.61,0.8]  57.5 20.2
+2026-11-21/210248 C  circles8 v[0.43,0.61,0.8] disturbance 78.1 41.3
+2026-11-21/210424 PP 고정 0.30(기본) circles8 v[0.43,0.61,0.8]  57.9 20.0
+2026-11-21/210536 C  circles8 v[0.43,0.61,0.8] disturbance 81.9 45.0
+2026-11-21/210648 PP 고정 0.30(기본) circles8 v[0.43,0.61,0.8]  52.8 20.2
+2026-11-21/211454 C  circles8 v[0.43,0.61,0.8] disturbance 80.2 47.0
+2026-11-21/211616 PP 고정 0.30(기본) circles8 v[0.43,0.61,0.8]  59.0 19.3
+2026-11-21/212105 C  circles8 v[0.43,0.61,0.8] disturbance 78.4 43.6
+2026-11-21/212502 C  circles8 v[0.43,0.61,0.8] disturbance 18.8 3.4
+2026-11-21/212629 PP 고정 0.30(기본) circles8 v[0.43,0.61,0.8]  12.3 0.0
+2026-11-21/213246 C  circles8 v[0.43,0.61,0.8] disturbance 27.0 6.3
+2026-11-21/213603 C  circles8 v[0.43,0.61,0.8] wheels 78.4 35.7
+2026-11-21/213847 C  circles8 v[0.43,0.61,0.8] disturbance,wheels 18.0 2.5
+2026-11-21/220123 PP 고정 0.30(기본) line dir0 v1.0 a2.5  91.7 60.7
+2026-11-21/220252 PP 고정 0.30(기본) line dir0 v1.0 a2.5  55.9 33.7
+2026-11-21/220348 PP 고정 0.30(기본) line dir0 v1.0 a3.0  73.3 36.7
+2026-11-21/220525 PP 고정 0.30(기본) line dir0 v1.0 a4.0  61.4 49.5
+2026-11-21/220900 PP 고정 0.30(기본) line dir0 v1.0 a5.0  62.3 51.2
+2026-11-21/221621 PP 고정 0.30(기본) line dir0 v1.0 a1.5  40.7 20.6
+2026-11-21/223053 C  line dir0 v1.0 a3.0  60.7 28.0
+2026-11-21/225012 C  circles8 v0.7  25.1 3.5
+2026-11-21/225104 C  circles8 v0.7  28.2 3.8
+2026-11-21/225157 C  circles8 v0.7  31.9 8.2
+2026-11-21/225302 C  circles8 v0.7  29.9 6.9
+2026-11-21/225349 C  circles8 v0.7  39.5 8.9
+2026-11-21/225435 C  circles8 v0.7  35.2 10.8
+2026-11-21/230443 C  line dir0 v1.0 a3.0  40.8 20.9
+2026-11-21/231430 C  line dir0 v1.0 a3.0  55.1 9.7
+2026-11-21/233612 C  line dir0 v1.0 a5.0 slip_guard 50.0 17.3
+2026-11-21/233706 C  line dir0 v1.0 a5.0 slip_guard 67.5 35.4
+2026-11-21/234437 C  line dir0 v1.0 a5.0 slip_guard 75.3 28.3
+2026-11-21/235317 C  circles8 v[0.43,0.61,0.8] slip_guard 82.4 47.3
+2026-11-21/235437 C  circles8 v[0.43,0.61,0.8]  89.4 54.7
+2026-11-21/235535 C  circles8 v[0.43,0.61,0.8] slip_guard 86.6 55.4
+2026-11-21/235642 C  circles8 v[0.43,0.61,0.8]  85.5 52.3
+2026-11-21/235749 C  circles8 v[0.43,0.61,0.8] slip_guard 80.3 44.6
+2026-11-21/235852 C  circles8 v[0.43,0.61,0.8]  83.9 53.3
+2026-11-22/000545 C  circles8 v[0.43,0.61,0.8] slip_guard,disturbance,wheels 77.2 40.3
+2026-11-22/002707 C  circles8 v0.6 변조0.5si slip_guard,disturbance,wheels 21.6 2.5
+2026-11-22/002822 PP 고정 0.30(기본) circles8 v0.6 변조0.5si  17.6 1.9
+2026-11-22/002931 C  circles8 v0.6 변조0.5si slip_guard,disturbance,wheels 20.1 3.4
+2026-11-22/003041 PP 고정 0.30(기본) circles8 v0.6 변조0.5si  17.8 3.1
+2026-11-22/003146 C  circles8 v0.6 변조0.5si slip_guard,disturbance,wheels 20.4 3.9
+2026-11-22/003451 PP 고정 0.30(기본) circles8 v0.6 변조0.5si  16.1 0.6
+2026-11-22/201610 C  line dir90 v0.3 a?  43.5 22.2
+2026-11-22/202238 C  line dir90 v0.3 a?  25.3 3.1
+2026-11-22/204801 C  line dir90 v0.3 a?  28.8 4.4
+2026-11-22/205437 C  circles8 v0.7  26.5 3.7
+2026-11-22/212703 C  circles8 v0.6 변조0.5si  27.4 5.3
+2026-11-22/212837 PP 고정 0.30(기본) circles8 v0.6 변조0.5si  17.9 2.4
+2026-11-23/114214 C  square a1.5 vmax1.5 slip_guard,disturbance,wheels 41.6 18.1
+2026-11-23/114314 C  circles8 v0.6 변조0.5si slip_guard,disturbance,wheels 19.3 1.0
+2026-11-23/114459 PP 고정 0.30(기본) circles8 v0.6 변조0.5si  16.7 1.5
+2026-11-23/114635 C  circles8 v0.6 변조0.5si slip_guard,disturbance,wheels 18.9 1.8
+2026-11-23/115407 C  circles8 v0.65 변조0.5si slip_guard,disturbance,wheels 29.2 6.0
+2026-11-23/115556 PP 고정 0.30(기본) circles8 v0.65 변조0.5si  20.3 2.4
+2026-11-23/120345 C  circles8 vmax 변조0.5si slip_guard,disturbance,wheels 17.6 5.3
+2026-11-23/120544 PP 고정 0.30(기본) circles8 vmax 변조0.5si  8.4 0.0
+2026-11-23/121319 C  square amax vmax? slip_guard,disturbance,wheels 46.1 15.2
+2026-11-23/121404 PP 고정 0.30(기본) square amax vmax?  68.9 45.4
+2026-11-23/143041 C  square amax vmax? slip_guard,disturbance,wheels 50.6 25.4
+2026-11-23/144243 C  circles8 vmax 변조0.5si slip_guard,disturbance,wheels 12.5 3.0
+2026-11-23/144409 PP 고정 0.30(기본) square amax vmax?  57.8 52.9
+2026-11-23/144542 PP 고정 0.30(기본) circles8 vmax 변조0.5si  11.1 0.2
+2026-11-23/151038 C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels 57.0 22.2
+2026-11-23/151249 PP 고정 0.30(기본) circles8 v0.69 변조0.5sq  54.4 23.3
+2026-11-23/154431 C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.2 59.6 21.9
+2026-11-23/155643_h010 C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.10 64.4 26.0
+2026-11-23/155956_h015 C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.15 55.7 22.1
+2026-11-23/160137_h000 C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.0 49.1 24.2
+2026-11-23/160416_h020b C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.20 52.0 15.5
+2026-11-23/160536_h015b C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.15 62.1 23.7
+2026-11-23/160715_h025 C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.25 49.7 14.4
+2026-11-23/160843_h000c C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.0 44.7 23.7
+2026-11-23/161024_h010b C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.10 61.8 28.2
+2026-11-23/161137_h025b C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.25 63.1 19.6
+2026-11-23/161250_h020c C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.20 63.1 18.9
+2026-11-23/161536_h015c C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.15 56.1 25.2
+2026-11-23/161649_h020nd C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.20 54.1 24.2
+2026-11-23/161802_ppb PP 고정 0.30(기본) circles8 v0.69 변조0.5sq  50.7 17.6
+2026-11-23/162745_h020nod C  circles8 v0.69 변조0.5sq slip_guard,wheels,h0.20 58.8 20.0
+2026-11-23/162858_h020nodb C  circles8 v0.69 변조0.5sq slip_guard,wheels,h0.20 60.7 17.1
+2026-11-23/163519_f_c020 C  circles8 vmax 변조0.5sq slip_guard,disturbance,wheels,h0.20 34.5 4.3
+2026-11-23/163644_f_pp PP 고정 0.30(기본) circles8 vmax 변조0.5sq  27.2 2.3
+2026-11-23/171926_pf_c C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.2,pfl0.05 58.8 20.2
+2026-11-23/172102_pf_pp PP 고정 0.30(기본) circles8 v0.69 변조0.5sq pfl0.05 57.0 27.5
+2026-11-23/172237_pf_c C  circles8 v0.69 변조0.5sq slip_guard,disturbance,wheels,h0.2,pfl0.05 55.7 13.9
+
+판 109 개 → runs.csv, summary.md

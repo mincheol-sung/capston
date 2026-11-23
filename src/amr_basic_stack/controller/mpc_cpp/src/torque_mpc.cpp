@@ -234,6 +234,9 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
   if (!(tu_.load_com_height >= 0.0 && tu_.load_min_frac > 0.0 && tu_.load_min_frac <= 1.0)) {
     throw std::invalid_argument("load_transfer: com_height ≥ 0, 0 < min_frac ≤ 1 이어야 한다");
   }
+  if (!(tu_.slip_alloc_floor > 0.0 && tu_.slip_alloc_floor <= 1.0)) {
+    throw std::invalid_argument("slip_alloc_floor 는 0 < 값 ≤ 1 (가중 배분에서 η_s 아래 한계)");
+  }
   tb_steps_.setZero(4, tu_.Nc);
   if (tu_.dist_kalman) {         // 축별 정상상태 Kalman 이득 (머리주석 "외란 관측기 이득")
     if (!((tu_.dist_kq.array() > 0.0).all() && (tu_.dist_kr_pos.array() > 0.0).all() && (tu_.dist_kr_vel.array() > 0.0).all())) {
@@ -334,7 +337,7 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat, double dt_state)
   }
   // 포화 중 갱신 멈춤 (2026-11-21, 머리주석): 직전에 낸 τ 가 상한에 붙었거나 목표 입력이 상한 밖이면 잔차가 "못 낸 힘" 을 담는다
   if (tu_.dist_freeze_on_sat) {
-    const TVec4 tb = tau_bar();
+    const TVec4 tb = tau_bar().cwiseProduct(slip_scale_used_);   // 2026-11-23 η_s: tau_prev_ 를 낸 상자 (η_s 1 이면 예전 그대로)
     const TVec4 tp = ground_ ? TVec4(P_ground_ * tau_prev_) : tau_prev_;          // 바닥 토크 상한이면 바닥 몫으로 견준다
     const TVec4 us0 = Us_.size() >= 4 ? (ground_ ? TVec4(P_ground_ * Us_.head<4>()) : TVec4(Us_.head<4>())) : TVec4::Zero();
     const bool sat = (tp.cwiseAbs().array() >= 0.98 * tb.array()).any() || us_clipped_ ||
@@ -514,9 +517,13 @@ TVec4 TorqueMPC::step(
   auto d_at = [this](double th) -> TVec6 {return tu_.dist_enable ? d_hat_world(th) : TVec6::Zero();};
   const Eigen::Matrix3d Mdiag = TVec3(md_.m_eff(), md_.m_eff(), md_.I_eff()).asDiagonal();
   const TVec4 tb_now = tau_bar();
+  // 2026-11-23 슬립 계수 η_s (머리주석): 상자에만 곱한다 (변화율은 tb_now 기준). 1 이면 예전 그대로
+  const TVec4 eta_s = slip_scale_;
+  const bool slip_w = tu_.slip_alloc && (eta_s.array() < 1.0 - 1e-9).any();
+  const TVec4 eta_w = eta_s.cwiseMax(tu_.slip_alloc_floor);
   // 2026-11-23 하중 이동 (TorqueTuning load_*): 기본은 열마다 tb_now, 켜면 아래 지평 루프에서 스텝마다 바꾼다
   tb_steps_.resize(4, Nc);
-  tb_steps_.colwise() = tb_now;
+  tb_steps_.colwise() = tb_now.cwiseProduct(eta_s);
   const bool load_on = tu_.load_com_height > 0.0;
   const TVec4 n0 = md_.wheel_normal_forces(0.0, 0.0, 0.0, 1.0);
   const TVec4 tf0 = md_.tau_friction_limits();
@@ -581,18 +588,20 @@ TVec4 TorqueMPC::step(
       // 식-14 목표 입력: U_s,i = F⁺ R(θ_r,i)ᵀ M (p̈_r,i − w_i − â_d − a_ρ)
       const TVec3 rhs = Mdiag * (acc - md_.w(Xdot_r) - a_d - a_rho);
       const TVec3 rb(c * rhs(0) + s * rhs(1), -s * rhs(0) + c * rhs(1), rhs(2));   // R(θ_r)ᵀ
+      TVec4 cw = TVec4::Ones();          // 배분 가중 c_i (가중이 없으면 최소 노름 F⁺)
+      bool weighted = false;
       if (load_on) {
         // 하중 이동: 기준 관성 가속도의 몸체 성분 → N_i,j. 상한 τ̄ ∝ μ̂_i N_i 를 N_i,j/N_i,0 배, 배분 가중 c_i = 그 마찰 한계
         const TVec4 nj = md_.wheel_normal_forces(c * acc(0) + s * acc(1), -s * acc(0) + c * acc(1), tu_.load_com_height, tu_.load_min_frac);
         const TVec4 cap = tf0.cwiseProduct(nj.cwiseQuotient(n0));
         if (i == 0) {n_now_ = nj;}
-        if (cap_dyn) {tb_steps_.col(i) = cap.cwiseMin(md_.tau_motor_limit());}
-        if (tu_.load_weighted_alloc) {     // min Σ (τ_q / cap_q)²  s.t. F τ = rb  →  τ = W⁻¹Fᵀ (F W⁻¹ Fᵀ)⁻¹ rb,  W⁻¹ = diag(cap²)
-          const Eigen::Matrix<double, 4, 3> WiFt = cap.cwiseProduct(cap).asDiagonal() * F_.transpose();
-          Us_.segment<4>(4 * i) = WiFt * (F_ * WiFt).inverse() * rb;
-        } else {
-          Us_.segment<4>(4 * i) = F_pinv_ * rb;
-        }
+        if (cap_dyn) {tb_steps_.col(i) = cap.cwiseMin(md_.tau_motor_limit()).cwiseProduct(eta_s);}
+        if (tu_.load_weighted_alloc) {cw = cap; weighted = true;}
+      }
+      if (slip_w) {cw = cw.cwiseProduct(eta_w); weighted = true;}   // 2026-11-23 η_s: 미끄러지는 바퀴 몫을 나머지로
+      if (weighted) {     // min Σ (τ_q / c_q)²  s.t. F τ = rb  →  τ = W⁻¹Fᵀ (F W⁻¹ Fᵀ)⁻¹ rb,  W⁻¹ = diag(c²)
+        const Eigen::Matrix<double, 4, 3> WiFt = cw.cwiseProduct(cw).asDiagonal() * F_.transpose();
+        Us_.segment<4>(4 * i) = WiFt * (F_ * WiFt).inverse() * rb;
       } else {
         Us_.segment<4>(4 * i) = F_pinv_ * rb;
       }
@@ -669,10 +678,57 @@ TVec4 TorqueMPC::step(
   const TVec4 tau = T_.head<4>();
   x_prev_ = x_hat;
   tau_prev_ = tau;
+  slip_scale_used_ = eta_s;
   has_prev_ = true;
   lin_prev_ = lin;
   has_lin_ = current;
   return tau;
+}
+
+// ── 슬립 계수 η_s (2026-11-23, 머리주석) ───────────────────────────
+SlipEta::SlipEta(const SlipEtaParams & p)
+: p_(p)
+{
+  if (!(p_.s > 0.0 && p_.lambda_c > 0.0 && p_.lambda_c < 2.0 && p_.fc > 0.0 && p_.omega_eps > 0.0)) {
+    throw std::invalid_argument("slip_eta: s > 0, 0 < lambda_c < 2, fc > 0, omega_eps > 0 이어야 한다");
+  }
+  tau_ = 1.0 / (2.0 * M_PI * p_.fc);
+}
+
+TVec4 SlipEta::slip_ratio(const TVec4 & omega, const TVec4 & omega_nom, double omega_eps)
+{
+  TVec4 out;
+  for (int i = 0; i < 4; ++i) {
+    const double den = std::max({std::abs(omega(i)), std::abs(omega_nom(i)), omega_eps});
+    out(i) = (omega(i) - omega_nom(i)) * (omega_nom(i) >= 0.0 ? 1.0 : -1.0) / den;
+  }
+  return out;
+}
+
+double SlipEta::eta_of(double lambda_f, double lambda_c, double s)
+{
+  return 1.0 / (1.0 + std::exp((std::abs(lambda_f) - lambda_c) / s));
+}
+
+const TVec4 & SlipEta::update(const TVec4 & omega, const TVec4 & omega_nom, const bool valid[4], double dt)
+{
+  if (!(dt > 0.0) || dt > 0.1) {dt = 0.01;}        // 첫 표본·stamp 이상: 공칭 100 Hz
+  const double a = dt / (tau_ + dt);
+  const TVec4 lam = slip_ratio(omega, omega_nom, p_.omega_eps);
+  for (int i = 0; i < 4; ++i) {
+    if (!valid[i] || !std::isfinite(lam(i))) {continue;}
+    lam_(i) = lam(i);
+    lam_f_(i) += a * (lam(i) - lam_f_(i));
+    eta_(i) = eta_of(lam_f_(i), p_.lambda_c, p_.s);
+  }
+  return eta_;
+}
+
+void SlipEta::reset()
+{
+  lam_.setZero();
+  lam_f_.setZero();
+  eta_.setOnes();
 }
 
 }  // namespace amr_mpc_cpp

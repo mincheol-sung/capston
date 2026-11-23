@@ -50,6 +50,22 @@ load_transfer:
   weighted_alloc: true   # U_s = argmin Σ (τ_i / τ̄_i(N))² — 마찰 사용률 고르게
   dynamic_cap: true      # friction 상한 τ̄_i × N_i / N_i,0 (지평 스텝마다)
 
+# ── 슬립 계수 η_s (2026-11-23 교수님 회의 "η 토크 상한", 선택 기능. 식은 torque_mpc.hpp 머리주석 "슬립 계수 η_s")
+#    바퀴별 상한 τ̄_i 에 η_s,i = 1/(1 + exp((|λ̃_i| − lambda_c)/s)) 를 곱한다. λ̃ = slip_logger 와 같은 λ 의 1 차 LPF.
+#    값 (사용자 결정 2026-11-23, analysis/torque_mpc_real/2026-11-23_slip_lpf/RESULTS_KO.md 5~7 절):
+#      10·15·20 % — η 0.95 at 0.10, 0.5 at 0.15, 0.05 at 0.20. 실차 μ–λ 곡선이 λ̃ 0.125~0.175 에서 꺾이고
+#      평형 슬립 (상한에 붙을 때) 이 0.14~0.17 로 그 위에 온다. ω_ε 는 slip_logger 와 같은 2.5 고정 (사용자 결정).
+#    꺼도 λ̃·η_s 는 계산해 /torque_mpc/slip 에 낸다 (켬/끔 판을 같은 지표로 견주려고).
+#    켤 때 회의 결정대로 마찰 상한을 μ_max 1.0 으로 푼다: launch slip_eta:=true mu_hat_wheels:=off mu_hat:=1.0
+slip_eta:
+  enable: false
+  lambda_c: 0.15         # η_s = 0.5 인 |λ̃|
+  s: 0.017               # logistic 폭 — 0.95 → 0.05 구간 = 2·ln19·s = 0.10
+  fc_hz: 10.0            # λ LPF 차단 주파수 (τ 15.9 ms)
+  omega_eps: 2.5         # [rad/s] λ 분모 아래 한계 (slip_logger omega_eps 와 같게)
+  weighted_alloc: true   # η_s < 1 인 바퀴가 있으면 목표 입력 U_s 를 min Σ (τ_i / (c_i η_s,i))² 로 배분 (나머지 바퀴로)
+  alloc_floor: 0.05      # 그 가중에서 η_s 아래 한계 (두 바퀴가 0 이면 F W⁻¹ Fᵀ 가 특이)
+
 # ── 외란 추정치 d̂ (적분 작용, 1판 식-9~11).  2026-11-10 결정: 기본 끔 (노미널 MPC)
 #    꺼도 d̂ 는 계산해서 로그·status 에 남긴다 — "모델이 어디서 틀렸나" 기록용. 예측에 더하지만 않는다.
 disturbance:
