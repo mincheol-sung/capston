@@ -30,8 +30,8 @@ body:
   #   analysis/torque_mpc_real/2026-11-18_load/RESULTS_KO.md): 앞 합 2199 g · 뒤 2401 g → 앞 비율 0.478,
   #   왼쪽 2280 g · 오른쪽 2283 g → 0.4997. 대각(FL+RR vs FR+RL)은 두 바퀴씩으로는 못 재서 0 으로 둔 값
   #   (네 바퀴 받침은 static indeterminate — 바닥 평탄도에 따라 바뀐다). 무게중심은 가운데서 뒤로 3.8 mm.
-  #   쓰는 곳: torque_mpc_node 의 friction 상한 τ_μ,i = (r/√2)·μ̂·N_i·c_s, 시뮬 SlipPlant 의 F_i = μ N_i tanh(·).
-  #   μ̂ 는 바닥 값(surface.mu_hat) 하나 — 바닥을 바꿔도 이 몫은 그대로. 적재(payload)를 싣거나 하부를 바꾸면 다시 잰다.
+  #   쓰는 곳: torque_mpc_node 의 friction 상한 τ_μ,i = (r/√2)·μ̂_i·N_i·c_s (μ̂_i = surface.mu_hat_wheels, 없으면 mu_hat — 2026-11-22),
+  #   시뮬 SlipPlant 의 F_i = μ N_i tanh(·). 바닥을 바꿔도 이 몫은 그대로. 적재(payload)를 싣거나 하부를 바꾸면 다시 잰다.
   #   비우면 1/4 씩 (예전 mg/4). 한 번만 바꿀 때 launch 인자 wheel_load_share:="0.25,0.25,0.25,0.25"
   wheel_load_share: [0.2388, 0.2392, 0.2608, 0.2612]
   inertia_z_kgm2: 0.06   # 추정. 리포에 값 없음. 0.3 × 0.3 m 균일판 4 kg 근사 m(a²+b²)/12.
@@ -95,8 +95,9 @@ friction:
 # ── 노면 (C 비교군의 마찰 토크 상한 τ_μ = (r/√2)·μ̂·(m g/4)·c_s, 1판 식-21)
 surface:
   mu_hat: 0.3                # 추정. 노면마다 토크 램프 시험 (To do 2절)
-  # 바퀴별 μ̂ [FL, FR, RL, RR] (2026-11-19 (11), 사용자 제공 값 — 출처 bag·계산은 이 리포에 없다). mg/4 기준:
-  #   τ_μ,i = (r/√2)·μ̂_i·(m g/4)·c_s — 실측 |τ_i| / ((r/√2)(mg/4)) 로 낸 값이라 하중 몫(body.wheel_load_share)을 다시 곱하지 않는다.
+  # 바퀴별 μ̂ [FL, FR, RL, RR] (2026-11-19 (11), 사용자 제공 값 — 출처 bag·계산은 이 리포에 없다).
+  #   2026-11-22 부터 N_i 기준: τ_μ,i = (r/√2)·μ̂_i·N_i·c_s, N_i = body.wheel_load_share_i·m g — 실측 |τ_i| / ((r/√2)·N_i) 로 낸 값.
+  #   (11-21 까지는 mg/4 기준이라 하중 몫을 안 곱했다. 아래 예전 값들은 mg/4 기준이다)
   #   값이 있으면 MPC friction 상한에서 mu_hat 대신 쓰인다 (mu_hat:= 를 줘도 안 바뀐다). 0 이하인 바퀴는 mu_hat × 하중 몫.
   #   잰 사분면 (ω·τ 부호): FL 3, FR 1, RL 3, RR 3 — 한 방향에서 잰 값을 양쪽 |τ_i| ≤ τ̄_i 에 같이 쓴다.
   #   끄기: launch mu_hat_wheels:=off.  한 번만 다른 값: mu_hat_wheels:="a,b,c,d".  시뮬 플랜트(surface_mu)에는 안 쓰인다
@@ -105,8 +106,28 @@ surface:
   #       0.139 / 0.204 N·m → mg/4 기준 0.44 / 0.64, 작은 쪽. (피드백 τ_c 식은 J_w·ω̇ 미분 잡음으로 0.05~0.37 로 흩어져 안 씀)
   #   RR: 같은 날 정사각형 bag 4 판에서 미끄럼 없이 50 ms 이상 낸 접지 토크 하한 0.132 N·m → 0.417 (예전 0.350 보다 큼)
   #   → C 앞 방향 최대 가속 (힘 분배 LP, c_s 0.8) 1.18 → 1.58 m/s². 램프 2 판뿐 — 더 재면 고친다. 예전 값: [0.432, 0.285, 0.456, 0.350]
-  mu_hat_wheels: [0.432, 0.44, 0.456, 0.417]
+  # 2026-11-21 사용자 결정 ("최신 업데이트"): [0.432, 0.44, 0.456, 0.417] → [0.572, 0.468, 0.570, 0.734]. 근거는 사용자 측 측정 (이 리포에 기록 없음).
+  #   τ̄_i = 0.2530·μ̂_i (r 0.04, mg/4 11.18 N, c_s 0.8) → [0.1447, 0.1184, 0.1442, 0.1857] N·m.
+  # 2026-11-22 사용자 결정: N_i 기준 값 [0.598, 0.489, 0.547, 0.703] ("바퀴별 다른 하중을 고려해서 구한 값"). 코드도 하중 몫을 곱하게 바꿈.
+  #   τ̄_i = 1.0122·μ̂_i·몫_i → [0.1445, 0.1184, 0.1444, 0.1859] N·m (11-21 값과 ±0.1 % 안 — 같은 측정의 다른 표현).
+  #   하중 몫 1/4 이면 식이 예전 mg/4 기준과 같다 — 예전 상한 그대로: mu_hat_wheels:="0.572,0.468,0.570,0.734" wheel_load_share:="0.25,0.25,0.25,0.25"
+  mu_hat_wheels: [0.598, 0.489, 0.547, 0.703]
   c_s: 0.8                   # 안전계수
+
+# ── 구동계 방향 보정 (2026-11-23 — 기본 0 = 보정 없음. 실차 A/B 뒤에 기본값을 정한다)
+#    실물: 바퀴가 굴러가는 축이 몸체 축 (라이다·IMU = SLAM) 보다 반시계로 돌아가 있고, 선회 중에는 구심가속에 비례해 옆으로 미끄러진다.
+#      v_실제,xy = R(δ)·(T ω)_xy,   δ = yaw_offset + slip_coef·a_c,   a_c = |v|·ω_z (반시계 선회 +), |a_c| ≤ slip_ac_max
+#    잰 값 (analysis/torque_mpc_real/2026-11-23_horizon_real/RESULTS_KO.md 5·6 절): yaw_offset +2.4° (R 0.3/0.5/0.75 회귀 절편 +2.33~+2.40),
+#      slip_coef −2.5 °/(m/s²) (−2.25~−2.79). 원인 후보 바퀴 toe (안 잼) — 옆걸음 바퀴 비율로 "대각선 반지름 차" 는 배제.
+#    쓰는 곳  yaw_offset: torque_mpc_node force_map xy 행 (G·B·U_s, kinematic–static duality) + 엔코더 몸체 속도 (velocity_source wheels),
+#                         wheel_pi (비교군 A) 바퀴 목표, torque_output (정지 마찰 기준 바퀴속도·슬립 가드 T⁻¹)
+#             slip_coef:  torque_mpc_node 엔코더 몸체 속도 (측정 쪽만 — 미끄럼이라 힘 사상은 안 돌린다), wheel_pi 바퀴 목표
+#    안 쓰는 곳: 시뮬 플랜트 (물리), slip_logger λ (지표 정의 그대로), 토크 램프·스텝 시험
+#    한 번만 바꿀 때: launch drive_yaw_deg:=2.4 drive_slip_coef:=-2.5
+drive:
+  yaw_offset_deg: 0.0
+  slip_coef_deg_per_mps2: 0.0
+  slip_ac_max_mps2: 2.0
 
 # ── 모델 스위치 — 2026-11-16 부터 시뮬 플랜트(Python TorquePlant·sim_plant_torque) 물리만 정한다.
 #    제어기(torque_mpc_node)는 이 값을 안 읽는다: M 에 m_w 를 늘 넣고, w 항만 torque_mpc.yaml model_terms.use_w 로 켜고 끈다

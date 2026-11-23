@@ -294,3 +294,43 @@ def test_speed_mod_peak_enters_load_check():
 def test_speed_mod_rejects_bad_args(kw):
     with pytest.raises(ValueError):
         Figure8(width=1.2, speed=0.45, accel=0.4, curve="circles", **kw)
+
+
+def test_speed_mod_phase_minus_90_is_slowest_at_crossings():
+    # 2026-11-22 speed_mod_phase_deg: −90° 면 −cos 꼴 — circles8 교차점 (σ = 0, ℓ_lap/2) 에서 V(1−ε), n 짝수
+    V, eps = 0.7, 0.4
+    f = Figure8(width=2.0, speed=V, accel=1.0, curve="circles", laps=2, speed_mod_amp=eps, speed_mod_cycles=4,
+                speed_mod_phase_deg=-90.0)
+    lap = f.L / f.laps
+    for s in (lap * 0.5, lap, lap * 1.5):
+        assert f._v_target(s) == pytest.approx(V * (1 - eps), abs=1e-9)
+    assert f._v_target(lap / 8) == pytest.approx(V * (1 + eps), abs=1e-9)      # 원 1/4 지점 최고
+    assert f.V_peak == pytest.approx(V * (1 + eps))
+    zero = Figure8(width=2.0, speed=V, accel=1.0, curve="circles", laps=2, speed_mod_amp=eps, speed_mod_cycles=4)
+    assert zero._v_target(lap / 8) == pytest.approx(V * (1 + eps * math.sin(math.pi)), abs=1e-9)   # 기본 0° 는 예전 식
+
+
+def test_speed_mod_phase_rejects_nan():
+    with pytest.raises(ValueError):
+        Figure8(width=2.0, curve="circles", speed_mod_amp=0.3, speed_mod_phase_deg=float("nan"))
+
+
+def test_speed_mod_square_two_levels_accel_limited_and_consistent():
+    # 2026-11-22 speed_mod_shape="square": V(1±ε) 계단, 바뀌는 곳은 |dv/dt| ≤ accel, 교차점 (φ −90°) 은 느린 쪽
+    V, eps, A = 0.65, 0.5, 1.5
+    f = Figure8(width=2.0, speed=V, accel=A, curve="circles", laps=2, speed_mod_amp=eps, speed_mod_cycles=2,
+                speed_mod_phase_deg=-90.0, speed_mod_shape="square")
+    t, s, v = f._lap_t, f._lap_s, f._lap_v
+    assert v.max() == pytest.approx(V * (1 + eps), abs=1e-6) and v[0] == 0.0 and v[-1] == 0.0
+    a = np.diff(v) / np.diff(t)
+    assert np.abs(a).max() <= A * 1.02
+    lap = f.L / f.laps
+    i = np.argmin(np.abs(s - lap / 2))                       # 첫 바퀴 가운데 교차점
+    assert v[i] == pytest.approx(V * (1 - eps), abs=1e-3)
+    ds = np.gradient(s, t)                                   # σ(t) 와 v(t) 가 맞물린다 (유한차분)
+    assert np.allclose(ds[5:-5], v[5:-5], atol=0.02)
+
+
+def test_speed_mod_shape_rejects_unknown():
+    with pytest.raises(ValueError):
+        Figure8(width=2.0, curve="circles", speed_mod_amp=0.3, speed_mod_shape="triangle")

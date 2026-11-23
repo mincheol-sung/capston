@@ -20,6 +20,16 @@ shape:=square 로 고른다. 속도 ur 는 몸체 좌표 [vx, vy, ω] — Figure
   tangent : 변 방향. 꼭짓점에서 헤딩이 90° 계단이 되지 않게 꼭짓점 ±yaw_blend/2 호길이 안에서 스무스스텝으로 돌린다
             (위치는 그대로 정사각형, 그 구간에서만 옆걸음이 섞인다). 정지하는 마지막 꼭짓점은 완화하지 않고,
             선 뒤 align_s 동안 출발 헤딩으로 제자리 회전한다 (Figure8 역정렬과 같은 스무스스텝).
+
+꼭짓점 처리 corner_mode (2026-11-21)
+  pass : 위 설명대로 — 꼭짓점을 corner_speed 로 지나고, tangent 면 헤딩을 꼭짓점 앞뒤에서 돌린다.
+         accel 1.5 · v_max 1.5 에서 헤딩 회전 토크가 직선 가감속 토크 (가장 약한 RR 상한의 96 %) 위에 겹쳐
+         앞먹임 U_s 가 C 마찰 상한의 2.55 배 (analysis/torque_mpc_sim/2026-11-20_square_profile).
+  stop : 꼭짓점마다 선다 (corner_speed 무시, 0). 선 자리에서 dwell_s 쉬고 → (tangent 면) rot_s 동안 +90° 제자리 회전
+         (스무스스텝, 정렬 회전과 같은 꼴) → dwell_s 쉬고 → 다음 변. 병진 가감속과 헤딩 회전이 시간상 겹치지 않는다.
+         몸체 v_y 가 어디서나 0 이라 퓨어 퍼슛 (v_y = 0) 도 원리상 정확히 낼 수 있는 기준이다.
+         dwell 은 torque_mpc 의 기준 가속도 차분 창 (acc_dt 0.2 s) 이 감속 끝과 회전 시작을 한 창에 섞지 않게 하는 틈.
+         fixed 면 회전 없이 dwell 만 (2·dwell_s 정지).
 """
 import bisect
 import math
@@ -71,9 +81,11 @@ class _Edge:
 
 class Square:
     def __init__(self, side=1.5, corner_speed=0.1, accel=0.4, v_max=0.0, laps=1.0,
-                 yaw_mode="tangent", yaw_blend=0.3, align_s=1.5):
+                 yaw_mode="tangent", yaw_blend=0.3, align_s=1.5, corner_mode="pass", rot_s=1.0, dwell_s=0.2):
         if yaw_mode not in ("tangent", "fixed"):
             raise ValueError(f"square 의 yaw_mode 는 tangent | fixed (받은 값 {yaw_mode!r})")
+        if corner_mode not in ("pass", "stop"):
+            raise ValueError(f"square 의 corner_mode 는 pass | stop (받은 값 {corner_mode!r})")
         if side <= 0.0 or accel <= 0.0 or corner_speed < 0.0:
             raise ValueError("square: side·accel > 0, corner_speed ≥ 0")
         self.n = int(round(4.0 * float(laps)))
@@ -81,14 +93,22 @@ class Square:
             raise ValueError(f"square: laps {laps} → 변 {self.n} 개 (1 개 이상이어야)")
         self.tangent = yaw_mode == "tangent"
         self.yaw_mode = yaw_mode
-        self.side, self.vc, self.A = float(side), float(corner_speed), float(accel)
-        self.b = float(yaw_blend) if self.tangent else 0.0
-        if self.tangent and not (0.0 < self.b <= self.side):
+        self.corner_mode = corner_mode
+        self.stop = corner_mode == "stop"
+        self.side, self.A = float(side), float(accel)
+        self.vc = 0.0 if self.stop else float(corner_speed)
+        self.b = float(yaw_blend) if (self.tangent and not self.stop) else 0.0
+        if self.tangent and not self.stop and not (0.0 < self.b <= self.side):
             raise ValueError(f"square tangent: 0 < yaw_blend ≤ side ({self.side} m) — 받은 값 {yaw_blend}")
+        self.rot = float(rot_s) if (self.stop and self.tangent) else 0.0     # 꼭짓점 제자리 회전 시간
+        self.dwell = float(dwell_s) if self.stop else 0.0                   # 회전 앞뒤 정지
+        if self.stop and (self.dwell < 0.0 or (self.tangent and self.rot <= 0.0)):
+            raise ValueError(f"square stop: rot_s > 0 (tangent), dwell_s ≥ 0 — 받은 값 {rot_s}, {dwell_s}")
+        self.T_corner = self.rot + 2.0 * self.dwell if self.stop else 0.0  # 사이 꼭짓점 하나에서 서 있는 시간
         self.edges = [_Edge(self.side, 0.0 if i == 0 else self.vc, 0.0 if i == self.n - 1 else self.vc,
                             self.A, float(v_max)) for i in range(self.n)]
-        self.t_start = list(np.cumsum([0.0] + [e.T for e in self.edges[:-1]]))
-        self.T_path = float(sum(e.T for e in self.edges))
+        self.t_start = list(np.cumsum([0.0] + [e.T + self.T_corner for e in self.edges[:-1]]))   # 변 i 의 출발 시각
+        self.T_path = float(sum(e.T for e in self.edges)) + (self.n - 1) * self.T_corner
         self.yaw_end = (self.n - 1) * 0.5 * math.pi                     # 마지막 변 방향 (로컬, 펼친 값)
         self.dtheta = wrap(-self.yaw_end) if self.tangent else 0.0       # 출발 헤딩으로 돌아가는 회전
         self.T_align = float(align_s) if (self.tangent and align_s > 0.0 and abs(self.dtheta) > 1e-9) else 0.0
@@ -106,6 +126,8 @@ class Square:
         """변 i, 누적 호길이 S 에서 (로컬 헤딩, dψ/dS)."""
         if not self.tangent:
             return 0.0, 0.0
+        if self.stop:                                                   # 변 위에서는 늘 변 방향 (회전은 꼭짓점에서 서서)
+            return i * 0.5 * math.pi, 0.0
         j = int(round(S / self.side))                                   # 가장 가까운 꼭짓점 (1..n−1 만 완화)
         if 1 <= j <= self.n - 1 and abs(S - j * self.side) <= 0.5 * self.b:
             s, ds = _smooth((S - j * self.side + 0.5 * self.b) / self.b)
@@ -121,11 +143,20 @@ class Square:
             pass
         elif t < self.T_path:
             i = bisect.bisect_right(self.t_start, t) - 1
-            s, v = self.edges[i].at(t - self.t_start[i])
-            p = self.corners[i] + s * self.dirs[i]
-            v_loc = v * self.dirs[i]
-            yl, dyds = self._yaw(i, i * self.side + s)
-            wl = dyds * v
+            tau = t - self.t_start[i]
+            if self.stop and tau >= self.edges[i].T:                    # stop: 변 i 끝 꼭짓점 i+1 에 서 있다
+                p = self.corners[i + 1]
+                yl = i * 0.5 * math.pi if self.tangent else 0.0
+                if self.rot > 0.0:
+                    s, ds = _smooth((tau - self.edges[i].T - self.dwell) / self.rot)
+                    yl += 0.5 * math.pi * s
+                    wl = 0.5 * math.pi * ds / self.rot
+            else:
+                s, v = self.edges[i].at(tau)
+                p = self.corners[i] + s * self.dirs[i]
+                v_loc = v * self.dirs[i]
+                yl, dyds = self._yaw(i, i * self.side + s)
+                wl = dyds * v
         else:
             p = self.corners[self.n]
             yl = self.yaw_end if self.tangent else 0.0
@@ -169,7 +200,8 @@ class Square:
 if __name__ == "__main__":
     # 검산: 속도를 위치의 유한차분과 비교 (몸체 좌표로), 변 가운데 최고속도 = √(v_c² + aL), 끝 포즈
     for kw in (dict(yaw_mode="tangent"), dict(yaw_mode="fixed"), dict(yaw_mode="tangent", accel=1.0),
-               dict(yaw_mode="fixed", v_max=0.5), dict(yaw_mode="tangent", laps=2.0)):
+               dict(yaw_mode="fixed", v_max=0.5), dict(yaw_mode="tangent", laps=2.0),
+               dict(yaw_mode="tangent", corner_mode="stop", accel=1.5, v_max=1.5), dict(yaw_mode="fixed", corner_mode="stop")):
         sq = Square(**kw)
         o = (0.3, -0.2, 0.7)
         h, err, wmax = 1e-5, 0.0, 0.0

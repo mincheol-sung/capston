@@ -148,3 +148,19 @@ def test_slip_plant_light_wheels_creep_more():
             assert min(ex[0], ex[1]) > 1.1 * max(ex[2], ex[3]) > 0
         else:
             assert np.allclose(ex, ex[0], rtol=1e-3)
+
+
+def test_slip_plant_load_transfer_matches_controller_formula():
+    """2026-11-23 SlipPlant 하중 이동: 합 m g 보존, 앞으로 가속 → 앞바퀴 가볍게, 왼쪽 가속 (왼쪽 선회 구심) → 왼쪽 바퀴 가볍게. 끄면 정지 하중."""
+    import numpy as np
+    from amr_mpc.torque.model import TorquePlant, SlipPlant
+    p = TorquePlant.from_yaml()
+    off = SlipPlant(p, 0.5)
+    assert np.allclose(off.normal_forces(np.array([1.0, 2.0])), p.wheel_normal_force)
+    sp = SlipPlant(p, 0.5, com_height=0.105)
+    n0 = p.wheel_normal_force
+    n = sp.normal_forces(np.array([1.5, 2.0]))
+    assert abs(n.sum() - p.mass * p.g) < 1e-9
+    dx = p.mass * 1.5 * 0.105 / (2 * p.wheel_base); dy = p.mass * 2.0 * 0.105 / (2 * p.robot_width)
+    assert np.allclose(n, n0 - np.array([1, 1, -1, -1]) * dx - np.array([1, -1, 1, -1]) * dy)
+    assert sp.stable_dt() < off.stable_dt()                     # 바깥 바퀴가 무거워질 수 있어 적분 간격을 줄인다

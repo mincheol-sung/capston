@@ -29,6 +29,33 @@
 //   dist_accel_only (2026-11-18, 시험용, 기본 끔): 위치 성분 [x, y, θ] 잔차를 버리고 0.5·Ts·(속도 잔차) 로 바꾼다
 //   — 일정한 가속도 a 의 ZOH 한 스텝 Δp = ½Ts²a, Δv = Ts a 와 같은 꼴 (input disturbance model). 추정기 위치·속도가
 //   서로 안 맞아 생기는 위치 잔차가 지평에서 j 배로 쌓이지 않게. 건너뛰기 판단은 원래 위치 잔차로 한다.
+//   dist_body_frame (2026-11-21): 잔차의 x·y 성분 (위치·속도) 을 R(θ̂)ᵀ 로 몸체 좌표로 돌린 뒤 거르고, 쓸 때 지평 스텝마다
+//   R(θ_r,j) 로 다시 돌린다 (d̂ 는 몸체 좌표로 저장 — d_hat() 도 몸체 좌표). 원을 돌 때 경로 기준으로 일정한 외란이 월드 좌표에서는
+//   ω 로 도는 벡터라, 월드 좌표에서 느리게 거르면 정상상태 몫까지 지워진다 (실차 8자 2026-11-21: 시정수 1 s 를 더하면
+//   곡률 중심 쪽 â_d 랩 평균 +0.16 → +0.06 m/s², 몸체 좌표로 거르면 +0.13 이고 흔들림 0.32 → 0.08 — analysis/torque_mpc_real/2026-11-21_square/ 14 절).
+//   dist_freeze_on_sat: 직전 주기에 낸 τ 가 상한 (0.98 τ̄) 에 붙었거나 목표 입력 U_s 가 상한을 넘었으면 갱신하지 않는다
+//   (anti-windup, conditional integration — 기준이 상한 밖이라 못 따라가는 몫을 외란으로 배우지 않게).
+//   dist_acc_max / dist_yaw_acc_max: 거른 뒤 |â_d,xy| = |d̂_ṗ,xy|/Ts, |α_d| = |d̂_θ̇|/Ts 의 상한 [m/s², rad/s²] (≤ 0 이면 없음).
+// 외란 관측기 이득 (2026-11-21, offset-free MPC — Rawlings·Mayne·Diehl 2017 1장, Pannocchia & Rawlings 2003):
+//   위 식-11 의 d̂ ← (1−α)d̂ + α d 는 증강 모델 [x; d] 의 Luenberger 관측기 (L_d = α I) 와 같다 (d − d̂ = y − x̂⁻).
+//   dist_kalman 이면 L 을 잡음 모델로 정한다: 축 a ∈ {x, y, θ} 마다 가속도 외란 a_k 를 random walk (변화율 σ_q /√s) 로 두고
+//   잔차 [r_p; r_v] = [½Ts²; Ts] a_k + v,  v ~ N(0, diag(σ_p², σ_v²)) 를 측정으로 — 정상상태 Kalman 이득 K_a (1×2) 를 Riccati 반복으로 구한다.
+//   위치 잔차도 그 잡음 크기만큼의 무게로 쓴다 (accel_only 는 무시). 저장은 â 이고 d̂ = [½Ts² â; Ts â].
+// 구심 feedforward 계수 ρ (2026-11-21): 곡률 중심 쪽 구심 몫 c_n = n̂_c·M(p̈_r − w)  (n̂_c = 기준 속도의 법선, ω_r 부호로 곡률 중심 쪽)
+//   중 η = 1 − ρ 만큼을 모델 밖 안쪽 힘으로 본다 → 가속도 외란 a_ρ = η c_n n̂_c / m_eq.  U_s 에서 빼고 (rhs −= M a_ρ) 예측 x_{i+1} 에
+//   [½Ts² a_ρ; Ts a_ρ] 로 더한다 — 외란이 예측 모델에도 있어야 offset-free (Rawlings·Mayne·Diehl 2017 1장 "Tracking, Disturbances, and Zero Offset").
+//   ρ = ff_normal_scale 고정이거나, ff_normal_estimate 면 d̂ 와 한 Kalman 필터로 같이 추정 (structured disturbance model):
+//     상태 z = [d_x, d_y, η] (몸체 좌표, random walk 분산 [kalman_q_x², kalman_q_y², ff_normal_q²]·Ts / 스텝),
+//     측정 = 몸체 좌표 잔차 [r_p; r_v] 의 x·y = [½Ts²; Ts] ⊗ (d + η g) + v,   g = (c_n/m_eq) R(θ̂)ᵀ n̂_c  (직전 주기 기준의 값).
+//   Pannocchia & Rawlings 2003 의 x⁺ = Ax + Bu + B_d d 에서 B_d 열 하나가 기준에 따라 바뀌는 꼴이다 (시변 — 논문은 LTI 만 다룬다).
+//   8자에서 n̂_c 가 왼원·오른원에 몸체 ±y 로 뒤집히므로 몸체 일정 몫 d 와 구심 비례 몫 η 가 갈린다 (한 원만 돌면 d_y + η g 합만 정해지고
+//   공분산이 그 방향으로 남는다). 잔차는 보상 여부와 무관한 "공칭 모델과 실제의 차" 라 d̂ 와 η̂ 가 서로의 학습을 멈추지 않는다.
+//   (먼저 만든 RLS 판은 오차로 feedback 힘을 써서 — feedback-error learning 꼴, Kawato 1987 — d̂ 가 오프셋을 지우면 학습이 멈추고
+//    둘이 같은 오차를 나눠 가졌다: 8자 시험 ρ̂ 0.92 (참값 0.7), 반경 +6.5 mm. stack_changelog 2026-11-21.)
+//   직선·저속 (|ω_r| < 0.3, v_r < 0.2, |c_n| < x_min) 은 g = 0 — η 는 안 보이고 분산만 는다 (상한 10 P0). dist_kalman·dist_body_frame 필요.
+//   리셋하면 d 몫은 지우고 η̂ 와 그 분산은 남긴다 (로봇·바닥의 성질).
+// 제약 있는 목표 입력 (target_projection, 2026-11-21): U_s 를 바퀴별로 [−τ̄, τ̄] 에 자른다 (상자에 대한 사영) — 기준이 상한 밖일 때
+//   입력 편차 항이 낼 수 없는 목표 쪽으로 끌지 않게.
 //
 // 선형화 방식 (TorqueTuning::linearization, torque_mpc.yaml 의 linearization.mode)
 //   reference      1판 그대로. 위 B(k), w(k) 에 지평 각 스텝의 기준 방향 θ_r(k)·기준 속도를 넣는다 (기준궤적 따라 LTV).
@@ -86,18 +113,28 @@ struct TorqueModel
   // 바퀴별 수직력 몫 [FL, FR, RL, RR] (합 1, 2026-11-19). N_i = 몫_i·m g. 기본 1/4 씩 = 1판 식-21 의 mg/4.
   //   상한 모드 friction 의 τ_μ,i 에만 쓰인다 (동역학 M 은 무게중심이 가운데라고 그대로 둔다)
   TVec4 wheel_load_share = TVec4::Constant(0.25);
-  // 바퀴별 μ̂ [FL, FR, RL, RR] (2026-11-19 (11)). mg/4 기준 값 — τ_μ,i = (r/√2)·μ̂_i·(m g/4)·c_s 로, 하중 몫이 이미 들어 있다고 본다
-  //   (실측 |τ_i| / ((r/√2)(mg/4)) 로 낸 값). 0 이하인 바퀴는 mu_hat × 하중 몫
+  // 바퀴별 μ̂ [FL, FR, RL, RR] (2026-11-19 (11)). 2026-11-22 부터 N_i 기준 값 — τ_μ,i = (r/√2)·μ̂_i·N_i·c_s, N_i = 몫_i·m g
+  //   (실측 |τ_i| / ((r/√2)·N_i) 로 낸 값. 11-21 까지는 mg/4 기준이었다). 0 이하인 바퀴는 μ̂_i 자리에 mu_hat
   TVec4 mu_hat_wheels = TVec4::Constant(-1.0);
   double c_s = 0.8;
   double gravity = 9.81;
+  // 구동계 방향 보정 (2026-11-23, torque_plant.yaml drive — 기본 0 = 보정 없음). 실차에서 바퀴가 굴러가는 축이 몸체 축 (SLAM) 보다
+  //   drive_yaw 만큼 반시계, 선회 중에는 구심가속 a_c = |v|·ω_z 에 비례해 옆으로 미끄러진다:  v_실제,xy = R(drive_yaw + slip_coef·a_c)·(T ω)_xy.
+  //   drive_yaw 는 force_map 의 xy 행 (→ G·B·U_s·야코비안, kinematic–static duality) 과 엔코더 몸체 속도에,
+  //   slip_coef 는 엔코더 몸체 속도에만 (미끄럼이라 힘 사상은 안 돌린다). 근거 analysis/torque_mpc_real/2026-11-23_horizon_real 5·6 절.
+  double drive_yaw = 0.0;            // [rad]
+  double slip_coef = 0.0;            // [rad / (m/s²)]
+  double slip_ac_max = 2.0;          // [m/s²] a_c 를 이 안으로 자른다 (잰 범위)
 
   double k() const {return 0.5 * (wheel_base + robot_width);}
   double mu() const {return 4.0 * J_w / (wheel_radius * wheel_radius);}     // m_w (식-3)
   double m_eff() const {return mass + mu();}
   double I_eff() const {return inertia_z + mu() * k() * k();}
-  // (T⁻¹)ᵀ : 바퀴 토크 → 몸체 [F_x, F_y, M_z]
+  // (T⁻¹)ᵀ : 바퀴 토크 → 몸체 [F_x, F_y, M_z].  drive_yaw ≠ 0 이면 xy 행을 R(drive_yaw) 로 돌린 값
   TMat34 force_map() const;
+  // 엔코더 몸체 속도 보정 (2026-11-23): v_xy ← R(drive_yaw + slip_coef·a_c) v_xy,  a_c = |v_xy|·wz (wz = 자이로 ω_z, |a_c| ≤ slip_ac_max).
+  //   ω_z 성분은 그대로. 보정값이 0 이면 v 그대로
+  TVec3 correct_wheel_velocity(const TVec3 & v, double wz) const;
   // 바퀴 기구학 v = T ω (몸체 [v_x, v_y, ω_z], 바퀴 [FL, FR, RL, RR] rad/s, 미끄럼 없음 가정).
   //   T = (r/4)[1 1 1 1; −1 1 1 −1; (−1 1 −1 1)/k] — force_map 의 T⁻¹ 의 유사역행렬 (2026-11-18, velocity_source wheels)
   TVec3 wheel_body_velocity(const TVec4 & omega) const
@@ -116,7 +153,16 @@ struct TorqueModel
   TVec3 w_value(const TVec3 & Xdot) const;
   double tau_motor_limit() const {return tau_rated - tau_fric_max;}                       // 비교군 B
   double tau_friction_limit() const;                                                      // τ_μ, 식-21 (N = mg/4, 평균 바퀴)
-  TVec4 tau_friction_limits() const;                                                      // 바퀴별 τ_μ,i (mu_hat_wheels > 하중 몫)
+  TVec4 tau_friction_limits() const;                                                      // 바퀴별 τ_μ,i = (r/√2)·μ̂_i·N_i·c_s
+  // 2026-11-23 하중 이동: 몸체 가속도 (a_x 앞, a_y 왼쪽, 관성 가속도의 몸체 성분) 에서 바퀴별 수직력 [N] (FL FR RL RR).
+  //   N_i = 몫_i·m g − s_x,i·m a_x h / (2 L) − s_y,i·m a_y h / (2 W),  s_x = [+ + − −] (앞), s_y = [+ − + −] (왼쪽), L = wheel_base, W = robot_width.
+  //   강체 네 바퀴를 앞뒤·좌우 축마다 강체 보로 본 정역학 근사 (서스펜션·차체 비틀림 없음). 아래로 min_frac·정지 하중에서 자른다
+  TVec4 wheel_normal_forces(double ax, double ay, double h, double min_frac) const;
+  // 2026-11-22 바닥 토크 사상 P: 무슬립이면 바퀴 i 가 바닥에 전하는 토크 τ_g = P τ  (나머지 J_w ω̇_i 는 바퀴 자신을 돌린다).
+  //   ω = Fᵀ v (F = force_map), 몸체 M_b v̇ = F τ_g, 바퀴 J_w ω̇ = τ − τ_g  →  (M_b + J_w F Fᵀ) v̇ = F τ (= M_eff, 코드의 M)
+  //   →  P = I − J_w Fᵀ M_eff⁻¹ F.  앞으로 고른 토크면 바닥 몫 1 − m_w/m_eff (4.56 kg · J_w 8.9e-4 → 0.672).
+  //   근거·수치: analysis/torque_mpc_real/2026-11-21_line_accel/GROUND_CAP_REVIEW_KO.md
+  Eigen::Matrix4d ground_map() const;
 };
 
 // 선형 모델  ẋ = A x + B τ + c (연속)  또는  x(k+1) = A x(k) + B τ(k) + c (이산)
@@ -149,6 +195,9 @@ struct TorqueTuning
   // 노드는 torque_mpc.yaml 의 linearization.mode 를 읽고, 그 기본값도 reference 다 (2026-11-14).
   TorqueLinearization linearization = TorqueLinearization::Reference;
   double rate_fraction = 1.0 / 3.0;
+  // 2026-11-22 마찰 상한을 어디에 거나: false = 바퀴 토크 τ 자체 |τ_i| ≤ τ̄_i (1판, 기본)
+  //   true = 바닥 토크 |(P τ)_i| ≤ τ̄_i (일반 제약 4·Nc 행) + 바퀴 토크는 모터 한계 |τ_i| ≤ τ_lim − τ_fric,max. limit_mode friction 일 때만
+  bool cap_on_ground = false;
   bool constrained = true;           // false 면 QP 대신 H T = −g (자기검사용, 1판 09절)
   bool dist_enable = false;
   double dist_alpha = 1.0;
@@ -156,7 +205,37 @@ struct TorqueTuning
   double dist_dt_tol = 0.002;        // [s] 상태 간격이 Ts ± 이 값을 벗어나면 (step 의 dt_state 로 판단, ≤ 0 이면 검사 안 함)
   double dist_skip_xy = 1e-3;        // [m] 잔차 위치 성분 |d̂_x|·|d̂_y| 가 이보다 크면 (SLAM 보정 계단). ≤ 0 이면 검사 안 함
   bool dist_accel_only = false;      // true: 위치 잔차 = ½Ts·속도 잔차 (가속도 외란 모델, 머리주석). false: 1판 식-9 그대로
+  // 2026-11-21 (머리주석). 구조체 기본값은 예전 동작 — 노드는 torque_mpc.yaml disturbance 블록을 읽는다
+  bool dist_body_frame = false;      // true: 몸체 좌표로 추정·저장, 쓸 때 R(θ_r,j) 로 돌린다. false: 월드 좌표 (1판)
+  bool dist_freeze_on_sat = false;   // true: 직전 τ 가 0.98 τ̄ 에 붙었거나 U_s 가 τ̄ 를 넘으면 갱신하지 않는다
+  double dist_acc_max = -1.0;        // [m/s²] |â_d,xy| 상한 (≤ 0 이면 없음)
+  double dist_yaw_acc_max = -1.0;    // [rad/s²] |α_d| 상한 (≤ 0 이면 없음)
+  // 2026-11-21 (정석 offset-free 쪽으로, 머리주석 "외란 관측기 이득"): true 면 α 대신 정상상태 Kalman 이득.
+  //   축마다 (x, y, θ) 가속도 외란 a 를 random walk 로 두고 잔차 [r_p; r_v] = [½Ts²; Ts] a + v 를 측정으로 — Riccati 반복으로 K (1×2).
+  bool dist_kalman = false;
+  TVec3 dist_kq = TVec3(0.3, 0.3, 0.8);          // [m/s²/√s, rad/s²/√s] 외란 변화율 (random walk) 표준편차
+  TVec3 dist_kr_pos = TVec3(1.6e-3, 1.6e-3, 8.7e-4);   // [m, rad] 한 스텝 위치 잔차 잡음 (실차 212502)
+  TVec3 dist_kr_vel = TVec3(0.017, 0.029, 0.079);      // [m/s, rad/s] 한 스텝 속도 잔차 잡음 (실차 212502)
+  // 2026-11-21 제약 있는 목표 입력 (target calculation, Muske & Rawlings 1993): U_s 를 상한 상자 [−τ̄, τ̄] 에 사영 (바퀴별 clamp)
+  bool target_projection = false;
+  // 2026-11-21 구심 feedforward 계수 ρ — 머리주석 "구심 feedforward 계수".
+  //   estimate 가 꺼져 있으면 ff_normal_scale 고정 (1 = 1판), 켜져 있으면 d̂ 와 같은 Kalman 필터로 η = 1 − ρ 추정
+  double ff_normal_scale = 1.0;
+  bool ff_normal_estimate = false;   // dist_kalman·dist_body_frame 필요
+  double ff_normal_q = 0.03;         // [1/√s] η random walk 세기
+  double ff_normal_min = 0.4;
+  double ff_normal_max = 1.2;
+  double ff_normal_P0 = 0.04;        // η 초기 분산 (σ 0.2). 분산 상한은 10 배
+  double ff_normal_x_min = 0.3;      // [N] 이보다 작은 구심 feedforward 는 g = 0 (직선·저속)
   int daqp_iter_limit = 1000;
+  // 2026-11-23 하중 이동 (머리주석 "하중 이동"). load_com_height ≤ 0 이면 끔 (예전 동작 그대로).
+  //   지평 스텝마다 기준 가속도로 바퀴별 수직력 N_i,j (TorqueModel::wheel_normal_forces) 를 내어
+  //   (1) load_weighted_alloc: 목표 입력 U_s 를 마찰 사용률 가중 — min Σ (τ_i / c_i)², c_i ∝ μ̂_i N_i,j  (가중 유사역행렬, F U_s = 몸체 힘 그대로)
+  //   (2) load_dynamic_cap: limit_mode friction 의 τ̄_i 를 N_i,j / N_i,0 배 (지평 스텝마다 다른 상자). 변화율 한계는 정지 τ̄ 기준 그대로
+  double load_com_height = 0.0;      // [m] 무게중심 높이 h (리포에 실측 없음 — URDF 차체 상자 중심 0.105)
+  double load_min_frac = 0.2;        // N_i ≥ 이 값 × 정지 N_i (바퀴가 뜨는 것까지는 안 본다)
+  bool load_weighted_alloc = true;
+  bool load_dynamic_cap = true;
 };
 
 struct TorqueStepStats
@@ -165,7 +244,10 @@ struct TorqueStepStats
   int active = 0;          // 활성 제약 수
   int fallback = 0;        // QP 실패 → 무제약 해를 상한으로 깎았다
   int exitflag = 0;
-  int d_skipped = 0;       // 이번 주기 외란 추정치 갱신을 건너뜀 (1 = 상태 간격, 2 = 잔차 계단)
+  int d_skipped = 0;       // 이번 주기 외란 추정치 갱신을 건너뜀 (1 = 상태 간격, 2 = 잔차 계단, 3 = 포화 중 멈춤)
+  int rho_updated = 0;     // 이번 주기 η 를 본 갱신 (g ≠ 0) 1 / 아님 0
+  double rho_g = 0.0;      // |g| = c_n / m_eq [m/s²] (직전 주기 기준)
+  double rho_r = 0.0;      // 몸체 속도 잔차 / Ts 의 ĝ 방향 성분 [m/s²] — η g + d·ĝ 의 측정
 };
 
 // 지평의 한 점: (포즈 X_r = [x, y, θ],  몸체 속도 u_r = [v_x, v_y, ω_z]).  ReferenceHorizon::horizon 의 원소와 같다
@@ -191,7 +273,14 @@ public:
 
   TVec4 tau_bar() const;                          // 이번에 쓰는 토크 상한 (바퀴별)
   double dtau_bar_of(double tau_bar) const {return tu_.rate_fraction * tau_bar;}
-  const TVec6 & d_hat() const {return d_hat_;}    // 필터 후 외란 추정치
+  bool cap_on_ground() const {return ground_;}     // 2026-11-22 마찰 상한이 바닥 토크에 걸렸나 (TorqueTuning::cap_on_ground)
+  const TVec6 & d_hat() const {return d_hat_;}    // 필터 후 외란 추정치 (dist_body_frame 이면 몸체 좌표)
+  TVec6 d_hat_world(double theta) const;          // 방향 θ 에서의 월드 좌표 값 (월드 저장이면 그대로)
+  const Eigen::Matrix<double, 3, 2> & dist_kalman_gain() const {return K_kal_;}   // 축별 [K_pos, K_vel]
+  double ff_normal_rho() const {return tu_.ff_normal_estimate ? rho_ : tu_.ff_normal_scale;}   // 지금 쓰는 ρ
+  double ff_normal_P() const {return Pz_(2, 2);}                // η̂ 분산
+  // 스칼라 random walk a 를 측정 [½Ts²; Ts] a + v (잡음 σ_p, σ_v) 로 볼 때 정상상태 Kalman 이득 (Riccati 반복). 시험·기록용 공개
+  static Eigen::RowVector2d steady_kalman_gain(double Ts, double q_rate, double r_pos, double r_vel);
   const TVec4 & tau_prev() const {return tau_prev_;}
   const TorqueStepStats & stats() const {return stats_;}
   const TorqueModel & model() const {return md_;}
@@ -199,10 +288,13 @@ public:
   const Eigen::VectorXd & solution() const {return T_;}        // T* 전체 (4Nc)
   const Eigen::VectorXd & target_input() const {return Us_;}   // 이번 주기 목표 입력 U_s (4Nc, 식-14)
   static TVec4 null_dir() {return TVec4(0.5, 0.5, -0.5, -0.5);}
+  // 2026-11-23 하중 이동: 이번 주기 지평 스텝별 상한 τ̄_i,j (4 × Nc, 하중 이동 끄면 열마다 tau_bar()) 와 스텝 0 의 수직력 N_i [N]
+  const Eigen::Matrix<double, 4, Eigen::Dynamic> & tau_bar_steps() const {return tb_steps_;}
+  const TVec4 & normal_forces_now() const {return n_now_;}
 
 private:
   void update_disturbance(const TVec6 & x_hat, double dt_state);
-  bool solve_qp(const TVec4 & tau_bar);
+  bool solve_qp(const TVec4 & tau_bar);   // 상자 = tb_steps_ (스텝별), 변화율 = 이 tau_bar (정지 상한) 기준
 
   TorqueModel md_;
   TorqueTuning tu_;
@@ -214,7 +306,23 @@ private:
   TorqueLinearModel lin_prev_;       // current_state: 직전 주기에 쓴 이산 모델 (외란 추정치용)
   bool has_lin_ = false;
   TVec6 d_hat_ = TVec6::Zero();
+  Eigen::Matrix<double, 3, 2> K_kal_ = Eigen::Matrix<double, 3, 2>::Zero();   // dist_kalman: 축별 [K_pos, K_vel]
+  TVec3 a_hat_ = TVec3::Zero();      // dist_kalman: 가속도 외란 추정 (저장 좌표). d_hat_ = [½Ts² â; Ts â]
+  // ff_normal_estimate: Kalman 상태 z = [d_x, d_y, η] (몸체) 와 공분산. η 몫은 리셋해도 남긴다
+  double rho_ = 1.0;
+  Eigen::Vector3d z_ = Eigen::Vector3d::Zero();
+  Eigen::Matrix3d Pz_ = Eigen::Matrix3d::Zero();
+  bool rho_have_ = false;            // 직전 주기의 c_n, n̂_c 가 측정 회귀에 쓸 만한가
+  double rho_cn_prev_ = 0.0;
+  Eigen::Vector2d rho_n_prev_ = Eigen::Vector2d::Zero();
+  void joint_kalman_update(const TVec6 & d_body, double theta);
+  bool us_clipped_ = false;          // 직전 주기 U_s 를 target_projection 이 잘랐다 (= 기준이 상한 밖) — 포화 중 멈춤에 쓴다
   TVec4 tau_bar_override_ = TVec4::Constant(-1.0);
+  Eigen::Matrix<double, 4, Eigen::Dynamic> tb_steps_;   // 2026-11-23 지평 스텝별 상한 (하중 이동)
+  TVec4 n_now_ = TVec4::Zero();                         // 스텝 0 의 바퀴별 수직력
+  TMat34 F_ = TMat34::Zero();                           // force_map (가중 배분용)
+  bool ground_ = false;                              // cap_on_ground 이 실제로 켜졌다 (limit_mode friction)
+  Eigen::Matrix4d P_ground_ = Eigen::Matrix4d::Identity();
   TorqueStepStats stats_;
 
   // 상수부

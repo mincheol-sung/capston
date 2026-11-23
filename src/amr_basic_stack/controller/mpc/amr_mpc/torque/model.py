@@ -40,6 +40,30 @@ def wheel_coefficients(value, name="friction coefficient"):
     return values.copy()
 
 
+def drive_params(plant_yaml):
+    """torque_plant.yaml drive 절 → (yaw_offset_deg, slip_coef_deg_per_mps2, slip_ac_max_mps2). 절이 없으면 (0, 0, 2) (2026-11-23)."""
+    d = (plant_yaml or {}).get("drive") or {}
+    return float(d.get("yaw_offset_deg", 0.0)), float(d.get("slip_coef_deg_per_mps2", 0.0)), float(d.get("slip_ac_max_mps2", 2.0))
+
+
+def drive_angle(yaw_offset, slip_coef, v_body, ac_max):
+    """구동계 방향 보정 각 δ = yaw_offset + slip_coef·a_c [rad],  a_c = |v_xy|·ω_z (v_body = [v_x, v_y, ω_z]) 를 ±ac_max 로 자름.
+    yaw_offset [rad], slip_coef [rad/(m/s²)]. C++ TorqueModel::correct_wheel_velocity 와 같은 식 (2026-11-23)."""
+    ac = float(np.clip(math.hypot(v_body[0], v_body[1]) * v_body[2], -ac_max, ac_max))
+    return yaw_offset + slip_coef * ac
+
+
+def drive_Tinv(Tinv, angle):
+    """구동계 방향 보정한 T⁻¹ (2026-11-23): 실제 몸체 속도 v → 바퀴 ω.
+    실물이 v_실제,xy = R(angle)·(T ω)_xy (바퀴가 굴러가는 축이 몸체 축보다 angle 반시계) 이면 ω = T⁻¹·blockdiag(R(−angle), 1)·v.
+    angle 0 이면 Tinv 그대로. 근거 analysis/torque_mpc_real/2026-11-23_horizon_real/RESULTS_KO.md 5·6 절."""
+    Tinv = np.asarray(Tinv, float)
+    if angle == 0.0:
+        return Tinv
+    c, s = math.cos(angle), math.sin(angle)
+    return Tinv @ np.array([[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]])      # 오른쪽에 R(−angle)
+
+
 def load_share(values):
     """바퀴별 수직력 몫 [FL, FR, RL, RR] → 합 1 로 맞춘 (4,) (2026-11-19). None·빈 값이면 1/4 씩.
     값마다 0.1~0.4, 합 1 ± 0.05 가 아니면 ValueError (C++ torque_mpc_node 와 같은 검사)."""
@@ -73,6 +97,8 @@ class TorquePlant:
     c_s: float
     g: float
     wheel_load_share: np.ndarray = None      # 바퀴별 수직력 몫 (합 1). None 이면 1/4 씩 (2026-11-19)
+    wheel_base: float = 0.0                  # 앞뒤 바퀴 축 거리 L [m] (하중 이동용, 2026-11-23). 0 이면 k 로 L = W = k
+    robot_width: float = 0.0                 # 좌우 바퀴 거리 W [m]
 
     def __post_init__(self):
         self.wheel_load_share = load_share(self.wheel_load_share)
@@ -101,6 +127,8 @@ class TorquePlant:
             c_s=float(surf["c_s"]),
             g=float(model["gravity"]),
             wheel_load_share=body.get("wheel_load_share") or None,
+            wheel_base=float(geo["wheel_base_m"]),
+            robot_width=float(geo["robot_width_m"]),
         )
         p.update(override)
         return cls(**p)
@@ -274,14 +302,33 @@ S_SIGN = np.array([-1.0, 1.0, 1.0, -1.0])
 C_SIGN = np.array([-1.0, 1.0, -1.0, 1.0])
 
 
+SX_SIGN = np.array([1.0, 1.0, -1.0, -1.0])        # 앞바퀴 (하중 이동: 앞으로 가속하면 준다)
+SY_SIGN = np.array([1.0, -1.0, 1.0, -1.0])        # 왼쪽 바퀴 (왼쪽으로 가속하면 — 왼쪽 선회의 구심 — 준다)
+
+
 class SlipPlant:
-    def __init__(self, plant, mu, v_eps=0.02, fric=None):
+    """com_height > 0 이면 하중 이동 (2026-11-23): 매 적분 스텝 시작에 직전 스텝의 몸체 가속도 (관성 가속도의 몸체 성분 a_x, a_y) 로
+    N_i = 몫_i m g − s_x m a_x h/(2L) − s_y m a_y h/(2W) (≥ 0, 0 이면 바퀴가 뜸). torque_mpc 의 TorqueModel::wheel_normal_forces 와 같은 식."""
+
+    def __init__(self, plant, mu, v_eps=0.02, fric=None, com_height=0.0):
         self.p = plant
         self.fric = fric                     # 구동계 마찰 (DrivetrainFriction) 또는 None
         self.mu = float(mu)
         self.v_eps = float(v_eps)
-        self.N = plant.wheel_normal_force              # (4,) 바퀴별 수직력
+        self.h = max(0.0, float(com_height))
+        self.N0 = plant.wheel_normal_force             # (4,) 정지 수직력
+        self.N = self.N0.copy()                        # (4,) 지금 수직력
         self.Fmax = self.mu * self.N                   # (4,) 바퀴별 최대 마찰력
+        self.a_body = np.zeros(2)                      # 직전 스텝 몸체 가속도 [a_x, a_y]
+
+    def normal_forces(self, a_body):
+        if self.h <= 0.0:
+            return self.N0
+        p = self.p
+        L = p.wheel_base if p.wheel_base > 0.0 else p.k
+        W = p.robot_width if p.robot_width > 0.0 else p.k
+        n = self.N0 - SX_SIGN * p.mass * a_body[0] * self.h / (2.0 * L) - SY_SIGN * p.mass * a_body[1] * self.h / (2.0 * W)
+        return np.maximum(n, 0.0)
 
     def contact_speed(self, X, Xd):
         """무슬립이라면 바퀴가 돌아야 할 각속도 (T⁻¹ v_body)."""
@@ -308,6 +355,9 @@ class SlipPlant:
         return np.concatenate([Xd, acc, wd])
 
     def step(self, X, Xd, w, tau, dt):
+        if self.h > 0.0:                                 # 하중 이동: 이 스텝 동안 N 고정 (직전 스텝 가속도)
+            self.N = self.normal_forces(self.a_body)
+            self.Fmax = self.mu * self.N
         s = np.concatenate([X, Xd, w])
         k1 = self.deriv(s, tau)
         k2 = self.deriv(s + 0.5 * dt * k1, tau)
@@ -315,11 +365,16 @@ class SlipPlant:
         k4 = self.deriv(s + dt * k3, tau)
         s = s + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
         s[2] = math.atan2(math.sin(s[2]), math.cos(s[2]))
+        if self.h > 0.0:
+            aw = (s[3:5] - np.asarray(Xd, float)[:2]) / dt                 # 관성 가속도 (월드)
+            c, sn = math.cos(s[2]), math.sin(s[2])
+            self.a_body = np.array([c * aw[0] + sn * aw[1], -sn * aw[0] + c * aw[1]])
         return s[:3], s[3:6], s[6:]
 
     def stable_dt(self):
-        """RK4 가 안정한 적분 간격의 대략값 (바퀴–바닥 마찰 시정수의 절반)."""
-        tc = self.p.J_w * 2.0 * self.v_eps / (self.p.r ** 2 * max(float(np.max(self.Fmax)), 1e-9))
+        """RK4 가 안정한 적분 간격의 대략값 (바퀴–바닥 마찰 시정수의 절반). 하중 이동이면 바깥 바퀴가 최대 2 배까지 무거워진다고 본다."""
+        fmax = float(np.max(self.mu * self.N0)) * (2.0 if self.h > 0.0 else 1.0)
+        tc = self.p.J_w * 2.0 * self.v_eps / (self.p.r ** 2 * max(fmax, 1e-9))
         dt = 0.5 * tc
         if self.fric is not None:                # 두 마찰이 같은 바퀴에 붙으므로 강성이 더해진다 → 간격의 조화합
             dt = 1.0 / (1.0 / dt + 1.0 / self.fric.stable_dt(self.p, slip=True))

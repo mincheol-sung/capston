@@ -38,6 +38,8 @@ track:
   align_s: 1.5            # [s] tangent 모드 앞뒤 제자리 회전
   speed_mod_amp: 0.0      # 순항 속도 sin 변조 진폭 ε (0 = 등속). v = speed·(1 + ε·sin(2π·n·σ/ℓ_lap)), 최고 speed·(1+ε) 가 부하 검사에 들어감. 2026-11-20
   speed_mod_cycles: 2.0   # 랩당 주기 수 n (circles8 에서 2 = 원 하나에 한 주기)
+  speed_mod_shape: sin    # sin | square (두 속도 V(1±ε) 계단, 바뀌는 곳은 accel 로 가감속). 2026-11-22
+  speed_mod_phase_deg: 0.0  # 변조 위상 φ [deg]: v = speed·(1 + ε·sin(2πnσ/ℓ_lap + φ)). −90 = 출발·교차점이 가장 느림 (n 짝수). 2026-11-22
   crossing_blend_m: 0.0   # [m] circles8 + tangent 교차점 헤딩 완화 (0 = 끔). 요 가속 최대 2v²/(R·Lb), 헤딩 최대 Lb/(4R) 덜 돔.
                           #   예 R 0.5: v 0.7 → 0.2 (9.8 rad/s², 5.7°), v 0.4 → 0.1 (6.4 rad/s², 2.9°). 2026-11-16
   start_delay: 3.0        # [s] 무장 뒤 출발까지 최소 대기 (진입 구간이 더 길면 그 시간)
@@ -68,6 +70,16 @@ track:
   square_corner_speed: 0.1  # [m/s] 꼭짓점 속도 (첫 출발·마지막 도착은 0)
   square_v_max: 0.0         # [m/s] > 0 이면 변 최고속도를 이 값에서 자름. 0 = 가속으로 낼 수 있는 최고 (부하 예산 V_LIMIT·load_budget 에서만 자름)
   square_yaw_blend: 0.3     # [m] tangent: 꼭짓점 앞뒤 합친 헤딩 회전 구간 (호길이). 0 < 값 ≤ side. 마지막 꼭짓점은 서서 align_s 동안 돌아 출발 헤딩으로
+  # 꼭짓점 처리 (2026-11-21). pass = 위대로 (corner_speed 로 지나며 tangent 면 yaw_blend 안에서 헤딩 회전).
+  #   stop = 꼭짓점마다 선다 (corner_speed·yaw_blend 무시): 쉼 dwell → (tangent) 제자리 +90° rot_s (스무스스텝) → 쉼 dwell → 다음 변.
+  #   accel 1.5 · v_max 1.5 에서 노드가 보는 앞먹임 max |U_s,i| / C 상한 (analysis/torque_mpc_sim/2026-11-20_square_profile):
+  #     pass (yaw_blend 0.3)   2.55 — 꼭짓점 구간 내내 초과, 주행 7.6 s
+  #     stop rot_s 0.6 / 0.8 / 1.0 / 1.2   1.22 / 0.96 / 0.96 / 0.96 (순수 회전 구간만 1.22 / 0.77 / 0.53 / 0.38)
+  #     0.96 = 직선 가감속 (RR) 그 자체. rot_s 1.0 + dwell_s 0.1 → 주행 11.6 s
+  #   몸체 v_y 가 어디서나 0 → 퓨어 퍼슛 (v_y = 0) 도 원리상 낼 수 있다. 꼭짓점에서 v_ref = 0 이라 PP 는 회전 모드 (rotate_speed) 로 돈다.
+  square_corner_mode: pass  # pass | stop
+  square_rot_s: 1.0         # [s] stop + tangent: 꼭짓점 제자리 90° 회전 시간 (ω 최대 1.5·(π/2)/rot_s = 2.36 rad/s)
+  square_dwell_s: 0.1       # [s] stop: 회전 앞·뒤 정지 (fixed 면 회전 없이 2·dwell)
 
   # 기준열 간격 (R4 리뷰 2026-11-13). MPC·퓨어 퍼슛은 행 사이를 직선으로 보간한다 → 곡선 안쪽으로 줄이 생긴다
   # (현 오차 ≈ v²·dt²/(8R)). 3 × 1.5 m 8자(R_min 0.31 m)에서 최대 보간 오차:

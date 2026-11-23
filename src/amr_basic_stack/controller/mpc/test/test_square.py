@@ -119,3 +119,53 @@ def test_peak_load_is_peak_speed_for_fixed():
 def test_rejects_bad_parameters(kw):
     with pytest.raises(ValueError):
         Square(**kw)
+
+
+# ── 꼭짓점 정지 corner_mode stop (2026-11-21) ──────────────────────────────
+STOP = dict(corner_mode="stop", accel=1.5, v_max=1.5, rot_s=1.0, dwell_s=0.1)
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_stop_velocity_matches_position_derivative(mode):
+    """stop 은 속도 계단이 없다 — 어디서나 발행 속도 = 위치·헤딩의 미분."""
+    sq = Square(yaw_mode=mode, **STOP)
+    for t in np.linspace(0.002, sq.T_total - 0.002, 4000):
+        assert np.allclose(sq.at(t, O)[1], body_fd(sq, t), atol=1e-4), t
+
+
+def test_stop_timeline_and_corner_rotation():
+    """변 4 개 × 2 s (0 → 1.5 → 0, a 1.5) + 사이 꼭짓점 3 개 × (0.1 + 1.0 + 0.1). 꼭짓점 블록 동안 위치 고정·속도 0, 헤딩 +90°."""
+    sq = Square(yaw_mode="tangent", **STOP)
+    assert sq.vc == 0.0 and sq.T_corner == pytest.approx(1.2)
+    assert sq.T_path == pytest.approx(4 * 2.0 + 3 * 1.2)
+    for i in range(3):
+        t_stop = sq.t_start[i] + sq.edges[i].T
+        X0, u0 = sq.at(t_stop + 1e-6, O)
+        X1, u1 = sq.at(t_stop + sq.T_corner - 1e-6, O)
+        assert np.allclose(u0, 0.0, atol=1e-5) and np.allclose(u1, 0.0, atol=1e-5)
+        assert np.allclose(X0[:2], X1[:2], atol=1e-12)
+        assert wrap(X1[2] - X0[2]) == pytest.approx(math.pi / 2, abs=1e-6)
+        Xm, um = sq.at(t_stop + sq.dwell + 0.5 * sq.rot, O)    # 회전 가운데: 병진 0, ω = 1.5·(π/2)/rot_s
+        assert np.allclose(um[:2], 0.0) and um[2] == pytest.approx(1.5 * 0.5 * math.pi / sq.rot)
+
+
+def test_stop_tangent_has_no_sideways_velocity():
+    """stop + tangent: 몸체 v_y = 0 이 어디서나 — 퓨어 퍼슛 (v_y = 0) 이 낼 수 있는 기준."""
+    sq = Square(yaw_mode="tangent", **STOP)
+    vy = [sq.at(t, O)[1][1] for t in np.linspace(0.0, sq.T_total, 4000)]
+    assert np.abs(vy).max() < 1e-9
+
+
+def test_stop_fixed_never_rotates_and_pass_unchanged():
+    sq = Square(yaw_mode="fixed", **STOP)
+    assert sq.rot == 0.0 and sq.T_corner == pytest.approx(0.2)
+    assert all(sq.at(t, O)[1][2] == 0.0 for t in np.linspace(0.0, sq.T_total, 500))
+    a, b = Square(), Square(corner_mode="pass")                 # 기본은 pass — 예전 기준 그대로
+    assert a.T_path == b.T_path and a.t_start == b.t_start
+
+
+@pytest.mark.parametrize("kw", [dict(corner_mode="halt"), dict(corner_mode="stop", rot_s=0.0),
+                                dict(corner_mode="stop", dwell_s=-0.1)])
+def test_stop_rejects_bad_parameters(kw):
+    with pytest.raises(ValueError):
+        Square(**kw)

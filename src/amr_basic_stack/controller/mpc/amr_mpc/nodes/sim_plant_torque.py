@@ -54,7 +54,7 @@ from amr_mpc.ak40 import protocol as AKP
 from amr_mpc.ak40.bus import CanBus
 from amr_mpc.ak40.fake import FakeAk40Motors
 from amr_mpc.core import config, node_main
-from amr_mpc.torque.sim_sensors import DEFAULTS as SENSOR_DEFAULTS, SimSensors
+from amr_mpc.torque.sim_sensors import DEFAULTS as SENSOR_DEFAULTS, SimSensors, parse_overrides as parse_sensor_overrides
 
 
 class SimPlantTorqueNode(Node):
@@ -89,8 +89,12 @@ class SimPlantTorqueNode(Node):
             # 포즈 튐 흉내 (2026-11-19, sim_sensors.py 머리주석). "t,dx,dy[,dyaw_deg[,once]]" — 출발 t 초 뒤부터 스캔 포즈를
             # (dx, dy) m·dyaw° 옮긴다. once 1 이면 스캔 하나만. 비우면 끔
             ("slam_jump", ""),
-            ("surface_mu", -1.0),        # 바닥 마찰계수. ≤ 0 이면 슬립 없음 (기존 모델)
+            # 2026-11-21 센서 잡음 덮어쓰기 "키=값,…" (sim_sensors.DEFAULTS 의 숫자 키, sensor_noise_scale 을 곱한 뒤에 그 값으로).
+            #   kf 게인 걸림돌 시험: 실차 수준 IMU 진동·SLAM 떨림, 시간 상관 SLAM 오차 slam_gm_* (sim_sensors 머리주석). 비우면 끔
+            ("sensor_override", ""),
+            ("surface_mu", -1.0),       # 바닥 마찰계수. ≤ 0 이면 슬립 없음 (기존 모델)
             ("slip_v_eps", 0.02),        # [m/s] 마찰력을 부드럽게 잇는 미끄럼 속도
+            ("com_height", 0.0),         # [m] 슬립 모델 하중 이동 무게중심 높이 (2026-11-23, 0 = 정지 하중 — 예전)
             ("floor_efficiency", [1.0, 1.0, 1.0]),   # 바닥 효율 [η_x, η_y, η_ψ] (model.py step eff, 슬립 없는 판만). 실차 5-2 (0.15 N·m 가속 맞춤): 0.65, 0.40, 0.40
             ("wheel_efficiency", [1.0, 1.0, 1.0, 1.0]),   # 바퀴별 효율 [FL FR RL RR] (model.py step wheel_eff, 슬립 없는 판만)
             ("friction_scale", 1.0),     # 구동계 마찰 = torque_plant.yaml friction × 이 값. 0 이면 마찰 없음
@@ -121,7 +125,7 @@ class SimPlantTorqueNode(Node):
             raise SystemExit("[sim_plant_torque] wheel_efficiency 는 슬립 없는 판(surface_mu ≤ 0)에만")
         if self.eff is not None and float(g("surface_mu")) > 0:
             raise SystemExit("[sim_plant_torque] floor_efficiency 는 슬립 없는 판(surface_mu ≤ 0)에만 — 둘 중 하나만")
-        self.slip = (SlipPlant(self.p, float(g("surface_mu")), float(g("slip_v_eps")), fric=self.fric)
+        self.slip = (SlipPlant(self.p, float(g("surface_mu")), float(g("slip_v_eps")), fric=self.fric, com_height=float(g("com_height")))
                      if float(g("surface_mu")) > 0 else None)
         self.w = np.zeros(4)                                      # 슬립 모델의 바퀴 각속도
         self.Xd = np.zeros(3)
@@ -155,6 +159,13 @@ class SimPlantTorqueNode(Node):
                 self.get_logger().warning(
                     f"포즈 튐 흉내: 출발 {jump[0]:g} s 뒤 SLAM 포즈 ({jump[1]:+.2f}, {jump[2]:+.2f}) m, {jump[3]:+.1f}° "
                     f"{'스캔 하나만' if jump[4] else '그 뒤 계속'}")
+            try:
+                over = parse_sensor_overrides(g("sensor_override"))
+            except ValueError as e:
+                raise SystemExit(f"[sim_plant] {e}")
+            if over:
+                scfg.update(over)
+                self.get_logger().warning("센서 잡음 덮어쓰기: " + ", ".join(f"{k} {v:g}" for k, v in over.items()))
             self.sensors = SimSensors(scfg, seed=int(g("sensor_seed")))
             self.pub_div = max(1, int(round(float(g("imu_rate_hz")) / float(g("rate_hz")))))
             self.dt = self.dt / self.pub_div                  # 물리 틱 = IMU 주기

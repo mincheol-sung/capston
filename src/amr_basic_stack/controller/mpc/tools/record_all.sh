@@ -80,7 +80,8 @@ PIDS+=($!)
 (
   sleep 20
   for n in torque_mpc_node state_estimator_node figure8_reference_node torque_output_node ak40_can_node \
-           fault_monitor_node torque_command_gate slip_logger_node torque_viz_node imu_to_base_node; do
+           fault_monitor_node torque_command_gate slip_logger_node torque_viz_node imu_to_base_node \
+           pure_pursuit_node wheel_pi_node; do      # 2026-11-23 PP 판 (pp·adpp 룩어헤드, PI 게인) — MPC 판에선 없어서 파일이 안 남는다
     timeout 10 ros2 param dump "/$n" > "$TMP/params/$n.yaml" 2>/dev/null || rm -f "$TMP/params/$n.yaml"
   done
   echo "[record_all] 파라미터 저장 ($(ls "$TMP/params" | wc -l) 개 노드)"

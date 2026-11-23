@@ -33,15 +33,32 @@
 #   - 토크에 NaN·inf 가 있으면 DAMPING 으로 바꿔 낸다 (R6 리뷰 2026-11-13). 그대로 두면 inf 는 클램프에서
 #     ±τ_lim(최대 토크)이 된다. CAN 다리(ak40 bridge.set_command)도 NaN·inf 를 DAMPING 으로 바꾸지만 여기서 먼저 막는다.
 #     바퀴 속도에 NaN 이 있으면 그 바퀴 마찰 보상만 0 으로 둔다.
+#
+# 바퀴별 슬립 가드 (2026-11-21, slip_guard — 기본 끔. 비교군 C 실험용)
+#   /imu/base_link 자이로 ω_z 와 네 바퀴 ω 로 바퀴마다 leave-one-out 기구학 잔차 σ_i 를 내고, 한 바퀴가 자기 토크 방향으로
+#   바닥보다 더 돌면 (가속 헛돎·제동 잠김) 그 바퀴 순토크에 곱하는 이득 g_i 를 줄인다 — 식·문턱 근거는 amr_mpc/torque/slip_guard.py.
+#   마찰 보상 전 순토크 τ* 에 곱한다 (τ_cmd = g·τ* + τ_fric). MPC 는 이 줄임을 모른다 (MPC 바깥 층).
+#   /torque_output/slip_guard (Float64MultiArray) [t, σ×4, g×4, 판정 바퀴 (−1 없음, 0 FL … 3 RR)]
+#   자이로 바이어스는 네 바퀴가 서 있을 때 (|ω| < 0.05 rad/s) 지수 평균으로 잡는다. DAMPING 이 지나가면 g 를 1 로 되돌린다.
+#
+# 구동계 앞방향 보정 δ0 (2026-11-23, torque_plant.yaml drive.yaw_offset_deg, 기본 0): 정지 마찰 방향의 기준 바퀴속도와 슬립 가드의
+#   T⁻¹ 을 T⁻¹·R(−δ0) 로 (amr_mpc/torque/model.py drive_Tinv). launch drive_yaw_deg
 # ---------------------------------------------------------------
+
+import math
 
 import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
 
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import Imu
+from std_msgs.msg import Float64MultiArray
+
 from amr_interfaces.msg import PlanarReferenceArray, WheelStates, WheelTorqueCommand
-from amr_mpc.torque.model import TorquePlant, wheel_coefficients
+from amr_mpc.torque.slip_guard import SlipGuard
+from amr_mpc.torque.model import TorquePlant, drive_params, drive_Tinv, wheel_coefficients
 from amr_mpc.core import config, node_main
 
 
@@ -124,6 +141,17 @@ class TorqueOutputNode(Node):
             ("tau_limit_Nm", p.tau_rated),
             ("wheel_timeout", 0.3),
             ("max_wheel_rad_per_sec", rated_rpm * 2.0 * np.pi / 60.0),
+            ("slip_guard", False),                    # 바퀴별 슬립 가드 (2026-11-21). 아래는 그 설정 — amr_mpc/torque/slip_guard.py
+            ("imu_topic", "/imu/base_link"),
+            ("slip_threshold", 0.35),                 # σ 문턱 (bag 으로 고른 값. 2026-11-21 233706: 0.5 는 FL 헛돎을 0.15 s 늦게 잡아 0.35 로)
+            ("slip_floor_rad_s", 5.0),                # σ 분모 하한 [rad/s] (0.2 m/s) — 저속 잡음
+            ("slip_min_on_s", 0.05),                  # [s] 문턱을 이만큼 계속 넘어야 판정
+            ("slip_gain_min", 0.4),                   # g 하한 — 토크를 0 까지 끊지 않는다
+            ("slip_down_per_s", 8.0),                 # 판정 중 g 감소율 [1/s] (1 → 0.4 에 75 ms)
+            ("slip_up_per_s", 2.0),                   # 판정이 풀리면 g 회복률 [1/s] (0.4 → 1 에 0.3 s)
+            # 2026-11-23 구동계 앞방향 보정 δ0 (torque_plant.yaml drive, 기본 0) — 기준 바퀴속도 (정지 마찰 방향) 와 슬립 가드 T⁻¹ 에.
+            #   선회 미끄럼 몫은 여기서 안 쓴다 (슬립 가드가 잡을 대상이 아니고, 정지 마찰 방향에는 영향이 작다)
+            ("drive_yaw_offset_deg", drive_params(plant_yaml)[0]),
         ])
         g = lambda n: self.get_parameter(n).value
         scale = float(g("compensation_scale"))
@@ -136,7 +164,8 @@ class TorqueOutputNode(Node):
         if self.stribeck <= 0.0:
             raise ValueError(f"stribeck_rad_s {self.stribeck} — 0 보다 커야 한다")
         self.ref_timeout = float(g("reference_timeout"))
-        self.Tinv = p.Tinv
+        self.drive_yaw = math.radians(float(g("drive_yaw_offset_deg")))
+        self.Tinv = drive_Tinv(p.Tinv, self.drive_yaw)          # 실제 몸체 속도 → 바퀴 ω (δ0 0 이면 공칭)
         self.smooth, self.limit = max(1e-6, float(g("friction_smooth_rad_s"))), float(g("tau_limit_Nm"))
         self.wheel_timeout = float(g("wheel_timeout"))
         self.has_friction = bool(np.any(self.coulomb) or np.any(self.viscous))
@@ -144,6 +173,14 @@ class TorqueOutputNode(Node):
         self.omega = np.zeros(4)
         self.omega_t = None
         self.ref = None                                 # (stamp, dt, 몸체속도 행 (N, 3))
+        self.guard = None
+        if bool(g("slip_guard")):
+            self.guard = SlipGuard(self.Tinv, g("slip_threshold"), g("slip_floor_rad_s"), g("slip_min_on_s"), 3,
+                                   g("slip_gain_min"), g("slip_down_per_s"), g("slip_up_per_s"))
+            self.wz, self.wz_t, self.gyro_bias, self.bias_n = 0.0, None, 0.0, 0
+            self.tau_net = np.zeros(4)
+            self.pub_guard = self.create_publisher(Float64MultiArray, "/torque_output/slip_guard", 10)
+            self.create_subscription(Imu, str(g("imu_topic")), self.on_imu, qos_profile_sensor_data)
 
         ref_topic = str(g("reference_topic"))
         self.pub = self.create_publisher(WheelTorqueCommand, str(g("output_topic")), 10)
@@ -157,6 +194,13 @@ class TorqueOutputNode(Node):
             f"torque_output: {g('input_topic')} → {g('output_topic')}   마찰 보상 "
             f"{'없음(0)' if not self.has_friction else f'coulomb {self.coulomb} N·m, viscous {self.viscous} N·m·s/rad (실측 × {scale})'}"
             f"   정지 마찰 {static_txt}   안전 클램프 ±{self.limit} N·m")
+        if self.drive_yaw:
+            self.get_logger().info(f"구동계 앞방향 보정 δ0 {math.degrees(self.drive_yaw):+.2f}° — 기준 바퀴속도·슬립 가드 T⁻¹·R(−δ0)")
+        if self.guard is not None:
+            gd = self.guard
+            self.get_logger().info(
+                f"슬립 가드 켬: σ 문턱 {gd.th} (분모 하한 {gd.floor} rad/s, {gd.min_on*1e3:.0f} ms 지속), g ≥ {gd.g_min}, "
+                f"감소 {gd.down}/s · 회복 {gd.up}/s, 자이로 {g('imu_topic')}")
         warn = friction_reserve_warning(self.coulomb, self.viscous, p.fric_max, float(g("max_wheel_rad_per_sec")))
         if warn:
             self.get_logger().warning(warn)
@@ -166,9 +210,26 @@ class TorqueOutputNode(Node):
     def now_s(self):
         return self.get_clock().now().nanoseconds * 1e-9
 
+    def on_imu(self, msg):
+        self.wz, self.wz_t = float(msg.angular_velocity.z), self.now_s()
+
     def on_wheel(self, msg):
+        now = self.now_s()
+        dt = now - self.omega_t if self.omega_t is not None else 0.0
         self.omega = np.array(msg.velocity, float)
-        self.omega_t = self.now_s()
+        self.omega_t = now
+        if self.guard is None or not np.all(np.isfinite(self.omega)):
+            return
+        if self.wz_t is None or now - self.wz_t > 0.1:      # 자이로가 없으면 감지하지 않고 g 를 되돌린다
+            self.guard.reset()
+            return
+        if np.all(np.abs(self.omega) < 0.05):               # 서 있으면 자이로 바이어스를 지수 평균으로
+            self.bias_n = min(self.bias_n + 1, 200)
+            self.gyro_bias += (self.wz - self.gyro_bias) / self.bias_n
+        gains = self.guard.update(self.omega, self.wz - self.gyro_bias, self.tau_net, dt)
+        m = Float64MultiArray()
+        m.data = [now, *self.guard.sigma.tolist(), *gains.tolist(), float(self.guard.flagged)]
+        self.pub_guard.publish(m)
 
     def on_reference(self, msg):
         rows = np.array([[r.vx, r.vy, r.yaw_rate] for r in msg.references], float).reshape(-1, 3)
@@ -176,6 +237,9 @@ class TorqueOutputNode(Node):
 
     def on_cmd(self, msg):
         if msg.mode != WheelTorqueCommand.MODE_TORQUE:
+            if self.guard is not None:                  # 추종이 끊겼다 — 다음 무장은 g = 1 에서
+                self.guard.reset()
+                self.tau_net = np.zeros(4)
             self.pub.publish(msg)                       # DAMPING 등은 그대로
             return
         if not np.all(np.isfinite(msg.torque)):
@@ -195,7 +259,11 @@ class TorqueOutputNode(Node):
         # 정지 마찰 항은 ω ≈ 0 에서 최대라, 바퀴 속도를 모를 때(0 으로 둔 때) 켜면 도는 바퀴에도 더해진다 → 끈다
         omega_ref = (reference_wheel_speed(self.ref, self.now_s(), self.Tinv, self.ref_timeout)
                      if self.has_static and wheel_ok else None)
-        tau, clipped = motor_command(msg.torque, omega, self.coulomb, self.viscous, self.smooth, self.limit,
+        tau_net = np.asarray(msg.torque, float)
+        if self.guard is not None:
+            self.tau_net = tau_net.copy()               # 감지의 토크 방향은 MPC 가 원한 값으로
+            tau_net = self.guard.g * tau_net
+        tau, clipped = motor_command(tau_net, omega, self.coulomb, self.viscous, self.smooth, self.limit,
                                      omega_ref, self.static, self.stribeck)
         if clipped:
             self.get_logger().warning(f"안전 클램프 ±{self.limit} N·m 에 걸림", throttle_duration_sec=2.0)

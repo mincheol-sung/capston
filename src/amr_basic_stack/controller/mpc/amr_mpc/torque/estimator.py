@@ -94,6 +94,9 @@ def design_gains(T, accel_noise_density, accel_bias_walk, pose_noise_xy,
 
 
 MODES = ("kf", "slam")
+# kf 게인을 정하는 잡음 값 (design_gains 인자 순서). state_estimator_node 가 ROS 파라미터로도 받는다 (2026-11-21)
+NOISE_KEYS = ("accel_noise_density", "accel_bias_walk", "pose_noise_xy",
+              "gyro_noise_density", "gyro_bias_walk", "pose_noise_yaw_deg")
 
 
 class PlanarStateEstimator:

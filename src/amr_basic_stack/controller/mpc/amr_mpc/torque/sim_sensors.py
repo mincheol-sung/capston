@@ -10,6 +10,10 @@
     로봇이 처음 움직인 뒤(속도 > 0.05 m/s) slam_jump_t 초부터 스캔 포즈에 (slam_jump_dx, dy) [m, map], slam_jump_dyaw_deg 를 더한다.
       slam_jump_once false : 그 뒤로 계속 (전역 최적화·재측위처럼 SLAM 이 다른 자리로 옮겨 간 꼴)
       slam_jump_once true  : 스캔 하나에만 (스캔 매칭이 한 번 틀린 꼴)
+  · 시간 상관 SLAM 오차 (2026-11-21, kf 게인 튜닝의 걸림돌 ① 시험용). slam_gm_xy·slam_gm_yaw_deg > 0 이면 스캔마다
+    1차 Gauss-Markov 오차 b_{k+1} = φ b_k + √(1−φ²) σ n_k (φ = exp(−slam_period/slam_gm_tau), 정상 σ 그대로) 를 x·y·yaw 에 더한다.
+    white 잡음 slam_noise_xy 와 따로. 실차 정지 SLAM 떨림이 ρ(0.1 s) 0.4~0.76, ρ(1 s) 0.4~0.6 이었다
+    (analysis/estimator_tuning/2026-11-21_kf_innovation). 기본 0 = 없음 (예전과 같은 난수열).
   · slam_mode
       scan_time    : 스캔 시각 stamp 의 포즈를 늦게 한 번 낸다 (Cartographer use_pose_extrapolator = false 꼴)
       extrapolated : 100 Hz 로 stamp = 지금 인 포즈를 낸다. 마지막 두 스캔 포즈의 차로 구한 일정 속도로 위치를 외삽하고
@@ -32,7 +36,22 @@ DEFAULTS = dict(
     pose_pub_period=0.01,               # extrapolated 모드의 발행 주기
     gravity=9.81,
     slam_jump_t=-1.0, slam_jump_dx=0.0, slam_jump_dy=0.0, slam_jump_dyaw_deg=0.0, slam_jump_once=False,   # 포즈 튐 (머리주석)
+    slam_gm_xy=0.0, slam_gm_yaw_deg=0.0, slam_gm_tau=1.0,   # 시간 상관 SLAM 오차 [m, deg, s] (머리주석)
 )
+
+
+def parse_overrides(text):
+    """'키=값,키=값' → {키: float}. 키는 DEFAULTS 의 숫자 항목만 (launch 인자 sim_noise, 2026-11-21)."""
+    out = {}
+    for item in str(text or "").replace(" ", "").split(","):
+        if not item:
+            continue
+        k, sep, v = item.partition("=")
+        if not sep or k not in DEFAULTS or isinstance(DEFAULTS[k], (bool, str)):
+            num = sorted(n for n, d in DEFAULTS.items() if not isinstance(d, (bool, str)))
+            raise ValueError(f"sim_noise 항목 {item!r} — '키=값' 꼴, 키는 {num}")
+        out[k] = float(v)
+    return out
 
 
 class SimSensors:
@@ -51,6 +70,8 @@ class SimSensors:
         self.scans = deque(maxlen=2)        # 외삽기가 가진 스캔 포즈 (t_scan, p[2], yaw, theta_true)
         self.t_moved = None                 # 처음 움직인 시각 (포즈 튐 흉내 기준)
         self.jumps_done = 0                 # 튐을 넣은 스캔 수
+        self.gm = np.zeros(3)               # 시간 상관 SLAM 오차 [x, y, yaw(rad)] (머리주석)
+        self.gm_rng = np.random.default_rng(seed + 7919)   # 따로 둔 난수열 — 끄면 예전 판과 같은 잡음
 
     def _point(self, X):
         c, s = math.cos(X[2]), math.sin(X[2])
@@ -91,6 +112,15 @@ class SimSensors:
         if t >= self.next_scan:
             p = self._point(X) + self.rng.normal(0, c["slam_noise_xy"], 2)
             yaw = X[2] + self.rng.normal(0, math.radians(c["slam_noise_yaw_deg"]))
+            if c["slam_gm_xy"] > 0.0 or c["slam_gm_yaw_deg"] > 0.0:
+                phi = math.exp(-c["slam_period"] / max(c["slam_gm_tau"], 1e-6))
+                sig = np.array([c["slam_gm_xy"], c["slam_gm_xy"], math.radians(c["slam_gm_yaw_deg"])])
+                if not np.any(self.gm):                            # 첫 스캔: 정상분포에서 시작 (처음부터 정상 σ)
+                    self.gm = sig * self.gm_rng.standard_normal(3)
+                else:
+                    self.gm = phi * self.gm + math.sqrt(1.0 - phi * phi) * sig * self.gm_rng.standard_normal(3)
+                p = p + self.gm[:2]
+                yaw += self.gm[2]
             if (c["slam_jump_t"] >= 0.0 and self.t_moved is not None and t >= self.t_moved + c["slam_jump_t"]
                     and not (c["slam_jump_once"] and self.jumps_done > 0)):
                 p = p + np.array([c["slam_jump_dx"], c["slam_jump_dy"]])

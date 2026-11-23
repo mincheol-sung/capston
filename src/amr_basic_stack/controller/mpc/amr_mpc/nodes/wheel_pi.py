@@ -25,7 +25,12 @@
 # DAMPING + 리셋 조건
 #   미무장 · 무장 뒤 새 속도 명령 전 · 속도 명령 끊김(cmd_timeout — 퓨어 퍼슛이 정지를 결정하면 명령을 끊는다) ·
 #   /wheel_states 끊김(wheel_timeout, 감시 타이머가 낸다)
+#
+# 구동계 방향 보정 (2026-11-23, torque_plant.yaml drive — 기본 0): 실물 v_실제,xy = R(δ)·(T ω)_xy 이므로 ω = T⁻¹·R(−δ)·v.
+#   δ = δ0 + c·a_c, a_c = |v|·ω_z (그 v 로). 근거 analysis/torque_mpc_real/2026-11-23_horizon_real 5·6 절. launch drive_yaw_deg·drive_slip_coef
 # ---------------------------------------------------------------
+
+import math
 
 import numpy as np
 import rclpy
@@ -39,7 +44,7 @@ from std_msgs.msg import Bool, Float64MultiArray
 from amr_interfaces.msg import WheelStates, WheelTorqueCommand
 from amr_mpc.baseline.wheel_pi import WheelPI, wheel_targets
 from amr_mpc.core import config, node_main
-from amr_mpc.torque.model import TorquePlant
+from amr_mpc.torque.model import TorquePlant, drive_angle, drive_params, drive_Tinv
 
 
 class WheelPINode(Node):
@@ -48,6 +53,7 @@ class WheelPINode(Node):
         ya = config.load("torque_baseline_a.yaml")["wheel_pi"]
         ym = config.load("torque_mpc.yaml")
         plant = TorquePlant.from_yaml()
+        dyaw, dcoef, dac = drive_params(config.load("torque_plant.yaml"))
         self.declare_parameters("", [
             ("cmd_topic", "/pure_pursuit/cmd_vel"),
             ("wheel_states_topic", "/wheel_states"),
@@ -62,6 +68,10 @@ class WheelPINode(Node):
             ("wheel_timeout", float(ym["safety"]["state_timeout"])),
             ("speed_source", str(ya.get("speed_source", "wheels"))),   # wheels | estimator (머리주석)
             ("speed_topic", "/state_estimator/odom"),
+            # 2026-11-23 구동계 방향 보정 (torque_plant.yaml drive, 기본 0). ω_ref = T⁻¹·R(−δ)·v_cmd,  δ = δ0 + c·a_c (a_c = |v_cmd|·ω_cmd)
+            ("drive_yaw_offset_deg", dyaw),
+            ("drive_slip_coef_deg", dcoef),
+            ("drive_slip_ac_max", dac),
         ])
         g = lambda n: self.get_parameter(n).value
         tau_max = float(g("tau_max_Nm"))
@@ -73,6 +83,11 @@ class WheelPINode(Node):
         self.Ts = float(g("Ts"))
         self.pi = WheelPI(float(g("kp")), float(g("ki")), tau_max, tau_max * rf / self.Ts, dt_max=3.0 * self.Ts)
         self.Tinv = plant.Tinv
+        self.drive = (math.radians(float(g("drive_yaw_offset_deg"))), math.radians(float(g("drive_slip_coef_deg"))),
+                      float(g("drive_slip_ac_max")))
+        if self.drive[0] or self.drive[1]:
+            self.get_logger().info(f"구동계 방향 보정: δ0 {math.degrees(self.drive[0]):+.2f}°, 선회 미끄럼 {math.degrees(self.drive[1]):+.2f} °/(m/s²) "
+                                   f"× a_c (|a_c| ≤ {self.drive[2]:.1f}) — ω_ref = T⁻¹·R(−δ)·v")
         self.cmd_timeout, self.wheel_timeout = float(g("cmd_timeout")), float(g("wheel_timeout"))
 
         self.speed_source = str(g("speed_source")).strip().lower()
@@ -123,6 +138,10 @@ class WheelPINode(Node):
         self.v_cmd = np.array([m.twist.linear.x, m.twist.linear.y, m.twist.angular.z], float)
         self.cmd_rx = self.now_s()
 
+    def Tinv_at(self, v):
+        """몸체 속도 v 에서의 보정 T⁻¹ (drive 가 0 이면 공칭 그대로)."""
+        return drive_Tinv(self.Tinv, drive_angle(*self.drive[:2], v, self.drive[2]))
+
     def damping(self, reason):
         out = WheelTorqueCommand()
         out.header.stamp = self.get_clock().now().to_msg()
@@ -162,10 +181,10 @@ class WheelPINode(Node):
         if self.speed_source == "estimator":
             if now - self.est_rx > self.wheel_timeout:
                 return self.damping("추정기 속도 끊김")
-            omega = wheel_targets(self.Tinv, self.v_est)        # 추정기 몸체 속도 → 바퀴 속도 (T⁻¹ v)
+            omega = wheel_targets(self.Tinv_at(self.v_est), self.v_est)    # 추정기 몸체 속도 → 바퀴 속도 (T⁻¹ v, 보정 포함)
         else:
             omega = np.asarray(m.velocity, float)
-        omega_ref = wheel_targets(self.Tinv, self.v_cmd)
+        omega_ref = wheel_targets(self.Tinv_at(self.v_cmd), self.v_cmd)
         tau = self.pi.step(omega_ref, omega, dt)
         out = WheelTorqueCommand()
         out.header.stamp = m.header.stamp           # 계산에 쓴 바퀴 상태의 시각 (종단 지연 측정용, MPC 와 같은 규약)

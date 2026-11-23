@@ -306,19 +306,24 @@ TEST(TorqueMPC, WheelLoadShare)
   EXPECT_NEAR(mpcb.tau_bar()(3), md.tau_motor_limit(), 1e-12);
 }
 
-// 바퀴별 μ̂ (2026-11-19 (11)): 값이 있는 바퀴는 (r/√2)·μ̂_i·(mg/4)·c_s — mu_hat·하중 몫을 안 쓴다. 0 이하인 바퀴는 mu_hat × 하중 몫
-TEST(TorqueMPC, MuHatWheelsOverrideLoadShare)
+// 바퀴별 μ̂ (2026-11-19 (11), 2026-11-22 N_i 기준): 값이 있는 바퀴는 (r/√2)·μ̂_i·N_i·c_s — mu_hat 자리만 바뀌고 하중 몫은 곱한다.
+//   0 이하인 바퀴는 mu_hat × 하중 몫
+TEST(TorqueMPC, MuHatWheelsUseLoadShare)
 {
   TorqueModel md;
   md.mu_hat = 0.4;
   md.wheel_load_share = TVec4(0.2388, 0.2392, 0.2608, 0.2612);
-  md.mu_hat_wheels = TVec4(0.432, 0.285, -1.0, 0.350);
-  const double quarter = md.wheel_radius / std::sqrt(2.0) * md.mass * md.gravity / 4.0 * md.c_s;   // μ̂ 1 일 때 mg/4 기준
+  md.mu_hat_wheels = TVec4(0.598, 0.489, -1.0, 0.703);
+  const double unit = md.wheel_radius / std::sqrt(2.0) * md.mass * md.gravity * md.c_s;   // μ̂ 1, 하중 몫 1 일 때
   const TVec4 tf = md.tau_friction_limits();
-  EXPECT_NEAR(tf(0), 0.432 * quarter, 1e-12);
-  EXPECT_NEAR(tf(1), 0.285 * quarter, 1e-12);
-  EXPECT_NEAR(tf(2), 0.4 * 4.0 * 0.2608 * quarter, 1e-12);    // RL: mu_hat × 하중 몫
-  EXPECT_NEAR(tf(3), 0.350 * quarter, 1e-12);
+  EXPECT_NEAR(tf(0), 0.598 * 0.2388 * unit, 1e-12);
+  EXPECT_NEAR(tf(1), 0.489 * 0.2392 * unit, 1e-12);
+  EXPECT_NEAR(tf(2), 0.4 * 0.2608 * unit, 1e-12);             // RL: mu_hat × 하중 몫
+  EXPECT_NEAR(tf(3), 0.703 * 0.2612 * unit, 1e-12);
+  // 하중 몫이 1/4 이면 11-21 까지의 mg/4 기준 식 (r/√2)·μ̂_i·(mg/4)·c_s 와 같다
+  md.wheel_load_share = TVec4::Constant(0.25);
+  EXPECT_NEAR(md.tau_friction_limits()(0), 0.598 * unit / 4.0, 1e-12);
+  md.wheel_load_share = TVec4(0.2388, 0.2392, 0.2608, 0.2612);
   TorqueTuning tu;
   tu.limit_mode = TorqueLimitMode::Friction;
   TorqueMPC mpc(md, tu);
@@ -731,4 +736,453 @@ TEST(TorqueLinearizationMPC, DisturbanceEstimateRemovesOffset)
   EXPECT_GT(off, 2e-4);
   EXPECT_LT(std::abs(on), 0.05 * off);
   std::printf("            [current_state] 정상상태 오차  d̂ 끔 %.3f mm   d̂ 켬 %.4f mm\n", off * 1e3, on * 1e3);
+}
+
+// 2026-11-21 몸체 좌표 외란 추정치: 원을 도는 동안 몸체 기준으로 일정한 옆 힘 (실차 8자의 원 안쪽 어긋남 꼴).
+//   월드 좌표 d̂ 는 그 힘이 ω 로 도는 벡터라 느린 α 에서 지워지고, 몸체 좌표 d̂ 는 일정한 값으로 잡아 정상상태 옆 오차를 없앤다.
+namespace
+{
+struct CircleRun
+{
+  double radial_mean = 0.0;   // 마지막 3 s 의 (|p − c| − R) 평균 [m] (+ 바깥)
+  TVec6 d_last = TVec6::Zero();
+};
+
+CircleRun run_circle_body_force(bool enable, bool body, double alpha)
+{
+  TorqueModel md;
+  TorqueTuning tu;
+  tu.W << 20, 20, 10, 2, 2, 1;          // 지금 실차 Q (2026-11-21), R_Δ 100, R_U 10
+  tu.w_delta = 100.0;
+  tu.r_u = 10.0;
+  tu.dist_enable = enable;
+  tu.dist_alpha = alpha;
+  tu.dist_accel_only = true;
+  tu.dist_body_frame = body;
+  tu.dist_skip_xy = -1.0;
+  TorqueMPC mpc(md, tu);
+  Plant plant{md};
+  const double R = 0.5, v = 0.5, om = v / R;
+  const TVec3 F_body(0.0, -2.0, 0.0);   // 몸체 기준 오른쪽 (원 바깥) 2 N
+  plant.x << 0, 0, 0, v, 0, om;
+  CircleRun out;
+  int n = 0;
+  const int steps = 900;                // 9 s (한 바퀴 6.3 s)
+  for (int k = 0; k < steps; ++k) {
+    const double th = plant.x(2), c = std::cos(th), s = std::sin(th);
+    plant.force_ext << c * F_body(0) - s * F_body(1), s * F_body(0) + c * F_body(1), 0.0;
+    std::vector<TorqueRefPoint> ref;
+    for (int j = 0; j <= tu.Np; ++j) {ref.push_back(circle(R, v, (k + j) * tu.Ts));}
+    plant.step(mpc.step(plant.x, ref, nullptr, tu.Ts), tu.Ts);
+    if (k >= steps - 300) {
+      out.radial_mean += std::hypot(plant.x(0), plant.x(1) - R) - R;
+      ++n;
+    }
+  }
+  out.radial_mean /= n;
+  out.d_last = mpc.d_hat();
+  return out;
+}
+}  // namespace
+
+TEST(TorqueMPC, DisturbanceBodyFrameOnCircle)
+{
+  const auto off = run_circle_body_force(false, false, 0.01);
+  const auto world = run_circle_body_force(true, false, 0.01);
+  const auto body = run_circle_body_force(true, true, 0.01);
+  std::printf("            원 위 몸체 옆 힘 2 N: 반경 어긋남  d̂ 끔 %+.1f mm  월드 α0.01 %+.1f mm  몸체 α0.01 %+.1f mm\n",
+    off.radial_mean * 1e3, world.radial_mean * 1e3, body.radial_mean * 1e3);
+  EXPECT_GT(off.radial_mean, 0.01);                                  // 끄면 바깥으로 1 cm 넘게 남는다
+  EXPECT_LT(std::abs(body.radial_mean), 0.2 * off.radial_mean);       // 몸체 좌표: 1/5 아래
+  EXPECT_LT(std::abs(body.radial_mean), 0.5 * std::abs(world.radial_mean));   // 월드 좌표 (같은 α) 보다 절반 아래
+  // 몸체 좌표 d̂ 는 그 힘을 일정한 값으로 잡는다: d̂_ẏ / Ts ≈ F_y / m_eff
+  TorqueModel md;
+  EXPECT_NEAR(body.d_last(4) / 0.01, (-2.0) / md.m_eff(), 0.3 * std::abs((-2.0) / md.m_eff()));
+}
+
+// 포화 중 갱신 멈춤: 상한이 작아 τ 가 붙어 있는 동안은 d̂ 가 그대로다 (d_skipped 3). 끄면 갱신된다
+TEST(TorqueMPC, DisturbanceFreezeOnSaturation)
+{
+  for (bool freeze : {true, false}) {
+    TorqueModel md;
+    TorqueTuning tu;
+    tu.dist_freeze_on_sat = freeze;
+    tu.dist_alpha = 1.0;
+    tu.dist_skip_xy = -1.0;
+    TorqueMPC mpc(md, tu);
+    mpc.set_tau_bar_override(TVec4::Constant(0.01));
+    Plant plant{md};
+    plant.force_ext << 3.0, 0, 0;
+    const auto ref = hold_ref(TVec3(0.5, 0, 0), 51);    // 0.5 m 앞 — 상한에 붙는다
+    // 처음 몇 스텝은 변화율 제한 (Δτ̄ = τ̄/3) 으로 아직 상한 아래라 d̂ 가 갱신된다 — 상한에 붙은 뒤를 본다
+    for (int k = 0; k < 6; ++k) {plant.step(mpc.step(plant.x, ref, nullptr, tu.Ts), tu.Ts);}
+    const TVec6 d0 = mpc.d_hat();
+    plant.force_ext << -3.0, 2.0, 0;                       // 외란이 바뀌어도
+    for (int k = 0; k < 5; ++k) {plant.step(mpc.step(plant.x, ref, nullptr, tu.Ts), tu.Ts);}
+    if (freeze) {
+      EXPECT_EQ(mpc.stats().d_skipped, 3);
+      EXPECT_LT((mpc.d_hat() - d0).cwiseAbs().maxCoeff(), 1e-15);   // 포화 중에는 그대로
+    } else {
+      EXPECT_EQ(mpc.stats().d_skipped, 0);
+      EXPECT_GT((mpc.d_hat() - d0).cwiseAbs().maxCoeff(), 1e-4);    // 끄면 새 외란을 따라간다
+    }
+  }
+}
+
+// 상한: |â_d,xy| = |d̂_ṗ,xy| / Ts ≤ acc_max, |α_d| ≤ yaw_acc_max
+TEST(TorqueMPC, DisturbanceAccelClamp)
+{
+  TorqueModel md;
+  TorqueTuning tu;
+  tu.dist_alpha = 1.0;
+  tu.dist_accel_only = true;
+  tu.dist_skip_xy = -1.0;
+  tu.dist_acc_max = 0.5;
+  tu.dist_yaw_acc_max = 2.0;
+  TorqueMPC mpc(md, tu);
+  Plant plant{md};
+  plant.force_ext << 50.0, -30.0, 5.0;                  // 7.8·4.7 m/s², 52 rad/s² — 상한보다 훨씬 크다
+  const auto ref = hold_ref(TVec3::Zero(), 51);
+  for (int k = 0; k < 3; ++k) {plant.step(mpc.step(plant.x, ref, nullptr, tu.Ts), tu.Ts);}
+  EXPECT_LE(std::hypot(mpc.d_hat()(3), mpc.d_hat()(4)) / tu.Ts, 0.5 + 1e-9);
+  EXPECT_LE(std::abs(mpc.d_hat()(5)) / tu.Ts, 2.0 + 1e-9);
+  EXPECT_GT(std::hypot(mpc.d_hat()(3), mpc.d_hat()(4)) / tu.Ts, 0.49);   // 잘렸지 0 은 아니다
+  // accel_only 꼴 (위치 = ½Ts·속도) 이 유지된다
+  EXPECT_NEAR(mpc.d_hat()(0), 0.5 * tu.Ts * mpc.d_hat()(3), 1e-12);
+}
+
+// 2026-11-21 정상상태 Kalman 이득: 위치 잡음이 매우 크면 위치 무게 → 0 이고, 속도 측정만의 스칼라 식 α²/(1−α) = q Ts²/σ_v² 와 같다
+TEST(TorqueMPC, DisturbanceKalmanGainMatchesScalarFormula)
+{
+  const double Ts = 0.01, qr = 0.3, sv = 0.029;
+  const Eigen::RowVector2d K = TorqueMPC::steady_kalman_gain(Ts, qr, 1e6, sv);
+  const double alpha = K(1) * Ts;                       // 등가 α = K_vel · H_v
+  const double lhs = alpha * alpha / (1.0 - alpha), rhs = qr * qr * Ts * Ts * Ts / (sv * sv);
+  EXPECT_LT(std::abs(K(0)) * 0.5 * Ts * Ts, 1e-9);
+  EXPECT_NEAR(lhs, rhs, 1e-6 * rhs);
+  // 실차 잡음 (위치 1.6 mm, 속도 29 mm/s) 이면 위치 몫은 속도 몫의 1 % 아래 (실차 잔차 212502, RESULTS 19 절)
+  const Eigen::RowVector2d K2 = TorqueMPC::steady_kalman_gain(Ts, qr, 1.6e-3, sv);
+  EXPECT_LT(K2(0) * 0.5 * Ts * Ts, 0.01 * K2(1) * Ts);
+  std::printf("            Kalman: q %.2f σ_v %.3f → 등가 α %.4f (시정수 %.2f s)\n", qr, sv, alpha, Ts / alpha);
+}
+
+// Kalman 관측기 (몸체 좌표) 도 원 위 몸체 옆 힘의 정상상태 어긋남을 없앤다
+TEST(TorqueMPC, DisturbanceKalmanBodyFrameOnCircle)
+{
+  auto run = [](bool enable) {
+      TorqueModel md;
+      TorqueTuning tu;
+      tu.W << 20, 20, 10, 2, 2, 1;
+      tu.w_delta = 100.0;
+      tu.r_u = 10.0;
+      tu.dist_enable = enable;
+      tu.dist_kalman = true;
+      tu.dist_body_frame = true;
+      tu.dist_skip_xy = -1.0;
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      const double R = 0.5, v = 0.5;
+      plant.x << 0, 0, 0, v, 0, v / R;
+      double rad = 0.0; int n = 0;
+      for (int k = 0; k < 900; ++k) {
+        const double th = plant.x(2);
+        plant.force_ext << 2.0 * std::sin(th), -2.0 * std::cos(th), 0.0;   // 몸체 오른쪽 2 N
+        std::vector<TorqueRefPoint> ref;
+        for (int j = 0; j <= tu.Np; ++j) {ref.push_back(circle(R, v, (k + j) * tu.Ts));}
+        plant.step(mpc.step(plant.x, ref, nullptr, tu.Ts), tu.Ts);
+        if (k >= 600) {rad += std::hypot(plant.x(0), plant.x(1) - R) - R; ++n;}
+      }
+      return rad / n;
+    };
+  const double off = run(false), on = run(true);
+  std::printf("            Kalman 몸체 d̂: 반경 어긋남 끔 %+.1f mm  켬 %+.1f mm\n", off * 1e3, on * 1e3);
+  EXPECT_GT(off, 0.01);
+  EXPECT_LT(std::abs(on), 0.2 * off);
+}
+
+// 제약 있는 목표 입력: 기준이 상한 밖이면 U_s 를 [−τ̄, τ̄] 로 자른다
+TEST(TorqueMPC, TargetProjectionClipsToBounds)
+{
+  for (bool proj : {false, true}) {
+    TorqueModel md;
+    TorqueTuning tu;
+    tu.target_projection = proj;
+    TorqueMPC mpc(md, tu);
+    mpc.set_tau_bar_override(TVec4::Constant(0.05));
+    std::vector<TorqueRefPoint> ref;
+    for (int j = 0; j <= tu.Np; ++j) {           // 2 m/s² 가속 기준 — 필요한 토크 6.425·2·0.04/4 = 0.129 N·m > 0.05
+      const double t = j * tu.Ts;
+      ref.push_back({TVec3(t * t, 0, 0), TVec3(2.0 * t, 0, 0)});
+    }
+    std::vector<TVec3> acc(tu.Nc, TVec3(2.0, 0, 0));
+    mpc.step(TVec6::Zero(), ref, &acc);
+    const double umax = mpc.target_input().cwiseAbs().maxCoeff();
+    if (proj) {EXPECT_LE(umax, 0.05 + 1e-12);} else {EXPECT_GT(umax, 0.1);}
+  }
+}
+
+
+// 공통 설정: 실차 yaml 의 Q·R 과 몸체·Kalman d̂ (잡음 없는 플랜트라 skip_xy 끔)
+static TorqueTuning ff_tuning(bool dist, bool est)
+{
+  TorqueTuning tu;
+  tu.W << 20, 20, 10, 2, 2, 1;
+  tu.w_delta = 100.0;
+  tu.r_u = 10.0;
+  tu.dist_enable = dist;
+  tu.dist_kalman = true;
+  tu.dist_body_frame = true;
+  tu.dist_skip_xy = -1.0;
+  tu.dist_acc_max = 0.5;
+  tu.ff_normal_estimate = est;
+  return tu;
+}
+
+// 원 하나 (반시계, R 0.5, v 0.5) 에 구심의 30 % 안쪽 힘. 한 원에서는 n̂_c 가 몸체 +y 로 고정이라 d_y 와 η 가 갈리지 않는다 —
+//   합 d_y + η g (몸체 +y 쪽 모델 밖 가속도) 가 참값 β v²/R = 0.15 m/s² 로 가고 반경 오프셋이 없어지면 된다
+TEST(TorqueMPC, FeedforwardNormalEstimateOnCircle)
+{
+  struct Out {double rad, rho, sum;};
+  auto run = [](bool dist, bool est, double beta) {
+      TorqueModel md;
+      const TorqueTuning tu = ff_tuning(dist, est);
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      const double R = 0.5, v = 0.5;
+      plant.x << 0, 0, 0, v, 0, v / R;
+      double rad = 0.0, sum = 0.0; int n = 0;
+      for (int k = 0; k < 2000; ++k) {
+        const double dx = -plant.x(0), dy = R - plant.x(1), dn = std::hypot(dx, dy);
+        const double Fin = beta * md.m_eff() * v * v / R;                    // 원 중심 쪽 모델 밖 힘
+        plant.force_ext << Fin * dx / dn, Fin * dy / dn, 0.0;
+        std::vector<TorqueRefPoint> ref;
+        for (int j = 0; j <= tu.Np; ++j) {ref.push_back(circle(R, v, (k + j) * tu.Ts));}
+        plant.step(mpc.step(plant.x, ref, nullptr, tu.Ts), tu.Ts);
+        if (k >= 1500) {
+          rad += std::hypot(plant.x(0), plant.x(1) - R) - R;
+          sum += mpc.d_hat()(4) / tu.Ts + (1.0 - mpc.ff_normal_rho()) * mpc.stats().rho_g;
+          ++n;
+        }
+      }
+      return Out{rad / n, mpc.ff_normal_rho(), sum / n};
+    };
+  const Out off = run(false, false, 0.3), est_only = run(false, true, 0.3), both = run(true, true, 0.3), clean = run(true, true, 0.0);
+  for (auto [nm, o] : {std::pair{"보상 없음     ", off}, {"ρ 추정만 씀  ", est_only}, {"d̂ + ρ 추정   ", both}, {"힘 없음 d̂+ρ  ", clean}}) {
+    std::printf("            원 하나 %s: 반경 어긋남 %+.1f mm   ρ̂ %.3f   d̂_y + η̂ g %+.3f m/s²\n", nm, o.rad * 1e3, o.rho, o.sum);
+  }
+  EXPECT_LT(off.rad, -0.005);                                  // 안쪽 (반경이 작다) 으로 5 mm 넘게
+  EXPECT_LT(std::abs(both.rad), 0.1 * std::abs(off.rad));
+  EXPECT_NEAR(both.sum, 0.15, 0.02);
+  EXPECT_DOUBLE_EQ(off.rho, 1.0);
+  EXPECT_NEAR(clean.rho, 1.0, 0.05);                           // 모델이 맞으면 ρ̂ 가 1 에서 안 벗어난다
+  EXPECT_LT(std::abs(clean.rad), 0.002);
+}
+
+// 8자 (원 두 개, 왼원 반시계 → 오른원 시계, 원점에서 +x): 시각 t 의 (포즈, 몸체 속도). 방향은 랩마다 0 → 2π → 0
+static TorqueRefPoint eight(double R, double v, double t)
+{
+  const double om = v / R, T = 2.0 * M_PI / om, tt = std::fmod(t, 2.0 * T);
+  if (tt < T) {return circle(R, v, tt);}
+  const double ph = om * (tt - T);
+  return {TVec3(R * std::sin(ph), -R * (1.0 - std::cos(ph)), 2.0 * M_PI - ph), TVec3(v, 0.0, -om)};
+}
+
+// 8자에서 d̂ 와 ρ 가 나눠 갖는지: 실차 8자에서 분해한 두 몫을 그대로 넣는다 (RESULTS 19: 몸체 y 잔차 왼원 +0.18, 오른원 0 = d ± s)
+//   s = 구심에 비례하는 안쪽 힘 (β 0.3 → ρ 참값 0.7, R 0.5·v 0.5 에서 0.15 m/s²),  d = 몸체 왼쪽 일정 힘 0.09 m/s²
+TEST(TorqueMPC, FeedforwardNormalEstimateOnEight)
+{
+  struct Out {double left, right, rho, dl, dr;};
+  auto run = [](bool dist, bool est, double beta, double d_b) {
+      TorqueModel md;
+      const TorqueTuning tu = ff_tuning(dist, est);
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      const double R = 0.5, v = 0.5, om = v / R, T = 2.0 * M_PI / om;
+      plant.x << 0, 0, 0, v, 0, om;
+      const int N = static_cast<int>(6 * 2 * T / tu.Ts);            // 6 랩
+      double sl = 0, sr = 0, al = 0, ar = 0; int nl = 0, nr = 0;
+      for (int k = 0; k < N; ++k) {
+        const double t = k * tu.Ts, tt = std::fmod(t, 2.0 * T);
+        const bool left = tt < T;
+        const double cy = left ? R : -R, dx = -plant.x(0), dy = cy - plant.x(1), dn = std::hypot(dx, dy);
+        const double Fin = beta * md.m_eff() * v * v / R, Fd = md.m_eff() * d_b, th = plant.x(2);
+        plant.force_ext << Fin * dx / dn - Fd * std::sin(th), Fin * dy / dn + Fd * std::cos(th), 0.0;
+        std::vector<TorqueRefPoint> ref;
+        for (int j = 0; j <= tu.Np; ++j) {ref.push_back(eight(R, v, t + j * tu.Ts));}
+        plant.step(mpc.step(plant.x, ref, nullptr, tu.Ts), tu.Ts);
+        const double ph = std::fmod(tt, T) / T;
+        if (t > 8 * T && ph > 0.25 && ph < 0.9) {                       // 마지막 2 랩, 원 진입 과도 뺀 구간
+          const double e = std::hypot(plant.x(0), plant.x(1) - cy) - R;   // + = 바깥
+          const double ay = mpc.d_hat()(4) / tu.Ts;
+          if (left) {sl += e; al += ay; ++nl;} else {sr += e; ar += ay; ++nr;}
+        }
+      }
+      return Out{sl / nl, sr / nr, mpc.ff_normal_rho(), al / nl, ar / nr};
+    };
+  const Out a = run(false, false, 0.3, 0.09), b = run(true, false, 0.3, 0.09), c = run(false, true, 0.3, 0.09),
+    d = run(true, true, 0.3, 0.09), e = run(true, true, 0.0, 0.0);
+  for (auto [nm, o] : {std::pair{"보상 없음   ", a}, {"d̂ 만       ", b}, {"ρ 추정만 씀", c}, {"d̂ + ρ 추정 ", d}, {"힘 없음     ", e}}) {
+    std::printf("            8자 %s: 반경 어긋남 왼원 %+.1f mm  오른원 %+.1f mm   ρ̂ %.3f   몸체 â_d,y 왼원 %+.3f 오른원 %+.3f m/s²\n",
+      nm, o.left * 1e3, o.right * 1e3, o.rho, o.dl, o.dr);
+  }
+  EXPECT_NEAR(d.rho, 0.7, 0.1);                               // 구심 몫은 ρ 가
+  EXPECT_NEAR(d.dl, 0.09, 0.04);                              // 몸체 일정 몫은 d̂ 가 — 두 원에서 같은 값
+  EXPECT_NEAR(d.dr, 0.09, 0.04);
+  EXPECT_LT(std::abs(d.left) + std::abs(d.right), 0.5 * (std::abs(b.left) + std::abs(b.right)));
+  EXPECT_NEAR(e.rho, 1.0, 0.05);
+}
+
+// 2026-11-22 바닥 토크 상한 (TorqueTuning::cap_on_ground, TorqueModel::ground_map)
+TEST(TorqueModel, GroundMapForwardShareAndSymmetry)
+{
+  TorqueModel md;
+  md.mass = 4.56;
+  md.J_w = 8.9e-4;
+  const Eigen::Matrix4d P = md.ground_map();
+  EXPECT_TRUE(P.isApprox(P.transpose(), 1e-12));
+  // 네 바퀴 같은 토크 (앞) 의 바닥 몫 = 1 − m_w/m_eff (닫힌 꼴) = 1 − 2.225/6.785
+  const TVec4 ones = TVec4::Ones();
+  const TVec4 g = P * ones;
+  EXPECT_NEAR(g(0), 1.0 - md.mu() / md.m_eff(), 1e-12);
+  EXPECT_NEAR(g(0), 0.672, 1e-3);
+  // 바닥 토크로 만든 힘 = 몸체를 가속하는 힘: F τ_g = M_b M_eff⁻¹ F τ  (유한차분 아님, 식 대조)
+  const TVec4 tau(0.1, -0.05, 0.08, 0.02);
+  const TMat34 F = md.force_map();
+  const TVec3 a = TVec3(1.0 / md.m_eff(), 1.0 / md.m_eff(), 1.0 / md.I_eff()).asDiagonal() * (F * tau);
+  const TVec3 Fb = F * (P * tau);
+  EXPECT_NEAR(Fb(0), md.mass * a(0), 1e-9);
+  EXPECT_NEAR(Fb(1), md.mass * a(1), 1e-9);
+  EXPECT_NEAR(Fb(2), md.inertia_z * a(2), 1e-9);
+}
+
+TEST(TorqueMPC, GroundCapBoundsGroundTorqueAndAllowsMoreWheelTorque)
+{
+  TorqueModel md;
+  md.mass = 4.56;
+  md.J_w = 8.9e-4;
+  TorqueTuning tu;
+  tu.limit_mode = TorqueLimitMode::Friction;
+  tu.cap_on_ground = true;
+  TorqueMPC mpc(md, tu);
+  ASSERT_TRUE(mpc.cap_on_ground());
+  const double tb = md.tau_friction_limit();
+  const Eigen::Matrix4d P = md.ground_map();
+  Plant plant{md};
+  double tmax = 0.0, gmax = 0.0;
+  for (int k = 0; k < 100; ++k) {
+    const TVec4 tau = mpc.step(plant.x, hold_ref(TVec3(1.0, 0, 0), 51));     // 1 m 앞: 급가속 요구
+    EXPECT_EQ(mpc.stats().fallback, 0);
+    for (int j = 0; j < tu.Nc; ++j) {
+      const TVec4 tj = mpc.solution().segment<4>(4 * j);
+      EXPECT_LE((P * tj).cwiseAbs().maxCoeff(), tb + 1e-7) << "k=" << k << " j=" << j;
+      EXPECT_LE(tj.cwiseAbs().maxCoeff(), md.tau_motor_limit() + 1e-9);
+    }
+    tmax = std::max(tmax, tau.cwiseAbs().maxCoeff());
+    gmax = std::max(gmax, (P * tau).cwiseAbs().maxCoeff());
+    plant.step(tau, tu.Ts);
+  }
+  EXPECT_NEAR(gmax, tb, 1e-6);                 // 바닥 몫이 상한에 붙는다
+  EXPECT_GT(tmax, 1.4 * tb);                   // 바퀴 토크는 τ̄ 를 넘는다 (앞 고른 토크면 τ̄/0.672 ≈ 1.49 τ̄)
+  // limit_mode motor_only 면 cap_on_ground 를 켜도 안 쓰인다
+  TorqueTuning tub;
+  tub.cap_on_ground = true;
+  TorqueMPC mpcb(md, tub);
+  EXPECT_FALSE(mpcb.cap_on_ground());
+}
+
+// 2026-11-23 구동계 방향 보정 (torque_plant.yaml drive). δ0 는 force_map 의 xy 행만 R(δ0) 로 돌리고 (M_z 행·영공간 그대로),
+//   그래서 G(θ) 의 xy 행 = 보정 없는 G(θ + δ0) 의 xy 행. 기본 0 이면 예전과 같은 값.
+TEST(TorqueModel, DriveYawRotatesForceMapXYRowsOnly)
+{
+  TorqueModel nom, md;
+  md.drive_yaw = 2.4 * M_PI / 180.0;
+  const TMat34 F0 = nom.force_map(), F = md.force_map();
+  const double c = std::cos(md.drive_yaw), s = std::sin(md.drive_yaw);
+  EXPECT_LT((F.row(0) - (c * F0.row(0) - s * F0.row(1))).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT((F.row(1) - (s * F0.row(0) + c * F0.row(1))).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT((F.row(2) - F0.row(2)).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT((F * TorqueMPC::null_dir()).cwiseAbs().maxCoeff(), 1e-12);
+  for (double th : {0.0, 0.7, -2.1}) {
+    const TMat34 G = md.G(th), Gn = nom.G(th + md.drive_yaw);
+    EXPECT_LT((G.topRows<2>() - Gn.topRows<2>()).cwiseAbs().maxCoeff(), 1e-12);
+    EXPECT_LT((G.row(2) - nom.G(th).row(2)).cwiseAbs().maxCoeff(), 1e-12);
+  }
+  // 앞으로 1 N 을 내려고 고른 토크 (보정 없는 모델의 최소 노름) 는 실제로 옆 sin δ0 = 4.2 % 를 낸다 — 보정 모델의 F⁺ 는 정확히 1 N
+  const TVec4 tau0 = F0.transpose() * (F0 * F0.transpose()).inverse() * TVec3(1, 0, 0);
+  const TVec3 f_real = F * tau0;
+  EXPECT_NEAR(f_real(1), std::sin(md.drive_yaw), 1e-12);
+  const TVec4 tau1 = F.transpose() * (F * F.transpose()).inverse() * TVec3(1, 0, 0);
+  EXPECT_LT(((F * tau1) - TVec3(1, 0, 0)).cwiseAbs().maxCoeff(), 1e-12);
+}
+
+TEST(TorqueModel, CorrectWheelVelocity)
+{
+  TorqueModel md;
+  const TVec3 v(0.6, 0.0, 0.3);
+  EXPECT_EQ(md.correct_wheel_velocity(v, 1.8), v);                       // 기본 0: 그대로
+  md.drive_yaw = 2.4 * M_PI / 180.0;
+  TVec3 out = md.correct_wheel_velocity(v, 0.0);
+  EXPECT_NEAR(out(0), 0.6 * std::cos(md.drive_yaw), 1e-12);
+  EXPECT_NEAR(out(1), 0.6 * std::sin(md.drive_yaw), 1e-12);
+  EXPECT_DOUBLE_EQ(out(2), 0.3);                                         // ω_z 성분은 안 건드림
+  md.slip_coef = -2.5 * M_PI / 180.0;
+  out = md.correct_wheel_velocity(TVec3(0.9, 0.0, 0.0), 1.8);            // P1 최고속 CCW: a_c = 1.62 → δ = 2.4 − 4.05 = −1.65°
+  EXPECT_NEAR(std::atan2(out(1), out(0)), (2.4 - 2.5 * 1.62) * M_PI / 180.0, 1e-12);
+  EXPECT_NEAR(std::hypot(out(0), out(1)), 0.9, 1e-12);                   // 크기는 그대로 (회전만)
+  out = md.correct_wheel_velocity(TVec3(1.0, 0.0, 0.0), -3.0);           // a_c −3 → slip_ac_max 2 로 자름 → δ = 2.4 + 5.0°
+  EXPECT_NEAR(std::atan2(out(1), out(0)), (2.4 + 2.5 * 2.0) * M_PI / 180.0, 1e-12);
+}
+
+// 2026-11-23 하중 이동: 수직력 식의 부호·보존·아래 한계
+TEST(TorqueModel, WheelNormalForcesLoadTransfer)
+{
+  TorqueModel md;
+  md.mass = 4.56; md.wheel_base = 0.1724; md.robot_width = 0.214; md.gravity = 9.81;
+  md.wheel_load_share = TVec4(0.2388, 0.2392, 0.2608, 0.2612);
+  const TVec4 n0 = md.wheel_load_share * md.mass * md.gravity;
+  EXPECT_LT((md.wheel_normal_forces(1.0, 2.0, 0.0, 0.2) - n0).cwiseAbs().maxCoeff(), 1e-12);   // h = 0 → 정지
+  const double h = 0.105;
+  const TVec4 n = md.wheel_normal_forces(1.5, 2.0, h, 0.0);       // 앞으로 가속 + 왼쪽 구심 (왼쪽 선회)
+  EXPECT_NEAR(n.sum(), md.mass * md.gravity, 1e-9);                // 합 보존
+  const double dx = md.mass * 1.5 * h / (2 * md.wheel_base), dy = md.mass * 2.0 * h / (2 * md.robot_width);
+  EXPECT_NEAR(n(0), n0(0) - dx - dy, 1e-9);                        // FL: 앞·안쪽 → 가장 가볍다
+  EXPECT_NEAR(n(3), n0(3) + dx + dy, 1e-9);                        // RR: 뒤·바깥 → 가장 무겁다
+  EXPECT_NEAR(n(1), n0(1) - dx + dy, 1e-9);
+  EXPECT_NEAR(n(2), n0(2) + dx - dy, 1e-9);
+  const TVec4 nc = md.wheel_normal_forces(10.0, 10.0, h, 0.2);     // 아주 센 가속 → 아래 한계 0.2 × 정지
+  EXPECT_NEAR(nc(0), 0.2 * n0(0), 1e-12);
+}
+
+// 2026-11-23 하중 이동: 왼쪽 원 위에서 목표 입력이 같은 몸체 힘을 내되 (F U_s 같음) 가벼운 안쪽 바퀴에 덜 싣고, friction 상한이 안쪽만 준다
+TEST(TorqueMPC, LoadTransferWeightsTargetInputAndCaps)
+{
+  TorqueModel md;
+  md.mass = 4.56; md.wheel_base = 0.1724; md.robot_width = 0.214;
+  md.mu_hat = 0.5;
+  TorqueTuning tu;
+  tu.limit_mode = TorqueLimitMode::Friction;
+  const double R = 0.4, v = 1.0;                                    // 구심 2.5 m/s²
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= tu.Np; ++j) {ref.push_back(circle(R, v, j * tu.Ts));}
+  TVec6 x;
+  x << 0, 0, 0, v, 0, v / R;
+  TorqueMPC off(md, tu);
+  off.step(x, ref);
+  tu.load_com_height = 0.105;
+  TorqueMPC on(md, tu);
+  on.step(x, ref);
+  const TMat34 F = md.force_map();
+  const TVec4 u0 = off.target_input().head<4>(), u1 = on.target_input().head<4>();
+  EXPECT_LT((F * u0 - F * u1).cwiseAbs().maxCoeff(), 1e-9);         // 같은 몸체 힘
+  // 왼쪽 선회 → 왼쪽 (FL, RL) 이 가볍다: 가중 배분은 왼쪽 |τ| 를 줄이고 오른쪽을 늘린다
+  EXPECT_LT(std::abs(u1(0)), std::abs(u0(0)));
+  EXPECT_LT(std::abs(u1(2)), std::abs(u0(2)));
+  EXPECT_GT(std::abs(u1(1)), std::abs(u0(1)));
+  EXPECT_GT(std::abs(u1(3)), std::abs(u0(3)));
+  const TVec4 n = on.normal_forces_now();
+  EXPECT_LT(n(0), n(1));                                            // FL < FR (안쪽 < 바깥)
+  const auto & cap = on.tau_bar_steps();
+  EXPECT_LT(cap(0, 0), off.tau_bar()(0));                           // 안쪽 상한은 줄고
+  EXPECT_GT(cap(1, 0), off.tau_bar()(1));                           // 바깥은 는다
+  EXPECT_LT((off.tau_bar_steps().col(0) - off.tau_bar()).cwiseAbs().maxCoeff(), 1e-12);   // 끄면 정지 상한 그대로
 }

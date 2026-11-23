@@ -74,7 +74,7 @@ def test_plant_only(launch_mod):
     assert exes == ["sim_plant_torque_node", "state_estimator_node"]
 
 
-@pytest.mark.parametrize("controller", ["mpc", "pure_pursuit"])
+@pytest.mark.parametrize("controller", ["mpc", "pp", "adpp", "pure_pursuit"])
 def test_real_robot_path(launch_mod, monkeypatch, controller):
     """plant:=real — 모터·IMU 회전·robot_state(TF) 가 뜨고, 시뮬 플랜트·참값은 없다. CAN 자동 준비(sudo)는 끈다."""
     real_share = launch_mod.get_package_share_directory
@@ -248,6 +248,148 @@ def test_pure_pursuit_speed_source(launch_mod, given, expect):
         assert "speed_source" not in pi and "kp" not in pi
 
 
+@pytest.mark.parametrize("given, expect", [({}, {}), ({"mpc_dist_frame": "world", "mpc_dist_freeze": "false", "mpc_dist_acc_max": "0.3",
+                                                         "mpc_dist_yaw_acc_max": "-1"},
+                                                        {"disturbance_frame": "world", "disturbance_freeze_on_saturation": False,
+                                                         "disturbance_acc_max": 0.3, "disturbance_yaw_acc_max": -1.0})])
+def test_disturbance_frame_args(launch_mod, given, expect):
+    """2026-11-21: 외란 추정치 좌표·포화 중 멈춤·상한 덮어쓰기 (비우면 torque_mpc.yaml disturbance 블록을 노드가 읽는다)."""
+    import yaml                                     # 글자 파라미터는 YAML 로 적힌 Substitution 튜플 (test_pure_pursuit_speed_source 와 같음)
+    _, _, out = build(launch_mod, **given)
+    txt = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v)) if isinstance(v, (tuple, list)) else v
+    p = {k: txt(v) for k, v in _node_params(out, "torque_mpc_node").items()}
+    for k, v in expect.items():
+        assert p[k] == (pytest.approx(v) if isinstance(v, float) else v)
+    if not given:
+        assert not any(k in p for k in ("disturbance_frame", "disturbance_freeze_on_saturation", "disturbance_acc_max"))
+
+
+def test_disturbance_frame_rejects_unknown(launch_mod):
+    with pytest.raises(Exception):
+        build(launch_mod, mpc_dist_frame="map")
+
+
+@pytest.mark.parametrize("given, expect", [({}, {}), ({"mpc_dist_observer": "kalman", "mpc_target_projection": "true", "mpc_ff_normal_scale": "0.9",
+                                                         "mpc_ff_normal_estimate": "true", "mpc_ff_normal_q": "0.05"},
+                                                        {"disturbance_observer": "kalman", "target_projection": True, "ff_normal_scale": 0.9,
+                                                         "ff_normal_estimate": True, "ff_normal_q": 0.05})])
+def test_offset_free_args(launch_mod, given, expect):
+    """2026-11-21: 관측기·목표 입력 사영·구심 feedforward 계수 ρ 덮어쓰기 (비우면 torque_mpc.yaml 을 노드가 읽는다)."""
+    import yaml
+    _, _, out = build(launch_mod, **given)
+    txt = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v)) if isinstance(v, (tuple, list)) else v
+    p = {k: txt(v) for k, v in _node_params(out, "torque_mpc_node").items()}
+    for k, v in expect.items():
+        assert p[k] == (pytest.approx(v) if isinstance(v, float) else v)
+    if not given:
+        assert not any(k in p for k in ("disturbance_observer", "target_projection", "ff_normal_scale", "ff_normal_estimate", "ff_normal_q"))
+
+
+def test_offset_free_rejects_unknown_observer(launch_mod):
+    with pytest.raises(Exception):
+        build(launch_mod, mpc_dist_observer="luenberger")
+
+
+@pytest.mark.parametrize("given, expect", [({}, {}), ({"mpc_Nc": "25"}, {"Nc": 25}), ({"mpc_Np": "100", "mpc_Nc": "50"}, {"Np": 100, "Nc": 50})])
+def test_mpc_horizon_args(launch_mod, given, expect):
+    """2026-11-23: 예측·제어 지평 Np·Nc 덮어쓰기 (비우면 torque_mpc.yaml tuning 을 노드가 읽는다)."""
+    import yaml
+    _, _, out = build(launch_mod, **given)
+    txt = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v)) if isinstance(v, (tuple, list)) else v
+    p = {k: txt(v) for k, v in _node_params(out, "torque_mpc_node").items()}
+    for k in ("Np", "Nc"):
+        if k in expect:
+            assert p[k] == expect[k]
+        else:
+            assert k not in p
+
+
+@pytest.mark.parametrize("bad", [{"mpc_Nc": "400"}, {"mpc_Np": "400"}, {"mpc_Np": "50", "mpc_Nc": "60"}])
+def test_mpc_horizon_rejects_out_of_range(launch_mod, bad):
+    with pytest.raises(Exception):
+        build(launch_mod, **bad)
+
+
+def test_offset_free_args_pass_through_real_all():
+    """real_all 이 새 인자를 torque_experiment 로 넘긴다 (_PASS)."""
+    src = open(os.path.join(os.path.dirname(__file__), "..", "launch", "real_all.launch.py")).read()
+    for a in ("mpc_dist_observer", "mpc_target_projection", "mpc_ff_normal_scale", "mpc_ff_normal_estimate", "mpc_ff_normal_q", "mpc_Nc", "mpc_Np"):
+        assert f'"{a}"' in src
+
+
+@pytest.mark.parametrize("given, expect", [({}, {}), ({"pp_lookahead_min": "0.15", "pp_lookahead_max": "0.60"},
+                                                        {"lookahead_min": 0.15, "lookahead_max": 0.60})])
+def test_pure_pursuit_lookahead_override(launch_mod, given, expect):
+    """2026-11-21: 룩어헤드 하한·상한 덮어쓰기 (비우면 torque_baseline_a.yaml 을 노드가 읽는다)."""
+    _, _, out = build(launch_mod, controller="pure_pursuit", **given)
+    pp = _node_params(out, "pure_pursuit_node")
+    for k, v in expect.items():
+        assert pp[k] == pytest.approx(v)
+    if not given:
+        assert "lookahead_min" not in pp and "lookahead_max" not in pp
+
+
+def test_real_all_passes_pp_lookahead():
+    """real_all 이 pp_lookahead_min·max 를 torque_experiment 로 넘긴다."""
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    assert {"pp_lookahead_min", "pp_lookahead_max"} <= set(m._PASS)
+
+
+# ── 2026-11-23 비교군 세 개 (교수님 회의): 룩어헤드 고정 PP · 어댑티브 PP · MPC ──
+LOOKAHEAD = ("lookahead_time", "lookahead_min", "lookahead_max")
+
+
+def test_adpp_nodes(launch_mod):
+    exes, _, _ = build(launch_mod, controller="adpp")
+    assert "pure_pursuit_node" in exes and "wheel_pi_node" in exes and "torque_mpc_node" not in exes
+
+
+@pytest.mark.parametrize("given, expect", [
+    ({}, {"lookahead_time": 0.5, "lookahead_min": 0.15, "lookahead_max": 0.60}),
+    ({"pp_lookahead_max": "0.45"}, {"lookahead_time": 0.5, "lookahead_min": 0.15, "lookahead_max": 0.45}),   # 인자가 우선
+])
+def test_adpp_lookahead(launch_mod, given, expect):
+    """어댑티브는 torque_baseline_a.yaml pure_pursuit_adaptive 세 값을 노드에 넘긴다 (11-20 전 속도 비례 룩어헤드)."""
+    _, _, out = build(launch_mod, controller="adpp", **given)
+    pp = _node_params(out, "pure_pursuit_node")
+    for k, v in expect.items():
+        assert pp[k] == pytest.approx(v)
+
+
+def test_pp_fixed_vs_adaptive_yaml():
+    """고정 PP 는 min = max (상수), 어댑티브는 min < max — 두 비교군이 실제로 다르다."""
+    import yaml
+    ya = yaml.safe_load(open(os.path.join(HERE, "..", "config", "torque_baseline_a.yaml")))
+    fx, ad = ya["pure_pursuit"], ya["pure_pursuit_adaptive"]
+    assert fx["lookahead_min"] == fx["lookahead_max"]
+    assert ad["lookahead_min"] < ad["lookahead_max"] and ad["lookahead_time"] > 0
+
+
+def test_pp_modes_differ_only_in_lookahead(launch_mod):
+    """두 PP 모드는 룩어헤드 세 값 말고 같다: 퓨어 퍼슛 나머지 파라미터, 바퀴 PI, torque_output 입력, fault_monitor status."""
+    _, _, fx = build(launch_mod, controller="pp")
+    _, _, ad = build(launch_mod, controller="adpp")
+    txt = lambda v: "".join(getattr(s, "text", str(s)) for s in v) if isinstance(v, (tuple, list)) else v   # 글자 = Substitution 튜플
+    plain = lambda p, drop=(): {k: txt(v) for k, v in p.items() if k not in drop}
+    assert plain(_node_params(fx, "pure_pursuit_node"), LOOKAHEAD) == plain(_node_params(ad, "pure_pursuit_node"), LOOKAHEAD)
+    for exe in ("wheel_pi_node", "fault_monitor_node"):
+        assert plain(_node_params(fx, exe)) == plain(_node_params(ad, exe))
+    assert plain(_torque_output_params(fx)) == plain(_torque_output_params(ad))
+    import yaml                                     # 글자 파라미터는 YAML 로 적힌 Substitution 튜플
+    assert yaml.safe_load(plain(_node_params(ad, "fault_monitor_node"))["track_status_topic"]) == "/pure_pursuit/status"
+
+
+def test_pure_pursuit_is_old_name_of_pp(launch_mod):
+    """controller:=pure_pursuit (예전 이름, 옛 스크립트·bag 인자) 은 pp 와 같은 노드·파라미터."""
+    ex_old, _, old = build(launch_mod, controller="pure_pursuit")
+    ex_new, _, new = build(launch_mod, controller="pp")
+    assert ex_old == ex_new
+    txt = lambda v: "".join(getattr(s, "text", str(s)) for s in v) if isinstance(v, (tuple, list)) else v
+    for exe in ("pure_pursuit_node", "wheel_pi_node", "fault_monitor_node"):
+        assert {k: txt(v) for k, v in _node_params(old, exe).items()} == {k: txt(v) for k, v in _node_params(new, exe).items()}
+
+
 def test_track_error_stops_before_figure8_abort(launch_mod):
     """fault_monitor 정지 문턱(launch 기본 1.5 m, 2026-11-16)이 figure8 경성 중단 abort_error(torque_track.yaml 1.6 m)보다 작다."""
     import yaml
@@ -344,6 +486,7 @@ def test_real_all_passes_estimator_mode():
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     assert "est_mode" in m._PASS and "trip_on_pose_jump" in m._PASS
+    assert "lap_speeds" in m._PASS                           # 랩별 속도 사다리 (2026-11-21)
 
 
 
@@ -354,7 +497,7 @@ def test_real_all_passes_estimator_mode():
     ("0.4,-1,0.45,0.5", [0.4, -1.0, 0.45, 0.5]),         # 0 이하인 바퀴만 mu_hat
 ])
 def test_mu_hat_wheels_reaches_mpc(launch_mod, given, expect):
-    """2026-11-19 (11) 바퀴별 μ̂ (mg/4 기준) → torque_mpc_node. 시뮬 플랜트에는 안 넘어간다 (물리는 surface_mu·하중 몫)."""
+    """2026-11-19 (11) 바퀴별 μ̂ (2026-11-22 부터 N_i 기준) → torque_mpc_node. 시뮬 플랜트에는 안 넘어간다 (물리는 surface_mu·하중 몫)."""
     _, _, out = build(launch_mod, limit_mode="friction", mu_hat_wheels=given)
     got = _node_params(out, "torque_mpc_node").get("mu_hat_wheels")
     assert (list(got) if got is not None else None) == expect
@@ -434,3 +577,228 @@ def test_real_all_passes_square_keys():
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     assert {"square_side", "square_corner_speed", "square_v_max", "square_yaw_blend"} <= set(m._PASS)
+
+
+def test_square_corner_stop_reaches_figure8(launch_mod):
+    """2026-11-21 꼭짓점 정지: square_corner_mode·rot_s·dwell_s 가 노드로. 비우면 yaml (pass, 1.0, 0.1)."""
+    import yaml
+    text = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v))
+    _, _, out = build(launch_mod, shape="square", square_corner_mode="stop", square_rot_s="0.8")
+    p = _node_params(out, "figure8_reference_node")
+    assert text(p["square_corner_mode"]) == "stop" and p["square_rot_s"] == 0.8 and p["square_dwell_s"] == pytest.approx(0.1)
+    _, _, out = build(launch_mod, shape="square")
+    assert text(_node_params(out, "figure8_reference_node")["square_corner_mode"]) == "pass"
+
+
+def test_square_corner_mode_checked_before_nodes(launch_mod):
+    with pytest.raises(RuntimeError, match="square_corner_mode"):
+        build(launch_mod, shape="square", square_corner_mode="halt")
+
+
+def test_real_all_passes_square_corner_keys():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert {"square_corner_mode", "square_rot_s", "square_dwell_s"} <= set(m._PASS)
+
+
+@pytest.mark.parametrize("arg, expect", [("", False), ("true", True), ("false", False)])
+def test_slip_guard_passed_to_torque_output(launch_mod, arg, expect):
+    # 2026-11-21 바퀴별 슬립 가드 (amr_mpc/torque/slip_guard.py) — 기본 끔
+    _, _, out = build(launch_mod, slip_guard=arg)
+    assert _torque_output_params(out)["slip_guard"] is expect
+
+
+def test_real_all_passes_slip_guard():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "slip_guard" in m._PASS
+
+
+@pytest.mark.parametrize("arg", ["ground", "total"])
+def test_mpc_cap_on_passed(launch_mod, arg):
+    # 2026-11-22 friction 상한을 거는 곳 (torque_mpc.yaml torque_limit.cap_on)
+    _, _, out = build(launch_mod, limit_mode="friction", mpc_cap_on=arg)
+    v = _node_params(out, "torque_mpc_node")["cap_on"]
+    import yaml
+    assert yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v)) == arg   # 문자열 값은 YAML 로 실린 TextSubstitution 튜플
+
+
+def test_mpc_cap_on_rejects_unknown(launch_mod):
+    with pytest.raises(RuntimeError):
+        build(launch_mod, limit_mode="friction", mpc_cap_on="wheel")
+
+
+def test_real_all_passes_mpc_cap_on():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "mpc_cap_on" in m._PASS
+
+
+def _real_all_ctx(**over):
+    from launch.actions import GroupAction  # noqa: F401
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    ctx = LaunchContext()
+    for e in m.generate_launch_description().entities:
+        if isinstance(e, DeclareLaunchArgument):
+            ctx.launch_configurations[e.name] = "".join(s.perform(ctx) for s in e.default_value) if e.default_value else ""
+    ctx.launch_configurations.update(over)
+    return m, ctx
+
+
+def test_real_all_torque_include_first():
+    """2026-11-23: torque_experiment (CAN 준비·인자 검사에서 예외가 날 수 있다) 가 프로세스를 띄우는 어떤 동작보다 먼저 —
+    예외가 나도 고아가 안 남는다 (11-23 11:36 CAN 실패가 cartographer 묶음 12 개를 남겼다)."""
+    from launch.actions import ExecuteProcess, GroupAction, TimerAction
+    m, ctx = _real_all_ctx(sensors="true", localization="true", bag="true", viz="false", auto_localize="false", use_mpc="true")
+    m._leftover_nodes = lambda: []
+    ents = [e for e in m._nodes(ctx) if isinstance(e, (GroupAction, ExecuteProcess, TimerAction))]
+    assert len(ents) >= 3                                    # torque · bag · sensors · cartographer
+    first = ents[0]
+    assert isinstance(first, GroupAction)
+    inc = [e for e in first.get_sub_entities() if isinstance(e, IncludeLaunchDescription)][0]
+    txt = lambda x: x if isinstance(x, str) else "".join(s.perform(ctx) for s in x)
+    assert {txt(k): txt(v) for k, v in inc.launch_arguments}.get("plant") == "real"
+
+
+def test_real_all_refuses_with_leftover_nodes():
+    """2026-11-23: 고아 노드가 남아 있으면 아무것도 띄우기 전에 멈추고 정리 명령을 알려 준다."""
+    m, ctx = _real_all_ctx(sensors="false", localization="false", viz="false", auto_localize="false")
+    m._leftover_nodes = lambda: [(4321, "/x/install/amr_laser_tools/lib/amr_laser_tools/scan_merger")]
+    with pytest.raises(RuntimeError, match="kill -INT 4321"):
+        m._nodes(ctx)
+
+
+def test_leftover_nodes_finds_real_orphan(monkeypatch):
+    """실제 고아 (이중 fork 로 부모를 잃은 프로세스, 같은 ROS_DOMAIN_ID) 를 찾고, 다른 도메인은 안 찾는다."""
+    import subprocess, time
+    m, _ = _real_all_ctx()
+    install = os.path.realpath(os.path.join(m.get_package_share_directory("amr_mpc"), "..", "..", ".."))
+    tag = f"{install}/amr_orphan_test_{os.getpid()}"
+    monkeypatch.setenv("ROS_DOMAIN_ID", "79")
+    subprocess.run(["bash", "-c", f"(ROS_DOMAIN_ID=79 exec -a {tag} sleep 30 &)"], check=True)
+    subprocess.run(["bash", "-c", f"(ROS_DOMAIN_ID=78 exec -a {tag}_other sleep 30 &)"], check=True)
+    time.sleep(0.3)
+    try:
+        pids = {p for p, c in m._leftover_nodes() if tag in c}
+        mine = subprocess.run(["pgrep", "-f", tag], capture_output=True, text=True).stdout.split()
+        if not mine:
+            pytest.skip("고아를 못 만들었다")
+        parent = int(open(f"/proc/{mine[0]}/stat").read().rsplit(")", 1)[1].split()[1])
+        pcomm = open(f"/proc/{parent}/comm").read().strip()
+        if parent != 1 and pcomm not in ("systemd", "init"):
+            pytest.skip(f"이 환경의 하위 수거자는 {pcomm} — 검사 대상 밖")
+        names = {c for p, c in m._leftover_nodes() if tag in c}
+        assert any(c.startswith(tag + " ") or c == f"{tag} 30" for c in names)   # 도메인 79 것
+        assert not any("_other" in c for c in names)                              # 도메인 78 은 아님
+        assert pids
+    finally:
+        subprocess.run(["pkill", "-f", f"amr_orphan_test_{os.getpid()}"])
+
+
+def test_speed_max_reaches_figure8_as_numbers(launch_mod):
+    """2026-11-23 speed:=max·accel:=max → figure8_reference 에 숫자 (core/fig8_limits.py), 기동 로그 한 줄. 내부 키는 노드로 안 간다."""
+    from launch.actions import LogInfo
+    _, _, out = build(launch_mod, shape="circles8", width="2.0", yaw_mode="tangent", laps="2", speed="max", accel="max",
+                      speed_mod_amp="0.5", speed_mod_cycles="2", speed_mod_phase_deg="-90")
+    p = _node_params(out, "figure8_reference_node")
+    assert isinstance(p["speed"], float) and isinstance(p["accel"], float) and "_max_msg" not in p
+    assert 0.3 < p["speed"] < 0.75 and 0.5 <= p["accel"] <= 3.0
+    msgs = ["".join(getattr(s, "text", str(s)) for s in n.msg) for n in out if isinstance(n, LogInfo)]
+    assert any("speed:=max" in t and f"{p['speed']:.2f}" in t for t in msgs)
+
+
+def test_speed_max_rejected_for_line_before_nodes(launch_mod):
+    with pytest.raises(RuntimeError, match="speed:=max"):
+        build(launch_mod, shape="line", speed="max")
+
+
+def test_square_speed_max_sets_v_max_zero_and_edge_accel(launch_mod):
+    """2026-11-23 shape:=square speed:=max accel:=max → square_v_max 0 (부하 예산에서 자름), accel 은 변 직선 가속 한계."""
+    from launch.actions import LogInfo
+    _, _, out = build(launch_mod, shape="square", yaw_mode="tangent", square_v_max="1.5", speed="max", accel="max")
+    p = _node_params(out, "figure8_reference_node")
+    assert p["square_v_max"] == 0.0 and isinstance(p["accel"], float) and 1.0 <= p["accel"] <= 3.0
+    msgs = ["".join(getattr(s, "text", str(s)) for s in n.msg) for n in out if isinstance(n, LogInfo)]
+    assert any("(square)" in t and f"{p['accel']:.2f}" in t for t in msgs)
+
+
+def test_real_all_passes_max_ff_ratio():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "max_ff_ratio" in m._PASS
+
+
+# ── 2026-11-23 구동계 방향 보정 launch 인자 (torque_plant.yaml drive) ──
+@pytest.mark.parametrize("controller, exe", [("mpc", "torque_mpc_node"), ("pure_pursuit", "wheel_pi_node"),
+                                             ("pp", "wheel_pi_node"), ("adpp", "wheel_pi_node")])
+def test_drive_args_default_not_passed(launch_mod, controller, exe):
+    """인자를 안 주면 어느 노드에도 drive_* 를 넘기지 않는다 (노드가 torque_plant.yaml drive 기본 0 을 읽는다)."""
+    _, _, out = build(launch_mod, controller=controller)
+    assert not any(k.startswith("drive_") for k in _node_params(out, exe))
+    assert not any(k.startswith("drive_") for k in _torque_output_params(out))
+
+
+@pytest.mark.parametrize("controller, exe", [("mpc", "torque_mpc_node"), ("pure_pursuit", "wheel_pi_node"),
+                                             ("pp", "wheel_pi_node"), ("adpp", "wheel_pi_node")])
+def test_drive_args_pass_to_controller_and_output(launch_mod, controller, exe):
+    """drive_yaw_deg·drive_slip_coef → 제어기 (MPC·바퀴 PI) 에 둘 다, torque_output 에는 δ0 만."""
+    _, _, out = build(launch_mod, controller=controller, drive_yaw_deg="2.4", drive_slip_coef="-2.5")
+    p = _node_params(out, exe)
+    assert p["drive_yaw_offset_deg"] == 2.4 and p["drive_slip_coef_deg"] == -2.5
+    t = _torque_output_params(out)
+    assert t["drive_yaw_offset_deg"] == 2.4 and "drive_slip_coef_deg" not in t
+
+
+def test_drive_args_reject_non_number(launch_mod):
+    with pytest.raises(RuntimeError, match="drive_yaw_deg"):
+        build(launch_mod, drive_yaw_deg="abc")
+
+
+def test_real_all_passes_drive_args():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    assert {"drive_yaw_deg", "drive_slip_coef"} <= set(m._PASS)
+
+
+# ── 2026-11-23 path following (figure8_reference path_follow_lead_s) ──
+@pytest.mark.parametrize("given, lead, rate", [("", None, None), ("0.05", 0.05, 50.0), ("0", 0.0, 50.0), ("off", -1.0, 50.0)])
+def test_path_follow_lead_reaches_figure8(launch_mod, given, lead, rate):
+    """비우면 넘기지 않는다 (노드 기본 −1 = 시간 추종). 주면 lead 와 발행 50 Hz (발행 사이 외삽 몫을 줄인다)."""
+    _, _, out = build(launch_mod, shape="circles8", width="1.6", yaw_mode="tangent", path_follow_lead=given)
+    p = _node_params(out, "figure8_reference_node")
+    assert p.get("path_follow_lead_s") == lead and p.get("rate_hz") == rate
+
+
+@pytest.mark.parametrize("given", ["1.5", "-0.1", "abc"])
+def test_path_follow_lead_rejected(launch_mod, given):
+    with pytest.raises((RuntimeError, ValueError)):
+        build(launch_mod, shape="circles8", width="1.6", yaw_mode="tangent", path_follow_lead=given)
+
+
+def test_real_all_passes_path_follow_and_max_com_height():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "path_follow_lead" in m._PASS and "max_com_height" in m._PASS
+
+
+# ── 2026-11-23 friction_comp (교수님: 구동계 마찰은 d̂ 가 흡수할 외란 — 보상을 끄고 시험) ──
+@pytest.mark.parametrize("controller", ["mpc", "pp", "adpp", "pure_pursuit"])
+@pytest.mark.parametrize("given, expect", [("", None), ("true", None), ("false", 0.0)])
+def test_friction_comp_switch(launch_mod, controller, given, expect):
+    """false 면 torque_output compensation_scale 0 (coulomb·viscous·정지 모두 이 값을 곱한다). 비우거나 true 면 넘기지 않는다 (yaml 0.9)."""
+    _, _, out = build(launch_mod, controller=controller, friction_comp=given)
+    assert _torque_output_params(out).get("compensation_scale") == expect
+
+
+def test_real_all_passes_friction_comp():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "friction_comp" in m._PASS

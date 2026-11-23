@@ -15,6 +15,7 @@ namespace amr_mpc_cpp
 namespace
 {
 double wrap(double a) {return std::atan2(std::sin(a), std::cos(a));}
+constexpr double kJointPd0 = 0.09;   // 결합 Kalman 의 d_x·d_y 초기 분산 [(m/s²)²] (σ 0.3 — 실차 8자 정상상태 몫 0.09~0.26 을 덮는다)
 }  // namespace
 
 TorqueLimitMode parse_limit_mode(const std::string & s)
@@ -35,7 +36,23 @@ TMat34 TorqueModel::force_map() const
   F << 1.0, 1.0, 1.0, 1.0,        // F_x
     -1.0, 1.0, 1.0, -1.0,         // F_y
     -kk, kk, -kk, kk;             // M_z
-  return F / wheel_radius;
+  F /= wheel_radius;
+  if (drive_yaw != 0.0) {         // 2026-11-23 바퀴 힘 방향도 굴러가는 축과 같이 돈다 (속도 사상 R(δ)T 의 쌍대). M_z 행은 그대로
+    const double c = std::cos(drive_yaw), s = std::sin(drive_yaw);
+    const Eigen::Matrix<double, 1, 4> fx = F.row(0), fy = F.row(1);
+    F.row(0) = c * fx - s * fy;
+    F.row(1) = s * fx + c * fy;
+  }
+  return F;
+}
+
+TVec3 TorqueModel::correct_wheel_velocity(const TVec3 & v, double wz) const
+{
+  const double ac = std::clamp(std::hypot(v(0), v(1)) * wz, -slip_ac_max, slip_ac_max);
+  const double a = drive_yaw + slip_coef * ac;
+  if (a == 0.0) {return v;}
+  const double c = std::cos(a), s = std::sin(a);
+  return TVec3(c * v(0) - s * v(1), s * v(0) + c * v(1), v(2));
 }
 
 TMat34 TorqueModel::G(double theta) const
@@ -67,16 +84,34 @@ double TorqueModel::tau_friction_limit() const
   return wheel_radius / std::sqrt(2.0) * mu_hat * mass * gravity / 4.0 * c_s;
 }
 
+Eigen::Matrix4d TorqueModel::ground_map() const
+{
+  const TMat34 F = force_map();
+  const Eigen::Vector3d Minv(1.0 / m_eff(), 1.0 / m_eff(), 1.0 / I_eff());
+  return Eigen::Matrix4d::Identity() - J_w * F.transpose() * Minv.asDiagonal() * F;
+}
+
 TVec4 TorqueModel::tau_friction_limits() const
 {
-  // 식-21 을 바퀴마다: τ_μ,i = (r/√2)·μ̂·N_i·c_s,  N_i = 몫_i·m g  (몫 1/4 이면 mg/4 — 위와 같다) (2026-11-19 (10))
-  // 바퀴별 μ̂_i 가 있으면 (> 0) 그 바퀴는 (r/√2)·μ̂_i·(m g/4)·c_s — 하중 몫을 다시 곱하지 않는다 (2026-11-19 (11))
+  // 식-21 을 바퀴마다: τ_μ,i = (r/√2)·μ̂_i·N_i·c_s,  N_i = 몫_i·m g  (몫 1/4 이면 mg/4 — 위와 같다) (2026-11-19 (10))
+  // μ̂_i = mu_hat_wheels(i) (> 0 일 때), 아니면 mu_hat. 2026-11-22: 바퀴별 μ̂ 도 N_i 기준 — 하중 몫을 곱한다
+  //   (11-19 (11) ~ 11-21 은 mg/4 기준이라 하중 몫을 안 곱했다)
   const double unit = wheel_radius / std::sqrt(2.0) * mass * gravity * c_s;
   TVec4 out;
   for (int i = 0; i < 4; ++i) {
-    out(i) = mu_hat_wheels(i) > 0.0 ? unit * mu_hat_wheels(i) / 4.0 : unit * mu_hat * wheel_load_share(i);
+    out(i) = unit * (mu_hat_wheels(i) > 0.0 ? mu_hat_wheels(i) : mu_hat) * wheel_load_share(i);
   }
   return out;
+}
+
+TVec4 TorqueModel::wheel_normal_forces(double ax, double ay, double h, double min_frac) const
+{
+  // 머리주석 (hpp) 의 식. h ≤ 0 이면 정지 하중 그대로. 합 Σ N_i = m g 는 가속도와 상관없이 보존된다 (자르기 전)
+  const TVec4 n0 = wheel_load_share * mass * gravity;
+  if (!(h > 0.0)) {return n0;}
+  const TVec4 sx(1.0, 1.0, -1.0, -1.0), sy(1.0, -1.0, 1.0, -1.0);
+  const TVec4 n = n0 - sx * (mass * ax * h / (2.0 * wheel_base)) - sy * (mass * ay * h / (2.0 * robot_width));
+  return n.cwiseMax(min_frac * n0);
 }
 
 // ── 현재 상태 기준 선형화 ───────────────────────────────────────
@@ -162,7 +197,10 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
   if (!(tu_.w_delta + tu_.r_u > 0.0)) {throw std::invalid_argument("w_delta + r_u > 0 이어야 H 가 양의 정부호다");}
 
   nU_ = 4 * tu_.Nc;
-  const int mg = 4 * (tu_.Nc - 1);
+  ground_ = tu_.cap_on_ground && tu_.limit_mode == TorqueLimitMode::Friction;
+  P_ground_ = md_.ground_map();
+  const int mg_rate = 4 * (tu_.Nc - 1);
+  const int mg = mg_rate + (ground_ ? 4 * tu_.Nc : 0);       // 2026-11-22 바닥 토크 행 (cap_on_ground)
 
   // H_const = Dᵀ W̄_Δ D + R̄_U + q_null N.   DᵀD 는 블록 삼중대각: 대각 2I (마지막 I), 이웃 −I
   H_const_ = Eigen::MatrixXd::Zero(nU_, nU_);
@@ -184,11 +222,36 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
       A_gen_(4 * (j - 1) + i, 4 * (j - 1) + i) = -1.0;
     }
   }
+  if (ground_) {                  // 행 mg_rate + 4j + i : (P τ_j)_i
+    for (int j = 0; j < tu_.Nc; ++j) {A_gen_.block<4, 4>(mg_rate + 4 * j, 4 * j) = P_ground_;}
+  }
 
   {
     const TMat34 F = md_.force_map();
     F_pinv_ = F.transpose() * (F * F.transpose()).inverse();      // 식-14 의 ((T⁻¹)ᵀ)⁺ — 행이 직교라 닫힌 형과 같다
+    F_ = F;
   }
+  if (!(tu_.load_com_height >= 0.0 && tu_.load_min_frac > 0.0 && tu_.load_min_frac <= 1.0)) {
+    throw std::invalid_argument("load_transfer: com_height ≥ 0, 0 < min_frac ≤ 1 이어야 한다");
+  }
+  tb_steps_.setZero(4, tu_.Nc);
+  if (tu_.dist_kalman) {         // 축별 정상상태 Kalman 이득 (머리주석 "외란 관측기 이득")
+    if (!((tu_.dist_kq.array() > 0.0).all() && (tu_.dist_kr_pos.array() > 0.0).all() && (tu_.dist_kr_vel.array() > 0.0).all())) {
+      throw std::invalid_argument("dist_kalman: kalman_q·r_pos·r_vel 은 모두 양수여야 한다");
+    }
+    for (int ax = 0; ax < 3; ++ax) {
+      K_kal_.row(ax) = steady_kalman_gain(tu_.Ts, tu_.dist_kq(ax), tu_.dist_kr_pos(ax), tu_.dist_kr_vel(ax));
+    }
+  }
+  if (!(tu_.ff_normal_min > 0.0 && tu_.ff_normal_min <= tu_.ff_normal_max && tu_.ff_normal_q >= 0.0 && tu_.ff_normal_P0 > 0.0)) {
+    throw std::invalid_argument("ff_normal: 0 < min ≤ max, q ≥ 0, P0 > 0 이어야 한다");
+  }
+  if (tu_.ff_normal_estimate && !(tu_.dist_kalman && tu_.dist_body_frame)) {
+    throw std::invalid_argument("ff_normal_estimate 는 dist_kalman (observer kalman) 과 dist_body_frame (frame body) 이 켜져 있어야 한다");
+  }
+  rho_ = std::clamp(tu_.ff_normal_scale, tu_.ff_normal_min, tu_.ff_normal_max);   // 추정 시작값
+  z_ << 0.0, 0.0, 1.0 - rho_;
+  Pz_ = Eigen::Vector3d(kJointPd0, kJointPd0, tu_.ff_normal_P0).asDiagonal();
   Us_.setZero(nU_);
   Phi_.setZero(6 * tu_.Np, nU_);
   WPhi_.setZero(6 * tu_.Np, nU_);
@@ -208,6 +271,13 @@ void TorqueMPC::reset()
   x_prev_.setZero();
   tau_prev_.setZero();
   d_hat_.setZero();
+  a_hat_.setZero();
+  rho_have_ = false;             // d 몫은 지우고 η̂ 와 그 분산은 남긴다 (머리주석)
+  z_.head<2>().setZero();
+  {
+    const double pe = Pz_(2, 2);
+    Pz_ = Eigen::Vector3d(kJointPd0, kJointPd0, pe).asDiagonal();
+  }
   T_.setZero();
   stats_ = TorqueStepStats{};
 }
@@ -227,6 +297,16 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat, double dt_state)
   if (!has_prev_) {
     d_hat_.setZero();
     return;
+  }
+  if (tu_.ff_normal_estimate) {  // 결합 Kalman 예측 단계: random walk 분산을 더한다 (갱신을 건너뛰는 주기도). η 분산은 10 P0 에서 멈춘다
+    const double Ts = tu_.Ts;
+    Pz_.diagonal() += Ts * Eigen::Vector3d(tu_.dist_kq(0) * tu_.dist_kq(0), tu_.dist_kq(1) * tu_.dist_kq(1), tu_.ff_normal_q * tu_.ff_normal_q);
+    const double pmax = 10.0 * tu_.ff_normal_P0;
+    if (Pz_(2, 2) > pmax) {
+      const double f = std::sqrt(pmax / Pz_(2, 2));
+      Pz_.row(2) *= f;
+      Pz_.col(2) *= f;
+    }
   }
   // 식-9: 한 스텝 전 상태·토크로 예측한 값과 지금 추정값의 차
   TVec6 pred;
@@ -252,28 +332,150 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat, double dt_state)
     stats_.d_skipped = 2;
     return;
   }
-  if (tu_.dist_accel_only) {     // 가속도 외란 모델 (머리주석, 2026-11-18): 위치 잔차를 속도 잔차에서 만든다
+  // 포화 중 갱신 멈춤 (2026-11-21, 머리주석): 직전에 낸 τ 가 상한에 붙었거나 목표 입력이 상한 밖이면 잔차가 "못 낸 힘" 을 담는다
+  if (tu_.dist_freeze_on_sat) {
+    const TVec4 tb = tau_bar();
+    const TVec4 tp = ground_ ? TVec4(P_ground_ * tau_prev_) : tau_prev_;          // 바닥 토크 상한이면 바닥 몫으로 견준다
+    const TVec4 us0 = Us_.size() >= 4 ? (ground_ ? TVec4(P_ground_ * Us_.head<4>()) : TVec4(Us_.head<4>())) : TVec4::Zero();
+    const bool sat = (tp.cwiseAbs().array() >= 0.98 * tb.array()).any() || us_clipped_ ||
+      (Us_.size() >= 4 && (us0.cwiseAbs().array() > tb.array()).any());
+    if (sat) {
+      stats_.d_skipped = 3;
+      return;
+    }
+  }
+  if (tu_.dist_accel_only && !tu_.dist_kalman) {     // 가속도 외란 모델 (머리주석, 2026-11-18): 위치 잔차를 속도 잔차에서 만든다
     d.head<3>() = 0.5 * tu_.Ts * d.tail<3>();
   }
-  d_hat_ = (1.0 - tu_.dist_alpha) * d_hat_ + tu_.dist_alpha * d;     // 식-11
+  if (tu_.dist_body_frame) {     // 몸체 좌표 (2026-11-21): x·y 성분을 R(θ̂)ᵀ 로
+    const double c = std::cos(x_hat(2)), s = std::sin(x_hat(2));
+    for (int k : {0, 3}) {
+      const double ex = d(k), ey = d(k + 1);
+      d(k) = c * ex + s * ey;
+      d(k + 1) = -s * ex + c * ey;
+    }
+  }
+  const double Ts = tu_.Ts;
+  if (tu_.dist_kalman) {         // 정상상태 Kalman 이득 (머리주석 "외란 관측기 이득"): 축마다 â += K [r_p − ½Ts² â ; r_v − Ts â]
+    if (tu_.ff_normal_estimate) {  // x·y 는 η 와 같이 (머리주석 "구심 feedforward 계수")
+      joint_kalman_update(d, x_hat(2));
+      a_hat_.head<2>() = z_.head<2>();
+    }
+    for (int ax = tu_.ff_normal_estimate ? 2 : 0; ax < 3; ++ax) {
+      const double ip = d(ax) - 0.5 * Ts * Ts * a_hat_(ax), iv = d(ax + 3) - Ts * a_hat_(ax);
+      a_hat_(ax) += K_kal_(ax, 0) * ip + K_kal_(ax, 1) * iv;
+    }
+    d_hat_ << 0.5 * Ts * Ts * a_hat_, Ts * a_hat_;
+  } else {
+    d_hat_ = (1.0 - tu_.dist_alpha) * d_hat_ + tu_.dist_alpha * d;     // 식-11
+  }
+  // 상한 (2026-11-21): 가속도 크기로 자른다. 위치 성분도 같은 비율로 (accel_only 면 ½Ts·속도 꼴이 유지된다)
+  if (tu_.dist_acc_max > 0.0) {
+    const double n = std::hypot(d_hat_(3), d_hat_(4)) / Ts;
+    if (n > tu_.dist_acc_max) {
+      const double f = tu_.dist_acc_max / n;
+      d_hat_(0) *= f; d_hat_(1) *= f; d_hat_(3) *= f; d_hat_(4) *= f;
+    }
+  }
+  if (tu_.dist_yaw_acc_max > 0.0) {
+    const double n = std::abs(d_hat_(5)) / Ts;
+    if (n > tu_.dist_yaw_acc_max) {
+      const double f = tu_.dist_yaw_acc_max / n;
+      d_hat_(2) *= f; d_hat_(5) *= f;
+    }
+  }
+  if (tu_.dist_kalman) {a_hat_ = d_hat_.tail<3>() / Ts;}   // 상한에 잘렸으면 Kalman 상태도 같이
+  if (tu_.ff_normal_estimate) {z_.head<2>() = a_hat_.head<2>();}
+}
+
+void TorqueMPC::joint_kalman_update(const TVec6 & d, double theta)
+{
+  // 머리주석 "구심 feedforward 계수": z = [d_x, d_y, η] (몸체),  측정 [r_p,x; r_p,y; r_v,x; r_v,y] (몸체 잔차) = H z + v
+  const double Ts = tu_.Ts, hp = 0.5 * Ts * Ts;
+  Eigen::Vector2d g = Eigen::Vector2d::Zero();       // g = (c_n/m_eq) R(θ̂)ᵀ n̂_c — 잔차를 돌린 것과 같은 θ̂
+  if (rho_have_) {
+    const double c = std::cos(theta), s = std::sin(theta);
+    g << c * rho_n_prev_(0) + s * rho_n_prev_(1), -s * rho_n_prev_(0) + c * rho_n_prev_(1);
+    g *= rho_cn_prev_ / md_.m_eff();
+  }
+  Eigen::Matrix<double, 4, 3> H;
+  H << hp, 0.0, hp * g(0),
+    0.0, hp, hp * g(1),
+    Ts, 0.0, Ts * g(0),
+    0.0, Ts, Ts * g(1);
+  const Eigen::Vector4d y(d(0), d(1), d(3), d(4));
+  const Eigen::Vector4d rd(tu_.dist_kr_pos(0) * tu_.dist_kr_pos(0), tu_.dist_kr_pos(1) * tu_.dist_kr_pos(1),
+    tu_.dist_kr_vel(0) * tu_.dist_kr_vel(0), tu_.dist_kr_vel(1) * tu_.dist_kr_vel(1));
+  const Eigen::Matrix4d Rm = rd.asDiagonal();
+  const Eigen::Matrix4d S = H * Pz_ * H.transpose() + Rm;
+  const Eigen::Matrix<double, 3, 4> K = (S.ldlt().solve(H * Pz_)).transpose();     // P Hᵀ S⁻¹ (S, P 대칭)
+  z_ += K * (y - H * z_);
+  const Eigen::Matrix3d IKH = Eigen::Matrix3d::Identity() - K * H;
+  Pz_ = IKH * Pz_ * IKH.transpose() + K * Rm * K.transpose();          // Joseph form
+  z_(2) = std::clamp(z_(2), 1.0 - tu_.ff_normal_max, 1.0 - tu_.ff_normal_min);
+  rho_ = 1.0 - z_(2);
+  const double gn = g.norm();
+  stats_.rho_updated = gn > 0.0 ? 1 : 0;
+  stats_.rho_g = gn;
+  stats_.rho_r = gn > 0.0 ? (d(3) * g(0) + d(4) * g(1)) / (gn * Ts) : 0.0;
+}
+
+Eigen::RowVector2d TorqueMPC::steady_kalman_gain(double Ts, double q_rate, double r_pos, double r_vel)
+{
+  // 상태 a (스칼라 random walk, 스텝 분산 q = q_rate²·Ts), 측정 H = [½Ts²; Ts], R = diag(r_pos², r_vel²)
+  const double q = q_rate * q_rate * Ts;
+  const Eigen::Vector2d H(0.5 * Ts * Ts, Ts);
+  const Eigen::Matrix2d R = Eigen::Vector2d(r_pos * r_pos, r_vel * r_vel).asDiagonal();
+  double P = q;
+  Eigen::RowVector2d K = Eigen::RowVector2d::Zero();
+  for (int it = 0; it < 200000; ++it) {
+    const double Pm = P + q;                                    // 예측
+    const Eigen::Matrix2d S = H * Pm * H.transpose() + R;
+    const Eigen::RowVector2d Kn = Pm * H.transpose() * S.inverse();
+    const double Pn = (1.0 - Kn.dot(H)) * Pm;                    // 갱신
+    const bool done = std::abs(Pn - P) <= 1e-14 * std::max(P, 1e-300);
+    P = Pn;
+    K = Kn;
+    if (done) {break;}
+  }
+  return K;
+}
+
+TVec6 TorqueMPC::d_hat_world(double theta) const
+{
+  if (!tu_.dist_body_frame) {return d_hat_;}
+  TVec6 out = d_hat_;
+  const double c = std::cos(theta), s = std::sin(theta);
+  for (int k : {0, 3}) {
+    out(k) = c * d_hat_(k) - s * d_hat_(k + 1);
+    out(k + 1) = s * d_hat_(k) + c * d_hat_(k + 1);
+  }
+  return out;
 }
 
 bool TorqueMPC::solve_qp(const TVec4 & tau_bar)
 {
   const int mg = static_cast<int>(A_gen_.rows());
+  const int mg_rate = 4 * (tu_.Nc - 1);
+  const double tmot = md_.tau_motor_limit();
   for (int j = 0; j < tu_.Nc; ++j) {
     for (int i = 0; i < 4; ++i) {
-      const double tb = tau_bar(i), dtb = dtau_bar_of(tb);
-      double lo = -tb, hi = tb;
+      const double tb = tb_steps_(i, j), dtb = dtau_bar_of(tau_bar(i));   // 상자는 스텝별 (하중 이동), 변화율은 정지 상한 기준
+      const double box = ground_ ? tmot : tb;     // 바닥 토크 상한이면 바퀴 토크 자체는 모터 한계까지 (마찰 상한은 아래 일반 제약)
+      double lo = -box, hi = box;
       if (j == 0) {     // 첫 스텝의 변화율은 단일 변수라 bound 에 합친다. 상한이 우선 (머리주석)
-        lo = std::clamp(tau_prev_(i) - dtb, -tb, tb);
-        hi = std::clamp(tau_prev_(i) + dtb, -tb, tb);
+        lo = std::clamp(tau_prev_(i) - dtb, -box, box);
+        hi = std::clamp(tau_prev_(i) + dtb, -box, box);
       } else {
         lb_(nU_ + 4 * (j - 1) + i) = -dtb;
         ub_(nU_ + 4 * (j - 1) + i) = dtb;
       }
       lb_(4 * j + i) = lo;
       ub_(4 * j + i) = hi;
+      if (ground_) {
+        lb_(nU_ + mg_rate + 4 * j + i) = -tb;
+        ub_(nU_ + mg_rate + 4 * j + i) = tb;
+      }
     }
   }
   DAQPProblem qp{};
@@ -308,9 +510,23 @@ TVec4 TorqueMPC::step(
   stats_ = TorqueStepStats{};
 
   update_disturbance(x_hat, dt_state);
-  const TVec6 d_use = tu_.dist_enable ? d_hat_ : TVec6::Zero();
-  const TVec3 a_d = d_use.tail<3>() / Ts;          // 식-14 의 â_d
+  // 지평 스텝 i 에서 쓰는 d̂ (월드 좌표): 몸체 저장이면 그 스텝의 기준 방향 θ_r,i 로 돌린다 (2026-11-21)
+  auto d_at = [this](double th) -> TVec6 {return tu_.dist_enable ? d_hat_world(th) : TVec6::Zero();};
   const Eigen::Matrix3d Mdiag = TVec3(md_.m_eff(), md_.m_eff(), md_.I_eff()).asDiagonal();
+  const TVec4 tb_now = tau_bar();
+  // 2026-11-23 하중 이동 (TorqueTuning load_*): 기본은 열마다 tb_now, 켜면 아래 지평 루프에서 스텝마다 바꾼다
+  tb_steps_.resize(4, Nc);
+  tb_steps_.colwise() = tb_now;
+  const bool load_on = tu_.load_com_height > 0.0;
+  const TVec4 n0 = md_.wheel_normal_forces(0.0, 0.0, 0.0, 1.0);
+  const TVec4 tf0 = md_.tau_friction_limits();
+  const bool cap_dyn = load_on && tu_.load_dynamic_cap && tu_.limit_mode == TorqueLimitMode::Friction &&
+    !(tau_bar_override_.array() >= 0.0).any();
+  n_now_ = n0;
+
+  rho_have_ = false;              // 이번 주기 i = 0 에서 다시 채운다 (다음 주기 결합 Kalman 측정 회귀)
+  us_clipped_ = false;
+  const double rho_use = ff_normal_rho();
 
   // current_state: 이번 주기의 모델을 x̂(k), τ(k−1) 에서 한 번 만든다 (머리주석 "선형화 방식")
   const bool current = tu_.linearization == TorqueLinearization::CurrentState;
@@ -329,43 +545,87 @@ TVec4 TorqueMPC::step(
   double th_r = x_hat(2) + wrap(ref[0].first(2) - x_hat(2));
   for (int i = 0; i < Np; ++i) {
     const int cidx = std::min(i, Nc - 1);
-    if (i < Nc) {
-      // 식-14 목표 입력: U_s,i = F⁺ R(θ_r,i)ᵀ M (p̈_r,i − w_i − â_d)
-      const TVec3 & u_i = ref[i].second;
-      const double c = std::cos(th_r), s = std::sin(th_r);
-      const TVec3 Xdot_r(u_i(0) * c - u_i(1) * s, u_i(0) * s + u_i(1) * c, u_i(2));
-      TVec3 acc;
-      if (acc_ref && static_cast<int>(acc_ref->size()) > i) {
-        acc = (*acc_ref)[i];
-      } else {
-        // 지평 점에서: p̈ = d/dt (R(θ)u) = R(θ)(u̇ + ω S u),  S u = [−u_y, u_x, 0]
-        const int i0 = std::max(i - 1, 0), i1 = i + 1;
-        const TVec3 du = (ref[i1].second - ref[i0].second) / ((i1 - i0) * Ts);
-        const TVec3 body(du(0) - u_i(2) * u_i(1), du(1) + u_i(2) * u_i(0), du(2));
-        acc << body(0) * c - body(1) * s, body(0) * s + body(1) * c, body(2);
-      }
-      const TVec3 rhs = Mdiag * (acc - md_.w(Xdot_r) - a_d);
-      const TVec3 rb(c * rhs(0) + s * rhs(1), -s * rhs(0) + c * rhs(1), rhs(2));   // R(θ_r)ᵀ
-      Us_.segment<4>(4 * i) = F_pinv_ * rb;
+    const TVec6 d_use = d_at(th_r);
+    const TVec3 a_d = d_use.tail<3>() / Ts;          // 식-14 의 â_d
+    // 기준 속도·가속도 (지평 모든 스텝 — ρ 외란을 예측에도 넣으려고)
+    const TVec3 & u_i = ref[i].second;
+    const double c = std::cos(th_r), s = std::sin(th_r);
+    const TVec3 Xdot_r(u_i(0) * c - u_i(1) * s, u_i(0) * s + u_i(1) * c, u_i(2));
+    TVec3 acc;
+    if (acc_ref && static_cast<int>(acc_ref->size()) > i) {
+      acc = (*acc_ref)[i];
+    } else {
+      // 지평 점에서: p̈ = d/dt (R(θ)u) = R(θ)(u̇ + ω S u),  S u = [−u_y, u_x, 0]
+      const int i0 = std::max(i - 1, 0), i1 = i + 1;
+      const TVec3 du = (ref[i1].second - ref[i0].second) / ((i1 - i0) * Ts);
+      const TVec3 body(du(0) - u_i(2) * u_i(1), du(1) + u_i(2) * u_i(0), du(2));
+      acc << body(0) * c - body(1) * s, body(0) * s + body(1) * c, body(2);
     }
+    // 구심 feedforward 계수 ρ (머리주석): 곡률 중심 쪽 구심 몫 c_n = n̂_c·M(p̈_r − w) 중 (1 − ρ) 만큼을 "모델에 없는 안쪽 힘" 으로 본다 →
+    //   가속도 외란 a_ρ = (1 − ρ) c_n n̂_c / m_eff 를 U_s (빼기) 와 예측 (더하기) 에 같이 — offset-free 의 조건 (외란이 예측 모델에도 들어간다)
+    TVec3 a_rho = TVec3::Zero();
+    const double sp_r = std::hypot(Xdot_r(0), Xdot_r(1));
+    if (sp_r > 1e-3 && std::abs(u_i(2)) > 1e-3) {
+      const double sg = u_i(2) > 0.0 ? 1.0 : -1.0;
+      const Eigen::Vector2d n_c(-sg * Xdot_r(1) / sp_r, sg * Xdot_r(0) / sp_r);
+      const TVec3 cent = Mdiag * (acc - md_.w(Xdot_r));
+      const double c_n = n_c.dot(cent.head<2>());
+      a_rho.head<2>() = (1.0 - rho_use) * c_n / md_.m_eff() * n_c;
+      if (i == 0 && std::abs(u_i(2)) > 0.3 && sp_r > 0.2 && std::abs(c_n) > tu_.ff_normal_x_min) {
+        rho_have_ = true;
+        rho_cn_prev_ = c_n;
+        rho_n_prev_ = n_c;
+      }
+    }
+    if (i < Nc) {
+      // 식-14 목표 입력: U_s,i = F⁺ R(θ_r,i)ᵀ M (p̈_r,i − w_i − â_d − a_ρ)
+      const TVec3 rhs = Mdiag * (acc - md_.w(Xdot_r) - a_d - a_rho);
+      const TVec3 rb(c * rhs(0) + s * rhs(1), -s * rhs(0) + c * rhs(1), rhs(2));   // R(θ_r)ᵀ
+      if (load_on) {
+        // 하중 이동: 기준 관성 가속도의 몸체 성분 → N_i,j. 상한 τ̄ ∝ μ̂_i N_i 를 N_i,j/N_i,0 배, 배분 가중 c_i = 그 마찰 한계
+        const TVec4 nj = md_.wheel_normal_forces(c * acc(0) + s * acc(1), -s * acc(0) + c * acc(1), tu_.load_com_height, tu_.load_min_frac);
+        const TVec4 cap = tf0.cwiseProduct(nj.cwiseQuotient(n0));
+        if (i == 0) {n_now_ = nj;}
+        if (cap_dyn) {tb_steps_.col(i) = cap.cwiseMin(md_.tau_motor_limit());}
+        if (tu_.load_weighted_alloc) {     // min Σ (τ_q / cap_q)²  s.t. F τ = rb  →  τ = W⁻¹Fᵀ (F W⁻¹ Fᵀ)⁻¹ rb,  W⁻¹ = diag(cap²)
+          const Eigen::Matrix<double, 4, 3> WiFt = cap.cwiseProduct(cap).asDiagonal() * F_.transpose();
+          Us_.segment<4>(4 * i) = WiFt * (F_ * WiFt).inverse() * rb;
+        } else {
+          Us_.segment<4>(4 * i) = F_pinv_ * rb;
+        }
+      } else {
+        Us_.segment<4>(4 * i) = F_pinv_ * rb;
+      }
+      if (tu_.target_projection && ground_) {   // 바닥 토크 상한이면 P·U_s 가 상자 안에 들도록 같은 비율로 줄인다
+        const TVec4 ug = P_ground_ * Us_.segment<4>(4 * i);
+        double sc = 1.0;
+        for (int q = 0; q < 4; ++q) {if (std::abs(ug(q)) > tb_steps_(q, i)) {sc = std::min(sc, tb_steps_(q, i) / std::abs(ug(q)));}}
+        if (sc < 1.0) {Us_.segment<4>(4 * i) *= sc; if (i == 0) {us_clipped_ = true;}}
+      } else if (tu_.target_projection) {   // 제약 있는 목표 입력 (머리주석): 바퀴별 [−τ̄, τ̄] 사영
+        for (int q = 0; q < 4; ++q) {
+          const double u = Us_(4 * i + q), uc = std::clamp(u, -tb_steps_(q, i), tb_steps_(q, i));
+          if (i == 0 && uc != u) {us_clipped_ = true;}
+          Us_(4 * i + q) = uc;
+        }
+      }
+    }
+    TVec6 d_rho;
+    d_rho << 0.5 * Ts * Ts * a_rho, Ts * a_rho;      // ρ 외란의 한 스텝 몫 (가속도 외란 꼴)
     if (current) {
-      // x_{i+1} = A_d x_i + B_d τ + c_d + d̂   — 지평 전체에 같은 (A_d, B_d, c_d)
-      xf = lin.A * xf + lin.c + d_use;
+      // x_{i+1} = A_d x_i + B_d τ + c_d + d̂ + d_ρ   — 지평 전체에 같은 (A_d, B_d, c_d)
+      xf = lin.A * xf + lin.c + d_use + d_rho;
       Phi_j = (lin.A * Phi_j).eval();
       Phi_j.block<6, 4>(0, 4 * cidx) += lin.B;
       Phi_.block(6 * i, 0, 6, nU_) = Phi_j;
     } else {
       // 스텝 i 의 기준 방향·속도로 B_i, w_i (식-14)
-      const TVec3 & u_i = ref[i].second;
-      const double c = std::cos(th_r), s = std::sin(th_r);
-      const TVec3 Xdot_r(u_i(0) * c - u_i(1) * s, u_i(0) * s + u_i(1) * c, u_i(2));
       const TVec3 w_i = md_.w(Xdot_r);
       const TMat34 G_i = md_.G(th_r);
 
-      // x_{i+1} = A x_i + B_i τ + E w_i + d̂
+      // x_{i+1} = A x_i + B_i τ + E w_i + d̂ + d_ρ
       xf.head<3>() += Ts * xf.tail<3>() + 0.5 * Ts * Ts * w_i;
       xf.tail<3>() += Ts * w_i;
-      xf += d_use;
+      xf += d_use + d_rho;
       P += Ts * V;
       P.block<3, 4>(0, 4 * cidx) += 0.5 * Ts * Ts * G_i;
       V.block<3, 4>(0, 4 * cidx) += Ts * G_i;
@@ -401,9 +661,9 @@ TVec4 TorqueMPC::step(
     T_ = H_.ldlt().solve(-g_);          // QP 실패 → 무제약 해를 상한으로 깎는다
     stats_.fallback = 1;
     for (int i = 0; i < 4; ++i) {
-      const double dtb = dtau_bar_of(tb(i));
+      const double dtb = dtau_bar_of(tb(i)), b0 = tb_steps_(i, 0);
       T_(i) = std::clamp(
-        T_(i), std::clamp(tau_prev_(i) - dtb, -tb(i), tb(i)), std::clamp(tau_prev_(i) + dtb, -tb(i), tb(i)));
+        T_(i), std::clamp(tau_prev_(i) - dtb, -b0, b0), std::clamp(tau_prev_(i) + dtb, -b0, b0));
     }
   }
   const TVec4 tau = T_.head<4>();

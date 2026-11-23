@@ -43,8 +43,11 @@ estimator:
   #    값의 출처: bag(2026-09-23) /tf_static 의 base_link → camera_link (0.1140, +0.0475) → camera_gyro_frame (−0.0160, −0.0302).
   #    같은 bag 의 제자리 회전 구간에서 추정 속도와 휠 오돔의 차로 확인했다:
   #        (0, 0) 50 mm/s  →  (0.098, −0.030) 28 mm/s  →  (0.098, +0.017) 16 mm/s
-  #    ★ 지금 리포의 URDF 는 camera_link y = 0 이라 (0.098, −0.030) 이 된다. bag 때와 장착이 달라졌는지 미확인
-  #      → 실차에서 제자리 회전으로 다시 확인 (To do)
+  #    (예전 주석: URDF camera_link y = 0 이라 (0.098, −0.030) 이 된다, 제자리 회전으로 다시 확인 To do —
+  #     2026-11-22 확인 끝, 아래 줄. 지금 실행 TF 는 camera_link y +0.0475 라 base_footprint → camera_gyro_frame (0.1093, 0.0173))
+  #    2026-11-22 확인 (analysis/estimator_tuning/2026-11-22_lever_arm/RESULTS_KO.md): 제자리 스핀 2 판 (shape:=rotate 720° 왕복,
+  #      ω 1.0·1.5 rad/s) 에서 추정 중심 속도 − 바퀴 기구학 속도를 ω 에 회귀 → 실제 추적점 (0.1063, 0.0223) m, 이 값과 약 6 mm 차
+  #      (δ −3.0, +5.3 mm, 두 ω 에서 같음). 영향 ω 1.3 rad/s 에서 중심 속도 8 mm/s — 작아서 값은 그대로 둔다.
   #    2026-11-19 새 하부: base_link 가 몸체 기준 (−11.3, 0, +7.5) mm 옮겨지고 센서는 그대로 (문서 "AMR 하부 변경 전달 사항")
   #      → base_link 기준 IMU x 가 +11.3 mm: 0.098 → 0.1093 (URDF camera_link x 0.11398 → 0.12528 과 같은 이동). y 는 그대로
   imu_offset_x: 0.1093
@@ -90,3 +93,18 @@ slam:
   lua_without_wheel_odom: localization_torque_2d.lua
   lua_with_wheel_odom: localization_torque_odom_2d.lua
   wheel_odom_topic: /wheel_odom
+# ── 잡음 값 묶음 (2026-11-21) — launch 인자 est_gains:=<이름> 으로 고른다. 기본(est_gains 비움)은 위 estimator 절 그대로.
+#    여기 적은 키만 estimator 절 값을 덮어쓴다. 한 번만 바꿀 때는 est_noise:="키=값,…" (est_gains 뒤에 적용)
+estimator_presets:
+  # 실차 bag 37 개 innovation 분석 (analysis/estimator_tuning/2026-11-21_kf_innovation/README_KO.md):
+  #   지금 값은 innovation ρ₁ > 0 이 xy 35/35·yaw 35/35 bag → 게인 부족. xy 비 ×3, yaw 비 ×4 를 실측 절대값으로.
+  #   K_xy [0.711, 4.16, −1.133] → [0.881, 7.89, −2.183], K_yaw [0.440, −0.0339] → [0.863, −0.0671]
+  #   걸림돌 (실차 A/B 로 확인): 주행 중 SLAM 오차의 시간 상관(못 배제), K_v 두 배 → 속도 상태로 들어가는 포즈 잡음
+  #   ※ 2026-11-21 실차 A/B (C, circles8 0.7 m/s, 3 판씩 — analysis/torque_mpc_real/2026-11-21_kf_gain_ab/RESULTS_KO.md):
+  #     SLAM 기준 추종 −5 % (판 사이 차이 안), 추정 속도 떨림 1.57 배, Δτ +10 %, 큰 슬립 5.1 → 8.6 %, innovation ρ₁ −0.08~−0.20 (과보정)
+  #     → 채택 안 함. 기본은 위 estimator 절 그대로. 비교용으로만 남긴다.
+  candidate_1121:
+    accel_noise_density: 0.14     # 주행 IMU PSD 5–20 Hz 0.09~0.13
+    accel_bias_walk: 0.04         # 바이어스 시정수 σ_a/σ_b 3.5 s 유지 (데이터로 못 정함)
+    pose_noise_xy: 0.002          # 정지 SLAM 떨림 1.1~1.6 mm, 주행은 더 크다고 봄
+    pose_noise_yaw_deg: 0.05      # yaml 위 주석의 정지 실측 0.05°, 2026-11-21 정지 떨림 0.024~0.029°

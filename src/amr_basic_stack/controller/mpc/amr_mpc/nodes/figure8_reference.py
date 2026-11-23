@@ -35,6 +35,16 @@
 #   발행이 끊기면 mpc_tracking_node 가 ref_timeout(0.5 s) 뒤 /cmd_vel 0 을 내고 멈춘다.
 #   yaw_mode=fixed 면 정렬 회전이 없다 (헤딩 고정 게걸음).
 #
+# path_follow_lead_s (2026-11-23, core/path_follow.py — 기본 −1 = 끔, 예전 동작)
+#   ≥ 0 이면 주행 구간 (T_align ~ T_align + T_path) 에서 기준 시각을 로봇 진행에 묶는다:
+#     t_proj = 경로에서 로봇 (x, y) 에 가장 가까운 점의 시각, t_ref ← clamp(t_ref, t_proj, t_proj + lead).
+#   로봇이 마찰 때문에 늦으면 기준이 기다려, 늦은 만큼은 위치 오차가 아니라 주행 시간으로 나온다 (path following).
+#   정사영 지점 기준 속력 < 0.1 m/s (출발·정지 근처) 와 정사영 앞 lead + 0.25 s 안에 기준 감속이 있는 동안은 시계대로
+#   (감속 직전에 묶으면 MPC 가속도 앞먹임이 브레이크로 고정돼 멈춘다 — core/path_follow.py). 발행 사이 (1/rate_hz) 에 받는 쪽이 기준을 시계대로
+#   외삽하므로 실제 앞섬은 lead + 1/rate_hz 까지 — launch path_follow_lead 를 주면 rate_hz 50.
+#   /figure8/progress (Float64MultiArray) [t, t_ref, t_clock, t_proj (끄면 nan), 묶음 (+1 기다림 / −1 앞당김 / 0)],
+#   t_ref·t_clock 은 기준 출발 (start_delay 뒤) 기준 [s]. 주행 끝에 실제 주행 시간을 로그에 남긴다 (끈 때도).
+#
 # 부하 예산
 #   기준 부하 |vx|+|vy|+K_GEOM·|ω| 가 load_budget·V_LIMIT 를 넘으면 뜨지 않고 거부한다
 #   (fake_reference_node 와 같은 규칙).  남는 35 % 가 MPC 의 보정 여유다.
@@ -50,10 +60,11 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry, Path
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Float64MultiArray
 from amr_interfaces.msg import PlanarReference, PlanarReferenceArray
 
 from amr_mpc.core import node_main
+from amr_mpc.core import path_follow
 from amr_mpc.body import mpc as mpc_mod
 from amr_mpc.core.figure8 import Figure8, lead_in, lead_in_duration, ramp_elapsed, ramp_rate
 from amr_mpc.core.segment import Segment
@@ -85,6 +96,8 @@ class Figure8ReferenceNode(Node):
             ("align_s", 1.5),                         # tangent 모드 앞뒤 제자리 회전 시간 [s]
             ("speed_mod_amp", 0.0),                   # 순항 속도 sin 변조 진폭 ε (0 = 등속 순항, core/figure8.py). v = speed·(1 + ε sin(2πnσ/ℓ_lap))
             ("speed_mod_cycles", 2.0),                # 랩당 변조 주기 수 n (circles8 는 2 면 원 하나에 한 주기)
+            ("speed_mod_phase_deg", 0.0),             # 변조 위상 φ [deg] (2026-11-22). −90 = 출발·교차점에서 가장 느리게 (n 짝수)
+            ("speed_mod_shape", "sin"),               # sin | square (2026-11-22, 두 속도 계단 + accel 가감속)
             ("crossing_blend_m", 0.0),                # circles8 + tangent 교차점 헤딩 완화 길이 [m] (core/figure8.py, 0 = 끔)
             ("start_delay", 3.0),                     # 첫 odom 뒤 이만큼 기동 포즈를 유지하다 출발 (실차에서 손 뺄 시간)
             ("abort_error", 1.6),                     # 로봇이 기준에서 이만큼 벌어지면 발행 중단 → MPC 타임아웃 정지.
@@ -99,6 +112,7 @@ class Figure8ReferenceNode(Node):
             ("armed_topic", "/mpc/armed"),            # keyboard_command_gate 가 내는 무장 상태 (latched)
             ("resume_ramp_s", -1.0),                  # 무장 뒤 배속 0→1 시간 [s]. 음수면 speed/accel (경로 가속과 같은 가속도)
             ("resync_window_s", 2.0),                 # 재무장 때 가장 가까운 경로 지점을 찾는 범위 (멈춘 시각 ±) [s]. 0 이면 안 찾음
+            ("path_follow_lead_s", -1.0),             # ≥ 0 이면 기준 시각을 로봇 진행에 묶는다 (머리주석, 2026-11-23). 음수 = 끔
             ("load_budget", mpc_mod.LOAD_BUDGET),
             ("origin_mode", "robot"),                 # robot | fixed (머리주석)
             ("origin_x", 0.0), ("origin_y", 0.0),     # fixed: 8자 교차점 [m] (frame_id 좌표)
@@ -122,6 +136,9 @@ class Figure8ReferenceNode(Node):
             #   0 이면 부하 예산 load_budget·V_LIMIT 에서 자름). 꼭짓점 속도 square_corner_speed. speed 는 안 쓴다.
             #   yaw_mode tangent | fixed (spin 거부). tangent 는 꼭짓점 ±square_yaw_blend/2 [m] 에서 헤딩을 스무스스텝으로 돌린다
             ("square_side", 1.5), ("square_corner_speed", 0.1), ("square_v_max", 0.0), ("square_yaw_blend", 0.3),
+            #   꼭짓점 처리 (2026-11-21): square_corner_mode pass (위 설명, 기본) | stop (꼭짓점마다 서서 square_dwell_s 쉬고
+            #   square_rot_s 동안 +90° 제자리 회전, 다시 square_dwell_s 쉬고 다음 변 — 병진 가감속과 헤딩 회전을 시간상 뗀다)
+            ("square_corner_mode", "pass"), ("square_rot_s", 1.0), ("square_dwell_s", 0.1),
         ])
         g = lambda n: self.get_parameter(n).value
         self.dt, self.T, self.frame = float(g("dt")), int(g("horizon_steps")), str(g("frame_id"))
@@ -141,7 +158,9 @@ class Figure8ReferenceNode(Node):
                 vmax = float(g("square_v_max"))
                 self.path = Square(side=g("square_side"), corner_speed=g("square_corner_speed"), accel=g("accel"),
                                    v_max=vmax if vmax > 0.0 else budget * V_LIMIT, laps=g("laps"),
-                                   yaw_mode=str(g("yaw_mode")), yaw_blend=g("square_yaw_blend"), align_s=g("align_s"))
+                                   yaw_mode=str(g("yaw_mode")), yaw_blend=g("square_yaw_blend"), align_s=g("align_s"),
+                                   corner_mode=str(g("square_corner_mode")).strip().lower(), rot_s=g("square_rot_s"),
+                                   dwell_s=g("square_dwell_s"))
             elif self.shape not in ("figure8", "circles8"):
                 raise ValueError(f"shape={self.shape!r} — figure8 | circles8 | line | rotate | square")
             else:
@@ -151,7 +170,9 @@ class Figure8ReferenceNode(Node):
                                     lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None,
                                     curve="circles" if self.shape == "circles8" else "gerono",
                                     crossing_blend=float(g("crossing_blend_m")), spin_rate=float(g("spin_rate")),
-                                    speed_mod_amp=float(g("speed_mod_amp")), speed_mod_cycles=float(g("speed_mod_cycles")))
+                                    speed_mod_amp=float(g("speed_mod_amp")), speed_mod_cycles=float(g("speed_mod_cycles")),
+                                    speed_mod_phase_deg=float(g("speed_mod_phase_deg")),
+                                    speed_mod_shape=str(g("speed_mod_shape")))
         except ValueError as e:
             raise SystemExit(f"[figure8] 파라미터 오류: {e}")
 
@@ -180,6 +201,17 @@ class Figure8ReferenceNode(Node):
         v_top = self.path.V_peak if isinstance(self.path, Figure8) else self.path.V   # Figure8: sin 변조 최고 속도 (2026-11-20). Square 에는 없고 Segment 의 V_peak() 는 메서드
         self.ramp_s = (v_top / self.path.A) if rr < 0.0 else rr
         self.resync_window = max(0.0, float(g("resync_window_s")))
+        self.pf_lead = float(g("path_follow_lead_s"))
+        self.pf = self.pf_lead >= 0.0
+        T_al, T_pa = getattr(self.path, "T_align", None), getattr(self.path, "T_path", None)
+        self.drive = (float(T_al), float(T_al + T_pa)) if T_al is not None and T_pa is not None else None
+        if self.pf and (self.drive is None or self.shape not in ("figure8", "circles8", "square")):
+            raise SystemExit(f"[figure8] path_follow_lead_s 는 shape figure8 | circles8 | square 만 (받은 {self.shape})")
+        self.t_clock = 0.0                            # 묶지 않았을 때의 기준 시각 (+delay 포함, t_run 과 같은 축)
+        self.t_proj = None                            # 직전 정사영 시각
+        self.pf_flag = 0
+        self.drive_wall = [None, None]                # 주행 구간 시작·끝 벽시계 [s]
+        self.pub_prog = self.create_publisher(Float64MultiArray, "/figure8/progress", 10)
         self.pose_full = None
         mode = str(g("origin_mode")).strip().lower()
         if mode not in ("robot", "fixed"):
@@ -208,7 +240,9 @@ class Figure8ReferenceNode(Node):
             edges = "  ".join(f"[{i}] {vs:.2f}→{vp:.2f}→{ve:.2f} m/s {T:.1f} s" for i, vs, vp, ve, T in p.edge_summary()[:4])
             self.get_logger().info(
                 f"정사각형 한 변 {p.side:.2f} m × {p.n} 변 (왼쪽으로), yaw {p.yaw_mode}"
-                f"{f' (꼭짓점 헤딩 완화 {p.b:.2f} m)' if p.tangent else ''}, 꼭짓점 {p.vc:.2f} m/s, 가감속 {p.A:.2f} m/s²\n"
+                f"{f' (꼭짓점 헤딩 완화 {p.b:.2f} m)' if p.tangent and not p.stop else ''}, "
+                f"{f'꼭짓점 정지 (쉼 {p.dwell:.2f} s + 제자리 +90° {p.rot:.2f} s + 쉼 {p.dwell:.2f} s)' if p.stop else f'꼭짓점 {p.vc:.2f} m/s'}, "
+                f"가감속 {p.A:.2f} m/s²\n"
                 f"  변별 시작→최고→끝: {edges}{' …' if p.n > 4 else ''}\n"
                 f"  시간  대기 {self.delay:.1f} s + 주행 {p.T_path:.1f} s"
                 f"{f' + 정렬 {p.T_align:.1f} s' if p.T_align > 0.0 else ''}"
@@ -232,7 +266,7 @@ class Figure8ReferenceNode(Node):
             + f"  yaw {p.yaw_mode}  {p.laps:g} 바퀴"
             + (f"  (헤딩 {p.spin_turns} 바퀴 회전, 순항 {p.kappa_spin * p.V:.2f} rad/s)" if p.kappa_spin > 0.0 else "") + "\n"
             f"  호길이 {p.L:.2f} m  순항 {p.V:.2f} m/s  가감속 {p.A:.2f} m/s²  "
-            + (f"속도 변조 ε {p.mod_eps:.2f} × 랩당 {p.mod_n:g} 주기 → {p.V*(1-p.mod_eps):.2f}~{p.V_peak:.2f} m/s, 접선 가속 최대 {p.max_tangential_accel():.2f} m/s²  "
+            + (f"속도 변조 {p.mod_shape} ε {p.mod_eps:.2f} × 랩당 {p.mod_n:g} 주기 (위상 {math.degrees(p.mod_phase):+.0f}°) → {p.V*(1-p.mod_eps):.2f}~{p.V_peak:.2f} m/s, 접선 가속 최대 {p.max_tangential_accel():.2f} m/s²  "
                if p.mod_eps > 0.0 else "") +
             f"최대곡률 {p.max_curvature():.2f} 1/m (R_min {1/p.max_curvature():.3f} m)\n"
             f"  시간  대기 {self.delay:.1f} s + 정렬 {p.T_align:.1f} s ×2 + 주행 {p.T_path:.1f} s = {p.T_total:.1f} s"
@@ -343,11 +377,18 @@ class Figure8ReferenceNode(Node):
         now_s = now.nanoseconds * 1e-9
         if self.t_last_tick is not None and self.armed:          # 무장된 동안만 기준 시간이 흐른다
             el = max(0.0, now_s - self.t_last_tick)
-            self.t_run += ramp_elapsed(el, self.rate, self.ramp_s) if self.wait_for_arm else el
+            inc = ramp_elapsed(el, self.rate, self.ramp_s) if self.wait_for_arm else el
+            self.t_run += inc
+            self.t_clock += inc
             if self.wait_for_arm:
                 self.rate = ramp_rate(el, self.rate, self.ramp_s)
         self.t_last_tick = now_s
         t = self.t_run - self.delay                             # t<0 이면 at() 이 기동 포즈·속도 0 을 낸다
+        if self.pf and self.armed and self.pose is not None:    # path following: 기준 시각을 로봇 진행에 묶는다
+            t = self.govern(t)
+            self.t_run = t + self.delay
+        if self.armed and self.drive is not None:
+            self.note_drive(t, now_s)
         if not self.armed:                                      # 멈춘 동안은 그 자리 정지 기준 (속도 0)
             Xr, _ = self.ref_at(t)
             self.publish_hold(now, Xr)
@@ -386,6 +427,35 @@ class Figure8ReferenceNode(Node):
             r.x, r.y, r.yaw = map(float, Xr); r.vx, r.vy, r.yaw_rate = map(float, ur)
             msg.references.append(r)
         self.pub.publish(msg)
+        pr = Float64MultiArray()
+        pr.data = [now_s, t, self.t_clock - self.delay, float("nan") if self.t_proj is None else self.t_proj, float(self.pf_flag)]
+        self.pub_prog.publish(pr)
+
+    def govern(self, t):
+        """주행 구간에서 t_ref ← clamp(t_ref, t_proj, t_proj + lead) (core/path_follow.py). 밖이면 그대로."""
+        a, b = self.drive
+        self.pf_flag = 0
+        if t < a or t > b:
+            return t
+        anchor = a if self.t_proj is None else self.t_proj
+        self.t_proj = path_follow.project(lambda x: self.ref_at(x)[0], self.pose, anchor, a, b)
+        speed = lambda x: float(np.hypot(*self.ref_at(x)[1][:2]))
+        dec = path_follow.decel_ahead(speed, self.t_proj, self.pf_lead)
+        t_new, self.pf_flag = path_follow.govern(t, self.t_proj, self.pf_lead, speed(self.t_proj), decel=dec)
+        return t_new
+
+    def note_drive(self, t, now_s):
+        """주행 구간 시작·끝 벽시계 → 실제 주행 시간 로그 (path following 이면 늦은 만큼 길어진다)."""
+        a, b = self.drive
+        if self.drive_wall[0] is None and t >= a:
+            self.drive_wall[0] = now_s
+        if self.drive_wall[1] is None and self.drive_wall[0] is not None and t > b:
+            self.drive_wall[1] = now_s
+            T = now_s - self.drive_wall[0]
+            self.get_logger().info(
+                f"주행 끝: 실제 {T:.2f} s (기준 {b - a:.2f} s, {T - (b - a):+.2f} s) — "
+                + (f"path following lead {self.pf_lead:g} s, 기준 시각이 시계보다 {self.t_clock - self.t_run:.2f} s 늦음"
+                   if self.pf else "trajectory tracking (시계대로, 무장 배속 램프 몫만 길어짐)"))
 
 
 def main():

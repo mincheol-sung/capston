@@ -31,7 +31,7 @@ from sensor_msgs.msg import Imu, PointCloud2
 from std_msgs.msg import Float64MultiArray
 
 from amr_mpc.core import config, node_main
-from amr_mpc.torque.estimator import PlanarStateEstimator
+from amr_mpc.torque.estimator import NOISE_KEYS, PlanarStateEstimator
 
 
 def yaw_of(q):
@@ -58,8 +58,13 @@ class StateEstimatorNode(Node):
             # 2026-11-19: kf (고정 게인 칼만, 기본) | slam (원래 설계: SLAM 으로 덮어쓰기). launch 인자 est_mode.
             # ROS 파라미터로 둬야 record_all.sh 의 param dump(run_info/params) 에 어느 모드였는지 남는다
             ("est_mode", str(cfg.get("mode", "kf"))),
+            # 2026-11-21 kf 잡음 값(= 정상상태 게인) 덮어쓰기. 기본 = torque_estimator.yaml. launch 인자 est_gains·est_noise.
+            #   ROS 파라미터로 둬야 실차 A/B 판의 param dump(run_info/params)에 어느 값이었는지 남는다
+            *[(k, float(cfg[k])) for k in NOISE_KEYS],
         ])
         g = lambda n: self.get_parameter(n).value
+        for k in NOISE_KEYS:
+            cfg[k] = float(g(k))
         self.pose_source = str(g("pose_source")).strip().lower()
         if self.pose_source not in ("stamped", "after_scan_match"):
             raise SystemExit(f"[state_estimator] pose_source={self.pose_source!r} — stamped | after_scan_match")
@@ -99,7 +104,10 @@ class StateEstimatorNode(Node):
         if e.mode == "kf":
             mode_txt = (f"  모드 kf (고정 게인 칼만)  K_p {e.K_xy[0]:.3f}  K_v {e.K_xy[1]:.2f} 1/s  K_b {e.K_xy[2]:.2f} 1/s²   "
                         f"K_psi {e.K_yaw[0]:.3f}  K_bg {e.K_yaw[1]:.4f} 1/s   튐 (> {e.jump_xy*100:.0f} cm·"
-                        f"{math.degrees(e.jump_yaw):.0f}°) 버림, 연속 {e.jump_reset_count} 번이면 따라감")
+                        f"{math.degrees(e.jump_yaw):.0f}°) 버림, 연속 {e.jump_reset_count} 번이면 따라감\n"
+                        f"  잡음 값 (게인 설계): " + ", ".join(f"{k} {cfg[k]:g}" for k in NOISE_KEYS) +
+                        ("" if all(abs(cfg[k] - float(config.section("estimator", "torque_estimator.yaml")[k])) < 1e-12
+                                   for k in NOISE_KEYS) else "   ← yaml 과 다름 (launch est_gains·est_noise)"))
         else:
             mode_txt = (f"  모드 slam (SLAM 덮어쓰기): 포즈 시각의 위치·방향 = SLAM, 속도 = 두 포즈 차분 + 저역통과 "
                         f"{e.slam_v_lpf_hz:g} Hz, 바이어스는 기동 값 고정, 튐도 따름 (개수만 셈)")

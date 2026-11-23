@@ -89,7 +89,7 @@ def run_label(bag):
         args = open(p).read()
     get = lambda k: (re.search(rf"\b{k}:=(\S+)", args) or [None, ""])[1]
     ctrl = get("controller") or "mpc"
-    lab = "A 퓨어퍼슛" if ctrl == "pure_pursuit" else ("MPC " + (get("limit_mode") or "") + f" μ̂{get('mu_hat') or '?'}"
+    lab = "A 퓨어퍼슛" if ctrl in ("pp", "pure_pursuit") else "A 어댑티브 PP" if ctrl == "adpp" else ("MPC " + (get("limit_mode") or "") + f" μ̂{get('mu_hat') or '?'}"
                                                        + (" w" if get("use_w") in ("true", "True", "1") else "")
                                                        + (" 바퀴v" if get("velocity_source") == "wheels" else ""))
     return f"{lab} v{get('speed') or '?'} {get('shape') or ''}{get('width') or ''}"

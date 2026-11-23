@@ -24,6 +24,13 @@
 #     v(t) = min(A·t, v_target(σ), √(2A(L − σ)))   — 출발은 accel 로 올라가 v_target 에 붙고, 끝은 accel 로 정확히 선다.
 #     순항 중 접선 가속 a_t = v·dv/dσ = v·V·ε·(2πn/ℓ_lap)·cos(…) 는 accel 과 따로 정해진다 (max_tangential_accel()).
 #     최고 속도 V·(1+ε) 가 기준 부하 검사에 들어간다. lap_speeds 와 같이 쓸 수 없다. ε = 0 이면 위 사다리꼴 그대로.
+#   speed_mod_phase_deg=φ (2026-11-22): v_target(σ) = V·(1 + ε·sin(2π·n·σ/ℓ_lap + φ)). 기본 0 = 위 식 그대로.
+#     φ = −90° 이면 −cos 꼴 — σ = 0 (출발·교차점) 에서 가장 느리다. circles8 은 교차점이 σ = 0, ℓ_lap/2 이라 n 이 짝수면
+#     두 교차점 모두 최저 속도 V(1−ε) — 곡률 부호가 뒤집히는 순간의 ω 계단 ±v/R 이 (1−ε) 배로 준다.
+#   speed_mod_shape="square" (2026-11-22): 같은 sin 의 부호로 고른 두 속도 — sin(…) ≥ 0 이면 V(1+ε), 아니면 V(1−ε) (구간 길이 반반).
+#     바뀌는 곳은 accel 로 가감속한다: 호길이 격자에서 앞으로 v ≤ √(v_prev² + 2A·Δσ), 뒤로 v ≤ √(v_next² + 2A·Δσ)
+#     (가감속 한계 속도 프로파일의 forward–backward pass, 시작·끝 v = 0). 감속은 느린 구간 앞에서 끝난다.
+#     sin 보다 가감속이 짧고 세다 (|a_t| = accel). 기본 "sin" = 위 식 그대로.
 #
 # 헤딩 (yaw_mode)
 #   "tangent"  접선 추종.  경로 시작 접선각 θ(0)=atan2(H, W/2) 만큼 기동 헤딩과 어긋나므로,
@@ -107,7 +114,8 @@ def ramp_rate(tau, rate0, ramp_s):
 class Figure8:
     def __init__(self, width=1.4, height=0.8, speed=0.25, accel=0.4,
                  laps=1.0, yaw_mode="tangent", align_s=1.5, samples=8000, lap_speeds=None, curve="gerono",
-                 crossing_blend=0.0, spin_rate=1.0, speed_mod_amp=0.0, speed_mod_cycles=2.0):
+                 crossing_blend=0.0, spin_rate=1.0, speed_mod_amp=0.0, speed_mod_cycles=2.0, speed_mod_phase_deg=0.0,
+                 speed_mod_shape="sin"):
         if curve not in ("gerono", "circles"):
             raise ValueError(f"curve 는 gerono | circles (받은 값 {curve!r})")
         self.curve = curve
@@ -126,6 +134,12 @@ class Figure8:
         if laps <= 0.0:
             raise ValueError("laps 는 양수")
         self.mod_eps, self.mod_n = float(speed_mod_amp), float(speed_mod_cycles)
+        self.mod_phase = math.radians(float(speed_mod_phase_deg))
+        self.mod_shape = str(speed_mod_shape)
+        if self.mod_shape not in ("sin", "square"):
+            raise ValueError(f"speed_mod_shape 는 sin | square (받은 값 {speed_mod_shape!r})")
+        if not math.isfinite(self.mod_phase):
+            raise ValueError(f"speed_mod_phase_deg {speed_mod_phase_deg} — 유한한 값")
         if not (0.0 <= self.mod_eps < 1.0):
             raise ValueError(f"speed_mod_amp {speed_mod_amp} — 0 이상 1 미만 (1 이면 순항 중 속도 0 에 닿는다)")
         if self.mod_eps > 0.0 and self.mod_n <= 0.0:
@@ -178,7 +192,10 @@ class Figure8:
         if self.lap_speeds is not None:
             self._build_lap_profile()
         elif self.mod_eps > 0.0:
-            self._build_mod_profile()
+            if self.mod_shape == "square":
+                self._build_square_profile()
+            else:
+                self._build_mod_profile()
 
         # ---- spin: 헤딩 = κ_s·σ, 정수 바퀴 n 으로 맞춰 끝에서 출발 헤딩 (머리주석 "spin")
         self.spin_turns, self.kappa_spin = 0, 0.0
@@ -231,7 +248,31 @@ class Figure8:
         self.T_path = float(ts[-1])
 
     def _v_target(self, s):
-        return self.V * (1.0 + self.mod_eps * math.sin(2.0 * math.pi * self.mod_n * s * self.laps / self.L))
+        x = math.sin(2.0 * math.pi * self.mod_n * s * self.laps / self.L + self.mod_phase)
+        if self.mod_shape == "square":
+            x = 1.0 if x >= 0.0 else -1.0
+        return self.V * (1.0 + self.mod_eps * x)
+
+    def _build_square_profile(self, ds=5e-4):
+        """두 속도 계단 + 가감속 한계 A: 호길이 격자 forward–backward pass 로 v(σ), 그다음 t(σ) = ∫ dσ / v."""
+        A, L = self.A, self.L
+        s = np.linspace(0.0, L, max(2001, int(L / ds) + 1))
+        d = np.diff(s)
+        vt = np.array([self._v_target(x) for x in s])
+        v = vt.copy()
+        v[0] = 0.0
+        for i in range(1, len(s)):                                   # 앞으로: 가속 한계
+            v[i] = min(v[i], math.sqrt(v[i - 1] ** 2 + 2.0 * A * d[i - 1]))
+        v[-1] = 0.0
+        for i in range(len(s) - 2, -1, -1):                          # 뒤로: 감속 한계
+            v[i] = min(v[i], math.sqrt(v[i + 1] ** 2 + 2.0 * A * d[i]))
+        vm = 0.5 * (v[1:] + v[:-1])
+        dt = np.where(vm > 1e-9, d / np.maximum(vm, 1e-9), 0.0)
+        dt[0] = math.sqrt(2.0 * d[0] / A)                            # v = 0 에서 출발하는 첫 칸
+        dt[-1] = math.sqrt(2.0 * d[-1] / A)
+        t = np.concatenate(([0.0], np.cumsum(dt)))
+        self._lap_t, self._lap_s, self._lap_v = t, s, v
+        self.T_path = float(t[-1])
 
     def _build_mod_profile(self, h=1e-3):
         """sin 변조 순항 속도: v = min(A·t, v_target(σ), √(2A(L−σ))) 를 1 ms 격자로 적분한 σ(t), v(t) 표."""

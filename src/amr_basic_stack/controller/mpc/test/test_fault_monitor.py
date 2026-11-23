@@ -27,3 +27,16 @@ def test_each_fault_is_detected():
 def test_pose_jump_can_be_disabled():
     st = ok_state(10.0); st["jump_count"] = 9
     assert check_faults(10.0, True, {**CFG, "trip_on_pose_jump": False}, st) == []
+
+
+def test_state_timeout_can_be_disabled():
+    # 텔레옵(teleop.launch.py)은 추정기 없이 돈다 — 추정기 끊김은 안 보고, 바퀴 끊김·모터 에러는 그대로 본다 (2026-11-23)
+    cfg = {**CFG, "check_state_timeout": False}
+    st = ok_state(10.0); st["state_rx"] = None
+    assert check_faults(10.0, True, cfg, st) == []
+    st["wheel_rx"] = 9.0
+    out = check_faults(10.0, True, cfg, st)
+    assert len(out) == 1 and out[0].startswith("wheel_timeout"), out
+    st = ok_state(10.0); st["state_rx"] = None; st["motor_error"] = [0, 255, 0, 0]
+    out = check_faults(10.0, True, cfg, st)
+    assert len(out) == 1 and out[0].startswith("motor_error"), out

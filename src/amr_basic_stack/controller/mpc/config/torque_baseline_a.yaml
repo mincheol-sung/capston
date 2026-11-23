@@ -49,6 +49,15 @@ pure_pursuit:
   search_dt: 0.01         # [s] 룩어헤드 탐색 간격 (0.5 m/s 에서 5 mm, 사이는 원–선분 교점으로 보간)
   search_horizon: 3.0     # [s] 기준열(4 s) 안
 
+# 2026-11-23 비교군 "어댑티브 PP" — controller:=adpp 일 때 launch 가 위 pure_pursuit 의 이 세 값만 덮어쓴다.
+#   11-20 (9) 전까지 쓰던 속도 비례 룩어헤드 L_d = clamp(lookahead_time·|v_ref|, lookahead_min, lookahead_max).
+#   나머지 (k_along·v_max·w_max·탐색, 바퀴 PI 게인·토크 상한) 는 고정 PP (controller:=pp) 와 같다 → 룩어헤드만 다른 비교.
+#   (교수님 회의 11-23: 비교군 = 룩어헤드 고정 PP · 어댑티브 PP · MPC)
+pure_pursuit_adaptive:
+  lookahead_time: 0.5     # [s]
+  lookahead_min: 0.15     # [m]
+  lookahead_max: 0.60     # [m]
+
 wheel_pi:
   # τ_i = K_p·e_i + K_i·∫e_i dt,  e_i = ω_ref,i − ω_i  [rad/s]
   # 근거 (2026-11-11). 바퀴 하나가 보는 관성 = 차체를 바퀴 축으로 옮긴 값 (torque_plant.yaml, 무슬립 모델):

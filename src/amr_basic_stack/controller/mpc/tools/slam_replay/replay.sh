@@ -14,7 +14,8 @@
 #   비교: tools/slam_replay/compare.py
 #
 # bag 에 있어야 하는 토픽: /scan_front /scan_rear /imu/base_link /tf_static (/wheel_states — --odom 일 때)
-# 재생 때 다시 만드는 것: /scan_front_carto·/scan_rear_carto (scan_sector_filter), /camera/imu (imu_relay.py)
+# 실차 기본 설정(reverse_data, flip_x_axis 모두 true)으로 LaserScan-only bag의 점별 시각을 복원한다.
+# 새 bag에 /points_*_timed가 있으면 기록한 점을 그대로 재생한다.
 # (set -u 는 ROS setup.bash 와 충돌해서 쓰지 않는다)
 HERE=$(cd "$(dirname "$0")" && pwd)
 WS=$(cd "$HERE/../../../../../.." && pwd)
@@ -38,18 +39,30 @@ L=$OUT/$LABEL; CFG=$L/cfg; mkdir -p "$CFG"; cp "$SHARE"/*.lua "$CFG"/; cp "$HERE
 if [[ -z "$PLAY" ]]; then PLAY=$(ros2 bag info "$BAG" 2>/dev/null | awk '/Duration/{print int($2)+1}'); fi
 echo "재생: $BAG → $L  (설정 $LUA, $PLAY s, 도메인 $DOM)"
 P=()
-ros2 run amr_laser_tools scan_sector_filter --ros-args -r __node:=front_cartographer_scan_filter --params-file "$YAML" \
-  -p use_sim_time:=true -r scan_in:=/scan_front -r scan_out:=/scan_front_carto > "$L/filter_front.log" 2>&1 & P+=($!)
-ros2 run amr_laser_tools scan_sector_filter --ros-args -r __node:=rear_cartographer_scan_filter --params-file "$YAML" \
-  -p use_sim_time:=true -r scan_in:=/scan_rear -r scan_out:=/scan_rear_carto > "$L/filter_rear.log" 2>&1 & P+=($!)
+BAG_INFO=$(ros2 bag info "$BAG") || exit 1
+TOPICS=(/scan_front /scan_rear /imu/base_link /tf_static)
+CONVERTER=$(ros2 pkg prefix rplidar_ros)/lib/rplidar_ros/scan_to_timed_cloud
+FILTER=$(ros2 pkg prefix amr_laser_tools)/lib/amr_laser_tools/scan_sector_filter
+for side in front rear; do
+  if [[ "$BAG_INFO" == *"Topic: /points_${side}_timed |"* ]]; then
+    TOPICS+=("/points_${side}_timed")
+  else
+    "$CONVERTER" --ros-args -r "__node:=bag_driver_$side" -p use_sim_time:=true \
+      -r "scan:=/scan_$side" -r "points_timed:=/points_${side}_timed" > "$L/convert_$side.log" 2>&1 & P+=($!)
+  fi
+  "$FILTER" --ros-args -r "__node:=${side}_cartographer_scan_filter" --params-file "$YAML" \
+    -p use_sim_time:=true -r "scan_in:=/scan_$side" -r "scan_out:=/scan_${side}_carto" \
+    -r "points_in:=/points_${side}_timed" -r "points_out:=/points_${side}_carto" > "$L/filter_$side.log" 2>&1 & P+=($!)
+done
 /usr/bin/python3 "$HERE/imu_relay.py" --ros-args -p use_sim_time:=true > "$L/imu_relay.log" 2>&1 & P+=($!)
 if (( ODOM )); then ros2 run amr_mpc wheel_odometry_node --ros-args -p use_sim_time:=true > "$L/wheel_odom.log" 2>&1 & P+=($!); fi
 ros2 run cartographer_ros cartographer_node -configuration_directory "$CFG" -configuration_basename "$LUA" \
   -load_state_filename "$PB" -load_frozen_state true --ros-args -p use_sim_time:=true \
+  -r points2_1:=/points_front_carto -r points2_2:=/points_rear_carto \
   -r scan_1:=/scan_front_carto -r scan_2:=/scan_rear_carto -r imu:=/camera/imu -r odom:=/wheel_odom > "$L/carto.log" 2>&1 & P+=($!)
 /usr/bin/python3 "$HERE/pose_rec.py" "$L/pose.csv" --ros-args -p use_sim_time:=true > "$L/pose_rec.log" 2>&1 & P+=($!)
-TOPICS="/scan_front /scan_rear /imu/base_link /tf_static"; (( ODOM )) && TOPICS="$TOPICS /wheel_states"
-ros2 bag play "$BAG" --clock 100 --start-paused --topics $TOPICS > "$L/play.log" 2>&1 & BP=$!
+(( ODOM )) && TOPICS+=(/wheel_states)
+ros2 bag play "$BAG" --clock 100 --start-paused --topics "${TOPICS[@]}" > "$L/play.log" 2>&1 & BP=$!
 sleep 12                                   # 지도(pbstream) 불러오기
 /usr/bin/python3 "$HERE/set_init.py" "$CFG" "$LUA" $INIT | tee "$L/init.log"
 ros2 service call /rosbag2_player/resume rosbag2_interfaces/srv/Resume > /dev/null 2>&1

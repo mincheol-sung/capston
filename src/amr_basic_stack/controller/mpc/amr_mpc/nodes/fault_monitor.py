@@ -39,7 +39,10 @@ def check_faults(now, armed, cfg, st):
         out.append(f"track_error: 기준과 {st['track_error']*100:.1f} cm (한계 {cfg['max_track_error']*100:.1f} cm)")
     if any(st.get("motor_error", [])):
         out.append(f"motor_error: 드라이버 에러 코드 {list(st['motor_error'])}")
-    for key, name in (("wheel_rx", "wheel_timeout"), ("state_rx", "state_timeout")):
+    keys = [("wheel_rx", "wheel_timeout")]
+    if cfg.get("check_state_timeout", True):        # 2026-11-23: 텔레옵(teleop.launch.py)은 추정기 없이 돈다
+        keys.append(("state_rx", "state_timeout"))
+    for key, name in keys:
         t = st.get(key)
         if t is None or now - t > cfg["timeout"]:
             out.append(f"{name}: {'한 번도 안 옴' if t is None else f'{now - t:.2f} s 동안 안 옴'}")
@@ -58,10 +61,13 @@ class FaultMonitorNode(Node):
             ("rate_hz", 20.0),
             # 추종 오차를 읽을 status 토픽 — [t, e_x, e_y, ...] 꼴. MPC = /torque_mpc/status, 비교군 A = /pure_pursuit/status
             ("track_status_topic", "/torque_mpc/status"),
+            # false 면 /state_estimator/odom 끊김을 안 본다 — 추정기 없이 도는 텔레옵용 (2026-11-23). 모터 에러·바퀴 끊김은 그대로 본다
+            ("check_state_timeout", True),
         ])
         g = lambda n: self.get_parameter(n).value
         self.cfg = {"max_track_error": float(g("max_track_error")), "timeout": float(g("timeout")),
-                    "trip_on_pose_jump": bool(g("trip_on_pose_jump"))}
+                    "trip_on_pose_jump": bool(g("trip_on_pose_jump")),
+                    "check_state_timeout": bool(g("check_state_timeout"))}
         self.armed, self.st = False, {}
         latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.pub_arm = self.create_publisher(Bool, str(g("arm_topic")), 10)
@@ -74,7 +80,8 @@ class FaultMonitorNode(Node):
         self.create_timer(1.0 / float(g("rate_hz")), self.on_tick)
         self.get_logger().info(
             f"fault_monitor: 무장 중 검사 — 포즈 튐 {'켬' if self.cfg['trip_on_pose_jump'] else '끔'}, "
-            f"추종 오차 > {self.cfg['max_track_error']*100:.0f} cm, 모터 에러, 센서 끊김 > {self.cfg['timeout']} s → /mpc/arm false")
+            f"추종 오차 > {self.cfg['max_track_error']*100:.0f} cm, 모터 에러, "
+            f"{'바퀴·추정기' if self.cfg['check_state_timeout'] else '바퀴'} 끊김 > {self.cfg['timeout']} s → /mpc/arm false")
 
     def now(self):
         return self.get_clock().now().nanoseconds * 1e-9
