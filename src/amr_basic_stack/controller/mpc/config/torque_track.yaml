@@ -85,18 +85,19 @@ track:
   #   이웃 직선 사이각 zigzag_angle_deg (진행 방향은 꼭짓점마다 180° − 각 꺾이고, 꺾는 쪽이 번갈아). + 왼쪽 / − 오른쪽으로 나아간다.
   #   헤딩 = 직선 방향, 직선마다 전진·후진을 번갈아 (짝수 직선 전진, 홀수 후진) → 꼭짓점에서 몸체는 사이각만큼만 돈다.
   #   직선 양 끝 속도 0. 속도 파형 zigzag_profile: sine = 반 사인 v = V_p sin(πτ/T) (최대 가속 = 양 끝) | square = 사다리꼴
-  #   (자르지 않으면 삼각형). 두 파형 모두 최대 가속도 = zigzag_accel. 꼭짓점: 쉼 dwell → 제자리 회전 rot_s → 쉼 dwell.
-  #   yaw_mode 는 tangent 만 (fixed·spin 거부). laps·align_s 는 안 쓴다. launch 가 zigzag_accel 을 노드 accel 로 넘긴다 —
-  #   launch accel:= 을 주면 zigzag_accel 과 같은 뜻 (둘 다 주면 거부), speed:=max 는 zigzag_v_max 0 (2026-11-24 (7), 정사각형과 같은 꼴).
+  #   (자르지 않으면 삼각형). 꼭짓점: 쉼 dwell → 제자리 회전 rot_s → 쉼 dwell. yaw_mode 는 tangent 만 (fixed·spin 거부). laps·align_s 는 안 쓴다.
+  #   가속도·속도는 공용 launch 인자 (2026-11-24 (8), 전용 zigzag_accel·zigzag_v_max 는 지움):
+  #     accel:= 최대 가속도 [m/s²] | max = C 마찰 상한 안 직선 가속 한계 (fig8_limits.line_accel_max, max_ff_ratio 적용)
+  #     speed:= 직선 최고 속도 상한 [m/s] | max = 부하 예산 load_budget·V_LIMIT 에서만 자름 (정사각형의 square_v_max 와 같은 뜻)
+  #     지그재그에서는 둘 다 비우면 max — 위 공용 speed 0.5·accel 0.4 는 지그재그에 안 쓴다 (처음 조건 "가속도를 낼 수 있는 최대로").
   #   5 × 1 m, 10°, accel max (C 상한 1.70) 이면 sine 직선 최고 0.92 m/s · 1.70 s, square 1.30 m/s · 1.53 s.
   #   미리 보기: python3 -m amr_mpc.core.fig8_limits --shape zigzag --zigzag_profile square
-  #   예) amrall use_mpc:=true shape:=zigzag zigzag_profile:=square speed:=max accel:=max limit_mode:=friction  (speed·accel max 는 기본값과 같다)
+  #   예) amrall use_mpc:=true shape:=zigzag zigzag_profile:=square limit_mode:=friction            (= speed:=max accel:=max)
+  #       amrall use_mpc:=true shape:=zigzag accel:=1.0 speed:=0.6
   zigzag_n: 5               # 직선 개수
   zigzag_length: 1.0        # [m] 직선 하나 길이
   zigzag_angle_deg: 10.0    # [deg] 이웃 직선 사이각 (0 < |값| < 180)
   zigzag_profile: sine      # sine | square
-  zigzag_accel: max         # [m/s²] 또는 max = C 마찰 상한 안 직선 가속 한계 (fig8_limits.line_accel_max, max_ff_ratio 적용)
-  zigzag_v_max: 0.0         # [m/s] > 0 이면 직선 최고 속도를 이 값에서 자름. 0 = 부하 예산 load_budget·V_LIMIT 에서만
   zigzag_rot_s: 0.5         # [s] 꼭짓점 제자리 회전 시간 (스무스스텝, 10° 면 ω 최대 1.5·α/rot_s = 0.52 rad/s)
   zigzag_dwell_s: 0.1       # [s] 회전 앞·뒤 정지
 

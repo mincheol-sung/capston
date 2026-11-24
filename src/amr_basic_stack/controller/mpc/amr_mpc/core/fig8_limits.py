@@ -162,12 +162,12 @@ def zigzag_make(track, accel, v_max):
                   dwell_s=float(track["zigzag_dwell_s"]), yaw_mode=str(track["yaw_mode"]))
 
 
-def zigzag_max(c, load_cap, track, accel=None, max_ff_ratio=1.0, k_geom=None):
+def zigzag_max(c, load_cap, track, accel=None, v_max=0.0, max_ff_ratio=1.0, k_geom=None):
     """지그재그 (2026-11-24): (직선 최고 속도, accel, 정보). accel None 이면 직선 가속 한계 line_accel_max.
-    zigzag_v_max 0 이면 load_cap 에서 자른다 (figure8_reference 와 같은 뜻). 꼭짓점 제자리 회전 앞먹임은 info['ff'] 에 같이 (전체 최대)."""
+    v_max (launch speed) ≤ 0 이면 load_cap 에서 자른다 (figure8_reference 와 같은 뜻). 꼭짓점 제자리 회전 앞먹임은 info['ff'] 에 같이 (전체 최대)."""
     if accel is None:
         accel = line_accel_max(c, max_ff_ratio)
-    z = zigzag_make(track, accel, float(track.get("zigzag_v_max", 0.0)) or load_cap)
+    z = zigzag_make(track, accel, v_max if v_max > 0.0 else load_cap)
     run, _ = z.peak_load(k_geom if k_geom is not None else c["k"])
     line_ff = c["me"] * max(g.a_peak for g in z.legs) * c["r"] / 4.0 / float(np.min(c["tau_bar"]))
     return z.V, accel, dict(ff=ff_ratio(z, c), line_ff=line_ff, load=run / load_cap, T=z.T_total, tau_bar=c["tau_bar"])
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     for key in ("shape", "width", "height", "laps", "yaw_mode", "align_s", "crossing_blend_m", "spin_rate",
                 "speed_mod_amp", "speed_mod_cycles", "speed_mod_phase_deg", "speed_mod_shape",
                 "square_side", "square_corner_speed", "square_yaw_blend", "square_corner_mode", "square_rot_s", "square_dwell_s",
-                "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_v_max", "zigzag_rot_s", "zigzag_dwell_s"):
+                "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_rot_s", "zigzag_dwell_s"):
         ap.add_argument(f"--{key}", default=tr.get(key))
     ap.add_argument("--load_budget", type=float, default=1.0)
     ap.add_argument("--max_wheel_rad_per_sec", type=float, default=370.0 * 2 * math.pi / 60.0)
@@ -226,9 +226,9 @@ if __name__ == "__main__":
     k_geom = c["k"]
     cap = a.load_budget * c["r"] * a.max_wheel_rad_per_sec
     if track["shape"] == "zigzag":
-        vp, acc, info = zigzag_max(c, cap, track, accel=a.accel, max_ff_ratio=a.max_ff_ratio, k_geom=k_geom)
+        vp, acc, info = zigzag_max(c, cap, track, accel=a.accel, v_max=a.speed or 0.0, max_ff_ratio=a.max_ff_ratio, k_geom=k_geom)
         print(f"zigzag {track['zigzag_n']} × {track['zigzag_length']} m, 사이각 {track['zigzag_angle_deg']}°, {track['zigzag_profile']}: "
-              f"accel {acc:.2f} → 직선 최고 {vp:.2f} m/s  (직선 앞먹임 {info['line_ff']:.3f} ≤ {a.max_ff_ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, "
+              f"accel {acc:.2f} → 직선 최고 {vp:.2f} m/s (상한 {f'speed {a.speed:g}' if a.speed else f'부하 예산 {cap:.2f}'})  (직선 앞먹임 {info['line_ff']:.3f} ≤ {a.max_ff_ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, "
               f"부하 {info['load'] * 100:.0f} %, 기준 {info['T']:.1f} s)")
     elif track["shape"] == "square":
         track["square_v_max"] = 0.0

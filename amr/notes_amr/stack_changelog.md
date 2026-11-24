@@ -61,6 +61,17 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-24 (8) — 지그재그 전용 `zigzag_accel`·`zigzag_v_max` 지움 → 공용 `accel`·`speed`
+- 왜: 사용자 요청 ("기존 accel, speed 인자로 설정할 수 있는 거면 삭제"). (7) 에서 두 인자가 같은 뜻의 별명이 됐다.
+- 바꾼 것: 지그재그에서 `accel:=` = 최대 가속도 (숫자 | max), `speed:=` = 직선 최고 속도 상한 (숫자 | max = 부하 예산에서만, `square_v_max` 와 같은 뜻).
+  **지그재그에서 둘 다 비우면 max** — yaml 공용 `speed: 0.5`·`accel: 0.4` 를 쓰면 기본 동작이 최대 가속에서 0.4 m/s² 로 바뀌기 때문 (처음 조건 "가속도를 낼 수 있는 최대로").
+  노드는 지그재그에서 `speed` 를 상한으로 읽고 (≤ 0 = load_budget·V_LIMIT), `zigzag_v_max` 파라미터는 없앴다.
+- 바꾼 파일: `mpc/launch/torque_experiment.launch.py`·`real_all.launch.py` (키 둘 지움), `mpc/config/torque_track.yaml`, `mpc/amr_mpc/nodes/figure8_reference.py`,
+  `mpc/amr_mpc/core/fig8_limits.py` (`zigzag_max(v_max=)`, CLI 는 `--speed` 가 상한), `mpc/amr_mpc/core/zigzag.py` (주석), `mpc/test/test_launch_modes.py`.
+- 확인: pytest 566 통과. `fig8_limits --shape zigzag --zigzag_profile square` → accel 1.70, 직선 최고 1.30 m/s (상한 부하 예산 1.55),
+  `--speed 0.6` → sine 직선 최고 0.60 m/s, 앞먹임 0.413.
+- 쓰는 법: `amrall use_mpc:=true shape:=zigzag …` (= `speed:=max accel:=max`), 값을 줄 때 `accel:=1.0 speed:=0.6`.
+
 ### 2026-11-24 (7) — 지그재그도 `speed:=max accel:=max` 로 (accel:= = zigzag_accel:=, speed:=max → zigzag_v_max 0)
 - 왜: 사용자 요청 — 다른 경로 (circles8·square) 와 같은 명령 모양으로. (6) 에서는 지그재그에 `accel:=` 을 주면 기동 거부, `speed:=max` 는 효과 없음이었다
   (기본값 `zigzag_accel: max`·`zigzag_v_max: 0` 이 이미 그 뜻이라 결과는 같았다).

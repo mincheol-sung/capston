@@ -142,9 +142,9 @@ class Figure8ReferenceNode(Node):
             ("square_corner_mode", "pass"), ("square_rot_s", 1.0), ("square_dwell_s", 0.1),
             # 지그재그 (2026-11-24, core/zigzag.py). shape:=zigzag — 길이 zigzag_length 직선 zigzag_n 개, 이웃 사이각 zigzag_angle_deg,
             #   직선마다 전진·후진을 번갈아 (헤딩 = 직선 방향). 직선 양 끝 속도 0, 파형 zigzag_profile sine | square, 최대 가속도 accel.
-            #   zigzag_v_max > 0 이면 직선 최고 속도를 그 값에서, 0 이면 load_budget·V_LIMIT 에서 자름. 꼭짓점: 쉼 → 회전 rot_s → 쉼
+            #   speed > 0 이면 직선 최고 속도를 그 값에서, ≤ 0 이면 load_budget·V_LIMIT 에서 자름 (2026-11-24 (8) zigzag_v_max 대신). 꼭짓점: 쉼 → 회전 rot_s → 쉼
             ("zigzag_n", 5), ("zigzag_length", 1.0), ("zigzag_angle_deg", 10.0), ("zigzag_profile", "sine"),
-            ("zigzag_v_max", 0.0), ("zigzag_rot_s", 0.5), ("zigzag_dwell_s", 0.1),
+            ("zigzag_rot_s", 0.5), ("zigzag_dwell_s", 0.1),
         ])
         g = lambda n: self.get_parameter(n).value
         self.dt, self.T, self.frame = float(g("dt")), int(g("horizon_steps")), str(g("frame_id"))
@@ -168,7 +168,7 @@ class Figure8ReferenceNode(Node):
                                    corner_mode=str(g("square_corner_mode")).strip().lower(), rot_s=g("square_rot_s"),
                                    dwell_s=g("square_dwell_s"))
             elif self.shape == "zigzag":
-                vmax = float(g("zigzag_v_max"))
+                vmax = float(g("speed"))                    # 지그재그에서 speed = 직선 최고 속도 상한 (launch: max → 0)
                 self.path = Zigzag(n=g("zigzag_n"), length=g("zigzag_length"), angle_deg=g("zigzag_angle_deg"), accel=g("accel"),
                                    v_max=vmax if vmax > 0.0 else budget * V_LIMIT,
                                    profile=str(g("zigzag_profile")).strip().lower(), rot_s=g("zigzag_rot_s"),
@@ -193,7 +193,7 @@ class Figure8ReferenceNode(Node):
         if run > cap and self.shape == "zigzag":
             raise SystemExit(
                 f"[figure8] 지그재그 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "
-                f"zigzag_v_max 를 낮추거나 zigzag_rot_s 를 늘려라.")
+                f"speed:= (직선 최고 속도 상한) 를 낮추거나 zigzag_rot_s 를 늘려라.")
         if run > cap and self.shape == "square":
             raise SystemExit(
                 f"[figure8] 정사각형 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "

@@ -4,6 +4,7 @@
 plant:=real 은 이 PC 에서 한 번도 돌아본 적 없는 경로라, 인자 이름 오타·빠진 import 같은 것을 여기서 잡는다.
 """
 import importlib.util
+import math
 import os
 
 import pytest
@@ -603,16 +604,16 @@ def test_real_all_passes_square_corner_keys():
 
 
 def test_zigzag_params_reach_figure8(launch_mod):
-    """2026-11-24 지그재그: zigzag_* 가 노드로 (zigzag_n 은 정수), zigzag_accel max → C 직선 가속 한계가 accel 로. 비우면 yaml."""
+    """2026-11-24 지그재그: zigzag_* 가 노드로 (zigzag_n 은 정수). 비우면 yaml. 전용 zigzag_accel·zigzag_v_max 는 없다 ((8))."""
     import yaml
     text = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v))
     _, _, out = build(launch_mod, shape="zigzag", zigzag_n="3", zigzag_angle_deg="-20", zigzag_profile="square")
     p = _node_params(out, "figure8_reference_node")
     assert text(p["shape"]) == "zigzag" and text(p["zigzag_profile"]) == "square"
     assert p["zigzag_n"] == 3 and isinstance(p["zigzag_n"], int) and p["zigzag_angle_deg"] == -20.0
-    assert p["zigzag_length"] == 1.0 and p["zigzag_v_max"] == 0.0 and "zigzag_accel" not in p
-    assert 0.5 < p["accel"] < 3.0                     # max 가 숫자로 (지금 설정 1.70)
-    _, _, out = build(launch_mod, shape="zigzag", zigzag_accel="0.8")
+    assert p["zigzag_length"] == 1.0 and "zigzag_accel" not in p and "zigzag_v_max" not in p
+    assert 0.5 < p["accel"] < 3.0                     # 비우면 max 가 숫자로 (지금 설정 1.70)
+    _, _, out = build(launch_mod, shape="zigzag", accel="0.8")
     p = _node_params(out, "figure8_reference_node")
     assert p["accel"] == 0.8 and text(p["zigzag_profile"]) == "sine" and p["zigzag_n"] == 5
 
@@ -627,28 +628,27 @@ def test_zigzag_accel_max_matches_square_edge(launch_mod):
 
 @pytest.mark.parametrize("args, match", [
     ({"yaw_mode": "fixed"}, "zigzag"), ({"yaw_mode": "spin"}, "zigzag"), ({"zigzag_profile": "triangle"}, "zigzag_profile"),
-    ({"zigzag_n": "2.5"}, "zigzag_n"), ({"zigzag_n": "0"}, "zigzag_n"), ({"accel": "1.0", "zigzag_accel": "max"}, "zigzag_accel"),
+    ({"zigzag_n": "2.5"}, "zigzag_n"), ({"zigzag_n": "0"}, "zigzag_n"),
 ])
 def test_zigzag_rejected_before_nodes(launch_mod, args, match):
     with pytest.raises(RuntimeError, match=match):
         build(launch_mod, shape="zigzag", **args)
 
 
-@pytest.mark.parametrize("args, accel, v_max, msg", [
-    ({}, "max", 0.0, "accel:=max"),
+@pytest.mark.parametrize("args, accel, speed, msg", [
+    ({}, "max", 0.0, "speed:=max · accel:=max"),                  # 비우면 둘 다 max (yaml 공용 speed 0.5·accel 0.4 안 씀)
     ({"speed": "max", "accel": "max"}, "max", 0.0, "speed:=max · accel:=max"),
-    ({"speed": "max", "zigzag_v_max": "0.6"}, "max", 0.0, "speed:=max · accel:=max"),   # speed:=max 가 zigzag_v_max 를 0 으로 (정사각형과 같다)
-    ({"accel": "1.0"}, 1.0, 0.0, None),                                               # accel:= = zigzag_accel:=
-    ({"accel": "1.0", "speed": "max"}, 1.0, 0.0, "speed:=max ("),                      # 2026-11-24 (7) 전에는 숫자인데 "zigzag_accel:=max" 로 찍혔다
-    ({"zigzag_v_max": "0.6"}, "max", 0.6, "accel:=max"),
+    ({"accel": "1.0"}, 1.0, 0.0, "speed:=max ("),
+    ({"speed": "0.6"}, "max", 0.6, "accel:=max ("),                # speed = 직선 최고 속도 상한
+    ({"speed": "0.6", "accel": "1.0"}, 1.0, 0.6, None),            # max 없음 → 계산·로그 없이 그대로
 ])
-def test_zigzag_speed_accel_max(launch_mod, args, accel, v_max, msg):
-    """2026-11-24 (7): 지그재그도 speed:=max accel:=max 로 — accel:= 은 zigzag_accel:= 과 같은 뜻, speed:=max 는 zigzag_v_max 0."""
+def test_zigzag_speed_accel(launch_mod, args, accel, speed, msg):
+    """2026-11-24 (8): 지그재그 가속도·속도는 공용 accel·speed — accel = 최대 가속도, speed = 직선 최고 속도 상한 (노드에 0 = 부하 예산)."""
     _, _, out = build(launch_mod, shape="zigzag", **args)
     p = _node_params(out, "figure8_reference_node")
     _, _, ref = build(launch_mod, shape="square", accel="max")
     a_max = _node_params(ref, "figure8_reference_node")["accel"]
-    assert p["accel"] == pytest.approx(a_max if accel == "max" else accel) and p["zigzag_v_max"] == v_max
+    assert p["accel"] == pytest.approx(a_max if accel == "max" else accel) and p["speed"] == speed
     logs = ["".join(getattr(x, "text", str(x)) for x in o.msg) for o in out if type(o).__name__ == "LogInfo" and "zigzag" in "".join(getattr(x, "text", str(x)) for x in o.msg)]
     if msg is None:
         assert not logs
@@ -656,12 +656,19 @@ def test_zigzag_speed_accel_max(launch_mod, args, accel, v_max, msg):
         assert len(logs) == 1 and logs[0].startswith(msg)
 
 
+def test_zigzag_speed_cap_reaches_peak():
+    """speed 상한이 직선 최고 속도를 자른다 (Zigzag v_max) — sine 5 × 1 m, accel 1.7: 상한 없음 0.92, 0.6 이면 0.6."""
+    from amr_mpc.core.zigzag import Zigzag
+    assert Zigzag(accel=1.7).V == pytest.approx(math.sqrt(1.7 / 2.0))
+    assert Zigzag(accel=1.7, v_max=0.6).V == pytest.approx(0.6)
+
+
 def test_real_all_passes_zigzag_keys():
     spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
-    assert {"zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_accel", "zigzag_v_max",
-            "zigzag_rot_s", "zigzag_dwell_s"} <= set(m._PASS)
+    assert {"zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_rot_s", "zigzag_dwell_s", "speed", "accel"} <= set(m._PASS)
+    assert not {"zigzag_accel", "zigzag_v_max"} & set(m._PASS)
 
 
 @pytest.mark.parametrize("arg, expect", [("", False), ("true", True), ("false", False)])

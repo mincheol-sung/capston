@@ -17,7 +17,8 @@ shape:=zigzag 로 고른다. 속도 ur 는 몸체 좌표 [vx, vy, ω] — Figure
                      자르지 않으면 삼각형 (bang-bang, 최소 시간 2√(L/A)).
   profile "sine"   : 반 사인  v(τ) = V_p·sin(πτ/T_leg). 최대 가속도 |a| = π·V_p/T_leg (양 끝) 를 A 로 둔다
                      → V_p = √(A·L/2), T_leg = π·√(L/(2A)). V_p > v_max 면 V_p = v_max, T_leg = π·L/(2·V_p) (최대 가속도 < A).
-  A 는 launch 가 zigzag_accel (기본 max = C 마찰 상한 안 직선 가속 한계, core/fig8_limits.line_accel_max) 로 정해 accel 로 넘긴다.
+  A 는 launch accel:= (지그재그에서 비우면 max = C 마찰 상한 안 직선 가속 한계, core/fig8_limits.line_accel_max), v_max 는 launch speed:=
+  (비우면 max = 부하 예산에서만 자름) 로 정해 노드 accel·speed 로 넘긴다 (2026-11-24 (8)).
 
 꼭짓점 (Square corner_mode stop 과 같은 꼴)
   선 자리에서 dwell_s 쉼 → rot_s 동안 θ_k → θ_{k+1} 제자리 회전 (스무스스텝 3x² − 2x³, 양 끝 ω = 0) → dwell_s 쉼 → 다음 직선.
