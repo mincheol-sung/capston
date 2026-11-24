@@ -86,10 +86,11 @@ track:
   #   헤딩 = 직선 방향, 직선마다 전진·후진을 번갈아 (짝수 직선 전진, 홀수 후진) → 꼭짓점에서 몸체는 사이각만큼만 돈다.
   #   직선 양 끝 속도 0. 속도 파형 zigzag_profile: sine = 반 사인 v = V_p sin(πτ/T) (최대 가속 = 양 끝) | square = 사다리꼴
   #   (자르지 않으면 삼각형). 두 파형 모두 최대 가속도 = zigzag_accel. 꼭짓점: 쉼 dwell → 제자리 회전 rot_s → 쉼 dwell.
-  #   yaw_mode 는 tangent 만 (fixed·spin 거부). speed·accel·laps·align_s 는 안 쓴다 (launch 가 zigzag_accel 을 accel 로 넘김).
+  #   yaw_mode 는 tangent 만 (fixed·spin 거부). laps·align_s 는 안 쓴다. launch 가 zigzag_accel 을 노드 accel 로 넘긴다 —
+  #   launch accel:= 을 주면 zigzag_accel 과 같은 뜻 (둘 다 주면 거부), speed:=max 는 zigzag_v_max 0 (2026-11-24 (7), 정사각형과 같은 꼴).
   #   5 × 1 m, 10°, accel max (C 상한 1.70) 이면 sine 직선 최고 0.92 m/s · 1.70 s, square 1.30 m/s · 1.53 s.
   #   미리 보기: python3 -m amr_mpc.core.fig8_limits --shape zigzag --zigzag_profile square
-  #   예) amrall use_mpc:=true shape:=zigzag zigzag_profile:=square limit_mode:=friction
+  #   예) amrall use_mpc:=true shape:=zigzag zigzag_profile:=square speed:=max accel:=max limit_mode:=friction  (speed·accel max 는 기본값과 같다)
   zigzag_n: 5               # 직선 개수
   zigzag_length: 1.0        # [m] 직선 하나 길이
   zigzag_angle_deg: 10.0    # [deg] 이웃 직선 사이각 (0 < |값| < 180)

@@ -26,8 +26,9 @@
                             # 2026-11-23 원 크기만 주면 C 마찰 상한·부하 예산 안의 최대 speed·accel 로 (core/fig8_limits.py, 기동 로그에 값).
                             #   shape:=square speed:=max accel:=max 도 — 변 직선 가속만 상한 안 (꼭짓점 짧은 포화는 허용), square_v_max 0.
                             #   A·B·C 같은 기준 (늘 C 상한으로 계산). 여유: max_ff_ratio:=0.9. 미리 보기: python3 -m amr_mpc.core.fig8_limits --width 1.6
-  ros2 launch amr_mpc torque_experiment.launch.py shape:=zigzag zigzag_profile:=square   # 2026-11-24 지그재그: 1 m 직선 5 개, 사이각 10°,
-                            #   직선마다 전진·후진, 양 끝 정지, 최대 가속 zigzag_accel (기본 max). zigzag_n·zigzag_length·zigzag_angle_deg 로 바꾼다
+  ros2 launch amr_mpc torque_experiment.launch.py shape:=zigzag zigzag_profile:=square speed:=max accel:=max   # 2026-11-24 지그재그: 1 m 직선 5 개, 사이각 10°,
+                            #   직선마다 전진·후진, 양 끝 정지, 최대 가속 zigzag_accel (기본 max). zigzag_n·zigzag_length·zigzag_angle_deg 로 바꾼다.
+                            #   accel:= 은 zigzag_accel:= 과 같은 뜻, speed:=max 는 zigzag_v_max:=0 (정사각형과 같다). 기본값이 이미 둘 다 max
                                                                         #   무장해야 기준 시간이 흐른다. 정지하면 기준도 멈추고, 다시 a 로 이어 간다
   ros2 launch amr_mpc torque_experiment.launch.py armed:=true           # 띄우자마자 무장 (시뮬에서만)
   ros2 launch amr_mpc torque_experiment.launch.py limit_mode:=friction  # 비교군 C (마찰 토크 상한). 기본 motor_only = B
@@ -188,9 +189,12 @@ def _track(context, share):
     if out["shape"] == "zigzag":
         if out["yaw_mode"] != "tangent":
             raise RuntimeError("shape:=zigzag 는 yaw_mode:=tangent 만 (헤딩 = 직선 방향, 직선마다 전진·후진)")
+        # 2026-11-24 (7): accel:= 을 주면 zigzag_accel 과 같은 뜻 (다른 경로처럼 speed:=max accel:=max 로 띄우게). 둘 다 주면 거부
         if LaunchConfiguration("accel").perform(context).strip():
-            raise RuntimeError("shape:=zigzag 의 가속도는 zigzag_accel:= (숫자 또는 max) 로 — accel:= 은 안 쓴다")
-        out["accel"] = zz_accel
+            if LaunchConfiguration("zigzag_accel").perform(context).strip():
+                raise RuntimeError("shape:=zigzag 에 accel:= 과 zigzag_accel:= 을 같이 줬다 — 같은 뜻이니 하나만")
+        else:
+            out["accel"] = zz_accel
     if "max" in (out["speed"], out["accel"]):
         _resolve_max(out, context, share)
     return out
@@ -243,8 +247,9 @@ def _resolve_max(out, context, share):
         cap = budget * c["r"] * float(g("max_wheel_rad_per_sec"))
         accel = None if out["accel"] == "max" else out["accel"]
         try:
-            if out["shape"] == "zigzag":              # 직선 가속 한계 (fig8_limits.line_accel_max, 2026-11-24). speed 는 안 쓴다
-                v, a, info = fig8_limits.zigzag_max(c, cap, out, accel=accel, max_ff_ratio=ratio)
+            if out["shape"] == "zigzag":              # 직선 가속 한계 (fig8_limits.line_accel_max, 2026-11-24). speed:=max → zigzag_v_max 0 (정사각형과 같다)
+                zz = dict(out, zigzag_v_max=0.0 if out["speed"] == "max" else out["zigzag_v_max"])
+                v, a, info = fig8_limits.zigzag_max(c, cap, zz, accel=accel, max_ff_ratio=ratio)
             elif out["shape"] == "square":            # 꼭짓점은 빼고 변 직선 가속만 (fig8_limits 머리말, 2026-11-23)
                 sq = dict(out, square_v_max=0.0 if out["speed"] == "max" else out["square_v_max"])
                 v, a, info = fig8_limits.square_max(c, cap, sq, accel=accel, max_ff_ratio=ratio)
@@ -257,8 +262,11 @@ def _resolve_max(out, context, share):
         _MAX_CACHE[key] = (v, a, info, ratio, budget)
     v, a, info, ratio, budget = _MAX_CACHE[key]
     if out["shape"] == "zigzag":
+        what = " · ".join(x for x in ("speed:=max" if out["speed"] == "max" else "", "accel:=max" if out["accel"] == "max" else "") if x)
+        if out["speed"] == "max":
+            out["zigzag_v_max"] = 0.0                 # figure8_reference: 0 = load_budget·V_LIMIT 에서 자름
         out["speed"], out["accel"] = float(v), float(a)   # speed 는 지그재그에 안 쓰인다 (직선 최고 속도를 적어 둠)
-        out["_max_msg"] = (f"zigzag_accel:=max (zigzag {out['zigzag_profile']}) → accel {a:.2f} m/s², 직선 최고 {v:.2f} m/s "
+        out["_max_msg"] = (f"{what} (zigzag {out['zigzag_profile']}) → accel {a:.2f} m/s², 직선 최고 {v:.2f} m/s "
                            f"(zigzag_v_max {out['zigzag_v_max']:g})  직선 앞먹임 {info['line_ff']:.3f} ≤ {ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, "
                            f"부하 {info['load'] * 100:.0f} % of 예산 {budget:.2f}, 기준 {info['T']:.1f} s")
         return

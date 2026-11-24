@@ -627,11 +627,33 @@ def test_zigzag_accel_max_matches_square_edge(launch_mod):
 
 @pytest.mark.parametrize("args, match", [
     ({"yaw_mode": "fixed"}, "zigzag"), ({"yaw_mode": "spin"}, "zigzag"), ({"zigzag_profile": "triangle"}, "zigzag_profile"),
-    ({"zigzag_n": "2.5"}, "zigzag_n"), ({"zigzag_n": "0"}, "zigzag_n"), ({"accel": "1.0"}, "zigzag_accel"),
+    ({"zigzag_n": "2.5"}, "zigzag_n"), ({"zigzag_n": "0"}, "zigzag_n"), ({"accel": "1.0", "zigzag_accel": "max"}, "zigzag_accel"),
 ])
 def test_zigzag_rejected_before_nodes(launch_mod, args, match):
     with pytest.raises(RuntimeError, match=match):
         build(launch_mod, shape="zigzag", **args)
+
+
+@pytest.mark.parametrize("args, accel, v_max, msg", [
+    ({}, "max", 0.0, "accel:=max"),
+    ({"speed": "max", "accel": "max"}, "max", 0.0, "speed:=max · accel:=max"),
+    ({"speed": "max", "zigzag_v_max": "0.6"}, "max", 0.0, "speed:=max · accel:=max"),   # speed:=max 가 zigzag_v_max 를 0 으로 (정사각형과 같다)
+    ({"accel": "1.0"}, 1.0, 0.0, None),                                               # accel:= = zigzag_accel:=
+    ({"accel": "1.0", "speed": "max"}, 1.0, 0.0, "speed:=max ("),                      # 2026-11-24 (7) 전에는 숫자인데 "zigzag_accel:=max" 로 찍혔다
+    ({"zigzag_v_max": "0.6"}, "max", 0.6, "accel:=max"),
+])
+def test_zigzag_speed_accel_max(launch_mod, args, accel, v_max, msg):
+    """2026-11-24 (7): 지그재그도 speed:=max accel:=max 로 — accel:= 은 zigzag_accel:= 과 같은 뜻, speed:=max 는 zigzag_v_max 0."""
+    _, _, out = build(launch_mod, shape="zigzag", **args)
+    p = _node_params(out, "figure8_reference_node")
+    _, _, ref = build(launch_mod, shape="square", accel="max")
+    a_max = _node_params(ref, "figure8_reference_node")["accel"]
+    assert p["accel"] == pytest.approx(a_max if accel == "max" else accel) and p["zigzag_v_max"] == v_max
+    logs = ["".join(getattr(x, "text", str(x)) for x in o.msg) for o in out if type(o).__name__ == "LogInfo" and "zigzag" in "".join(getattr(x, "text", str(x)) for x in o.msg)]
+    if msg is None:
+        assert not logs
+    else:
+        assert len(logs) == 1 and logs[0].startswith(msg)
 
 
 def test_real_all_passes_zigzag_keys():

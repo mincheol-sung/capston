@@ -61,6 +61,18 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-24 (7) — 지그재그도 `speed:=max accel:=max` 로 (accel:= = zigzag_accel:=, speed:=max → zigzag_v_max 0)
+- 왜: 사용자 요청 — 다른 경로 (circles8·square) 와 같은 명령 모양으로. (6) 에서는 지그재그에 `accel:=` 을 주면 기동 거부, `speed:=max` 는 효과 없음이었다
+  (기본값 `zigzag_accel: max`·`zigzag_v_max: 0` 이 이미 그 뜻이라 결과는 같았다).
+- 바꾼 파일:
+  - `mpc/launch/torque_experiment.launch.py` — 지그재그에서 `accel:=` (숫자 | max) 은 `zigzag_accel:=` 과 같은 뜻. 둘 다 주면 기동 거부.
+    `speed:=max` 면 `zigzag_v_max` 0 (= load_budget·V_LIMIT 에서만 자름, 정사각형의 `square_v_max` 와 같은 꼴).
+    기동 로그 머리를 실제로 max 인 것만 (`speed:=max · accel:=max` 등) — 전에는 숫자 accel 에 speed:=max 를 주면 "zigzag_accel:=max" 로 잘못 찍혔다.
+  - `mpc/config/torque_track.yaml` — 주석. `mpc/test/test_launch_modes.py` — 새 6 개, 거부 시험 1 개 바꿈 (`accel:=1.0` 단독 → `accel` + `zigzag_accel` 같이).
+- 확인: pytest 567 통과. ROS 시뮬 C (`shape:=zigzag zigzag_profile:=square speed:=max accel:=max limit_mode:=friction`): fault 0, RMS 13.8 · 최대 35.1 mm, 요 RMS 0.25°,
+  기동 로그 `speed:=max · accel:=max (zigzag square) → accel 1.70 m/s², 직선 최고 1.30 m/s (zigzag_v_max 0)  직선 앞먹임 0.974 ≤ 1.0, 꼭짓점 회전 포함 최대 0.97, 부하 84 %`.
+- 쓰는 법: `amrall use_mpc:=true shape:=zigzag zigzag_profile:=square speed:=max accel:=max …` — 인자 없이 띄운 것과 같다.
+
 ### 2026-11-24 (6) — 지그재그 기준 `shape:=zigzag` (직선 n 개, 전진·후진 번갈아) + PP 룩어헤드 탐색이 cusp 를 넘지 않게
 - 왜: 사용자 요청 — A (PP) 와 C 를 비교할 새 경로. 조건: 1 m 직선 5 개, 이웃 직선 사이각 10° (개수·길이·각은 인자), 헤딩 = 직선 방향이고
   진행 방향이 꺾이면 전진·후진을 바꾼다, 직선 양 끝 속도 0 에 최대 가속도, 속도 파형 sine | square.
