@@ -97,6 +97,15 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 - 쓰는 법: `amrall use_mpc:=true controller:=pp shape:=zigzag zigzag_profile:=square max_track_error:=0.5 bag:=true` (A),
   `amrall use_mpc:=true shape:=zigzag zigzag_profile:=square limit_mode:=friction velocity_source:=wheels disturbance:=true slip_guard:=true max_track_error:=0.5 bag:=true` (C).
   미리 보기 `python3 -m amr_mpc.core.fig8_limits --shape zigzag --zigzag_profile square`.
+- **정정 (같은 날, 커밋 8ca2311 뒤)**: 위의 **운동학** 숫자는 코드 기본값 `PurePursuitConfig()` (L_d 0.15~0.60 속도 비례, v_max 1.0, w_max 3.0) 로 돌린 것이다.
+  실제 `controller:=pp` 는 `torque_baseline_a.yaml` 의 L_d 0.30 고정 · v_max 1.7 · w_max 8.7 이다 (L_d 범위는 `adpp` 와 같다). ROS 시뮬 표는 launch 를 거쳐 yaml 을 썼으므로 그대로 맞다.
+  - "첫 전진 직선 0.45 m 에서 시작 (남은 0.55 < L_d 0.60)" 은 adpp 의 경우다. **pp 는 0.72 m (남은 0.28 < L_d 0.30)** 에서 시작한다 (sine 0.721 · square 0.725 m).
+  - 실제 yaml 로 다시 돌린 운동학 (수정 전 → 후): zigzag sine pp 위치 RMS 81.0 → 1.1 mm · yaw 최대 62.6 → 0.1°, adpp 111.0 → 1.1 mm · 74.5 → 0.1°.
+    zigzag square pp 84.4 → 1.3 mm · 63.6 → 0.1°, adpp 279.5 → 1.3 mm · 109.2 → 0.1°. square stop 1.5/1.5 pp 71.4 → 1.2 mm, adpp 135.8 → 1.2 mm.
+    square pass (꼭짓점 0.1) 1.5/1.5 · max (1.70/1.55) 와 circles8 실차 조건 5 개 (등속 0.5 · 1.1, lap_speeds, sin·계단 변조) 는 pp·adpp 모두 수정 전·후 같음 (명령 차이 ω ≤ 0.006 rad/s, 경로 끝 몫).
+  - 결론 (지그재그·stop 은 수정 전 실패·수정 후 따라감, pass·circles8 은 영향 없음) 은 바뀌지 않는다. todo 의 "헤딩 75°" 도 adpp 값이다 (pp 는 63°).
+  - 추가 확인: square `pass` + `square_corner_speed:=0` 은 수정 뒤 pp 가 나빠진다 (위치 RMS 55.3 → 63.5 mm, yaw RMS 10.4 → 20.8°, adpp 는 106.1 → 52.5 mm 로 좋아짐).
+    pass 는 꼭짓점 ±0.15 m 에서 달리며 헤딩을 돌려 옆걸음이 섞이는데 (PP 는 v_y = 0), 수정 뒤 pp 는 꼭짓점까지 곧게 가서 늦게 돈다 — 원인은 확인 안 함. 실차에서 안 쓴 조건, 꼭짓점에서 세우려면 `stop`.
 
 ### 2026-11-23 (15) — 토크 MPC 슬립 계수 η_s: 바퀴별 상한 × 1/(1+exp((|λ̃|−0.15)/0.017)) (`slip_eta`, 기본 끔)
 - 왜: 11-23 교수님 회의 "η 토크 상한" (선택 기능) — μ_max 를 1.0 으로 풀고 바퀴별 현재 슬립으로 상한을 줄이는 피드백. 사용자 요청 "에타 있는 모드랑 없는 모드 구분".
