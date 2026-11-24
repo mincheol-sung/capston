@@ -43,6 +43,7 @@ _PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_
          "width", "height", "yaw_mode", "align_s",
          "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_out_and_back", "seg_pause_s", "speed",
          "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend", "square_corner_mode", "square_rot_s", "square_dwell_s",
+         "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_accel", "zigzag_v_max", "zigzag_rot_s", "zigzag_dwell_s",
          "accel", "max_ff_ratio", "laps", "hold_s", "max_track_error",
          "ramp_dir", "ramp_tau_max", "ramp_rate", "ramp_distance", "ramp_stop_distance", "ramp_inertia_ff", "ramp_log_dir",
          "step_dir", "step_tau", "step_distance", "step_max_time", "step_inertia_ff", "step_log_dir", "mpc_W", "mpc_com_height", "mpc_load_weighted_alloc", "mpc_load_dynamic_cap", "mpc_w_delta", "mpc_w_dudt", "mpc_r_u", "mpc_Nc", "mpc_Np", "mpc_q_null", "mpc_dist_alpha", "mpc_dist_accel_only", "mpc_dist_frame", "mpc_dist_freeze", "mpc_dist_acc_max", "mpc_dist_yaw_acc_max", "mpc_dist_observer", "mpc_target_projection", "mpc_cap_on", "slip_eta", "slip_eta_lambda_c", "slip_eta_s", "mpc_ff_normal_scale", "mpc_ff_normal_estimate", "mpc_ff_normal_q", "velocity_source", "est_pose_period", "pp_speed_source", "pp_kp", "pp_ki",

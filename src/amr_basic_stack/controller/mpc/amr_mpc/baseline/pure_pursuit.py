@@ -84,12 +84,17 @@ def find_lookahead(ref_at, t, pos, L, cfg):
       · 기준점이 원 밖·다가옴    → 로봇이 L 이상 앞서 있다. 기준점은 로봇 뒤라 겨누면 돌아선다 → 건너뛰고
                                   원을 지나 나가는 교점(원에 안 들어오면 가장 가까운 점)
     "멀어지는 중" 조건이 없으면 마지막 경우에 뒤쪽 기준점을 골라 로봇이 뒤로 돈다 (단위 시험으로 확인, 2026-11-11).
+    기준 속력이 rotate_speed 밑으로 떨어지는 점 (경로가 서는 점 — 끝, 정지 꼭짓점, 전진·후진이 바뀌는 cusp) 너머는 보지 않고
+    그 점을 겨눈다 (2026-11-24 지그재그: 직선 끝 L 안에서 꼭짓점 너머 되돌아오는 다음 직선의 로봇 뒤쪽 점을 골라 운동학 시뮬에서 헤딩 75° 틀어짐).
     끝까지 못 찾으면(경로가 멈춤·짧음) 마지막으로 본 점. 반환 (점, 그 점의 기준 시각 − t)."""
     pos = np.asarray(pos, float)[:2]
     n = max(1, int(round(cfg.search_horizon / cfg.search_dt)))
     prev, d_prev = None, None
     for i in range(n + 1):
-        p = np.asarray(ref_at(t + i * cfg.search_dt)[0][:2], float)
+        Xr, ur = ref_at(t + i * cfg.search_dt)
+        p = np.asarray(Xr[:2], float)
+        if i > 0 and math.hypot(float(ur[0]), float(ur[1])) < cfg.rotate_speed:
+            return p, i * cfg.search_dt                     # 경로가 서는 점 — 그 너머는 다른 직선 (위)
         d = float(np.hypot(*(p - pos)))
         if prev is not None and d >= L and d >= d_prev:
             if d_prev < L:

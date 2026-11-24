@@ -602,6 +602,46 @@ def test_real_all_passes_square_corner_keys():
     assert {"square_corner_mode", "square_rot_s", "square_dwell_s"} <= set(m._PASS)
 
 
+def test_zigzag_params_reach_figure8(launch_mod):
+    """2026-11-24 지그재그: zigzag_* 가 노드로 (zigzag_n 은 정수), zigzag_accel max → C 직선 가속 한계가 accel 로. 비우면 yaml."""
+    import yaml
+    text = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v))
+    _, _, out = build(launch_mod, shape="zigzag", zigzag_n="3", zigzag_angle_deg="-20", zigzag_profile="square")
+    p = _node_params(out, "figure8_reference_node")
+    assert text(p["shape"]) == "zigzag" and text(p["zigzag_profile"]) == "square"
+    assert p["zigzag_n"] == 3 and isinstance(p["zigzag_n"], int) and p["zigzag_angle_deg"] == -20.0
+    assert p["zigzag_length"] == 1.0 and p["zigzag_v_max"] == 0.0 and "zigzag_accel" not in p
+    assert 0.5 < p["accel"] < 3.0                     # max 가 숫자로 (지금 설정 1.70)
+    _, _, out = build(launch_mod, shape="zigzag", zigzag_accel="0.8")
+    p = _node_params(out, "figure8_reference_node")
+    assert p["accel"] == 0.8 and text(p["zigzag_profile"]) == "sine" and p["zigzag_n"] == 5
+
+
+def test_zigzag_accel_max_matches_square_edge(launch_mod):
+    """지그재그 직선과 정사각형 변은 같은 직선 가속 한계 (fig8_limits.line_accel_max)."""
+    _, _, out = build(launch_mod, shape="zigzag")
+    a_z = _node_params(out, "figure8_reference_node")["accel"]
+    _, _, out = build(launch_mod, shape="square", accel="max")
+    assert a_z == pytest.approx(_node_params(out, "figure8_reference_node")["accel"])
+
+
+@pytest.mark.parametrize("args, match", [
+    ({"yaw_mode": "fixed"}, "zigzag"), ({"yaw_mode": "spin"}, "zigzag"), ({"zigzag_profile": "triangle"}, "zigzag_profile"),
+    ({"zigzag_n": "2.5"}, "zigzag_n"), ({"zigzag_n": "0"}, "zigzag_n"), ({"accel": "1.0"}, "zigzag_accel"),
+])
+def test_zigzag_rejected_before_nodes(launch_mod, args, match):
+    with pytest.raises(RuntimeError, match=match):
+        build(launch_mod, shape="zigzag", **args)
+
+
+def test_real_all_passes_zigzag_keys():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert {"zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_accel", "zigzag_v_max",
+            "zigzag_rot_s", "zigzag_dwell_s"} <= set(m._PASS)
+
+
 @pytest.mark.parametrize("arg, expect", [("", False), ("true", True), ("false", False)])
 def test_slip_guard_passed_to_torque_output(launch_mod, arg, expect):
     # 2026-11-21 바퀴별 슬립 가드 (amr_mpc/torque/slip_guard.py) — 기본 끔

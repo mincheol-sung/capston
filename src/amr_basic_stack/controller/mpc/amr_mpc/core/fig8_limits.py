@@ -9,6 +9,9 @@
 A·B·C 가 같은 기준을 받게, 제어기 종류와 상관없이 늘 C 상한으로 계산한다 (B·PP 는 상한이 더 크다).
 검산: 2026-11-23 실차 circles8 (width 2.0, speed_mod 0.5 × 2, 위상 −90°) → speed 0.65 · accel 1.3 (analysis/torque_mpc_sim/2026-11-23_fig8_max).
 
+지그재그 (zigzag_max, 2026-11-24): 직선마다 몸체 x 방향 가감속뿐이라 정사각형 변과 같은 직선 가속 한계 (line_accel_max) 를 쓴다.
+  꼭짓점 제자리 회전 (zigzag_rot_s) 앞먹임은 info['ff'] 로 알려만 준다.
+
 정사각형 (square_max, 2026-11-23 사용자 "1.5 1.5 로 했더니 돌아갔잖아"): 8자와 기준이 다르다.
   꼭짓점 (pass) 헤딩 회전은 앞먹임이 상한의 2 배 넘게 나와도 짧게 지나간다 — 실차 114214 (accel 1.5, v_max 1.5) 는 꼭짓점 시간의 49 % 포화에도
   완주, SLAM 위치 오차 RMS 45 mm. 그래서 꼭짓점은 빼고, 계속 걸리는 변 위 직선 가속만 상한 안에 둔다:
@@ -142,14 +145,39 @@ def max_speed_accel(make, c, load_cap, k_geom, speed=None, accel=None, max_ff_ra
                               com_height=c.get("com_height", 0.0))
 
 
+def line_accel_max(c, max_ff_ratio=1.0):
+    """몸체 x 방향 직선 등가속의 C 상한 안 최대 가속도 (0.05 내림). U_s 는 네 바퀴 모두 m_eff·a·r/4 (w = 0) → 가장 약한 τ̄_i 가 정한다."""
+    a_lim = max_ff_ratio * 4.0 * float(np.min(c["tau_bar"])) / (c["me"] * c["r"])
+    accel = math.floor(a_lim / A_STEP + 1e-9) * A_STEP
+    if accel <= 0.0:
+        raise ValueError(f"직선 가속 한계 {a_lim:.3f} m/s² — 0.05 보다 작다 (τ̄ 확인)")
+    return accel
+
+
+def zigzag_make(track, accel, v_max):
+    """launch _track 값 (zigzag_* 키) → Zigzag."""
+    from amr_mpc.core.zigzag import Zigzag
+    return Zigzag(n=float(track["zigzag_n"]), length=float(track["zigzag_length"]), angle_deg=float(track["zigzag_angle_deg"]),
+                  accel=accel, v_max=v_max, profile=str(track["zigzag_profile"]), rot_s=float(track["zigzag_rot_s"]),
+                  dwell_s=float(track["zigzag_dwell_s"]), yaw_mode=str(track["yaw_mode"]))
+
+
+def zigzag_max(c, load_cap, track, accel=None, max_ff_ratio=1.0, k_geom=None):
+    """지그재그 (2026-11-24): (직선 최고 속도, accel, 정보). accel None 이면 직선 가속 한계 line_accel_max.
+    zigzag_v_max 0 이면 load_cap 에서 자른다 (figure8_reference 와 같은 뜻). 꼭짓점 제자리 회전 앞먹임은 info['ff'] 에 같이 (전체 최대)."""
+    if accel is None:
+        accel = line_accel_max(c, max_ff_ratio)
+    z = zigzag_make(track, accel, float(track.get("zigzag_v_max", 0.0)) or load_cap)
+    run, _ = z.peak_load(k_geom if k_geom is not None else c["k"])
+    line_ff = c["me"] * max(g.a_peak for g in z.legs) * c["r"] / 4.0 / float(np.min(c["tau_bar"]))
+    return z.V, accel, dict(ff=ff_ratio(z, c), line_ff=line_ff, load=run / load_cap, T=z.T_total, tau_bar=c["tau_bar"])
+
+
 def square_max(c, load_cap, track, accel=None, max_ff_ratio=1.0, k_geom=None):
     """정사각형: (변 최고 속도, accel, 정보). accel None 이면 변 직선 가속 한계 (위 식), 변 최고 = min(√(v_c² + a·L), load_cap)."""
     from amr_mpc.core.square import Square
     if accel is None:
-        a_lim = max_ff_ratio * 4.0 * float(np.min(c["tau_bar"])) / (c["me"] * c["r"])
-        accel = math.floor(a_lim / A_STEP + 1e-9) * A_STEP
-        if accel <= 0.0:
-            raise ValueError(f"변 직선 가속 한계 {a_lim:.3f} m/s² — 0.05 보다 작다 (τ̄ 확인)")
+        accel = line_accel_max(c, max_ff_ratio)
     vmax = float(track.get("square_v_max", 0.0)) or load_cap
     sq = Square(side=float(track["square_side"]), corner_speed=float(track["square_corner_speed"]), accel=accel, v_max=vmax,
                 laps=float(track["laps"]), yaw_mode=str(track["yaw_mode"]), yaw_blend=float(track["square_yaw_blend"]),
@@ -183,7 +211,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="figure8·circles8 의 낼 수 있는 최대 speed·accel (launch speed:=max accel:=max 와 같은 계산)")
     for key in ("shape", "width", "height", "laps", "yaw_mode", "align_s", "crossing_blend_m", "spin_rate",
                 "speed_mod_amp", "speed_mod_cycles", "speed_mod_phase_deg", "speed_mod_shape",
-                "square_side", "square_corner_speed", "square_yaw_blend", "square_corner_mode", "square_rot_s", "square_dwell_s"):
+                "square_side", "square_corner_speed", "square_yaw_blend", "square_corner_mode", "square_rot_s", "square_dwell_s",
+                "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_v_max", "zigzag_rot_s", "zigzag_dwell_s"):
         ap.add_argument(f"--{key}", default=tr.get(key))
     ap.add_argument("--load_budget", type=float, default=1.0)
     ap.add_argument("--max_wheel_rad_per_sec", type=float, default=370.0 * 2 * math.pi / 60.0)
@@ -196,7 +225,12 @@ if __name__ == "__main__":
     c = plant_constants(cfg, com_height=a.com_height)
     k_geom = c["k"]
     cap = a.load_budget * c["r"] * a.max_wheel_rad_per_sec
-    if track["shape"] == "square":
+    if track["shape"] == "zigzag":
+        vp, acc, info = zigzag_max(c, cap, track, accel=a.accel, max_ff_ratio=a.max_ff_ratio, k_geom=k_geom)
+        print(f"zigzag {track['zigzag_n']} × {track['zigzag_length']} m, 사이각 {track['zigzag_angle_deg']}°, {track['zigzag_profile']}: "
+              f"accel {acc:.2f} → 직선 최고 {vp:.2f} m/s  (직선 앞먹임 {info['line_ff']:.3f} ≤ {a.max_ff_ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, "
+              f"부하 {info['load'] * 100:.0f} %, 기준 {info['T']:.1f} s)")
+    elif track["shape"] == "square":
         track["square_v_max"] = 0.0
         vp, acc, info = square_max(c, cap, track, max_ff_ratio=a.max_ff_ratio, k_geom=k_geom)
         print(f"square side {track['square_side']} ({track['square_corner_mode']}): accel:={acc:.2f} square_v_max:=0 → 변 최고 {vp:.2f} m/s  "

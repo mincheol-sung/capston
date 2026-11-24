@@ -61,6 +61,43 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-24 (6) — 지그재그 기준 `shape:=zigzag` (직선 n 개, 전진·후진 번갈아) + PP 룩어헤드 탐색이 cusp 를 넘지 않게
+- 왜: 사용자 요청 — A (PP) 와 C 를 비교할 새 경로. 조건: 1 m 직선 5 개, 이웃 직선 사이각 10° (개수·길이·각은 인자), 헤딩 = 직선 방향이고
+  진행 방향이 꺾이면 전진·후진을 바꾼다, 직선 양 끝 속도 0 에 최대 가속도, 속도 파형 sine | square.
+  실차 기록에서 C 가 확실히 이긴 조건 (11-23 square `max`: 위치 77 vs 197 mm, 요 3.0 vs 25.8°, 큰 슬립 18 vs 47 %) 이 "마찰 한계 가감속 + 급한 방향 전환" 이라
+  그 조건을 반복하는 경로다.
+- 바꾼 파일:
+  - `mpc/amr_mpc/core/zigzag.py` (새) — `Zigzag` (Square 와 같은 꼴). 사이각 α 는 꼭짓점에서 두 직선이 이루는 각 → 진행 방향은 180° − α 꺾이고 꺾는 쪽이 번갈아.
+    헤딩 θ_k = 0 (짝수 직선, 전진) / −sign·α (홀수, 후진) → 꼭짓점에서 몸체는 α 만 돈다. angle_deg > 0 이면 왼쪽으로 나아간다.
+    속도: sine = 반 사인 v = V_p sin(πτ/T), 양 끝 가속 = A → V_p = √(AL/2), T = π√(L/(2A)). square = 사다리꼴 (안 자르면 삼각형 bang-bang, V_p = √(AL)).
+    `zigzag_v_max` (0 = load_budget·V_LIMIT) 에서 자른다. 꼭짓점: 쉼 dwell → 스무스스텝 회전 rot_s → 쉼 dwell (Square stop 과 같은 꼴). 끝 정렬 회전 없음.
+  - `mpc/amr_mpc/core/fig8_limits.py` — `line_accel_max` (square_max 의 직선 가속 한계를 함수로 뺌, 값 같음), `zigzag_make`·`zigzag_max`, CLI `--shape zigzag`.
+  - `mpc/amr_mpc/nodes/figure8_reference.py` — 파라미터 `zigzag_*`, Zigzag 선택, 부하 초과 메시지, 기동 로그 (직선별 전진/후진·헤딩·최고 속력).
+  - `mpc/config/torque_track.yaml` — `zigzag_n 5 · zigzag_length 1.0 · zigzag_angle_deg 10 · zigzag_profile sine · zigzag_accel max · zigzag_v_max 0 · zigzag_rot_s 0.5 · zigzag_dwell_s 0.1`.
+  - `mpc/launch/torque_experiment.launch.py` — 키·허용값, `zigzag_accel` (숫자 | max → C 직선 가속 한계) 을 노드 `accel` 로, `zigzag_n` 정수 검사,
+    지그재그에 `yaw_mode` tangent 아님·`accel:=` 을 주면 기동 거부 (조용히 무시되지 않게). `real_all.launch.py` `_PASS`.
+  - `mpc/amr_mpc/baseline/pure_pursuit.py` — `find_lookahead`: 기준 속력이 `rotate_speed` (0.02) 밑인 점 (경로 끝·정지 꼭짓점·전진/후진 cusp) 너머는 안 보고 그 점을 겨눈다.
+    수정 전 PP 는 후진 주행 자체는 된다 (운동학: 후진 직선·원호 R 1 m 에서 오차 ~0) — 실패는 첫 **전진** 직선 0.45 m 에서 시작 (남은 길이 0.55 < L_d 0.60 →
+    탐색이 꼭짓점을 넘어 되돌아오는 직선의 로봇 뒤 0.40 m 점을 고름). Nav2 Regulated Pure Pursuit (Macenski et al. 2023) 도 후진 허용 때 룩어헤드를 cusp 에서 자른다.
+  - `mpc/test/test_zigzag.py` (새, 19), `test_launch_modes.py` (새 9), `test_baseline_a.py` (cusp·지그재그 운동학 3, 기존 1 기대값: 끝난 경로의 lead 3.0 → 0.8 s, 겨누는 점은 같음).
+- 확인: colcon (symlink), pytest 561 통과 (`ROS_STATIC_PEERS` 비우고 — 비우지 않으면 무관한 `test_ak40` SIGTERM 시험이 10 s 타임아웃).
+  - `fig8_limits --shape zigzag` (기본 5 × 1 m, 10°): accel max 1.70 m/s² → sine 직선 최고 0.92 m/s·1.70 s, square 1.30 m/s·1.53 s, 기준 11.3 / 10.5 s.
+    직선 앞먹임 0.974, 꼭짓점 회전 포함 최대 0.95 / 0.97 (≤ 1), 부하 59 / 84 %. square 경로의 accel max 는 리팩터 전과 같음 (1.70, 꼭짓점 포함 2.47).
+  - ROS 시뮬 (참값 기준, `tools/run_compare.sh` 같은 방식, fault 0):
+    | 판 | C (friction) | A 수정 전 | A 수정 후 |
+    |---|---|---|---|
+    | zigzag sine | RMS 13.9 · 최대 35.5 mm, 요 0.28° | 51.7 · 121.5 mm, 21.3° | 14.0 · 32.8 mm, 0.86° |
+    | zigzag square | 13.1 · 37.5 mm, 0.29° | 41.1 · 94.0 mm, 18.3° | 19.3 · 41.9 mm, 0.86° |
+  - PP 수정이 기존 경로에 주는 영향 (수정 전·후, side 1.5 · accel 1.5 · v_max 1.5, PP): square `pass` 는 운동학 숫자가 모든 자리까지 같고 토크 시뮬 33.3 → 32.6 mm (판 차이 수준, 판끼리 흔들림은 안 잼).
+    `square_corner_mode:=stop` 은 토크 시뮬 56.8 → 15.8 mm, 요 17.7 → 1.4° — 수정 전 A 는 정지 꼭짓점마다 다음 변을 겨눴다. 지금까지 실차 square 판은 모두 pass 라 다시 할 필요 없음.
+    circles8 width 2.0 · 0.5 m/s PP 수정 후 16.2 mm (수정 전 같은 판은 안 돌림 — 경로 중간에 기준 속력 0 이 없어 끝점 말고는 같은 코드 경로).
+  - 실차 미확인.
+- 알게 된 것: 꼭짓점을 서지 않고 지나가는 지그재그 (pass) 는 전진·후진 전환에서 속도 계단 2·v_c·cos(α/2) (v_c 0.3 → 0.60 m/s, acc_dt 창 2.99 m/s² > C 직선 상한 1.70) 이고,
+  기준 속력이 0.02 밑으로 안 내려가 위 PP 수정도 안 걸린다 (운동학: v_c 0.1 · 0.3 에서 수정 전·후 같게 요 최대 75.5 · 105.1°). 그래서 정지형만 넣었다.
+- 쓰는 법: `amrall use_mpc:=true controller:=pp shape:=zigzag zigzag_profile:=square max_track_error:=0.5 bag:=true` (A),
+  `amrall use_mpc:=true shape:=zigzag zigzag_profile:=square limit_mode:=friction velocity_source:=wheels disturbance:=true slip_guard:=true max_track_error:=0.5 bag:=true` (C).
+  미리 보기 `python3 -m amr_mpc.core.fig8_limits --shape zigzag --zigzag_profile square`.
+
 ### 2026-11-23 (15) — 토크 MPC 슬립 계수 η_s: 바퀴별 상한 × 1/(1+exp((|λ̃|−0.15)/0.017)) (`slip_eta`, 기본 끔)
 - 왜: 11-23 교수님 회의 "η 토크 상한" (선택 기능) — μ_max 를 1.0 으로 풀고 바퀴별 현재 슬립으로 상한을 줄이는 피드백. 사용자 요청 "에타 있는 모드랑 없는 모드 구분".
   곡선 값은 사용자 결정 10·15·20 % (η 0.95 / 0.5 / 0.05), ω_ε 2.5 고정, 10 Hz LPF — 근거 analysis/torque_mpc_real/2026-11-23_slip_lpf/RESULTS_KO.md 5~7 절

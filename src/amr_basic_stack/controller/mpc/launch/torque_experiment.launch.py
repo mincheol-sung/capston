@@ -26,6 +26,8 @@
                             # 2026-11-23 원 크기만 주면 C 마찰 상한·부하 예산 안의 최대 speed·accel 로 (core/fig8_limits.py, 기동 로그에 값).
                             #   shape:=square speed:=max accel:=max 도 — 변 직선 가속만 상한 안 (꼭짓점 짧은 포화는 허용), square_v_max 0.
                             #   A·B·C 같은 기준 (늘 C 상한으로 계산). 여유: max_ff_ratio:=0.9. 미리 보기: python3 -m amr_mpc.core.fig8_limits --width 1.6
+  ros2 launch amr_mpc torque_experiment.launch.py shape:=zigzag zigzag_profile:=square   # 2026-11-24 지그재그: 1 m 직선 5 개, 사이각 10°,
+                            #   직선마다 전진·후진, 양 끝 정지, 최대 가속 zigzag_accel (기본 max). zigzag_n·zigzag_length·zigzag_angle_deg 로 바꾼다
                                                                         #   무장해야 기준 시간이 흐른다. 정지하면 기준도 멈추고, 다시 a 로 이어 간다
   ros2 launch amr_mpc torque_experiment.launch.py armed:=true           # 띄우자마자 무장 (시뮬에서만)
   ros2 launch amr_mpc torque_experiment.launch.py limit_mode:=friction  # 비교군 C (마찰 토크 상한). 기본 motor_only = B
@@ -119,7 +121,10 @@ _TRACK_KEYS = ["origin_mode", "origin_x", "origin_y", "origin_yaw_deg", "start_t
                "seg_out_and_back", "seg_pause_s",
                # 정사각형 (2026-11-20): shape:=square 와 square_* (core/square.py)
                "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend",
-               "square_corner_mode", "square_rot_s", "square_dwell_s"]                # 2026-11-21 꼭짓점 정지
+               "square_corner_mode", "square_rot_s", "square_dwell_s",                # 2026-11-21 꼭짓점 정지
+               # 지그재그 (2026-11-24): shape:=zigzag 와 zigzag_* (core/zigzag.py). zigzag_accel 은 노드 accel 로 넘어간다
+               "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_accel", "zigzag_v_max",
+               "zigzag_rot_s", "zigzag_dwell_s"]
 
 
 def _est_noise(share, preset, text):
@@ -160,12 +165,18 @@ def _track(context, share):
             out[k] = [float(x) for x in (v or [])] or [0.0]
         elif k == "horizon_steps":
             out[k] = int(float(track[k]))
+        elif k == "zigzag_n":                         # 노드 파라미터가 정수 — 5.0 을 넘기면 rclpy 가 타입 오류로 죽는다
+            n = float(track[k])
+            if n != int(n) or n < 1:
+                raise RuntimeError(f"zigzag_n 은 1 이상 정수 — {track[k]!r}")
+            out[k] = int(n)
         elif k == "seg_out_and_back":
             out[k] = str(track[k]).strip().lower() in ("1", "true", "yes", "on")
-        elif k in ("speed", "accel") and str(track[k]).strip().lower() == "max":
+        elif k in ("speed", "accel", "zigzag_accel") and str(track[k]).strip().lower() == "max":
             out[k] = "max"                            # 2026-11-23 아래 _resolve_max 가 숫자로 바꾼다
         else:
-            out[k] = str(track[k]) if k in ("origin_mode", "yaw_mode", "shape", "square_corner_mode", "speed_mod_shape") else float(track[k])
+            out[k] = str(track[k]) if k in ("origin_mode", "yaw_mode", "shape", "square_corner_mode", "speed_mod_shape",
+                                            "zigzag_profile") else float(track[k])
     # 문자열 인자는 여기서 허용값을 검사한다 (2026-11-16): yaw_mode:=true 로 띄운 판이 6 개 있었다 — figure8_reference_node 가
     # 시작하자마자 ValueError 로 죽는데 오류가 화면에만 나오고 /rosout·bag 에는 안 남아, 무장해도 기준 없이 그냥 서 있었다.
     for k, allowed in _TRACK_CHOICES.items():
@@ -173,6 +184,13 @@ def _track(context, share):
             raise RuntimeError(f"{k}:={out[k]!r} — 허용값은 {' | '.join(allowed)} (torque_track.yaml 또는 launch 인자)")
     if out["shape"] == "square" and out["yaw_mode"] == "spin":        # 2026-11-20: 노드 기동 오류는 bag 에 안 남는다 (위 주석)
         raise RuntimeError("shape:=square 는 yaw_mode:=tangent | fixed (spin 은 figure8·circles8 만)")
+    zz_accel = out.pop("zigzag_accel")               # 노드에는 없는 키 — 지그재그면 accel 로 넘긴다 (2026-11-24)
+    if out["shape"] == "zigzag":
+        if out["yaw_mode"] != "tangent":
+            raise RuntimeError("shape:=zigzag 는 yaw_mode:=tangent 만 (헤딩 = 직선 방향, 직선마다 전진·후진)")
+        if LaunchConfiguration("accel").perform(context).strip():
+            raise RuntimeError("shape:=zigzag 의 가속도는 zigzag_accel:= (숫자 또는 max) 로 — accel:= 은 안 쓴다")
+        out["accel"] = zz_accel
     if "max" in (out["speed"], out["accel"]):
         _resolve_max(out, context, share)
     return out
@@ -196,9 +214,9 @@ def _resolve_max(out, context, share):
     제어기와 상관없이 C 상한 (torque_plant.yaml + 이번 launch 의 mu_hat·mu_hat_wheels·wheel_load_share·payload 인자) 으로 계산해
     A·B·C 가 같은 기준을 받는다. 부하 예산·바퀴 속도 상한은 figure8_reference 에 넘기는 값과 같다."""
     g = lambda n: LaunchConfiguration(n).perform(context).strip()
-    if out["shape"] not in ("figure8", "circles8", "square"):
-        raise RuntimeError(f"speed:=max·accel:=max 는 shape:=figure8|circles8|square 만 (받은 shape {out['shape']!r})")
-    if out["shape"] != "square" and any(v > 0.0 for v in out["lap_speeds"]):
+    if out["shape"] not in ("figure8", "circles8", "square", "zigzag"):
+        raise RuntimeError(f"speed:=max·accel:=max 는 shape:=figure8|circles8|square|zigzag 만 (받은 shape {out['shape']!r})")
+    if out["shape"] not in ("square", "zigzag") and any(v > 0.0 for v in out["lap_speeds"]):
         raise RuntimeError("speed:=max 와 lap_speeds 는 같이 쓸 수 없다")
     ratio = float(g("max_ff_ratio") or 1.0)
     if not 0.1 <= ratio <= 1.5:
@@ -225,7 +243,9 @@ def _resolve_max(out, context, share):
         cap = budget * c["r"] * float(g("max_wheel_rad_per_sec"))
         accel = None if out["accel"] == "max" else out["accel"]
         try:
-            if out["shape"] == "square":              # 꼭짓점은 빼고 변 직선 가속만 (fig8_limits 머리말, 2026-11-23)
+            if out["shape"] == "zigzag":              # 직선 가속 한계 (fig8_limits.line_accel_max, 2026-11-24). speed 는 안 쓴다
+                v, a, info = fig8_limits.zigzag_max(c, cap, out, accel=accel, max_ff_ratio=ratio)
+            elif out["shape"] == "square":            # 꼭짓점은 빼고 변 직선 가속만 (fig8_limits 머리말, 2026-11-23)
                 sq = dict(out, square_v_max=0.0 if out["speed"] == "max" else out["square_v_max"])
                 v, a, info = fig8_limits.square_max(c, cap, sq, accel=accel, max_ff_ratio=ratio)
             else:
@@ -236,6 +256,12 @@ def _resolve_max(out, context, share):
             raise RuntimeError(f"speed:=max·accel:=max — {e}")
         _MAX_CACHE[key] = (v, a, info, ratio, budget)
     v, a, info, ratio, budget = _MAX_CACHE[key]
+    if out["shape"] == "zigzag":
+        out["speed"], out["accel"] = float(v), float(a)   # speed 는 지그재그에 안 쓰인다 (직선 최고 속도를 적어 둠)
+        out["_max_msg"] = (f"zigzag_accel:=max (zigzag {out['zigzag_profile']}) → accel {a:.2f} m/s², 직선 최고 {v:.2f} m/s "
+                           f"(zigzag_v_max {out['zigzag_v_max']:g})  직선 앞먹임 {info['line_ff']:.3f} ≤ {ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, "
+                           f"부하 {info['load'] * 100:.0f} % of 예산 {budget:.2f}, 기준 {info['T']:.1f} s")
+        return
     if out["shape"] == "square":
         if out["speed"] == "max":
             out["square_v_max"] = 0.0                 # figure8_reference: 0 = load_budget·V_LIMIT 에서 자름
@@ -250,7 +276,8 @@ def _resolve_max(out, context, share):
                        f"부하 {info['load'] * 100:.0f} % of 예산 {budget:.2f}, 기준 {info['T']:.1f} s, τ̄ {[round(x, 4) for x in info['tau_bar']]} N·m)")
 
 
-_TRACK_CHOICES = {"yaw_mode": ("tangent", "fixed", "spin"), "shape": ("figure8", "circles8", "line", "rotate", "square"),
+_TRACK_CHOICES = {"yaw_mode": ("tangent", "fixed", "spin"), "shape": ("figure8", "circles8", "line", "rotate", "square", "zigzag"),
+                  "zigzag_profile": ("sine", "square"),
                   "origin_mode": ("robot", "fixed"), "square_corner_mode": ("pass", "stop"),
                   "speed_mod_shape": ("sin", "square")}
 

@@ -69,6 +69,7 @@ from amr_mpc.body import mpc as mpc_mod
 from amr_mpc.core.figure8 import Figure8, lead_in, lead_in_duration, ramp_elapsed, ramp_rate
 from amr_mpc.core.segment import Segment
 from amr_mpc.core.square import Square
+from amr_mpc.core.zigzag import Zigzag
 K_GEOM = mpc_mod.K_GEOM
 
 
@@ -139,6 +140,11 @@ class Figure8ReferenceNode(Node):
             #   꼭짓점 처리 (2026-11-21): square_corner_mode pass (위 설명, 기본) | stop (꼭짓점마다 서서 square_dwell_s 쉬고
             #   square_rot_s 동안 +90° 제자리 회전, 다시 square_dwell_s 쉬고 다음 변 — 병진 가감속과 헤딩 회전을 시간상 뗀다)
             ("square_corner_mode", "pass"), ("square_rot_s", 1.0), ("square_dwell_s", 0.1),
+            # 지그재그 (2026-11-24, core/zigzag.py). shape:=zigzag — 길이 zigzag_length 직선 zigzag_n 개, 이웃 사이각 zigzag_angle_deg,
+            #   직선마다 전진·후진을 번갈아 (헤딩 = 직선 방향). 직선 양 끝 속도 0, 파형 zigzag_profile sine | square, 최대 가속도 accel.
+            #   zigzag_v_max > 0 이면 직선 최고 속도를 그 값에서, 0 이면 load_budget·V_LIMIT 에서 자름. 꼭짓점: 쉼 → 회전 rot_s → 쉼
+            ("zigzag_n", 5), ("zigzag_length", 1.0), ("zigzag_angle_deg", 10.0), ("zigzag_profile", "sine"),
+            ("zigzag_v_max", 0.0), ("zigzag_rot_s", 0.5), ("zigzag_dwell_s", 0.1),
         ])
         g = lambda n: self.get_parameter(n).value
         self.dt, self.T, self.frame = float(g("dt")), int(g("horizon_steps")), str(g("frame_id"))
@@ -161,8 +167,14 @@ class Figure8ReferenceNode(Node):
                                    yaw_mode=str(g("yaw_mode")), yaw_blend=g("square_yaw_blend"), align_s=g("align_s"),
                                    corner_mode=str(g("square_corner_mode")).strip().lower(), rot_s=g("square_rot_s"),
                                    dwell_s=g("square_dwell_s"))
+            elif self.shape == "zigzag":
+                vmax = float(g("zigzag_v_max"))
+                self.path = Zigzag(n=g("zigzag_n"), length=g("zigzag_length"), angle_deg=g("zigzag_angle_deg"), accel=g("accel"),
+                                   v_max=vmax if vmax > 0.0 else budget * V_LIMIT,
+                                   profile=str(g("zigzag_profile")).strip().lower(), rot_s=g("zigzag_rot_s"),
+                                   dwell_s=g("zigzag_dwell_s"), yaw_mode=str(g("yaw_mode")))
             elif self.shape not in ("figure8", "circles8"):
-                raise ValueError(f"shape={self.shape!r} — figure8 | circles8 | line | rotate | square")
+                raise ValueError(f"shape={self.shape!r} — figure8 | circles8 | line | rotate | square | zigzag")
             else:
                 self.path = Figure8(width=g("width"), height=g("height"), speed=g("speed"),
                                     accel=g("accel"), laps=g("laps"), yaw_mode=str(g("yaw_mode")),
@@ -178,6 +190,10 @@ class Figure8ReferenceNode(Node):
 
         run, spin = self.path.peak_load(K_GEOM)
         cap = budget * V_LIMIT
+        if run > cap and self.shape == "zigzag":
+            raise SystemExit(
+                f"[figure8] 지그재그 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "
+                f"zigzag_v_max 를 낮추거나 zigzag_rot_s 를 늘려라.")
         if run > cap and self.shape == "square":
             raise SystemExit(
                 f"[figure8] 정사각형 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "
@@ -236,6 +252,17 @@ class Figure8ReferenceNode(Node):
             self.publish_path(self.track_origin)
 
         p = self.path
+        if self.shape == "zigzag":
+            legs = "  ".join(f"[{k}] {'전진' if d > 0 else '후진'} {h:+.0f}° 최고 {vp:.2f} m/s {T:.2f} s"
+                             for k, d, h, vp, _, T in p.leg_summary()[:4])
+            self.get_logger().info(
+                f"지그재그 직선 {p.length:.2f} m × {p.n} 개, 사이각 {abs(p.angle_deg):.1f}° ({'왼쪽' if p.angle_deg > 0 else '오른쪽'}으로), "
+                f"속도 파형 {p.profile}, 최대 가속 {max(g.a_peak for g in p.legs):.2f} m/s² (accel {p.A:.2f}), "
+                f"꼭짓점 쉼 {p.dwell:.2f} s + 회전 {p.rot:.2f} s + 쉼 {p.dwell:.2f} s\n"
+                f"  직선별: {legs}{' …' if p.n > 4 else ''}\n"
+                f"  시간  대기 {self.delay:.1f} s + 주행 {p.T_path:.1f} s{'' if self.hold < 0 else f' + 유지 {self.hold:.1f} s'}   "
+                f"부하 {run/V_LIMIT*100:.0f} % (예산 {budget*100:.0f} %, V_LIMIT {V_LIMIT:.2f} m/s)")
+            return
         if self.shape == "square":
             edges = "  ".join(f"[{i}] {vs:.2f}→{vp:.2f}→{ve:.2f} m/s {T:.1f} s" for i, vs, vp, ve, T in p.edge_summary()[:4])
             self.get_logger().info(

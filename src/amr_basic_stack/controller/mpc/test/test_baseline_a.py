@@ -7,7 +7,7 @@ import pytest
 from amr_mpc.baseline.pure_pursuit import PurePursuitConfig, find_lookahead, lookahead_distance, pure_pursuit
 from amr_mpc.baseline.wheel_pi import WheelPI, wheel_targets
 from amr_mpc.core import config
-from amr_mpc.core.reference import ReferenceHorizon
+from amr_mpc.core.reference import ReferenceHorizon, wrap
 from amr_mpc.torque.model import SlipPlant, TorquePlant
 
 
@@ -87,11 +87,37 @@ def test_rotate_in_place_segment():
 
 
 def test_lookahead_stops_at_horizon_end():
-    """경로가 멈추면(끝점 유지) 원 밖 점이 없다 → 마지막 점을 겨눈다 (예외·무한 루프 없음)."""
+    """경로가 멈추면(끝점 유지) 원 밖 점이 없다 → 끝점을 겨눈다 (예외·무한 루프 없음).
+    2026-11-24 부터 기준 속력이 0 이 되는 시각 (기준열 끝 1.0 s, t 0.2 에서 0.8 s 앞) 에서 탐색을 멈춘다 (예전엔 search_horizon 3 s 까지)."""
     rows = [(0.01 * i, 0.0, 0.0, 0.05, 0.0, 0.0) for i in range(1, 6)]
     ref = ReferenceHorizon.from_rows(0.0, 0.2, rows)
     p, lead = find_lookahead(ref.at, 0.2, [0.0, 0.0], 0.3, PurePursuitConfig(search_horizon=3.0))
-    assert np.allclose(p, [0.05, 0.0]) and lead == pytest.approx(3.0)
+    assert np.allclose(p, [0.05, 0.0]) and lead == pytest.approx(0.8)
+
+
+def test_lookahead_does_not_cross_cusp():
+    """2026-11-24 지그재그: 직선 끝 (속력 0, 다음 직선은 후진으로 되돌아옴) 너머를 보지 않는다.
+    로봇이 끝점에서 0.1 m 앞 (L 0.3 안) 이면 예전엔 꼭짓점 너머 로봇 뒤쪽의 다음 직선 점을 겨눴다."""
+    from amr_mpc.core.zigzag import Zigzag
+    z = Zigzag(accel=1.7, profile="square")
+    g = z.legs[0]
+    t = next(x for x in np.arange(0.0, g.T, 0.001) if z.at(x)[0][0] >= 0.9)
+    p, lead = find_lookahead(z.at, t, z.at(t)[0][:2], 0.3, PurePursuitConfig())
+    assert np.allclose(p, z.corners[1], atol=2e-3) and lead < g.T - t + 0.02
+
+
+@pytest.mark.parametrize("profile", ["sine", "square"])
+def test_pure_pursuit_follows_zigzag_kinematic(profile):
+    """지그재그 (전진·후진 번갈아) 를 유니사이클 운동학으로 따라가면 헤딩 오차 < 2°, 위치 오차 < 10 cm (수정 전 75°, 38 cm)."""
+    from amr_mpc.core.zigzag import Zigzag
+    z = Zigzag(accel=1.7, profile=profile)
+    cfg, x, dt, ey, ep = PurePursuitConfig(), np.zeros(3), 0.01, 0.0, 0.0
+    for k in range(int((z.T_total + 1.0) / dt)):
+        v, w, _ = pure_pursuit(cfg, z.at, k * dt, x)
+        Xr = z.at(k * dt)[0]
+        ey, ep = max(ey, abs(wrap(Xr[2] - x[2]))), max(ep, float(np.hypot(*(Xr[:2] - x[:2]))))
+        x = x + dt * np.array([v * math.cos(x[2]), v * math.sin(x[2]), w])
+    assert math.degrees(ey) < 2.0 and ep < 0.10
 
 
 def test_figure8_crossing_follows_time_not_nearest_branch():
