@@ -83,9 +83,15 @@ track:
 
   # ── 지그재그 (2026-11-24, core/zigzag.py). shape:=zigzag. 출발 포즈에서 길이 zigzag_length 직선 zigzag_n 개,
   #   이웃 직선 사이각 zigzag_angle_deg (진행 방향은 꼭짓점마다 180° − 각 꺾이고, 꺾는 쪽이 번갈아). + 왼쪽 / − 오른쪽으로 나아간다.
-  #   헤딩 = 직선 방향, 직선마다 전진·후진을 번갈아 (짝수 직선 전진, 홀수 후진) → 꼭짓점에서 몸체는 사이각만큼만 돈다.
   #   직선 양 끝 속도 0. 속도 파형 zigzag_profile: sine = 반 사인 v = V_p sin(πτ/T) (최대 가속 = 양 끝) | square = 사다리꼴
-  #   (자르지 않으면 삼각형). 꼭짓점: 쉼 dwell → 제자리 회전 rot_s → 쉼 dwell. yaw_mode 는 tangent 만 (fixed·spin 거부). laps·align_s 는 안 쓴다.
+  #   (자르지 않으면 삼각형). laps 는 안 쓴다 (직선 개수 = zigzag_n).
+  #   yaw_mode (2026-11-24 (9), 위 공용 yaw_mode·spin_rate·align_s 그대로):
+  #     tangent : 헤딩 = 직선 방향, 직선마다 전진·후진 (짝수 전진, 홀수 후진) → 꼭짓점에서 몸체는 사이각만 돈다 (쉼 dwell → 회전 rot_s → 쉼 dwell).
+  #               n 짝수면 끝 헤딩이 출발과 사이각만큼 달라 선 뒤 align_s 동안 출발 헤딩으로 제자리 회전.
+  #     fixed   : 헤딩 고정, 옆걸음 (꼭짓점은 쉼 2·dwell 만). 퓨어 퍼슛은 v_y = 0 이라 못 간다.
+  #     spin    : Figure8 spin 과 같은 식 — 헤딩 = κ_s·호길이, 정수 바퀴 (spin_rate ≈ 직선 최고 속력에서의 ω), 끝에서 출발 헤딩. 퓨어 퍼슛은 못 간다.
+  #     fixed·spin 의 accel max 는 경로 전체 앞먹임 ≤ max_ff_ratio 로 찾는다 (옆걸음·요 가속이 직선 식보다 바퀴 토크를 키움).
+  #   path_follow_lead 도 쓸 수 있다 — 사영 창이 다음 직선 끝을 넘지 않는다.
   #   가속도·속도는 공용 launch 인자 (2026-11-24 (8), 전용 zigzag_accel·zigzag_v_max 는 지움):
   #     accel:= 최대 가속도 [m/s²] | max = C 마찰 상한 안 직선 가속 한계 (fig8_limits.line_accel_max, max_ff_ratio 적용)
   #     speed:= 직선 최고 속도 상한 [m/s] | max = 부하 예산 load_budget·V_LIMIT 에서만 자름 (정사각형의 square_v_max 와 같은 뜻)

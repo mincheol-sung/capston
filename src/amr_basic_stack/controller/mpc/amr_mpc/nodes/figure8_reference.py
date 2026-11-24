@@ -172,7 +172,8 @@ class Figure8ReferenceNode(Node):
                 self.path = Zigzag(n=g("zigzag_n"), length=g("zigzag_length"), angle_deg=g("zigzag_angle_deg"), accel=g("accel"),
                                    v_max=vmax if vmax > 0.0 else budget * V_LIMIT,
                                    profile=str(g("zigzag_profile")).strip().lower(), rot_s=g("zigzag_rot_s"),
-                                   dwell_s=g("zigzag_dwell_s"), yaw_mode=str(g("yaw_mode")))
+                                   dwell_s=g("zigzag_dwell_s"), yaw_mode=str(g("yaw_mode")),
+                                   spin_rate=float(g("spin_rate")), align_s=float(g("align_s")))
             elif self.shape not in ("figure8", "circles8"):
                 raise ValueError(f"shape={self.shape!r} — figure8 | circles8 | line | rotate | square | zigzag")
             else:
@@ -221,8 +222,10 @@ class Figure8ReferenceNode(Node):
         self.pf = self.pf_lead >= 0.0
         T_al, T_pa = getattr(self.path, "T_align", None), getattr(self.path, "T_path", None)
         self.drive = (float(T_al), float(T_al + T_pa)) if T_al is not None and T_pa is not None else None
-        if self.pf and (self.drive is None or self.shape not in ("figure8", "circles8", "square")):
-            raise SystemExit(f"[figure8] path_follow_lead_s 는 shape figure8 | circles8 | square 만 (받은 {self.shape})")
+        if getattr(self.path, "drive_window", None) is not None:   # Zigzag: 정렬 회전이 끝에만 있어 주행 구간 = (0, T_path) (2026-11-24 (9))
+            self.drive = tuple(float(x) for x in self.path.drive_window)
+        if self.pf and (self.drive is None or self.shape not in ("figure8", "circles8", "square", "zigzag")):
+            raise SystemExit(f"[figure8] path_follow_lead_s 는 shape figure8 | circles8 | square | zigzag 만 (받은 {self.shape})")
         self.t_clock = 0.0                            # 묶지 않았을 때의 기준 시각 (+delay 포함, t_run 과 같은 축)
         self.t_proj = None                            # 직전 정사영 시각
         self.pf_flag = 0
@@ -253,14 +256,18 @@ class Figure8ReferenceNode(Node):
 
         p = self.path
         if self.shape == "zigzag":
-            legs = "  ".join(f"[{k}] {'전진' if d > 0 else '후진'} {h:+.0f}° 최고 {vp:.2f} m/s {T:.2f} s"
+            legs = "  ".join(f"[{k}] {('전진' if d > 0 else '후진') + ' ' if p.tangent else ''}{h:+.0f}° 최고 {vp:.2f} m/s {T:.2f} s"
                              for k, d, h, vp, _, T in p.leg_summary()[:4])
+            yaw_txt = {"tangent": "헤딩 = 직선 방향, 전진·후진 번갈아" + (f", 끝 정렬 {p.T_align:.1f} s" if p.T_align > 0.0 else ""),
+                       "fixed": "헤딩 고정 (옆걸음)",
+                       "spin": f"헤딩 {p.spin_turns} 바퀴 회전 (κ_s {p.kappa_spin:.2f} rad/m, 최고 ω {p.kappa_spin * p.V:.2f} rad/s)"}[p.yaw_mode]
             self.get_logger().info(
                 f"지그재그 직선 {p.length:.2f} m × {p.n} 개, 사이각 {abs(p.angle_deg):.1f}° ({'왼쪽' if p.angle_deg > 0 else '오른쪽'}으로), "
                 f"속도 파형 {p.profile}, 최대 가속 {max(g.a_peak for g in p.legs):.2f} m/s² (accel {p.A:.2f}), "
-                f"꼭짓점 쉼 {p.dwell:.2f} s + 회전 {p.rot:.2f} s + 쉼 {p.dwell:.2f} s\n"
+                f"yaw {p.yaw_mode} ({yaw_txt}), 꼭짓점 쉼 {p.dwell:.2f} s + 회전 {p.rot:.2f} s + 쉼 {p.dwell:.2f} s\n"
                 f"  직선별: {legs}{' …' if p.n > 4 else ''}\n"
-                f"  시간  대기 {self.delay:.1f} s + 주행 {p.T_path:.1f} s{'' if self.hold < 0 else f' + 유지 {self.hold:.1f} s'}   "
+                f"  시간  대기 {self.delay:.1f} s + 주행 {p.T_path:.1f} s{f' + 정렬 {p.T_align:.1f} s' if p.T_align > 0.0 else ''}"
+                f"{'' if self.hold < 0 else f' + 유지 {self.hold:.1f} s'}   "
                 f"부하 {run/V_LIMIT*100:.0f} % (예산 {budget*100:.0f} %, V_LIMIT {V_LIMIT:.2f} m/s)")
             return
         if self.shape == "square":
@@ -465,6 +472,12 @@ class Figure8ReferenceNode(Node):
         if t < a or t > b:
             return t
         anchor = a if self.t_proj is None else self.t_proj
+        if hasattr(self.path, "segment_window"):      # Zigzag: 직선 위에서만 묶고 사영 창을 그 직선에 가둔다, 꼭짓점은 시계대로 (core/zigzag.py, 2026-11-24 (9))
+            win = self.path.segment_window(t)
+            if win is None:
+                return t
+            a, b = max(a, win[0]), min(b, win[1])
+            anchor = min(max(anchor, a), b)
         self.t_proj = path_follow.project(lambda x: self.ref_at(x)[0], self.pose, anchor, a, b)
         speed = lambda x: float(np.hypot(*self.ref_at(x)[1][:2]))
         dec = path_follow.decel_ahead(speed, self.t_proj, self.pf_lead)

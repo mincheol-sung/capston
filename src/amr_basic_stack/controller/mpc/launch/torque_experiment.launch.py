@@ -184,9 +184,7 @@ def _track(context, share):
             raise RuntimeError(f"{k}:={out[k]!r} — 허용값은 {' | '.join(allowed)} (torque_track.yaml 또는 launch 인자)")
     if out["shape"] == "square" and out["yaw_mode"] == "spin":        # 2026-11-20: 노드 기동 오류는 bag 에 안 남는다 (위 주석)
         raise RuntimeError("shape:=square 는 yaw_mode:=tangent | fixed (spin 은 figure8·circles8 만)")
-    if out["shape"] == "zigzag":
-        if out["yaw_mode"] != "tangent":
-            raise RuntimeError("shape:=zigzag 는 yaw_mode:=tangent 만 (헤딩 = 직선 방향, 직선마다 전진·후진)")
+    if out["shape"] == "zigzag":                     # yaw_mode tangent | fixed | spin 모두 (2026-11-24 (9), core/zigzag.py 머리말)
         # 2026-11-24 (8): accel = 최대 가속도, speed = 직선 최고 속도 상한. launch 인자를 비우면 yaml 공용 값 (speed 0.5·accel 0.4) 대신 max
         for k in ("speed", "accel"):
             if not LaunchConfiguration(k).perform(context).strip():
@@ -263,7 +261,9 @@ def _resolve_max(out, context, share):
         out["speed"] = 0.0 if out["speed"] == "max" else out["speed"]   # figure8_reference: 지그재그 speed ≤ 0 = load_budget·V_LIMIT 에서 자름
         out["accel"] = float(a)
         out["_max_msg"] = (f"{what} (zigzag {out['zigzag_profile']}) → accel {a:.2f} m/s², 직선 최고 {v:.2f} m/s "
-                           f"({cap_txt})  직선 앞먹임 {info['line_ff']:.3f} ≤ {ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, "
+                           f"({cap_txt}, yaw {out['yaw_mode']})  "
+                           + (f"직선 앞먹임 {info['line_ff']:.3f} ≤ {ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, " if out["yaw_mode"] == "tangent"
+                              else f"경로 전체 앞먹임 {info['ff']:.3f} ≤ {ratio}, ") +
                            f"부하 {info['load'] * 100:.0f} % of 예산 {budget:.2f}, 기준 {info['T']:.1f} s")
         return
     if out["shape"] == "square":

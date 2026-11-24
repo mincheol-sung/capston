@@ -159,15 +159,30 @@ def zigzag_make(track, accel, v_max):
     from amr_mpc.core.zigzag import Zigzag
     return Zigzag(n=float(track["zigzag_n"]), length=float(track["zigzag_length"]), angle_deg=float(track["zigzag_angle_deg"]),
                   accel=accel, v_max=v_max, profile=str(track["zigzag_profile"]), rot_s=float(track["zigzag_rot_s"]),
-                  dwell_s=float(track["zigzag_dwell_s"]), yaw_mode=str(track["yaw_mode"]))
+                  dwell_s=float(track["zigzag_dwell_s"]), yaw_mode=str(track["yaw_mode"]),
+                  spin_rate=float(track.get("spin_rate", 1.0)), align_s=float(track.get("align_s", 0.0)))
 
 
 def zigzag_max(c, load_cap, track, accel=None, v_max=0.0, max_ff_ratio=1.0, k_geom=None):
     """지그재그 (2026-11-24): (직선 최고 속도, accel, 정보). accel None 이면 직선 가속 한계 line_accel_max.
-    v_max (launch speed) ≤ 0 이면 load_cap 에서 자른다 (figure8_reference 와 같은 뜻). 꼭짓점 제자리 회전 앞먹임은 info['ff'] 에 같이 (전체 최대)."""
+    v_max (launch speed) ≤ 0 이면 load_cap 에서 자른다 (figure8_reference 와 같은 뜻). 꼭짓점 제자리 회전 앞먹임은 info['ff'] 에 같이 (전체 최대).
+    yaw_mode fixed·spin (2026-11-24 (9)) 은 몸체 가속이 x 축만이 아니라 (옆걸음 |cos β|+|sin β| 배, spin 은 요 가속 κ_s·a 가 더해짐)
+    직선 식이 바퀴 토크를 낮춰 본다 → accel None 이면 경로 전체 앞먹임 ff_ratio ≤ max_ff_ratio·부하 예산 안의 최대를 0.05 격자로 찾는다."""
+    vm = v_max if v_max > 0.0 else load_cap
+    if accel is None and str(track["yaw_mode"]) != "tangent":
+        k = k_geom if k_geom is not None else c["k"]
+
+        def ok(n):
+            zz = zigzag_make(track, n * A_STEP, vm)
+            run, spin = zz.peak_load(k)
+            return run <= load_cap and spin <= load_cap and ff_ratio(zz, c) <= max_ff_ratio
+        n = _largest(ok, 1, int(round(3.0 / A_STEP)))
+        if n is None:
+            raise ValueError(f"zigzag {track['yaw_mode']}: accel {A_STEP} 도 상한 안에 못 든다 (부하 예산·C 앞먹임)")
+        accel = n * A_STEP
     if accel is None:
         accel = line_accel_max(c, max_ff_ratio)
-    z = zigzag_make(track, accel, v_max if v_max > 0.0 else load_cap)
+    z = zigzag_make(track, accel, vm)
     run, _ = z.peak_load(k_geom if k_geom is not None else c["k"])
     line_ff = c["me"] * max(g.a_peak for g in z.legs) * c["r"] / 4.0 / float(np.min(c["tau_bar"]))
     return z.V, accel, dict(ff=ff_ratio(z, c), line_ff=line_ff, load=run / load_cap, T=z.T_total, tau_bar=c["tau_bar"])
@@ -228,7 +243,9 @@ if __name__ == "__main__":
     if track["shape"] == "zigzag":
         vp, acc, info = zigzag_max(c, cap, track, accel=a.accel, v_max=a.speed or 0.0, max_ff_ratio=a.max_ff_ratio, k_geom=k_geom)
         print(f"zigzag {track['zigzag_n']} × {track['zigzag_length']} m, 사이각 {track['zigzag_angle_deg']}°, {track['zigzag_profile']}: "
-              f"accel {acc:.2f} → 직선 최고 {vp:.2f} m/s (상한 {f'speed {a.speed:g}' if a.speed else f'부하 예산 {cap:.2f}'})  (직선 앞먹임 {info['line_ff']:.3f} ≤ {a.max_ff_ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, "
+              f"yaw {track['yaw_mode']}, accel {acc:.2f} → 직선 최고 {vp:.2f} m/s (상한 {f'speed {a.speed:g}' if a.speed else f'부하 예산 {cap:.2f}'})  ("
+              + (f"직선 앞먹임 {info['line_ff']:.3f} ≤ {a.max_ff_ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, " if track["yaw_mode"] == "tangent"
+                 else f"경로 전체 앞먹임 {info['ff']:.3f} ≤ {a.max_ff_ratio}, ") +
               f"부하 {info['load'] * 100:.0f} %, 기준 {info['T']:.1f} s)")
     elif track["shape"] == "square":
         track["square_v_max"] = 0.0

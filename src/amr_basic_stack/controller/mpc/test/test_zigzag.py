@@ -62,7 +62,9 @@ def test_speed_profile_ends_zero_and_peak_accel(profile, v_max):
     assert np.max(np.abs(acc)) <= A + 1e-9
 
 
-@pytest.mark.parametrize("kw", [dict(), dict(profile="square", accel=1.7), dict(angle_deg=-30.0, n=4, v_max=0.5)])
+@pytest.mark.parametrize("kw", [dict(), dict(profile="square", accel=1.7), dict(angle_deg=-30.0, n=4, v_max=0.5),
+                                dict(yaw_mode="fixed"), dict(yaw_mode="spin"), dict(yaw_mode="spin", spin_rate=3.0, profile="square", accel=1.7),
+                                dict(n=4, align_s=1.5)])
 def test_velocity_matches_finite_difference(kw):
     z = Zigzag(**kw)
     o = (0.3, -0.2, 0.7)
@@ -85,8 +87,53 @@ def test_corner_rotation_in_place():
     assert z.T_align == 0.0 and z.T_total == z.T_path
 
 
-@pytest.mark.parametrize("kw", [dict(yaw_mode="fixed"), dict(profile="tri"), dict(n=0), dict(n=2.5), dict(angle_deg=0.0),
+@pytest.mark.parametrize("kw", [dict(yaw_mode="bad"), dict(yaw_mode="spin", spin_rate=0.0), dict(profile="tri"), dict(n=0), dict(n=2.5), dict(angle_deg=0.0),
                                 dict(angle_deg=180.0), dict(length=0.0), dict(accel=0.0), dict(rot_s=0.0)])
 def test_rejects_bad_params(kw):
     with pytest.raises(ValueError):
         Zigzag(**kw)
+
+
+def test_fixed_heading_and_body_velocity():
+    """2026-11-24 (9) fixed: 헤딩 0 고정, 몸체 속도 = 진행 방향 그대로 (홀수 직선은 170° 방향 → v_x < 0, v_y > 0), 꼭짓점 회전 없음 (쉼 2·dwell)."""
+    z = Zigzag(yaw_mode="fixed", dwell_s=0.1)
+    assert z.T_corner == pytest.approx(0.2) and z.rot == 0.0
+    for k, g in enumerate(z.legs):
+        X, u = z.at(z.t_start[k] + 0.5 * g.T)
+        assert X[2] == 0.0 and u[2] == 0.0
+        assert np.allclose(u[:2] / np.hypot(*u[:2]), z.dirs[k])
+    X, u = z.at(z.t_start[1] + 0.5 * z.legs[1].T)
+    assert u[0] < 0.0 and u[1] > 0.0
+
+
+def test_spin_integer_turns_and_rate():
+    """spin: 헤딩 = κ_s·호길이, n_s = round(spin_rate·L/V/2π) ≥ 1, ω = κ_s·v, 끝 헤딩 = 출발."""
+    z = Zigzag(yaw_mode="spin", spin_rate=3.0, accel=1.7, profile="square")
+    assert z.spin_turns == round(3.0 * 5.0 / z.V / (2 * math.pi)) == 2
+    assert z.kappa_spin == pytest.approx(2 * math.pi * 2 / 5.0)
+    k, g = 2, z.legs[2]
+    t = z.t_start[k] + 0.3 * g.T
+    X, u = z.at(t)
+    d, v, _ = g.at(0.3 * g.T)
+    assert u[2] == pytest.approx(z.kappa_spin * v) and X[2] == pytest.approx(wrap(z.kappa_spin * (k * z.length + d)))
+    assert abs(wrap(z.at(z.T_total + 1.0)[0][2])) < 1e-9
+    assert z.at(z.t_stop[0] + 0.05)[1][2] == 0.0                         # 꼭짓점 (v = 0) 에서 ω = 0
+
+
+def test_tangent_end_alignment():
+    """tangent, n 짝수: 끝 헤딩 −α → align_s 동안 출발 헤딩으로. n 홀수·align_s 0 이면 정렬 없음. 주행 구간 = (0, T_path)."""
+    z = Zigzag(n=4, align_s=1.5)
+    assert z.T_align == 1.5 and z.T_total == pytest.approx(z.T_path + 1.5) and z.drive_window == (0.0, z.T_path)
+    assert z.at(z.T_path)[0][2] == pytest.approx(-math.radians(10.0))
+    assert abs(z.at(z.T_total)[0][2]) < 1e-12 and z.at(z.T_path + 0.75)[1][2] > 0.0
+    assert Zigzag(n=5, align_s=1.5).T_align == 0.0 and Zigzag(n=4, align_s=0.0).T_align == 0.0
+
+
+def test_segment_window():
+    """path following: 직선 j 위면 (t_start[j], t_stop[j]), 꼭짓점 (쉼·회전)·주행 밖이면 None (시계대로)."""
+    z = Zigzag()
+    assert z.segment_window(0.0) == pytest.approx((0.0, z.t_stop[0]))
+    assert z.segment_window(z.t_stop[0] - 0.01) == pytest.approx((0.0, z.t_stop[0]))
+    assert z.segment_window(z.t_stop[0] + 0.05) is None
+    assert z.segment_window(z.t_start[1] + 0.5) == pytest.approx((z.t_start[1], z.t_stop[1]))
+    assert z.segment_window(z.T_path + 1.0) is None

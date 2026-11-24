@@ -5,6 +5,7 @@ plant:=real 은 이 PC 에서 한 번도 돌아본 적 없는 경로라, 인자 
 """
 import importlib.util
 import math
+import re
 import os
 
 import pytest
@@ -627,7 +628,7 @@ def test_zigzag_accel_max_matches_square_edge(launch_mod):
 
 
 @pytest.mark.parametrize("args, match", [
-    ({"yaw_mode": "fixed"}, "zigzag"), ({"yaw_mode": "spin"}, "zigzag"), ({"zigzag_profile": "triangle"}, "zigzag_profile"),
+    ({"zigzag_profile": "triangle"}, "zigzag_profile"),
     ({"zigzag_n": "2.5"}, "zigzag_n"), ({"zigzag_n": "0"}, "zigzag_n"),
 ])
 def test_zigzag_rejected_before_nodes(launch_mod, args, match):
@@ -654,6 +655,21 @@ def test_zigzag_speed_accel(launch_mod, args, accel, speed, msg):
         assert not logs
     else:
         assert len(logs) == 1 and logs[0].startswith(msg)
+
+
+@pytest.mark.parametrize("yaw", ["tangent", "fixed", "spin"])
+def test_zigzag_yaw_modes_reach_figure8(launch_mod, yaw):
+    """2026-11-24 (9): 지그재그도 yaw_mode tangent | fixed | spin, spin_rate·align_s 가 노드로. fixed·spin 의 accel max 는 경로 전체 앞먹임으로."""
+    import yaml
+    from amr_mpc.core import fig8_limits
+    text = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v))
+    _, _, out = build(launch_mod, shape="zigzag", yaw_mode=yaw, spin_rate="2.0", align_s="1.0")
+    p = _node_params(out, "figure8_reference_node")
+    assert text(p["yaw_mode"]) == yaw and p["spin_rate"] == 2.0 and p["align_s"] == 1.0
+    logs = ["".join(getattr(x, "text", str(x)) for x in o.msg) for o in out if type(o).__name__ == "LogInfo" and "zigzag" in "".join(getattr(x, "text", str(x)) for x in o.msg)]
+    assert len(logs) == 1 and f"yaw {yaw}" in logs[0] and (("직선 앞먹임" in logs[0]) == (yaw == "tangent"))
+    m = re.search(r"앞먹임 ([0-9.]+) ≤", logs[0])
+    assert m and float(m.group(1)) <= 1.0 + 1e-9
 
 
 def test_zigzag_speed_cap_reaches_peak():

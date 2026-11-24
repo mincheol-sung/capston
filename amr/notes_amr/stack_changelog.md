@@ -61,6 +61,32 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-24 (9) — 지그재그에도 다른 경로의 기능: `yaw_mode` tangent | fixed | spin, 끝 정렬 `align_s`, `path_follow_lead`
+- 왜: 사용자 요청 ("원래 다른 경로에서 쓰던 기능들 지그재그에서도 동일하게").
+- 바꾼 것:
+  - `mpc/amr_mpc/core/zigzag.py` — `yaw_mode`: tangent (지금까지, 헤딩 = 직선 방향, 전진·후진 번갈아) | fixed (헤딩 고정, 옆걸음, 꼭짓점은 쉼 2·dwell)
+    | spin (Figure8 spin 과 같은 식: 헤딩 = κ_s·호길이, κ_s = 2π·n_s/L, n_s = round(spin_rate·L/V/2π) ≥ 1, ω = κ_s·v, 끝에서 출발 헤딩).
+    tangent 에서 n 짝수면 끝 헤딩이 사이각만큼 달라 `align_s` 동안 출발 헤딩으로 제자리 회전 (Square 와 같은 스무스스텝). `drive_window` = (0, T_path),
+    `segment_window(t)` (path following 용, 아래).
+  - `mpc/amr_mpc/core/fig8_limits.py` — fixed·spin 의 `accel:=max` 는 경로 전체 앞먹임 `ff_ratio ≤ max_ff_ratio`·부하 예산 안 최대를 0.05 격자로 찾는다
+    (직선 식 `line_accel_max` 는 몸체 x 가속만 가정 — 옆걸음은 바퀴마다 |cos β ∓ sin β| 배, spin 은 요 가속 κ_s·a 가 더해진다). tangent 는 그대로.
+    기동 로그·CLI 의 "직선 앞먹임" 은 tangent 에서만 (fixed·spin 은 "경로 전체 앞먹임").
+  - `mpc/amr_mpc/nodes/figure8_reference.py` — Zigzag 에 spin_rate·align_s, 기동 로그에 yaw 설명, `path_follow_lead` 를 zigzag 에도 허용,
+    주행 구간은 `drive_window`, path following 은 **직선 위에서만** 묶고 사영 창을 그 직선 [t_start, t_stop] 에 가둔다 (꼭짓점 쉼·회전은 시계대로).
+    이웃 직선이 10° 옆에 겹쳐 같은 자리가 두 직선 위에 있어서, 기존 창 (직전 t_proj −0.2 ~ +1.0 s) 그대로면 시뮬에서 두 가지로 실패했다:
+    ① 꼭짓점 뒤 후진하는 로봇이 지난 직선에 사영돼 t_proj 가 1.53 → 0.31 s 로 거꾸로 내려가고, 상한 `t_ref ≤ t_proj + lead` 가 기준을 지난 직선 0.53 s 로 되돌림 — 90 s 동안 되풀이.
+    ② (창을 정지점 사이로만 가뒀을 때) 꼭짓점에서 조금 덜 간 로봇이 다음 직선 중간에 사영돼 하한 `t_ref ≥ t_proj` 가 쉼·회전·직선 앞부분을 건너뜀 (주행 10.47 → 6.40 s, C RMS 175 mm).
+  - `mpc/launch/torque_experiment.launch.py` — 지그재그 yaw_mode 거부 지움, max 로그에 yaw. `mpc/config/torque_track.yaml` — 주석.
+  - `mpc/test/test_zigzag.py` (fixed·spin·정렬·segment_window·유한차분 4 모드), `test_launch_modes.py` (yaw 세 모드).
+- 확인: pytest 576 통과. `fig8_limits --shape zigzag` (5 × 1 m, 10°, accel max): tangent sine 1.70 / square 1.70, fixed sine 1.75 (경로 전체 앞먹임 0.980) / square 1.70,
+  spin sine 1.15 / square 0.85 (요 가속이 바퀴 토크를 키움).
+  ROS 시뮬 (fault 0): C fixed RMS 15.3 mm · 요 0.26° (accel 1.75), C spin 12.9 mm · 0.25° (accel 1.15), C tangent n 4 + 끝 정렬 13.2 mm.
+  path following (square 파형, lead 0.3): C 21.6 mm · 주행 10.26 s (끄면 15.4 mm · 10.46 s), A 18.2 mm · 9.36 s (끄면 19.3 mm · 10.46 s) — 이 경로에서는 이득이 크지 않다.
+- 안 넣은 것 (지그재그에 해당 없음): `laps` (직선 개수 = `zigzag_n`, 닫힌 경로가 아니라 바퀴 개념 없음), `lap_speeds`·`speed_mod_*` (순항 속도를 바꾸는 기능 — 직선마다 0 에서 0 이라 순항이 없다),
+  `crossing_blend_m` (circles8 교차점용), `square_corner_mode:=pass` (전진·후진 전환에서 속도 계단 2·v_c·cos(α/2) — 앞선 계산). PP 는 fixed·spin 을 못 간다 (v_y = 0, 다른 경로와 같다).
+- 알게 된 것 (안 고침): Square 는 정렬 회전 (tangent) 이 **끝에만** 있는데 노드의 path following 주행 구간이 (T_align, T_align + T_path) 라 1.5 s 밀려 있다
+  (Figure8 은 앞뒤 정렬이라 맞다). square + `path_follow_lead` 를 쓸 때만 해당.
+
 ### 2026-11-24 (8) — 지그재그 전용 `zigzag_accel`·`zigzag_v_max` 지움 → 공용 `accel`·`speed`
 - 왜: 사용자 요청 ("기존 accel, speed 인자로 설정할 수 있는 거면 삭제"). (7) 에서 두 인자가 같은 뜻의 별명이 됐다.
 - 바꾼 것: 지그재그에서 `accel:=` = 최대 가속도 (숫자 | max), `speed:=` = 직선 최고 속도 상한 (숫자 | max = 부하 예산에서만, `square_v_max` 와 같은 뜻).
