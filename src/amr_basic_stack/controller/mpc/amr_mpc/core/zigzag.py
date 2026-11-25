@@ -31,6 +31,22 @@ shape:=zigzag 로 고른다. 속도 ur 는 몸체 좌표 [vx, vy, ω] — Figure
   선 자리에서 dwell_s 쉼 → rot_s 동안 θ_k → θ_{k+1} 제자리 회전 (스무스스텝 3x² − 2x³, 양 끝 ω = 0) → dwell_s 쉼 → 다음 직선.
   dwell 은 torque_mpc 의 기준 가속도 차분 창 (acc_dt 0.2 s) 이 감속 끝과 회전 시작을 한 창에 섞지 않게 하는 틈.
   (tangent 만. fixed·spin 은 쉼 2·dwell 뿐.) 끝 정렬 회전은 위 "헤딩" 의 align_s.
+
+꼭짓점 corner_mode pass (2026-11-25, 사용자: PP·MPC 를 같은 경로·속도·가속도 부하에서 비교 — 서지 않고 이어 달리기)
+  turn_m > 0 (기본): 꼭짓점 앞뒤 turn_m [m] 를 cubic spiral (Kanayama & Hartman 1989, heading 이 호길이의 3차식) 로 깎아 이어 달린다.
+    turn 의 heading  θ(s) = θ_k + φ_k·S(s/L_t),  S = 스무스스텝 3x² − 2x³,  φ_k = θ_{k+1} − θ_k (늘 전진이면 ±(π − α), 번갈아)
+    곡률 κ(s) = φ_k·6x(1 − x)/L_t → turn 양 끝 κ = 0 이라 직선과 곡률이 이어진다 (ω 계단 없음), 최대 1.5·|φ|/L_t (가운데).
+    L_t 는 turn 이 꼭짓점에서 양쪽 직선 위 turn_m 지점에서 시작·끝나게:  turn_m = L_t·d₁(φ),  d₁ = X₁ − Y₁/tan|φ|
+    ((X₁, Y₁) = 길이 1 turn 의 끝점, 수치 적분). 대칭이라 끝점도 다음 직선 위 turn_m. 0 < turn_m ≤ L/2. 꼭짓점 자체는 지나지 않는다.
+    turn 위는 corner_speed v_c 등속 (몸체 [v_c, 0, v_c·κ(s)]) → 퓨어 퍼슛 (v_y = 0, ω = vκ) 도 원리상 정확히 낼 수 있다.
+    turn 앞뒤 직선에 dwell_s 동안 v_c 등속 (거리 v_c·dwell_s, 직선이 짧으면 줄임) — stop 의 쉼과 같은 이유:
+    torque_mpc 기준 가속도 차분 창 (acc_dt 0.2 s) 에 직선 감속 끝과 turn 의 횡가속이 한꺼번에 들어가지 않게.
+    tangent·늘 전진만 (reverse 는 False 로 — 전진·후진이 바뀌는 cusp 는 v = 0 을 지나야 한다).
+    path following 창 segment_window: 직선 k = (turn k−1 가운데, turn k 가운데) — 빈틈 없이 이어진다.
+  turn_m = 0: 모양은 꺾인 선 그대로, 꼭짓점을 v_c 로 지난다. 속도 방향·heading 이 꼭짓점에서 계단 — 기준 자체가 낼 수 없는 값
+    (2026-11-25 실차: PP·MPC 둘 다 못 따라감).
+  직선 남은 부분은 v_c →(가속 A)→ 최고 →(감속 A)→ v_c 사다리꼴 (Square._Edge 와 같은 꼴, v_max 에서 자름), 첫 직선은 0 에서 출발,
+  마지막은 0 으로 선다. profile square 만.
 """
 import bisect
 import math
@@ -89,9 +105,85 @@ class _Leg:
         return self.L - 0.5 * A * u * u, A * u, -A
 
 
+class _PassEdge:
+    """pass 의 직선 (남은 부분): v_s 등속 b_s → v_s →(가속 A)→ v_p →(감속 A)→ v_e → v_e 등속 b_e. at(τ) → (이동 거리, 속력, 가속도)."""
+
+    def __init__(self, L, vs, ve, A, v_max, bs=0.0, be=0.0):
+        if bs + be > L:                                                 # 직선이 짧으면 등속 구간을 비례로 줄임
+            k = L / (bs + be)
+            bs, be = bs * k, be * k
+        Lm = L - bs - be
+        vp = math.sqrt(0.5 * (vs * vs + ve * ve + 2.0 * A * Lm))
+        if v_max > 0.0:
+            vp = min(vp, v_max)
+        if vp < max(vs, ve) - 1e-9:
+            raise ValueError(f"zigzag pass: 직선 {L:.3f} m 에서 accel {A:.2f} 로 corner_speed {max(vs, ve):.3f} m/s 를 못 낸다 "
+                             f"(최고 {vp:.3f}) — zigzag_corner_speed 를 낮춰라")
+        vp = max(vp, vs, ve)
+        self.L, self.vs, self.ve, self.vp, self.A, self.a_peak = L, vs, ve, vp, A, A
+        self.bs, self.be = bs, be
+        self.ts = bs / vs if bs > 0.0 else 0.0
+        self.te = be / ve if be > 0.0 else 0.0
+        self.d1 = (vp * vp - vs * vs) / (2.0 * A)
+        self.d3 = (vp * vp - ve * ve) / (2.0 * A)
+        self.d2 = max(0.0, Lm - self.d1 - self.d3)
+        self.t1, self.t3 = (vp - vs) / A, (vp - ve) / A
+        self.t2 = self.d2 / vp if vp > 0.0 else 0.0
+        self.T = self.ts + self.t1 + self.t2 + self.t3 + self.te
+
+    def at(self, tau):
+        A, vs, ve, vp = self.A, self.vs, self.ve, self.vp
+        if tau <= 0.0:
+            return 0.0, vs, 0.0
+        if tau >= self.T:
+            return self.L, ve, 0.0
+        if tau < self.ts:
+            return vs * tau, vs, 0.0
+        u, x0 = tau - self.ts, self.bs
+        if u < self.t1:
+            return x0 + vs * u + 0.5 * A * u * u, vs + A * u, A
+        u -= self.t1; x0 += self.d1
+        if u < self.t2:
+            return x0 + vp * u, vp, 0.0
+        u -= self.t2; x0 += self.d2
+        if u < self.t3:
+            return x0 + vp * u - 0.5 * A * u * u, vp - A * u, -A
+        u -= self.t3; x0 += self.d3
+        return x0 + ve * u, ve, 0.0
+
+
+class _Turn:
+    """길이 1, 들어갈 때 heading 0 인 cubic spiral θ(x) = φ·S(x) (φ > 0, 왼쪽) 의 위치 표와 꼭짓점 거리 d₁.
+    pos(x) 는 Hermite 보간 — 접선 (cos θ, sin θ) 을 그대로 써서 위치 미분이 heading 과 맞는다."""
+
+    N = 4000
+
+    def __init__(self, phi):
+        self.phi = float(phi)
+        x = np.linspace(0.0, 1.0, 8 * self.N + 1)                       # 사다리꼴 적분은 8 배 촘촘히, 표는 N 칸
+        th = self.phi * x * x * (3.0 - 2.0 * x)
+        c, s = np.cos(th), np.sin(th)
+        h = x[1] - x[0]
+        X = np.concatenate([[0.0], np.cumsum(0.5 * h * (c[1:] + c[:-1]))])
+        Y = np.concatenate([[0.0], np.cumsum(0.5 * h * (s[1:] + s[:-1]))])
+        self.P = np.stack([X[::8], Y[::8]], 1)
+        self.Tg = np.stack([c[::8], s[::8]], 1)
+        X1, Y1 = self.P[-1]
+        self.d1 = float(X1 - Y1 / math.tan(self.phi))                   # 시작점에서 들어가는 직선을 따라 꼭짓점까지 (L_t = 1)
+
+    def pos(self, x):
+        x = min(max(x, 0.0), 1.0)
+        i = min(int(x * self.N), self.N - 1)
+        h = 1.0 / self.N
+        u = x * self.N - i
+        h00, h10, h01, h11 = 2 * u**3 - 3 * u**2 + 1, u**3 - 2 * u**2 + u, -2 * u**3 + 3 * u**2, u**3 - u**2
+        return h00 * self.P[i] + h10 * h * self.Tg[i] + h01 * self.P[i + 1] + h11 * h * self.Tg[i + 1]
+
+
 class Zigzag:
     def __init__(self, n=5, length=1.0, angle_deg=10.0, accel=1.0, v_max=0.0, profile="sine",
-                 rot_s=0.5, dwell_s=0.1, yaw_mode="tangent", spin_rate=1.0, align_s=0.0):
+                 rot_s=0.5, dwell_s=0.1, yaw_mode="tangent", spin_rate=1.0, align_s=0.0, reverse=True,
+                 corner_mode="stop", corner_speed=0.3, turn_m=0.5):
         if yaw_mode not in ("tangent", "fixed", "spin"):
             raise ValueError(f"zigzag 의 yaw_mode 는 tangent | fixed | spin — 받은 값 {yaw_mode!r}")
         if yaw_mode == "spin" and not spin_rate > 0.0:
@@ -105,7 +197,24 @@ class Zigzag:
             raise ValueError(f"zigzag: length·accel > 0, v_max ≥ 0 — 받은 값 {length}, {accel}, {v_max}")
         if not 0.0 < abs(angle_deg) < 180.0:
             raise ValueError(f"zigzag_angle_deg 는 0 < |값| < 180 (직선 사이각) — 받은 값 {angle_deg}")
-        if (yaw_mode == "tangent" and rot_s <= 0.0) or dwell_s < 0.0:
+        if corner_mode not in ("stop", "pass"):
+            raise ValueError(f"zigzag_corner 는 stop | pass — 받은 값 {corner_mode!r}")
+        self.corner_mode = corner_mode
+        self.pass_ = corner_mode == "pass"
+        if self.pass_ and profile != "square":
+            raise ValueError(f"zigzag_corner pass 는 zigzag_profile square 만 — 받은 값 {profile!r}")
+        if self.pass_ and not corner_speed > 0.0:
+            raise ValueError(f"zigzag_corner_speed 는 양수 [m/s] — 받은 값 {corner_speed}")
+        self.round_ = self.pass_ and turn_m > 0.0                      # cubic spiral 로 깎음 (머리말 pass)
+        if self.round_:
+            if yaw_mode != "tangent":
+                raise ValueError(f"zigzag_turn_m > 0 (꼭짓점 깎기) 는 yaw_mode tangent 만 — 받은 값 {yaw_mode!r}")
+            if turn_m > 0.5 * length + 1e-12:
+                raise ValueError(f"zigzag_turn_m 은 0 ≤ 값 ≤ zigzag_length/2 ({0.5 * length:g}) — 받은 값 {turn_m}")
+            reverse = False
+        elif self.pass_ and turn_m < 0.0:
+            raise ValueError(f"zigzag_turn_m 은 0 이상 — 받은 값 {turn_m}")
+        if (yaw_mode == "tangent" and rot_s <= 0.0 and not self.pass_) or dwell_s < 0.0:
             raise ValueError(f"zigzag: rot_s > 0 (tangent), dwell_s ≥ 0 — 받은 값 {rot_s}, {dwell_s}")
         self.n, self.length, self.profile = int(n_f), float(length), profile
         self.angle_deg = float(angle_deg)
@@ -113,19 +222,37 @@ class Zigzag:
         sgn = 1.0 if angle_deg > 0.0 else -1.0
         self.yaw_mode = yaw_mode
         self.tangent = yaw_mode == "tangent"
-        self.rot, self.dwell = (float(rot_s) if self.tangent else 0.0), float(dwell_s)
+        self.rot = float(rot_s) if self.tangent and not self.pass_ else 0.0
+        self.dwell = 0.0 if (self.pass_ and not self.round_) else float(dwell_s)   # 깎은 pass: turn 앞뒤 v_c 등속 시간
         self.T_corner = self.rot + 2.0 * self.dwell                      # fixed·spin 은 꼭짓점에서 돌 일이 없어 쉼만
         self.A = float(accel)
-        self.legs = [_Leg(self.length, self.A, float(v_max), profile) for _ in range(self.n)]
-        self.heads = [0.0 if k % 2 == 0 else -sgn * self.alpha for k in range(self.n)]   # 직선 k 의 축 방향 (tangent 헤딩) θ_k
-        self.dirs_sign = [1.0 if k % 2 == 0 else -1.0 for k in range(self.n)]           # tangent 에서 전진 +1 / 후진 −1
+        self.vc = float(corner_speed) if self.pass_ else 0.0
+        if self.pass_:                                                  # 꼭짓점 v_c, 첫 직선 0 에서 출발·마지막 0 으로 선다
+            self.legs = [_PassEdge(self.length, 0.0 if k == 0 else self.vc, 0.0 if k == self.n - 1 else self.vc, self.A, float(v_max))
+                         for k in range(self.n)]
+        else:
+            self.legs = [_Leg(self.length, self.A, float(v_max), profile) for _ in range(self.n)]
+        # tangent 헤딩 θ_k 와 진행 부호 (2026-11-24 (10) reverse):
+        #   reverse True  — θ_k = 0 | −s·α, 홀수 직선 후진 → 꼭짓점 회전 ∓α
+        #   reverse False — θ_k = 0 | s·(π − α) (= 진행 방향), 늘 전진 → 꼭짓점 회전 ±(π − α), 짧은 쪽으로 번갈아 (헤딩이 한쪽으로 쌓이지 않음)
+        #   진행 방향 d_k·(cos θ_k, sin θ_k) 는 둘이 같다 → 꼭짓점·모양 같음
+        self.reverse = bool(reverse)
+        if self.reverse:
+            self.heads = [0.0 if k % 2 == 0 else -sgn * self.alpha for k in range(self.n)]
+            self.dirs_sign = [1.0 if k % 2 == 0 else -1.0 for k in range(self.n)]
+        else:
+            self.heads = [0.0 if k % 2 == 0 else sgn * (math.pi - self.alpha) for k in range(self.n)]
+            self.dirs_sign = [1.0] * self.n
         self.dirs = [d * np.array([math.cos(h), math.sin(h)]) for d, h in zip(self.dirs_sign, self.heads)]   # 진행 방향 (로컬)
         self.corners = [np.zeros(2)]
         for u in self.dirs:
             self.corners.append(self.corners[-1] + self.length * u)
-        self.t_start = list(np.cumsum([0.0] + [g.T + self.T_corner for g in self.legs[:-1]]))
-        self.t_stop = [ts + g.T for ts, g in zip(self.t_start, self.legs)]   # 직선 k 가 끝나 서는 시각
-        self.T_path = float(sum(g.T for g in self.legs)) + (self.n - 1) * self.T_corner
+        if self.round_:
+            self._build_round(float(turn_m), float(v_max))
+        else:
+            self.t_start = list(np.cumsum([0.0] + [g.T + self.T_corner for g in self.legs[:-1]]))
+            self.t_stop = [ts + g.T for ts, g in zip(self.t_start, self.legs)]   # 직선 k 가 끝나 서는 (pass: 꼭짓점을 지나는) 시각
+            self.T_path = float(sum(g.T for g in self.legs)) + (self.n - 1) * self.T_corner
         self.V = max(g.vp for g in self.legs)
         self.L = self.n * self.length
         # spin (Figure8 과 같은 식): 헤딩 = κ_s·S (S = 누적 호길이), κ_s = 2π·n_s/L, n_s = round(spin_rate·L/V / 2π) ≥ 1 → 끝에서 출발 헤딩.
@@ -139,6 +266,51 @@ class Zigzag:
         self.T_align = float(align_s) if (self.tangent and align_s > 0.0 and abs(self.dtheta) > 1e-9) else 0.0
         self.T_total = self.T_path + self.T_align
         self.drive_window = (0.0, self.T_path)                           # path following 구간 (정렬 회전은 끝에)
+
+    def _build_round(self, d, v_max):
+        """pass + turn_m > 0: 직선 남은 부분 (_PassEdge) 과 turn 을 번갈아 이은 시간표. self.legs 를 직선 남은 부분으로 바꾼다."""
+        self.turn_m = d
+        self.turn = _Turn(math.pi - self.alpha)                         # 늘 전진 → |φ| = π − α
+        self.Lt = d / self.turn.d1
+        self.T_corner = self.Lt / self.vc                               # turn 시간 (등속)
+        self.kappa_max = 1.5 * self.turn.phi / self.Lt
+        n, vc, b = self.n, self.vc, self.vc * self.dwell
+        self.legs, self.seg = [], []                                    # seg: (시작 시각, 시간, 종류, k)
+        t = 0.0
+        for k in range(n):
+            o_s, o_e = (d if k > 0 else 0.0), (d if k < n - 1 else 0.0)
+            e = _PassEdge(self.length - o_s - o_e, vc if k > 0 else 0.0, vc if k < n - 1 else 0.0, self.A, v_max,
+                          b if k > 0 else 0.0, b if k < n - 1 else 0.0)
+            e.p0 = self.corners[k] + o_s * self.dirs[k]
+            self.legs.append(e)
+            self.seg.append((t, e.T, "edge", k)); t += e.T
+            if k < n - 1:
+                self.seg.append((t, self.T_corner, "turn", k)); t += self.T_corner
+        self.seg_t = [x[0] for x in self.seg]
+        self.T_path = t
+        mids = [s0 + 0.5 * T for s0, T, kind, _ in self.seg if kind == "turn"]
+        self.t_start, self.t_stop = [0.0] + mids, mids + [self.T_path]   # path following 창
+
+    def _at_round(self, t):
+        """깎은 pass 의 (로컬 위치, 로컬 월드 속도, 로컬 heading, ω)."""
+        i = max(0, bisect.bisect_right(self.seg_t, t) - 1)
+        t0, _, kind, k = self.seg[i]
+        tau = t - t0
+        if kind == "edge":
+            e = self.legs[k]
+            dist, v, _ = e.at(tau)
+            return e.p0 + dist * self.dirs[k], v * self.dirs[k], self.heads[k], 0.0
+        sg = 1.0 if wrap(self.heads[k + 1] - self.heads[k]) > 0.0 else -1.0
+        x = min(max(tau / self.T_corner, 0.0), 1.0)
+        P = self.turn.pos(x)
+        h0 = self.heads[k]
+        c0, s0 = math.cos(h0), math.sin(h0)
+        px, py = self.Lt * P[0], self.Lt * sg * P[1]
+        start = self.corners[k + 1] - self.turn_m * self.dirs[k]
+        S, dS = _smooth(x)
+        yl = h0 + sg * self.turn.phi * S
+        w = sg * self.turn.phi * dS / self.Lt * self.vc
+        return (start + np.array([c0 * px - s0 * py, s0 * px + c0 * py]), self.vc * np.array([math.cos(yl), math.sin(yl)]), yl, w)
 
     def _yaw(self, k, S):
         """직선 k, 누적 호길이 S 에서 (로컬 헤딩, dψ/dS)."""
@@ -167,11 +339,13 @@ class Zigzag:
                 s, ds = _smooth((t - self.T_path) / self.T_align)
                 yl += self.dtheta * s
                 wl = self.dtheta * ds / self.T_align if t < self.T_total else 0.0
+        elif t > 0.0 and self.round_:
+            p, vw, yl, wl = self._at_round(t)
         elif t > 0.0:
             k = bisect.bisect_right(self.t_start, t) - 1
             tau = t - self.t_start[k]
             g = self.legs[k]
-            if tau >= g.T:                                              # 꼭짓점 k+1 에 서 있다
+            if tau >= g.T and not self.pass_:                           # 꼭짓점 k+1 에 서 있다 (pass 는 T_corner 0 이라 안 옴)
                 p = self.corners[k + 1]
                 yl, _ = self._yaw(k, (k + 1) * self.length)
                 if self.tangent:                                        # θ_k → θ_{k+1} 제자리 회전
@@ -204,7 +378,7 @@ class Zigzag:
         return run, spin
 
     def max_curvature(self):
-        return math.inf                                                 # 꼭짓점
+        return self.kappa_max if self.round_ else math.inf             # 꺾인 꼭짓점은 ∞
 
     def leg_summary(self):
         """[(직선 번호, 진행 부호, 직선 시작 헤딩 [deg], 최고 속력, 최대 가속도, 시간)] — 기동 로그용. 진행 부호는 tangent 의 전진 +1 / 후진 −1."""
@@ -212,17 +386,24 @@ class Zigzag:
                 for k, g in enumerate(self.legs)]
 
     def path_xy(self, n=0, origin=(0.0, 0.0, 0.0)):
-        """RViz 표시용 꼭짓점."""
+        """RViz 표시용 꼭짓점 (깎은 pass 는 곡선을 촘촘히)."""
         x0, y0, a0 = origin
         c0, s0 = math.cos(a0), math.sin(a0)
-        return [(x0 + c0 * p[0] - s0 * p[1], y0 + s0 * p[0] + c0 * p[1]) for p in self.corners]
+        pts = self.corners
+        if self.round_:
+            pts = [self._at_round(t)[0] for t in np.linspace(0.0, self.T_path, max(int(n), 40 * self.n + 1))]
+        return [(x0 + c0 * p[0] - s0 * p[1], y0 + s0 * p[0] + c0 * p[1]) for p in pts]
 
 
 if __name__ == "__main__":
     # 검산: 속도를 위치의 유한차분과 비교 (몸체 좌표로), 직선 양 끝 속도 0, 최대 가속도 = A, 사이각, 끝 헤딩
     for kw in (dict(), dict(profile="square"), dict(profile="sine", v_max=0.6), dict(n=4, align_s=1.5),
                dict(angle_deg=-10.0, n=4), dict(accel=1.7, profile="square"), dict(yaw_mode="fixed"), dict(yaw_mode="spin"),
-               dict(yaw_mode="spin", spin_rate=3.0, accel=1.7, profile="square")):
+               dict(yaw_mode="spin", spin_rate=3.0, accel=1.7, profile="square"),
+               dict(corner_mode="pass", n=10, angle_deg=30.0, accel=1.15, corner_speed=0.5, align_s=1.5, reverse=False, profile="square", turn_m=0.0),
+               dict(corner_mode="pass", n=4, angle_deg=-60.0, accel=1.15, corner_speed=0.4, v_max=0.8, profile="square", turn_m=0.0),
+               dict(corner_mode="pass", n=10, angle_deg=30.0, accel=1.15, corner_speed=0.3, align_s=1.5, profile="square", turn_m=0.5),
+               dict(corner_mode="pass", n=4, angle_deg=-60.0, accel=1.15, corner_speed=0.4, v_max=0.8, profile="square", turn_m=0.3)):
         z = Zigzag(**kw)
         o = (0.3, -0.2, 0.7)
         h, err = 1e-5, 0.0
@@ -235,7 +416,10 @@ if __name__ == "__main__":
             c, s = math.cos(X1[2]), math.sin(X1[2])
             body = np.array([c * d[0] + s * d[1], -s * d[0] + c * d[1], d[2]])
             err = max(err, float(np.abs(body - u).max()))
-        ends = max(np.hypot(*z.at(z.t_start[k] + g.T)[1][:2]) + np.hypot(*z.at(z.t_start[k])[1][:2]) for k, g in enumerate(z.legs))
+        if z.pass_:                                                     # pass: 출발·끝만 0, 사이 최저 속력 = corner_speed
+            ends = np.hypot(*z.at(0.0)[1][:2]) + np.hypot(*z.at(z.T_path)[1][:2])
+        else:
+            ends = max(np.hypot(*z.at(z.t_start[k] + g.T)[1][:2]) + np.hypot(*z.at(z.t_start[k])[1][:2]) for k, g in enumerate(z.legs))
         Xe, _ = z.at(z.T_total + 1.0, o)
         g = z.legs[0]
         print(f"{kw}: 직선 {z.n} × {z.length} m, 최고 {g.vp:.3f} m/s, 최대 가속 {g.a_peak:.3f}, 주행 {z.T_path:.2f} s + 정렬 {z.T_align:.2f} s, "

@@ -1,0 +1,82 @@
+[INFO] [launch]: All log files can be found below /home/smoc/.ros/log/2026-11-21-20-13-57-115555-smoc-NUC-384271
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch.user]: controller:=pure_pursuit — MPC 인자 ['limit_mode'] 는 쓰지 않는다 (log_prefix 는 slip_logger 에만 쓴다)
+[INFO] [sim_plant_torque_node-1]: process started with pid [384334]
+[INFO] [state_estimator_node-2]: process started with pid [384335]
+[INFO] [figure8_reference_node-3]: process started with pid [384336]
+[INFO] [pure_pursuit_node-4]: process started with pid [384337]
+[INFO] [wheel_pi_node-5]: process started with pid [384338]
+[INFO] [torque_output_node-6]: process started with pid [384339]
+[INFO] [fault_monitor_node-7]: process started with pid [384340]
+[INFO] [slip_logger_node-8]: process started with pid [384341]
+[INFO] [keyboard_command_gate-9]: process started with pid [384342]
+[slip_logger_node-8] [INFO] [1795259637.591794198] [slip_logger_node]: slip_logger: 바퀴 /wheel_states + 차체 /state_estimator/odom + 참값 /sim/ground_truth → /slip_logger/slip (ω_ε 2.5 rad/s, 잡음 바닥 |λ| 0.1)
+[wheel_pi_node-5] [INFO] [1795259637.593224356] [wheel_pi_node]: 바퀴별 PI (비교군 A). /pure_pursuit/cmd_vel + /wheel_states → /wheel_pi/cmd_raw
+[wheel_pi_node-5]   K_p 0.03 N·m/(rad/s)  K_i 0.15 N·m/rad   상한 τ̄ 1.2000 N·m, Δτ̄ 0.4000 N·m/10 ms (비교군 B 와 같다)   명령 끊김 0.05 s
+[wheel_pi_node-5]   속도 되먹임: 엔코더 ω (표준)
+[fault_monitor_node-7] [INFO] [1795259637.616363421] [fault_monitor_node]: fault_monitor: 무장 중 검사 — 포즈 튐 켬, 추종 오차 > 150 cm, 모터 에러, 센서 끊김 > 0.3 s → /mpc/arm false
+[torque_output_node-6] [INFO] [1795259637.632555145] [torque_output_node]: torque_output: /wheel_pi/cmd_raw → /torque_output/cmd_raw   마찰 보상 coulomb [0.01566 0.01854 0.01395 0.01413] N·m, viscous [0.0009594 0.0010422 0.0010008 0.0010593] N·m·s/rad (실측 × 0.9)   정지 마찰 끔   안전 클램프 ±1.3 N·m
+[wheel_pi_node-5] [WARN] [1795259637.633199566] [wheel_pi_node]: /wheel_states 대기/끊김
+[keyboard_command_gate-9] [WARN] [1795259637.634852252] [torque_command_gate]: Keyboard arming unavailable: cannot open /dev/tty ([Errno 6] No such device or address: '/dev/tty'). Use std_msgs/Bool on /mpc/arm instead.
+[keyboard_command_gate-9] [WARN] [1795259637.635128521] [torque_command_gate]: MPC command gate is DISARMED. Press 'a' to arm; press 's' or SPACE to stop.
+[keyboard_command_gate-9] [INFO] [1795259637.635695398] [torque_command_gate]: Command gate [torques]: /torque_output/cmd_raw -> /wheel_torque_cmd, arm topic=/mpc/arm, forward on receive.
+[figure8_reference_node-3] [INFO] [1795259637.662732145] [figure8_reference_node]: 정사각형 한 변 1.50 m × 4 변 (왼쪽으로), yaw tangent (꼭짓점 헤딩 완화 0.30 m), 꼭짓점 0.10 m/s, 가감속 1.50 m/s²
+[figure8_reference_node-3]   변별 시작→최고→끝: [0] 0.00→1.50→0.10 m/s 1.9 s  [1] 0.10→1.50→0.10 m/s 1.9 s  [2] 0.10→1.50→0.10 m/s 1.9 s  [3] 0.10→1.50→0.00 m/s 1.9 s
+[figure8_reference_node-3]   시간  대기 3.0 s + 주행 7.6 s + 정렬 1.5 s + 유지 5.0 s   부하 주행 97 %  정렬 20 % (예산 100 %, V_LIMIT 1.55 m/s)
+[pure_pursuit_node-4] [INFO] [1795259637.680531068] [pure_pursuit_node]: 퓨어 퍼슛 (비교군 A). /dra_mppi/reference_trajectory + /state_estimator/odom → /pure_pursuit/cmd_vel
+[pure_pursuit_node-4]   룩어헤드 L_d = clamp(0.5 s × |v_ref|, 0.3, 0.3) m   진행 보정 k_along 1 /s   회전 구간 |v_ref| < 0.02 m/s (k_heading 2)
+[sim_plant_torque_node-1] [INFO] [1795259637.728175301] [sim_plant_torque_node]: 시뮬 플랜트: m=4.56 kg  I_z=0.060  바퀴관성 켬 (μ=2.225 kg)  kd=0.02  피크 4.1 N·m  물리 틱 200 Hz  슬립 모델 μ 0.45 (바퀴별 최대 [FL FR RL RR] [4.81 4.82 5.25 5.26] N, 토크로 [0.136 0.136 0.148 0.149] N·m)  구동계 마찰 [FL FR RL RR] coulomb [0.0174 0.0206 0.0155 0.0157] N·m + viscous [0.00107 0.00116 0.00111 0.00118]·ω (ω_s 0.05 rad/s)
+[sim_plant_torque_node-1]   센서 흉내: IMU 200 Hz @ (0.109, 0.017) m, SLAM scan_time 지연 130 ms, 잡음 배율 1
+[state_estimator_node-2] [INFO] [1795259637.741220929] [state_estimator_node]: state_estimator: /imu/base_link + /tracked_pose [stamped] → /state_estimator/odom (100 Hz)
+[state_estimator_node-2]   IMU·포즈 기준점 (0.109, 0.017) m (base_footprint 기준)
+[state_estimator_node-2]   모드 kf (고정 게인 칼만)  K_p 0.711  K_v 4.16 1/s  K_b -1.13 1/s²   K_psi 0.440  K_bg -0.0339 1/s   튐 (> 15 cm·15°) 버림, 연속 5 번이면 따라감
+[state_estimator_node-2]   정지 상태에서 1.0 s 동안 바이어스를 잡는다 — 그동안 로봇을 움직이지 말 것
+[state_estimator_node-2] [INFO] [1795259638.793339625] [state_estimator_node]: 준비 끝. 바이어스: 가속도 (-0.152, +0.129) m/s², 자이로 +0.0003 rad/s — 출력 시작
+[wheel_pi_node-5] [INFO] [1795259647.249913911] [wheel_pi_node]: 게이트 무장
+[keyboard_command_gate-9] [WARN] [1795259647.249930758] [torque_command_gate]: MPC command gate ARMED by ROS arm topic.
+[pure_pursuit_node-4] [INFO] [1795259647.250032589] [pure_pursuit_node]: 게이트 무장 — 추종 가능
+[figure8_reference_node-3] [INFO] [1795259647.250303016] [figure8_reference_node]: 출발: 출발점에서 0.3 cm, 0.0° — 진입 3.0 s 뒤 8자 시작 (교차점 x 0.000  y 0.000  0.0°)
+[pure_pursuit_node-4] [INFO] [1795259647.354415380] [pure_pursuit_node]: 추종 시작. 기준열 80×0.05 s
+[wheel_pi_node-5] [INFO] [1795259647.364446101] [wheel_pi_node]: PI 시작
+[pure_pursuit_node-4] [INFO] [1795259660.058867694] [pure_pursuit_node]: hold 진입: 오차 3.7 mm, -1.73° — 명령 끊음 (DAMPING)
+[wheel_pi_node-5] [INFO] [1795259660.110490420] [wheel_pi_node]: 정지(DAMPING): 속도 명령 끊김 (퓨어 퍼슛 정지)
+[figure8_reference_node-3] [INFO] [1795259665.049016415] [figure8_reference_node]: 8자 완주 + 유지 5.0 s 끝 — 발행 중단. MPC 가 곧 타임아웃으로 정지한다.
+[pure_pursuit_node-4] [WARN] [1795259665.460032067] [pure_pursuit_node]: 기준열 0.51 s 없음
+[pure_pursuit_node-4] [WARN] [1795259667.460296545] [pure_pursuit_node]: 기준열 2.51 s 없음
+[pure_pursuit_node-4] [WARN] [1795259669.470202300] [pure_pursuit_node]: 기준열 4.52 s 없음
+[pure_pursuit_node-4] [WARN] [1795259671.470316209] [pure_pursuit_node]: 기준열 6.52 s 없음
+[pure_pursuit_node-4] [WARN] [1795259673.475832623] [pure_pursuit_node]: 기준열 8.52 s 없음
+[pure_pursuit_node-4] [WARN] [1795259675.481710462] [pure_pursuit_node]: 기준열 10.53 s 없음
+[pure_pursuit_node-4] [WARN] [1795259677.489736472] [pure_pursuit_node]: 기준열 12.54 s 없음
+[pure_pursuit_node-4] [WARN] [1795259679.490541710] [pure_pursuit_node]: 기준열 14.54 s 없음
+[pure_pursuit_node-4] [WARN] [1795259681.500700901] [pure_pursuit_node]: 기준열 16.55 s 없음
+[pure_pursuit_node-4] [WARN] [1795259683.504261451] [pure_pursuit_node]: 기준열 18.55 s 없음
+[pure_pursuit_node-4] [WARN] [1795259685.504841847] [pure_pursuit_node]: 기준열 20.55 s 없음
+[pure_pursuit_node-4] [WARN] [1795259687.508992427] [pure_pursuit_node]: 기준열 22.56 s 없음
+[pure_pursuit_node-4] [WARN] [1795259689.514676309] [pure_pursuit_node]: 기준열 24.56 s 없음
+[pure_pursuit_node-4] [WARN] [1795259691.524630952] [pure_pursuit_node]: 기준열 26.57 s 없음
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [keyboard_command_gate-9]: sending signal 'SIGINT' to process[keyboard_command_gate-9]
+[INFO] [slip_logger_node-8]: sending signal 'SIGINT' to process[slip_logger_node-8]
+[INFO] [fault_monitor_node-7]: sending signal 'SIGINT' to process[fault_monitor_node-7]
+[INFO] [torque_output_node-6]: sending signal 'SIGINT' to process[torque_output_node-6]
+[INFO] [wheel_pi_node-5]: sending signal 'SIGINT' to process[wheel_pi_node-5]
+[INFO] [pure_pursuit_node-4]: sending signal 'SIGINT' to process[pure_pursuit_node-4]
+[INFO] [figure8_reference_node-3]: sending signal 'SIGINT' to process[figure8_reference_node-3]
+[INFO] [state_estimator_node-2]: sending signal 'SIGINT' to process[state_estimator_node-2]
+[INFO] [sim_plant_torque_node-1]: sending signal 'SIGINT' to process[sim_plant_torque_node-1]
+[keyboard_command_gate-9] [WARN] [1795259692.556948410] [torque_command_gate]: MPC command gate DISARMED by node shutdown.
+[slip_logger_node-8] [slip_logger] 5370행, 움직인 구간 796행 (차체 속도 > 0.05 m/s)
+[slip_logger_node-8]   FL: λ 평균 -0.146  RMS 0.412  최대 |λ| 1.020  |λ|>0.1 비율 50.0 %   | 참값 λ RMS 0.391  최대 1.006
+[slip_logger_node-8]   FR: λ 평균 -0.007  RMS 0.196  최대 |λ| 0.979  |λ|>0.1 비율 28.3 %   | 참값 λ RMS 0.108  최대 0.582
+[slip_logger_node-8]   RL: λ 평균 -0.031  RMS 0.300  최대 |λ| 1.129  |λ|>0.1 비율 52.8 %   | 참값 λ RMS 0.196  최대 0.881
+[slip_logger_node-8]   RR: λ 평균 -0.072  RMS 0.286  최대 |λ| 1.484  |λ|>0.1 비율 40.5 %   | 참값 λ RMS 0.233  최대 1.193
+[INFO] [sim_plant_torque_node-1]: process has finished cleanly [pid 384334]
+[INFO] [fault_monitor_node-7]: process has finished cleanly [pid 384340]
+[INFO] [pure_pursuit_node-4]: process has finished cleanly [pid 384337]
+[INFO] [torque_output_node-6]: process has finished cleanly [pid 384339]
+[INFO] [figure8_reference_node-3]: process has finished cleanly [pid 384336]
+[INFO] [wheel_pi_node-5]: process has finished cleanly [pid 384338]
+[INFO] [slip_logger_node-8]: process has finished cleanly [pid 384341]
+[INFO] [keyboard_command_gate-9]: process has finished cleanly [pid 384342]
+[INFO] [state_estimator_node-2]: process has finished cleanly [pid 384335]

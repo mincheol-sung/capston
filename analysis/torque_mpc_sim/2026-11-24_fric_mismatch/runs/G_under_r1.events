@@ -1,0 +1,2 @@
+[state_estimator_node-2] [ERROR] [1795528940.978408950] [state_estimator_node]: SLAM 포즈가 0.50 s 동안 반영되지 않음 (한계 0.5 s) — IMU 적분만으로는 위치가 흘러가므로 출력을 멈춘다
+[figure8_reference_node-3] [INFO] [1795528959.407303332] [figure8_reference_node]: 8자 완주 + 유지 5.0 s 끝 — 발행 중단. MPC 가 곧 타임아웃으로 정지한다.

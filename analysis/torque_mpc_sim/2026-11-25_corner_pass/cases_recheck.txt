@@ -1,0 +1,3 @@
+# 오전에 실패한 판 (2026-11-25_polyline/pass_a10: 슬립 모델 없음, accel 1.0) 을 지금 코드로 다시
+recheck_pass_a10_noslip|shape:=polyline square_corner_mode:=pass accel:=1.0 limit_mode:=friction
+recheck_pass_a10_mu045|shape:=polyline square_corner_mode:=pass accel:=1.0 limit_mode:=friction surface_mu:=0.45 sim_com_height:=0.105

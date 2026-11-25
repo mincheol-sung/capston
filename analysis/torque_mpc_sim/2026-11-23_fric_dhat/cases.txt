@@ -1,0 +1,6 @@
+# 라벨|launch 인자  (공통: circles8 1.6 · laps 2 · speed 0.69 · accel 3.0 계단 변조 · μ 0.55 · 플랜트 h 0.2 · C h 0.2)
+# 2026-11-23 교수님 "구동계 마찰은 d̂ 에 든 외란 — 보상 빼라" 시험. 시뮬 플랜트 마찰 = 실측값 (정지 마찰 없음), 보상은 ×0.9
+Cfc|disturbance:=true
+Cnofc|disturbance:=true friction_comp:=false
+Cnofc_wide|disturbance:=true friction_comp:=false mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0
+Cnofc_nod|disturbance:=false friction_comp:=false

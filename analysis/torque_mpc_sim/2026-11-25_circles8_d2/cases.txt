@@ -1,0 +1,3 @@
+# 2026-11-25 원 두 개 8자, 원 지름 2 m (width 4.0), 새 기본값 + friction 상한, 바닥 μ 0.45 (슬립 모델). fig8_limits 로 고른 최고 speed·accel
+blend06_v089_a05|crossing_blend_m:=0.6 speed:=0.89 accel:=0.5
+noblend_v061_a08|crossing_blend_m:=0.0 speed:=0.61 accel:=0.8

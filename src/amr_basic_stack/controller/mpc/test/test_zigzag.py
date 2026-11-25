@@ -64,7 +64,7 @@ def test_speed_profile_ends_zero_and_peak_accel(profile, v_max):
 
 @pytest.mark.parametrize("kw", [dict(), dict(profile="square", accel=1.7), dict(angle_deg=-30.0, n=4, v_max=0.5),
                                 dict(yaw_mode="fixed"), dict(yaw_mode="spin"), dict(yaw_mode="spin", spin_rate=3.0, profile="square", accel=1.7),
-                                dict(n=4, align_s=1.5)])
+                                dict(n=4, align_s=1.5), dict(reverse=False, rot_s=1.2), dict(reverse=False, rot_s=1.2, n=4, align_s=2.0)])
 def test_velocity_matches_finite_difference(kw):
     z = Zigzag(**kw)
     o = (0.3, -0.2, 0.7)
@@ -137,3 +137,98 @@ def test_segment_window():
     assert z.segment_window(z.t_stop[0] + 0.05) is None
     assert z.segment_window(z.t_start[1] + 0.5) == pytest.approx((z.t_start[1], z.t_stop[1]))
     assert z.segment_window(z.T_path + 1.0) is None
+
+
+def test_forward_only_same_shape_always_forward():
+    """2026-11-24 (10) reverse=False: 꼭짓점·모양은 같고, 직선마다 v_x > 0 (늘 전진), 헤딩 = 진행 방향 (0 | s·(π − α)),
+    꼭짓점 회전 ±(π − α) 가 번갈아 (헤딩이 쌓이지 않음)."""
+    a = math.radians(10.0)
+    z0, z1 = Zigzag(reverse=True), Zigzag(reverse=False, rot_s=1.2)
+    assert all(np.allclose(p, q) for p, q in zip(z0.corners, z1.corners))
+    for k, g in enumerate(z1.legs):
+        X, u = z1.at(z1.t_start[k] + 0.5 * g.T)
+        assert u[0] > 0.0 and u[1] == 0.0 and u[2] == 0.0
+        assert X[2] == pytest.approx(0.0 if k % 2 == 0 else math.pi - a)
+    d = [z1.heads[k + 1] - z1.heads[k] for k in range(z1.n - 1)]
+    assert d == pytest.approx([math.pi - a, -(math.pi - a)] * 2)
+    assert z1.at(z1.t_stop[0] + z1.dwell + 0.5 * z1.rot)[1][2] > 0.0     # 첫 꼭짓점은 반시계 (왼쪽 지그재그)
+
+
+def test_forward_only_end_alignment():
+    """늘 전진, n 짝수: 끝 헤딩 π − α → align_s 동안 출발 헤딩으로 (−(π − α))."""
+    z = Zigzag(n=4, reverse=False, rot_s=1.2, align_s=2.0)
+    assert z.dtheta == pytest.approx(-(math.pi - math.radians(10.0))) and z.T_align == 2.0
+    assert abs(z.at(z.T_total)[0][2]) < 1e-12
+
+
+def test_pass_sharp_no_stop_same_shape():
+    """2026-11-25 corner_mode pass, turn_m 0 (꺾인 채): 꼭짓점·모양은 stop 과 같고, 출발·끝 말고는 서지 않는다 (꼭짓점 속력 = corner_speed),
+    쉼·제자리 회전 없음 (ω = 0), 직선 사이 시간 틈 없음, 늘 전진 (reverse False)."""
+    kw = dict(n=10, angle_deg=30.0, accel=1.15, profile="square", reverse=False)
+    z0, z = Zigzag(rot_s=1.1, **kw), Zigzag(corner_mode="pass", corner_speed=0.5, turn_m=0.0, **kw)
+    assert all(np.allclose(p, q) for p, q in zip(z0.corners, z.corners))
+    assert z.T_corner == 0.0 and z.rot == 0.0 and z.dwell == 0.0
+    assert z.t_start[1:] == pytest.approx(z.t_stop[:-1])
+    ts = np.linspace(1e-3, z.T_path - 1e-3, 5000)
+    sp = np.array([z.at(t)[1] for t in ts])
+    assert sp[:, 0].min() > 0.0 and np.abs(sp[:, 1]).max() < 1e-12 and np.all(sp[:, 2] == 0.0)
+    for k in range(1, z.n):                                             # 꼭짓점 k 를 지나는 속력
+        assert z.at(z.t_start[k])[1][0] == pytest.approx(0.5)
+        assert np.allclose(z.at(z.t_start[k])[0][:2], z.corners[k])
+    assert z.T_path < z0.T_path
+    assert np.hypot(*z.at(0.0)[1][:2]) == 0.0 and np.hypot(*z.at(z.T_path)[1][:2]) == 0.0
+
+
+def test_pass_sharp_velocity_matches_finite_difference_off_corners():
+    z = Zigzag(corner_mode="pass", corner_speed=0.4, n=4, angle_deg=-60.0, accel=1.15, profile="square", v_max=0.8, turn_m=0.0)
+    o = (0.3, -0.2, 0.7)
+    for t in np.linspace(0.01, z.T_path - 0.01, 3000):
+        if min(abs(t - x) for x in z.t_start[1:]) < 1e-4:               # 꼭짓점 계단은 빼고
+            continue
+        assert np.allclose(_fd_body(z, t, o), z.at(t, o)[1], atol=1e-4)
+
+
+@pytest.mark.parametrize("kw", [dict(n=10, angle_deg=30.0, turn_m=0.5, corner_speed=0.3),
+                                dict(n=4, angle_deg=-60.0, turn_m=0.3, corner_speed=0.4, v_max=0.8),
+                                dict(n=3, angle_deg=90.0, turn_m=0.2, corner_speed=0.5, dwell_s=0.0)])
+def test_pass_round_continuous_curvature_and_geometry(kw):
+    """turn_m > 0 (cubic spiral): 위치·속도·heading·ω 가 이어지고 (ω 계단 없음), v_y = 0, 출발·끝 말고 v_x ≥ corner_speed 아래로 안 떨어짐,
+    turn 이 꼭짓점 앞뒤 turn_m 지점에서 시작·끝나고 heading 이 다음 직선 방향, 최대 곡률 1.5·(π − α)/L_t, 속도 vs 위치 유한차분."""
+    z = Zigzag(corner_mode="pass", accel=1.15, profile="square", **kw)
+    assert z.round_ and not z.reverse and z.max_curvature() == pytest.approx(1.5 * (math.pi - z.alpha) / z.Lt)
+    ts = np.linspace(0.0, z.T_path, 20001)
+    XU = [z.at(t) for t in ts]
+    X = np.array([a for a, _ in XU]); U = np.array([b for _, b in XU])
+    assert np.abs(U[:, 1]).max() < 1e-12
+    inner = (ts > z.legs[0].t1 + 0.01) & (ts < z.T_path - z.legs[-1].t3 - 0.01)
+    assert U[inner, 0].min() >= z.vc - 1e-9
+    dt = ts[1] - ts[0]
+    assert np.abs(np.diff(U[:, 2])).max() < 0.05 and np.abs(np.diff(U[:, 0])).max() <= z.A * dt + 1e-9
+    assert np.abs(np.diff(X[:, :2], axis=0)).max() < 2.0 * z.V * dt
+    assert np.abs([wrap(x) for x in np.diff(X[:, 2])]).max() < 0.05
+    for s0, T, kind, k in z.seg:
+        if kind != "turn":
+            continue
+        Xa, _ = z.at(s0 + 1e-9); Xb, _ = z.at(s0 + T - 1e-9)
+        assert np.allclose(Xa[:2], z.corners[k + 1] - z.turn_m * z.dirs[k], atol=1e-6)
+        assert np.allclose(Xb[:2], z.corners[k + 1] + z.turn_m * z.dirs[k + 1], atol=1e-6)
+        assert wrap(Xb[2] - z.heads[k + 1]) == pytest.approx(0.0, abs=1e-6)
+    o = (0.3, -0.2, 0.7)
+    for t in np.linspace(0.003, z.T_path - 0.003, 3000):
+        assert np.allclose(_fd_body(z, t, o), z.at(t, o)[1], atol=1e-5)
+
+
+def test_pass_round_segment_window_covers_drive():
+    z = Zigzag(corner_mode="pass", accel=1.15, profile="square", n=5, angle_deg=30.0, turn_m=0.4, corner_speed=0.3)
+    assert z.t_start[0] == 0.0 and z.t_stop[-1] == pytest.approx(z.T_path) and z.t_start[1:] == pytest.approx(z.t_stop[:-1])
+    for t in np.linspace(0.0, z.T_path, 500):
+        assert z.segment_window(t) is not None
+
+
+@pytest.mark.parametrize("kw", [dict(profile="sine"), dict(profile="square", corner_speed=0.0),
+                                dict(profile="square", corner_speed=3.0, turn_m=0.0), dict(profile="square", corner_mode="glide"),
+                                dict(profile="square", turn_m=0.6), dict(profile="square", turn_m=-0.1),
+                                dict(profile="square", yaw_mode="fixed")])
+def test_pass_rejects(kw):
+    with pytest.raises(ValueError):
+        Zigzag(**{"corner_mode": "pass", **kw})

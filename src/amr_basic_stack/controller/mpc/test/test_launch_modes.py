@@ -516,15 +516,21 @@ def test_mu_hat_wheels_rejected_before_can_setup(launch_mod, monkeypatch, given)
 
 
 def test_mu_hat_ignored_warning_when_wheels_set(launch_mod):
-    """YAML 에 바퀴별 μ̂ 가 있으면 mu_hat:= 는 MPC 상한에 안 쓰인다 — launch 로그로 알리고, off 면 안 알린다."""
+    """바퀴별 μ̂ 가 있으면 mu_hat:= 는 MPC 상한에 안 쓰인다 — launch 로그로 알리고, 없으면 (off) 안 알린다.
+    2026-11-25 사용자 결정: YAML 기본이 바퀴별 값 끔 (−1 × 4) · mu_hat 0.33 · cap_on ground — 바퀴별 값은 인자로 줄 때만 있다."""
     from launch.actions import LogInfo
     import yaml
     with open(os.path.join(HERE, "..", "config", "torque_plant.yaml")) as f:
-        assert yaml.safe_load(f)["surface"]["mu_hat_wheels"]          # 지금 YAML 에 값이 있다
+        surf = yaml.safe_load(f)["surface"]
+    assert surf["mu_hat"] == 0.33 and surf["mu_hat_wheels"] == [-1.0] * 4 and surf["c_s"] == 0.8
+    with open(os.path.join(HERE, "..", "config", "torque_mpc.yaml")) as f:
+        assert yaml.safe_load(f)["torque_limit"]["cap_on"] == "ground"
     def msgs(**a):
         _, _, out = build(launch_mod, **a)
         return ["".join(getattr(s, "text", str(s)) for s in n.msg) for n in out if isinstance(n, LogInfo)]
-    assert any("안 쓰인다" in t and "mu_hat:=0.6" in t for t in msgs(limit_mode="friction", mu_hat="0.6"))
+    old_wheels = "0.598,0.489,0.547,0.703"
+    assert any("안 쓰인다" in t and "mu_hat:=0.6" in t for t in msgs(limit_mode="friction", mu_hat="0.6", mu_hat_wheels=old_wheels))
+    assert not any("mu_hat:=0.6" in t for t in msgs(limit_mode="friction", mu_hat="0.6"))                       # YAML 기본 (끔)
     assert not any("mu_hat:=0.6" in t for t in msgs(limit_mode="friction", mu_hat="0.6", mu_hat_wheels="off"))
 
 
@@ -670,6 +676,40 @@ def test_zigzag_yaw_modes_reach_figure8(launch_mod, yaw):
     assert len(logs) == 1 and f"yaw {yaw}" in logs[0] and (("직선 앞먹임" in logs[0]) == (yaw == "tangent"))
     m = re.search(r"앞먹임 ([0-9.]+) ≤", logs[0])
     assert m and float(m.group(1)) <= 1.0 + 1e-9
+
+
+@pytest.mark.parametrize("args, rot_max", [
+    ({"zigzag_reverse": "false"}, True),                          # 늘 전진: zigzag_rot_s 비우면 max
+    ({"zigzag_reverse": "false", "zigzag_rot_s": "2.0"}, False),  # 주면 그 값
+    ({"zigzag_rot_s": "max"}, True),                              # 전진·후진에서도 max 를 줄 수 있다
+    ({}, False),                                                  # 기본 (전진·후진) 은 yaml 0.5
+])
+def test_zigzag_reverse_and_rot_max(launch_mod, args, rot_max):
+    """2026-11-24 (10): zigzag_reverse 가 노드로 (기본 true), zigzag_rot_s:=max 는 경로 전체 앞먹임 ≤ 1 인 가장 짧은 회전 시간으로."""
+    from amr_mpc.core import fig8_limits
+    from amr_mpc.core.zigzag import Zigzag
+    _, _, out = build(launch_mod, shape="zigzag", **args)
+    p = _node_params(out, "figure8_reference_node")
+    assert p["zigzag_reverse"] is (args.get("zigzag_reverse") != "false")
+    rot = p["zigzag_rot_s"]
+    assert isinstance(rot, float)
+    if not rot_max:
+        assert rot == float(args.get("zigzag_rot_s", 0.5))
+        return
+    logs = ["".join(getattr(x, "text", str(x)) for x in o.msg) for o in out if type(o).__name__ == "LogInfo" and "zigzag" in "".join(getattr(x, "text", str(x)) for x in o.msg)]
+    assert len(logs) == 1 and "zigzag_rot_s:=max" in logs[0] and f"꼭짓점 회전 {rot:.2f} s" in logs[0]
+    c = fig8_limits.plant_constants(os.path.join(HERE, "..", "config"))
+    z = Zigzag(accel=p["accel"], reverse=p["zigzag_reverse"], rot_s=rot)
+    assert fig8_limits.ff_ratio(z, c) <= 1.0 + 1e-9
+    if not p["zigzag_reverse"]:                                   # 한 칸 (0.05 s) 짧으면 상한을 넘는다 (가장 짧은 값)
+        assert fig8_limits.ff_ratio(Zigzag(accel=p["accel"], reverse=False, rot_s=rot - 0.05), c) > 1.0
+
+
+def test_real_all_passes_zigzag_reverse():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "zigzag_reverse" in m._PASS
 
 
 def test_zigzag_speed_cap_reaches_peak():
@@ -875,9 +915,9 @@ def test_real_all_passes_path_follow_and_max_com_height():
 
 # ── 2026-11-23 friction_comp (교수님: 구동계 마찰은 d̂ 가 흡수할 외란 — 보상을 끄고 시험) ──
 @pytest.mark.parametrize("controller", ["mpc", "pp", "adpp", "pure_pursuit"])
-@pytest.mark.parametrize("given, expect", [("", None), ("true", None), ("false", 0.0)])
+@pytest.mark.parametrize("given, expect", [("", 0.0), ("true", None), ("false", 0.0)])
 def test_friction_comp_switch(launch_mod, controller, given, expect):
-    """false 면 torque_output compensation_scale 0 (coulomb·viscous·정지 모두 이 값을 곱한다). 비우거나 true 면 넘기지 않는다 (yaml 0.9)."""
+    """2026-11-24 기본 끔: 비우거나 false 면 torque_output compensation_scale 0 (coulomb·viscous·정지 모두 이 값을 곱한다). true 면 넘기지 않는다 (yaml 0.9)."""
     _, _, out = build(launch_mod, controller=controller, friction_comp=given)
     assert _torque_output_params(out).get("compensation_scale") == expect
 
@@ -910,3 +950,214 @@ def test_slip_eta_args(launch_mod, given, expect):
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     assert {"slip_eta", "slip_eta_lambda_c", "slip_eta_s"} <= set(m._PASS)
+
+
+# ── 2026-11-24 마찰 상한 옮김 (11-23 회의 후속 지시서 T1 7단계 (B), torque_mpc.yaml torque_limit.friction_shift) ──
+@pytest.mark.parametrize("given, expect", [
+    ({}, None),                                                                                  # 비우면 yaml (끔) — 파라미터를 넘기지 않는다
+    ({"mpc_cap_friction_shift": "false"}, False),
+    ({"mpc_cap_friction_shift": "false", "friction_comp": "true"}, False),                       # 끈 채면 보상과 상관없다
+    ({"mpc_cap_friction_shift": "true", "friction_comp": "false", "limit_mode": "friction"}, True),
+    ({"mpc_cap_friction_shift": "true", "friction_comp": "false", "limit_mode": "friction", "mpc_cap_on": "ground"}, True),
+])
+def test_cap_friction_shift_args(launch_mod, given, expect):
+    _, _, out = build(launch_mod, **given)
+    p = _node_params(out, "torque_mpc_node")
+    if expect is None:
+        assert "cap_friction_shift" not in p
+    else:
+        assert p["cap_friction_shift"] is expect
+    if expect:                                                # 켠 판은 torque_output 보상이 0 이어야 한다
+        assert _torque_output_params(out).get("compensation_scale") == 0.0
+
+
+def test_cap_friction_shift_needs_comp_off(launch_mod):
+    """보상을 켠 채 (friction_comp:=true) 상한을 옮기면 구동계 마찰을 두 번 센다 → 기동 거부. 2026-11-24 부터 비움 = 끔이라 그냥 켜진다."""
+    with pytest.raises(RuntimeError, match="friction_comp:=false"):
+        build(launch_mod, mpc_cap_friction_shift="true", friction_comp="true", limit_mode="friction")
+    _, _, out = build(launch_mod, mpc_cap_friction_shift="true", limit_mode="friction")
+    assert _node_params(out, "torque_mpc_node")["cap_friction_shift"] is True
+    assert _torque_output_params(out).get("compensation_scale") == 0.0
+
+
+@pytest.mark.parametrize("controller", ["pp", "adpp"])
+def test_cap_friction_shift_ignored_by_pp(launch_mod, controller):
+    """PP 분기는 MPC 상한을 안 쓴다 — 인자를 줘도 거부하지 않고 안내만."""
+    exes, _, _ = build(launch_mod, controller=controller, mpc_cap_friction_shift="true")
+    assert "torque_mpc_node" not in exes and "wheel_pi_node" in exes
+
+
+def test_cap_friction_shift_yaml_default_off_and_passed_by_real_all():
+    import yaml
+    with open(os.path.join(HERE, "..", "config", "torque_mpc.yaml")) as f:
+        tl = yaml.safe_load(f)["torque_limit"]
+    assert tl["friction_shift"] is True and tl["friction_shift_scale"] == 1.0          # 2026-11-24 사용자 결정: 기본 켬
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "mpc_cap_friction_shift" in m._PASS
+
+
+# ── 2026-11-24 마찰 모델 (지시서 T11b 앞당김, torque_mpc.yaml model_terms.use_fric_model) ──
+@pytest.mark.parametrize("given, expect", [
+    ({}, None),
+    ({"use_fric_model": "false"}, False),
+    ({"use_fric_model": "false", "friction_comp": "true"}, False),
+    ({"use_fric_model": "true", "friction_comp": "false", "limit_mode": "friction", "mpc_cap_friction_shift": "true"}, True),
+    ({"use_fric_model": "true", "friction_comp": "false"}, True),                       # 상한 옮김 없이도 켤 수는 있다 (안내만)
+])
+def test_use_fric_model_args(launch_mod, given, expect):
+    _, _, out = build(launch_mod, **given)
+    p = _node_params(out, "torque_mpc_node")
+    if expect is None:
+        assert "use_fric_model" not in p
+    else:
+        assert p["use_fric_model"] is expect
+    if expect:
+        assert _torque_output_params(out).get("compensation_scale") == 0.0
+
+
+def test_use_fric_model_needs_comp_off(launch_mod):
+    with pytest.raises(RuntimeError, match="friction_comp:=false"):
+        build(launch_mod, use_fric_model="true", friction_comp="true", limit_mode="friction")
+    _, _, out = build(launch_mod, use_fric_model="true", limit_mode="friction")          # 2026-11-24 비움 = 보상 끔
+    assert _node_params(out, "torque_mpc_node")["use_fric_model"] is True
+
+
+def test_use_fric_model_yaml_default_off_and_passed_by_real_all():
+    import yaml
+    with open(os.path.join(HERE, "..", "config", "torque_mpc.yaml")) as f:
+        assert yaml.safe_load(f)["model_terms"]["use_fric_model"] is True               # 2026-11-24 사용자 결정: 기본 켬
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "use_fric_model" in m._PASS
+
+
+# ── 2026-11-24 구름 손실 (torque_mpc.yaml model_terms.fric_rolling_Nm, launch mpc_fric_rolling · sim_rolling) ──
+def test_fric_rolling_args(launch_mod):
+    on = {"use_fric_model": "true", "friction_comp": "false", "limit_mode": "friction", "mpc_cap_friction_shift": "true"}
+    _, _, out = build(launch_mod, **on)
+    assert "fric_rolling" not in _node_params(out, "torque_mpc_node")                 # 안 주면 노드가 yaml 기본 (0) 을 쓴다
+    assert _node_params(out, "sim_plant_torque_node")["rolling_Nm"] == 0.0
+    _, _, out = build(launch_mod, mpc_fric_rolling="0.0027", sim_rolling="0.0051", **on)
+    assert _node_params(out, "torque_mpc_node")["fric_rolling"] == pytest.approx(0.0027)
+    assert _node_params(out, "sim_plant_torque_node")["rolling_Nm"] == pytest.approx(0.0051)
+    _, _, out = build(launch_mod, mpc_fric_rolling="0.0027")                           # 2026-11-24 마찰 모델 yaml 기본이 켬 — 인자만 줘도 넘긴다
+    assert _node_params(out, "torque_mpc_node")["fric_rolling"] == pytest.approx(0.0027)
+    for off in ({"use_fric_model": "false"}, {"friction_comp": "true"}):               # 마찰 모델이 꺼진 판 (보상을 켠 판 포함) 에는 넘기지 않는다
+        _, _, out = build(launch_mod, mpc_fric_rolling="0.0027", **off)
+        assert "fric_rolling" not in _node_params(out, "torque_mpc_node")
+
+
+def test_fric_rolling_yaml_default_zero_and_passed_by_real_all():
+    import yaml
+    with open(os.path.join(HERE, "..", "config", "torque_mpc.yaml")) as f:
+        assert yaml.safe_load(f)["model_terms"]["fric_rolling_Nm"] == 0.0
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "mpc_fric_rolling" in m._PASS
+
+
+# ── 2026-11-24 사용자 결정 "기본 꺼": 주행 launch 의 torque_output 마찰 보상은 인자를 안 줘도 꺼진다 ──
+def test_friction_comp_default_is_off(launch_mod):
+    from launch.actions import LogInfo
+    msgs = lambda out: ["".join(getattr(s, "text", str(s)) for s in n.msg) for n in out if isinstance(n, LogInfo)]
+    arg = next(e for e in launch_mod.generate_launch_description().entities
+               if isinstance(e, DeclareLaunchArgument) and e.name == "friction_comp")
+    assert "".join(s.perform(LaunchContext()) for s in arg.default_value) == "false"
+    _, _, out = build(launch_mod)                                                       # 기본 (motor_only): 보상 끔, 안내 없음
+    assert _torque_output_params(out).get("compensation_scale") == 0.0
+    assert not any("마찰 상한 옮김도 꺼져 있다" in m for m in msgs(out))
+    _, _, out = build(launch_mod, limit_mode="friction", mpc_cap_friction_shift="false")   # friction 상한인데 상한 옮김을 끄면 알린다
+    assert any("마찰 상한 옮김도 꺼져 있다" in m for m in msgs(out))
+    _, _, out = build(launch_mod, limit_mode="friction")                                # yaml 기본 (옮김 켬) 이면 안내 없음
+    assert not any("마찰 상한 옮김도 꺼져 있다" in m for m in msgs(out))
+    _, _, out = build(launch_mod, limit_mode="friction", mpc_cap_friction_shift="true")
+    assert not any("마찰 상한 옮김도 꺼져 있다" in m for m in msgs(out))
+    _, _, out = build(launch_mod, limit_mode="friction", friction_comp="true")          # 보상을 켠 판: yaml 0.9, 상한 옮김·마찰 모델은 알아서 꺼진다
+    assert "compensation_scale" not in _torque_output_params(out)
+    assert not any("마찰 상한 옮김도 꺼져 있다" in m for m in msgs(out))
+    p = _node_params(out, "torque_mpc_node")
+    assert p["cap_friction_shift"] is False and p["use_fric_model"] is False
+
+
+def test_mpc_yaml_defaults_2026_11_24():
+    """사용자 결정 "둘다 키고 외란도 켜": 마찰 상한 옮김 · 마찰 모델 · 외란 추정의 yaml 기본이 켬. 구름 손실 값은 0 그대로."""
+    import yaml
+    with open(os.path.join(HERE, "..", "config", "torque_mpc.yaml")) as f:
+        y = yaml.safe_load(f)
+    assert y["torque_limit"]["friction_shift"] is True and y["model_terms"]["use_fric_model"] is True
+    assert y["disturbance"]["enable"] is True and y["model_terms"]["fric_rolling_Nm"] == 0.0
+
+
+@pytest.mark.parametrize("name", ["torque_step.launch.py", "torque_ramp.launch.py"])
+def test_step_and_ramp_keep_compensation_on(name):
+    """amrstep · amrramp 는 "바닥 토크 τ_g 를 준다" 가 정의 — 보상을 명시로 켠 채 real_all 에 넘긴다 (friction_comp:=false 로 끌 수 있다)."""
+    spec = importlib.util.spec_from_file_location(name.replace(".", "_"), os.path.join(HERE, "..", "launch", name))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert m._ARGS["friction_comp"] == ("friction_comp", "true")
+
+
+def test_zigzag_corner_pass_reaches_figure8(launch_mod):
+    """2026-11-25 zigzag_corner:=pass·zigzag_corner_speed·zigzag_turn_m 가 노드로. pass 면 zigzag_rot_s 를 max 로 찾지 않는다. real_all 도 넘긴다."""
+    import yaml
+    text = lambda v: yaml.safe_load("".join(getattr(x, "text", str(x)) for x in v))
+    logs_of = lambda out: ["".join(getattr(x, "text", str(x)) for x in o.msg) for o in out
+                           if type(o).__name__ == "LogInfo" and "zigzag" in "".join(getattr(x, "text", str(x)) for x in o.msg)]
+    base = dict(shape="zigzag", zigzag_profile="square", zigzag_reverse="false", zigzag_corner="pass")
+    _, _, out = build(launch_mod, zigzag_corner_speed="0.5", zigzag_turn_m="0", **base)      # 꺾인 채
+    p = _node_params(out, "figure8_reference_node")
+    assert text(p["zigzag_corner"]) == "pass" and p["zigzag_corner_speed"] == 0.5 and p["zigzag_turn_m"] == 0.0 and p["zigzag_rot_s"] == 0.5
+    logs = logs_of(out)
+    assert len(logs) == 1 and "꼭짓점 정지 없이 0.50 m/s (꺾인 채)" in logs[0]
+    with pytest.raises(RuntimeError, match="zigzag_turn_m > 0"):
+        build(launch_mod, zigzag_turn_m="0", **base)                     # 꺾인 채 + corner_speed max (yaml 기본)
+    with pytest.raises(RuntimeError, match="zigzag_corner"):
+        build(launch_mod, shape="zigzag", zigzag_corner="glide")
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert {"zigzag_corner", "zigzag_corner_speed", "zigzag_turn_m"} <= set(m._PASS)
+
+
+def test_zigzag_corner_pass_round_speed_max(launch_mod):
+    """turn_m > 0 (yaml 0.5) + zigzag_corner_speed 비움 (yaml max) → C 앞먹임 ≤ 1 안의 최대 v_c 가 숫자로, 로그에 turn 곡률."""
+    import re
+    _, _, out = build(launch_mod, shape="zigzag", zigzag_profile="square", zigzag_reverse="false", zigzag_corner="pass",
+                      zigzag_n="4", zigzag_angle_deg="30")
+    p = _node_params(out, "figure8_reference_node")
+    assert p["zigzag_turn_m"] == 0.5 and 0.05 <= p["zigzag_corner_speed"] < 1.0
+    logs = ["".join(getattr(x, "text", str(x)) for x in o.msg) for o in out
+            if type(o).__name__ == "LogInfo" and "zigzag" in "".join(getattr(x, "text", str(x)) for x in o.msg)]
+    assert len(logs) == 1 and "zigzag_corner_speed:=max" in logs[0] and "κ_max" in logs[0]
+    m = re.search(r"turn 포함 최대 ([0-9.]+)", logs[0])
+    assert m and float(m.group(1)) <= 1.0 + 1e-9
+
+
+# ── 2026-11-25 꺾은선 shape:=polyline (core/polyline.py) ──
+def test_polyline_shape_and_path_reach_node(launch_mod):
+    import yaml
+    txt = lambda v: v if isinstance(v, str) else yaml.safe_load("".join(getattr(s, "text", str(s)) for s in v))
+    _, _, out = build(launch_mod, shape="polyline")
+    p = {k: txt(v) for k, v in _node_params(out, "figure8_reference_node").items() if k in ("shape", "poly_path", "square_corner_mode")}
+    assert p["shape"] == "polyline" and p["poly_path"] == "R1,L1,L2,R1,R1,R2"        # torque_track.yaml 기본
+    _, _, out = build(launch_mod, shape="polyline", poly_path="F1,L1,L2,R1,R1,R2", square_corner_mode="stop")
+    p = {k: txt(v) for k, v in _node_params(out, "figure8_reference_node").items() if k in ("shape", "poly_path", "square_corner_mode")}
+    assert p["poly_path"] == "F1,L1,L2,R1,R1,R2" and p["square_corner_mode"] == "stop"
+    _, _, out = build(launch_mod, shape="polyline")                                   # 2026-11-25 오후: 꺾은선도 yaml 기본 (pass) 그대로
+    assert txt(_node_params(out, "figure8_reference_node")["square_corner_mode"]) == "pass"
+    _, _, out = build(launch_mod, shape="polyline", square_corner_mode="stop")
+    assert txt(_node_params(out, "figure8_reference_node")["square_corner_mode"]) == "stop"
+    _, _, out = build(launch_mod, shape="square")                                     # 정사각형은 yaml 기본 (pass) 그대로
+    assert txt(_node_params(out, "figure8_reference_node")["square_corner_mode"]) == "pass"
+    with pytest.raises(RuntimeError, match="poly_path"):
+        build(launch_mod, shape="polyline", poly_path="X1")
+    with pytest.raises(RuntimeError, match="spin"):
+        build(launch_mod, shape="polyline", yaw_mode="spin")
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "poly_path" in m._PASS

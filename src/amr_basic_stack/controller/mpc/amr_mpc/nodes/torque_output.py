@@ -12,6 +12,7 @@
 #   벤치에서 잰 고정 표로 하는 모터 보정이다.  2026-11-13: 벤치 식별 계수를 [FL, FR, RL, RR]별로 적용한다.
 #   coulomb 항은 ω = 0 근처에서 부호가 튀지 않게 tanh 로 잇는다 (ω_s = friction_smooth_rad_s).
 #   보상 계수 = friction 절 값 × compensation_scale (2026-11-14 기본 0.9 — 과보상 떨림을 피해 약간 덜 보상).
+#   ★ 2026-11-24: 주행 launch (torque_experiment · amrall) 는 compensation_scale 0 을 넘겨 보상을 기본으로 끈다 (friction_comp:=true 일 때만 0.9).
 #   friction 절 값 자체는 실측 그대로라 시뮬 플랜트(실제 마찰)와 보상이 10 % 어긋난 채로 시험된다.
 #
 # 정지 마찰 보상 (2026-11-16, stiction_comp)

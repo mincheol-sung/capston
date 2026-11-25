@@ -1,0 +1,10 @@
+# 2026-11-25 직진 가감속만 상한 밖인 시나리오 후보: 꺾은선 (정사각형 두 개, 꼭짓점 정지 = 구심 가속 없음), accel 이 직선 가속 상한 (바닥 1.75~1.83) 보다 큼
+#   시뮬 바닥 μ 0.33 (실차 단일 μ) · 무게중심 0.105 (하중 이동). MPC (추정기 / 바퀴 속도) vs PP. 새 기본값 + friction 상한
+mpc_a20|controller:=mpc limit_mode:=friction accel:=2.0
+mpcw_a20|controller:=mpc limit_mode:=friction accel:=2.0 velocity_source:=wheels
+pp_a20|controller:=pp accel:=2.0
+mpc_a25|controller:=mpc limit_mode:=friction accel:=2.5
+mpcw_a25|controller:=mpc limit_mode:=friction accel:=2.5 velocity_source:=wheels
+pp_a25|controller:=pp accel:=2.5
+mpc_a115|controller:=mpc limit_mode:=friction accel:=1.15
+pp_a115|controller:=pp accel:=1.15

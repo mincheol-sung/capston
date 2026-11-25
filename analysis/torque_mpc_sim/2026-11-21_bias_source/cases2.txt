@@ -1,0 +1,3 @@
+# B5 = B4 + 플랜트 마찰을 보상량과 같게 (friction_scale 0.9 = compensation_scale) → 보상 안 된 진행 끌림 0
+B5_r1|disturbance:=false limit_mode:=motor_only state_source:=truth friction_scale:=0.9
+B5_r2|disturbance:=false limit_mode:=motor_only state_source:=truth friction_scale:=0.9

@@ -1,0 +1,15 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1795429308.476100291] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1795429308.476226735] [rosbag2_recorder]: Event publisher thread: Started
+[INFO] [1795429308.478409377] [rosbag2_recorder]: Starting recording to '/home/smoc/capston/capston/analysis/torque_mpc_sim/2026-11-23_fric_dhat/dbg/nod'
+[INFO] [1795429308.479349612] [rosbag2_recorder]: Listening for topics...
+[INFO] [1795429308.479379805] [rosbag2_recorder]: Recording...
+[INFO] [1795429308.479384840] [rosbag2_recorder]: Topics discovery started.
+[INFO] [1795429308.685820286] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/cmd_raw'
+[INFO] [1795429308.687504851] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/status'
+[INFO] [1795429308.790665100] [rosbag2_recorder]: Subscribed to topic '/wheel_torque_cmd'
+[INFO] [1795429308.792587565] [rosbag2_recorder]: Subscribed to topic '/torque_output/cmd_raw'
+[INFO] [1795429308.967937895] [rosbag2_recorder]: Subscribed to topic '/wheel_states'
+[INFO] [1795429308.972656059] [rosbag2_recorder]: Subscribed to topic '/sim/ground_truth'
+[INFO] [1795429309.033444731] [rosbag2_recorder]: Subscribed to topic '/state_estimator/odom'
+[INFO] [1795429309.033488626] [rosbag2_recorder]: All requested topics are subscribed. Stopping discovery...
+[INFO] [1795429309.033498882] [rosbag2_recorder]: Topics discovery stopped.

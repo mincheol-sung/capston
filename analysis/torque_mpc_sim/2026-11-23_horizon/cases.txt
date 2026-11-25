@@ -1,0 +1,13 @@
+# 8자 width 1.2 (R 0.3) · tangent · lap_speeds 0.43/0.61/0.80 · accel 1.0 · 현실 조건 (추정기 · 바닥 μ 0.45 · C) — 지평 후보 3 개 × d̂ 켬/끔 × 2 판
+H50_on|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Np:=50 mpc_Nc:=25
+H75_on|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Np:=75 mpc_Nc:=40
+H100_on|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Np:=100 mpc_Nc:=50
+H50_off|disturbance:=false surface_mu:=0.45 limit_mode:=friction mpc_Np:=50 mpc_Nc:=25
+H75_off|disturbance:=false surface_mu:=0.45 limit_mode:=friction mpc_Np:=75 mpc_Nc:=40
+H100_off|disturbance:=false surface_mu:=0.45 limit_mode:=friction mpc_Np:=100 mpc_Nc:=50
+H50_on_r2|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Np:=50 mpc_Nc:=25
+H75_on_r2|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Np:=75 mpc_Nc:=40
+H100_on_r2|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Np:=100 mpc_Nc:=50
+H50_off_r2|disturbance:=false surface_mu:=0.45 limit_mode:=friction mpc_Np:=50 mpc_Nc:=25
+H75_off_r2|disturbance:=false surface_mu:=0.45 limit_mode:=friction mpc_Np:=75 mpc_Nc:=40
+H100_off_r2|disturbance:=false surface_mu:=0.45 limit_mode:=friction mpc_Np:=100 mpc_Nc:=50

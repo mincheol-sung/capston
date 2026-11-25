@@ -1,0 +1,12 @@
+c8_kf_r1|est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+c8_slam_r1|est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+c8_kf_r2|est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+c8_slam_r2|est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+c8_kf_r3|est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+c8_slam_r3|est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+sq_kf_r1|est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+sq_slam_r1|est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+sq_kf_r2|est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+sq_slam_r2|est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+sq_kf_r3|est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+sq_slam_r3|est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass

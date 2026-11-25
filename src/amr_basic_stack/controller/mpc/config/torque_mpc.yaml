@@ -15,9 +15,21 @@ torque_limit:
                         # friction      = 비교군 C. τ̄ = min(τ_lim − τ_fric,max, (r/√2)·μ̂·(m g/4)·c_s)   (1판 식-21)
                         # friction_mtte = C + MTTE 온라인 보정. 아직 구현 안 함 (기동 시 거부)
   rate_fraction: 0.3333 # 변화율 상한 Δτ̄ = τ̄ × 이 값 (1판: τ̄/3 — 3 스텝 30 ms 에 상한까지)
-  cap_on: total         # 2026-11-22 friction 상한을 거는 곳. total = 바퀴 토크 |τ_i| ≤ τ̄_i (1판) | ground = 바닥 토크 |(P τ)_i| ≤ τ̄_i
+  cap_on: ground        # 2026-11-22 friction 상한을 거는 곳. total = 바퀴 토크 |τ_i| ≤ τ̄_i (1판) | ground = 바닥 토크 |(P τ)_i| ≤ τ̄_i
+                        #   2026-11-25 사용자 결정 "기본으로 넣어": 기본 ground (그 전 total). 이번 실행만: launch mpc_cap_on:=total
                         #   (P = I − J_w Fᵀ M_eff⁻¹ F, 바퀴 관성 몫 제외 — 앞 1.94 → 2.88 m/s², analysis/.../2026-11-21_line_accel/GROUND_CAP_REVIEW_KO.md).
                         #   launch 인자 mpc_cap_on:=ground
+  # ── 마찰 상한 옮김 (2026-11-24, 11-23 교수님 회의 후속 지시서 T1 7단계 (B). 식은 torque_mpc.hpp 머리주석 "마찰 상한 옮김")
+  #    torque_output 마찰 보상을 끈 판 (launch friction_comp:=false) 에서는 MPC 의 τ 가 모터 토크라, 구동계 마찰 f 만큼이 바닥에 안 간다.
+  #    friction 상한 상자를 f 만큼 옮긴다:  −τ̄ + f ≤ τ ≤ τ̄ + f  (cap_on ground 면 바닥 토크 행을 P f 만큼).
+  #    f = scale × (coulomb·tanh(ω_r/ω_s) + viscous·ω_r),  ω_r = 지평 스텝의 기준 바퀴 속도,  coulomb·viscous = torque_plant.yaml friction.
+  #    false 면 예전 그대로 (f 를 계산하지도 더하지도 않는다). 보상을 켠 채 true 면 마찰을 두 번 센다 — launch 가 막는다.
+  #    launch 인자 mpc_cap_friction_shift:=true (friction_comp:=false limit_mode:=friction 과 같이)
+  #    2026-11-24 사용자 결정 (안정민 "둘다 키고 외란도 켜"): 기본 켬 — 주행 launch 의 마찰 보상 기본을 끄면서 같이. limit_mode friction 에서만 쓰인다.
+  #    끄려면 mpc_cap_friction_shift:=false. 보상을 켠 판 (friction_comp:=true) 은 launch 가 이것과 마찰 모델을 알아서 끈다.
+  friction_shift: true
+  friction_shift_scale: 1.0          # f 에 곱하는 배율 (1 = 실측 마찰 그대로. 벤치 무부하 값이라 바닥 위 주행 저항은 더 클 수 있다 — 지시서 T7 1단계 뒤 조정)
+  friction_shift_smooth_rad_s: 0.5   # ω_s: coulomb 항 tanh 폭 (torque_output friction_smooth_rad_s 와 같게)
 
 # ── 예측 모델의 선형화 방식 (식은 mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp 머리주석)
 #    2026-11-13 교수님 지시 "현재 스텝 기준 linearized model" 로 current_state 를 추가했다.
@@ -39,6 +51,26 @@ linearization:
 #    끈 채로 돌릴 때: use_w:=false
 model_terms:
   use_w: true
+  # ── 마찰 모델 (2026-11-24, 11-23 회의 후속 지시서 T11b 를 사용자 결정으로 앞당김. 식은 torque_mpc.hpp 머리주석 "마찰 모델")
+  #    구동계 마찰 τ_b = scale·(coulomb·tanh(ω_r/ω_s) + viscous·ω_r) 를 기준 바퀴 속도 ω_r 로 미리 계산해
+  #    목표 입력 (U_s + τ_b)·예측 (B (τ − τ_b))·외란 추정 잔차에 넣는다. 계수는 torque_plant.yaml friction, scale·ω_s 는
+  #    torque_limit.friction_shift_scale·friction_shift_smooth_rad_s 를 같이 쓴다 (상한 옮김과 같은 마찰 값).
+  #    torque_output 마찰 보상을 끈 판 전용 — 켠 채면 마찰을 두 번 넣는다 (launch 가 막는다). 롤러 구름 저항·정지 마찰은 없다.
+  #    false 면 예전 그대로.  launch 인자 use_fric_model:=true (friction_comp:=false 와 같이, 보통 mpc_cap_friction_shift:=true 도)
+  #    2026-11-24 사용자 결정: 기본 켬 (위 friction_shift 와 같이). 끄려면 use_fric_model:=false
+  use_fric_model: true
+  # ── 구름 손실 (2026-11-24, 정석 바퀴 식의 rolling resistance 항 f_r·N·r·sgn(ω). 식은 torque_mpc.hpp 머리주석 "마찰 모델" 끝)
+  #    바닥에서 띄운 값 (torque_plant.yaml friction) 보다 더 드는, 바퀴 회전 방향을 따르는 일정 토크 [N·m, 네 바퀴 공통].
+  #    ★ 메카넘 롤러가 자기 축으로 돌 때의 손실 (롤러 구름 저항, 지시서 use_rolling_res) 이 아니다 — 그 손실은 바퀴 중심에 옆 방향 속도가
+  #      있을 때만 (옆걸음·대각선·회전) 생기고 직진에서는 0 이다. 이 값은 직진 등속에서 잰 것이고, 롤러 구름 저항은 모델에 없다 (미측정).
+  #    use_fric_model 이 켜졌을 때 τ_b 에 더해 예측·목표 입력·외란 추정 잔차에 넣는다. 상한 옮김 (friction_shift) 에는 안 넣는다 —
+  #    허용 모터 토크가 이 값과 무관하게 (2026-11-24 사용자 결정 "슬립 방지가 메인이니 보수적으로"). 구동 쪽은 값이 커도 바닥 토크가
+  #    상한을 안 넘는다. ★ 제동 쪽은 실제 구름 손실만큼 상한을 넘는다 — 이 항을 넣기 전에도 그랬고 이 항으로는 안 바뀐다 (torque_mpc.hpp 머리주석).
+  #    잰 값 (analysis/torque_mpc_real/2026-11-24_floor/RESULTS_KO.md, 등속 직진 12 구간 34~36 °C, 모자란 양):
+  #      5 / 10 / 15 rad/s 에서 6.1 / 5.2 / 4.0 mN·m (구간별 3.1~7.0), 더 차가울 때의 띄운 값으로 빼면 평균 2.7.
+  #      0.0027 은 12 구간 어디서도 넘치지 않는 값, 0.0051 은 평균 (6 구간에서 넘침). 옆걸음·가속 중은 안 쟀다.
+  #    0 이면 예전 그대로. 이번 실행 한 번만: launch 인자 mpc_fric_rolling:=0.0027 (amrall 도 같음). 기본값은 실차 A/B 뒤 사용자가 정한다
+  fric_rolling_Nm: 0.0
 
 # ── 하중 이동 (2026-11-23, torque_mpc.hpp TorqueTuning load_*). com_height_m 0 = 끔 (예전 동작).
 #    실차 계단 변조 8자 (151038): 선회 원심 가속이 클수록 안쪽 바퀴가 미끄러졌다 (a_y 2.2~3.5 에서 안쪽 앞 끌림 40 %·안쪽 뒤 헛돎 66 %).
@@ -69,8 +101,9 @@ slip_eta:
 # ── 외란 추정치 d̂ (적분 작용, 1판 식-9~11).  2026-11-10 결정: 기본 끔 (노미널 MPC)
 #    꺼도 d̂ 는 계산해서 로그·status 에 남긴다 — "모델이 어디서 틀렸나" 기록용. 예측에 더하지만 않는다.
 disturbance:
-  enable: false         # 2026-11-16 교수님 지시(w 항·외란 추정치 지시서): 구현하되 끈 채로. 같은 날 앞선 "구현 지시서 3.7 대로 켬" 을 되돌림
-                        #   (오늘 실차 판 135118~144233 은 켠 상태였다). 이번 실행만 켤 때: launch 인자 disturbance:=true
+  enable: true          # 2026-11-24 사용자 결정 (안정민 "둘다 키고 외란도 켜"): 기본 켬. ★ 교수님 11-16 지시 ("구현하되 끈 채로") 와 다르니 보고할 것.
+                        #   이번 실행만 끌 때: launch 인자 disturbance:=false.
+                        #   (이전: false — 2026-11-16 교수님 지시 (w 항·외란 추정치 지시서), 같은 날 앞선 "구현 지시서 3.7 대로 켬" 을 되돌린 값)
   alpha: 0.01           # 저역통과 d̂_f = (1−α) d̂_f + α d̂.  1 = 필터 없음, 0.1 = 시정수 0.1 s, 0.01 = 1 s
                         # 2026-11-16: 지시서 시작값 1 → 0.1 (지시서 7.4절 3안 "떨리면 0.1까지"). 시뮬 8자 B: α 1 은 â_d = d̂_ṗ/Ts 가
                         # 추정기 속도 잡음을 100 배 키워 최대 7.7 m/s², 틱간 Δτ RMS 0.093 → 0.322·|τ|max 1.0. α 0.1 이면 0.101·0.51 (끈 것과 비슷)

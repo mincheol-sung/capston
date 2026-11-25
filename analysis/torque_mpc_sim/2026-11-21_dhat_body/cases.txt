@@ -1,0 +1,4 @@
+# 8자 width 1.2 · tangent · lap_speeds 0.43/0.61/0.80 · accel 1.0 · C (friction) · 바닥 μ 0.45 — d̂ 끔 / 예전 (월드 α 0.1, 위치 잔차, 멈춤·상한 없음) / 새 (yaml 기본: 몸체 α 0.01, accel_only, 멈춤, 상한)
+D0_r1|disturbance:=false
+D1_r1|disturbance:=true mpc_dist_frame:=world mpc_dist_alpha:=0.1 mpc_dist_accel_only:=false mpc_dist_freeze:=false mpc_dist_acc_max:=-1 mpc_dist_yaw_acc_max:=-1
+D2_r1|disturbance:=true

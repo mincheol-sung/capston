@@ -1,0 +1,5 @@
+# 8자 width 1.2 · tangent · lap_speeds 0.43/0.61/0.80 · accel 1.0 · C (friction) · 바닥 μ 0.45 — d̂ 켬 (yaml: 몸체·멈춤·상한)
+K0_r1|disturbance:=true
+K1_r1|disturbance:=true mpc_dist_observer:=kalman
+K2_r1|disturbance:=true mpc_dist_observer:=kalman mpc_ff_normal_estimate:=true
+K3_r1|disturbance:=true mpc_dist_observer:=kalman mpc_ff_normal_estimate:=true mpc_target_projection:=true

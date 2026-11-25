@@ -1,0 +1,2 @@
+/home/smoc/capston/capston/analysis/torque_mpc_sim/2026-11-21_square_stop/run_case.sh: line 22: 265849 Killed                  setsid /usr/bin/python3 -c "import os,signal,sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execvp(sys.argv[1], sys.argv[1:])" ros2 launch amr_mpc torque_experiment.launch.py use_rviz:=false "$@" > "$OUT/$LABEL.log" 2>&1 < /dev/null
+RUNNER_DONE 12 / 12

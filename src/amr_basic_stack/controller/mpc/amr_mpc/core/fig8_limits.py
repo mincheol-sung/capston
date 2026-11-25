@@ -11,6 +11,9 @@ A·B·C 가 같은 기준을 받게, 제어기 종류와 상관없이 늘 C 상�
 
 지그재그 (zigzag_max, 2026-11-24): 직선마다 몸체 x 방향 가감속뿐이라 정사각형 변과 같은 직선 가속 한계 (line_accel_max) 를 쓴다.
   꼭짓점 제자리 회전 (zigzag_rot_s) 앞먹임은 info['ff'] 로 알려만 준다.
+  zigzag_corner pass (2026-11-25): 꼭짓점을 서지 않고 zigzag_corner_speed 로. 직선은 같은 직선 가속 한계.
+    zigzag_turn_m > 0 (cubic spiral 로 깎음) 이면 zigzag_corner_speed:=max 를 zigzag_corner_speed_max 가 경로 전체 ff_ratio ≤ max_ff_ratio 로 찾는다.
+    turn_m 0 (꺾인 채) 은 꼭짓점 계단이라 어떤 v_c 도 상한 안에 못 든다 — 숫자로 주고 앞먹임은 info['ff'] 로 알려만 준다.
 
 정사각형 (square_max, 2026-11-23 사용자 "1.5 1.5 로 했더니 돌아갔잖아"): 8자와 기준이 다르다.
   꼭짓점 (pass) 헤딩 회전은 앞먹임이 상한의 2 배 넘게 나와도 짧게 지나간다 — 실차 114214 (accel 1.5, v_max 1.5) 는 꼭짓점 시간의 49 % 포화에도
@@ -160,7 +163,50 @@ def zigzag_make(track, accel, v_max):
     return Zigzag(n=float(track["zigzag_n"]), length=float(track["zigzag_length"]), angle_deg=float(track["zigzag_angle_deg"]),
                   accel=accel, v_max=v_max, profile=str(track["zigzag_profile"]), rot_s=float(track["zigzag_rot_s"]),
                   dwell_s=float(track["zigzag_dwell_s"]), yaw_mode=str(track["yaw_mode"]),
-                  spin_rate=float(track.get("spin_rate", 1.0)), align_s=float(track.get("align_s", 0.0)))
+                  spin_rate=float(track.get("spin_rate", 1.0)), align_s=float(track.get("align_s", 0.0)),
+                  reverse=str(track.get("zigzag_reverse", True)).strip().lower() in ("1", "true", "yes", "on"),
+                  corner_mode=str(track.get("zigzag_corner", "stop")).strip().lower(),
+                  corner_speed=float(track.get("zigzag_corner_speed", 0.3)), turn_m=float(track.get("zigzag_turn_m", 0.5)))
+
+
+def zigzag_corner_speed_max(c, load_cap, track, accel, v_max=0.0, max_ff_ratio=1.0, k_geom=None):
+    """zigzag_corner pass + zigzag_turn_m > 0 의 zigzag_corner_speed:=max (2026-11-25): turn 등속 v_c 중 경로 전체 C 앞먹임
+    ff_ratio ≤ max_ff_ratio·부하 예산 안·첫 직선에서 낼 수 있는 가장 큰 값 (0.01 격자, 내림). turn 횡가속 v_c²κ·요 가속 v_c²κ' 가 v_c 와 커진다."""
+    k = k_geom if k_geom is not None else c["k"]
+    vm = v_max if v_max > 0.0 else load_cap
+
+    def ok(n):
+        try:
+            z = zigzag_make(dict(track, zigzag_corner_speed=n * V_STEP), accel, vm)
+        except ValueError:                                # 첫 직선에서 v_c 를 못 낸다
+            return False
+        run, spin = z.peak_load(k)
+        return run <= load_cap and spin <= load_cap and ff_ratio(z, c) <= max_ff_ratio
+    n = _largest(ok, 1, int(math.floor(min(load_cap, vm) / V_STEP + 1e-9)))
+    if n is None:
+        raise ValueError(f"zigzag pass: corner_speed {V_STEP} 도 상한 안에 못 든다 (accel {accel:.2f}, turn_m {track.get('zigzag_turn_m')})")
+    return n * V_STEP
+
+
+def zigzag_rot_max(c, load_cap, track, accel, v_max=0.0, max_ff_ratio=1.0, k_geom=None, step=0.05, hi=5.0):
+    """zigzag_rot_s:=max (2026-11-24 (10)): 꼭짓점 제자리 회전 (tangent) 이 경로 전체 앞먹임을 max(max_ff_ratio, 회전을 아주 느리게 했을 때 값)
+    위로 올리지 않고 부하 예산 안인 가장 짧은 회전 시간 (step 격자, 올림). 늘 전진 (zigzag_reverse false) 은 꼭짓점에서 180° − 사이각을 돈다."""
+    k = k_geom if k_geom is not None else c["k"]
+    vm = v_max if v_max > 0.0 else load_cap
+    make = lambda rot: zigzag_make(dict(track, zigzag_rot_s=rot), accel, vm)
+    base = max(max_ff_ratio, ff_ratio(make(hi), c))
+
+    def ok(n):
+        z = make(n * step)
+        run, spin = z.peak_load(k)
+        return run <= load_cap and spin <= load_cap and ff_ratio(z, c) <= base + 1e-9
+    lo_n, hi_n = 1, int(round(hi / step))
+    if not ok(hi_n):
+        raise ValueError(f"꼭짓점 회전 {hi} s 로도 부하 예산을 넘는다")
+    while lo_n < hi_n:                                   # ok 는 회전 시간에 단조 (길수록 좋다) → 가장 작은 n
+        mid = (lo_n + hi_n) // 2
+        lo_n, hi_n = (lo_n, mid) if ok(mid) else (mid + 1, hi_n)
+    return lo_n * step
 
 
 def zigzag_max(c, load_cap, track, accel=None, v_max=0.0, max_ff_ratio=1.0, k_geom=None):
@@ -185,7 +231,10 @@ def zigzag_max(c, load_cap, track, accel=None, v_max=0.0, max_ff_ratio=1.0, k_ge
     z = zigzag_make(track, accel, vm)
     run, _ = z.peak_load(k_geom if k_geom is not None else c["k"])
     line_ff = c["me"] * max(g.a_peak for g in z.legs) * c["r"] / 4.0 / float(np.min(c["tau_bar"]))
-    return z.V, accel, dict(ff=ff_ratio(z, c), line_ff=line_ff, load=run / load_cap, T=z.T_total, tau_bar=c["tau_bar"])
+    info = dict(ff=ff_ratio(z, c), line_ff=line_ff, load=run / load_cap, T=z.T_total, tau_bar=c["tau_bar"])
+    if z.round_:
+        info.update(kappa_max=z.kappa_max, w_max=z.vc * z.kappa_max, a_lat=z.vc ** 2 * z.kappa_max, T_turn=z.T_corner)
+    return z.V, accel, info
 
 
 def square_max(c, load_cap, track, accel=None, max_ff_ratio=1.0, k_geom=None):
@@ -227,7 +276,8 @@ if __name__ == "__main__":
     for key in ("shape", "width", "height", "laps", "yaw_mode", "align_s", "crossing_blend_m", "spin_rate",
                 "speed_mod_amp", "speed_mod_cycles", "speed_mod_phase_deg", "speed_mod_shape",
                 "square_side", "square_corner_speed", "square_yaw_blend", "square_corner_mode", "square_rot_s", "square_dwell_s",
-                "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_rot_s", "zigzag_dwell_s"):
+                "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_rot_s", "zigzag_dwell_s", "zigzag_reverse",
+                "zigzag_corner", "zigzag_corner_speed", "zigzag_turn_m"):
         ap.add_argument(f"--{key}", default=tr.get(key))
     ap.add_argument("--load_budget", type=float, default=1.0)
     ap.add_argument("--max_wheel_rad_per_sec", type=float, default=370.0 * 2 * math.pi / 60.0)
@@ -241,12 +291,26 @@ if __name__ == "__main__":
     k_geom = c["k"]
     cap = a.load_budget * c["r"] * a.max_wheel_rad_per_sec
     if track["shape"] == "zigzag":
+        pass_ = str(track.get("zigzag_corner", "stop")).strip().lower() == "pass"
+        if pass_:
+            track["zigzag_rot_s"] = 0.5                   # pass 는 제자리 회전이 없다
+            if str(track["zigzag_corner_speed"]).strip().lower() == "max":
+                a0 = a.accel if a.accel else line_accel_max(c, a.max_ff_ratio)
+                track["zigzag_corner_speed"] = zigzag_corner_speed_max(c, cap, track, a0, a.speed or 0.0, a.max_ff_ratio, k_geom)
+                print(f"zigzag_corner_speed:=max → {track['zigzag_corner_speed']:.2f} m/s")
+        if str(track["zigzag_rot_s"]).strip().lower() == "max":
+            a0 = a.accel if a.accel else line_accel_max(c, a.max_ff_ratio)
+            track["zigzag_rot_s"] = zigzag_rot_max(c, cap, track, a0, a.speed or 0.0, a.max_ff_ratio, k_geom) if track["yaw_mode"] == "tangent" else 0.5
+            print(f"zigzag_rot_s:=max → {track['zigzag_rot_s']:.2f} s")
         vp, acc, info = zigzag_max(c, cap, track, accel=a.accel, v_max=a.speed or 0.0, max_ff_ratio=a.max_ff_ratio, k_geom=k_geom)
         print(f"zigzag {track['zigzag_n']} × {track['zigzag_length']} m, 사이각 {track['zigzag_angle_deg']}°, {track['zigzag_profile']}: "
               f"yaw {track['yaw_mode']}, accel {acc:.2f} → 직선 최고 {vp:.2f} m/s (상한 {f'speed {a.speed:g}' if a.speed else f'부하 예산 {cap:.2f}'})  ("
               + (f"직선 앞먹임 {info['line_ff']:.3f} ≤ {a.max_ff_ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, " if track["yaw_mode"] == "tangent"
                  else f"경로 전체 앞먹임 {info['ff']:.3f} ≤ {a.max_ff_ratio}, ") +
               f"부하 {info['load'] * 100:.0f} %, 기준 {info['T']:.1f} s)")
+        if "kappa_max" in info:
+            print(f"  turn_m {track['zigzag_turn_m']} m: κ_max {info['kappa_max']:.2f} 1/m, ω_max {info['w_max']:.2f} rad/s, "
+                  f"횡가속 최대 {info['a_lat']:.2f} m/s², turn {info['T_turn']:.2f} s")
     elif track["shape"] == "square":
         track["square_v_max"] = 0.0
         vp, acc, info = square_max(c, cap, track, max_ff_ratio=a.max_ff_ratio, k_geom=k_geom)

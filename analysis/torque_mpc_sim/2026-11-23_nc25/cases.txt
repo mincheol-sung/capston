@@ -1,0 +1,10 @@
+# 8자 width 1.2 (R 0.3) · tangent · lap_speeds 0.43/0.61/0.80 · accel 1.0 — 제어 지평 Nc 5 (지금) vs 25 (move blocking 풀기)
+#   N = 2026-11-21 B5 조건 (참값 상태 · 슬립 없음 · 상한 B · 마찰 = 보상량, d̂ 끔): 시뮬 스택에서 move blocking 몫만
+#   R = 현실 조건 (추정기 · 바닥 μ 0.45 · C · d̂ 켬 = yaml 몸체 α 0.01)
+N0_nc5|disturbance:=false limit_mode:=motor_only state_source:=truth friction_scale:=0.9
+N1_nc25|disturbance:=false limit_mode:=motor_only state_source:=truth friction_scale:=0.9 mpc_Nc:=25
+R0_nc5|disturbance:=true surface_mu:=0.45 limit_mode:=friction
+R1_nc25|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Nc:=25
+R0_nc5_r2|disturbance:=true surface_mu:=0.45 limit_mode:=friction
+R1_nc25_r2|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Nc:=25
+R2_nc15|disturbance:=true surface_mu:=0.45 limit_mode:=friction mpc_Nc:=15

@@ -61,6 +61,125 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-25 (2) — 지그재그 꼭짓점에서 서지 않기: `zigzag_corner:=pass` (cubic spiral 로 깎기 `zigzag_turn_m`, 꼭짓점 속도 `zigzag_corner_speed`)
+- 왜: 사용자 — PP 와 MPC 를 같은 경로·속도·가속도 부하에서 비교 (PP 는 미끄러지고 MPC 는 제약을 지키며 따라가는지). 지그재그가 꼭짓점마다 서서 (쉼 0.1 s → 제자리 150° 1.10 s → 쉼 0.1 s) 주행 30.35 s 중 11.7 s (38.6 %) 를 병진 0 으로 보냈다.
+  처음엔 꺾인 채 꼭짓점을 v_c 로 지나게만 했다 (`zigzag_turn_m:=0` 으로 남김) — 11-25 실차에서 PP·MPC 둘 다 못 따라감 (꼭짓점에서 속도 방향 150°·heading 계단, v_c 0.5 면 C 앞먹임 6.36 배). 그래서 꼭짓점을 곡률이 이어지게 깎는다.
+- 바꾼 파일:
+  - `controller/mpc/amr_mpc/core/zigzag.py` — `corner_mode` stop (기존) | pass. pass + `turn_m` > 0: 꼭짓점 앞뒤 turn_m 를 cubic spiral (Kanayama & Hartman 1989, θ(s) = θ_k + φ·(3x² − 2x³)) 로 깎음 → 양 끝 κ = 0 (ω 계단 없음), 몸체 v_y = 0·ω = vκ (퓨어 퍼슛도 낼 수 있음). turn 은 v_c 등속, 앞뒤 `dwell_s` 동안 v_c 등속 (acc_dt 창 분리). 직선은 v_c → 가속 A → 최고 → 감속 A → v_c 사다리꼴 (`_PassEdge`). path following 창 = turn 가운데 ~ turn 가운데. `turn_m` 0 이면 꺾인 채. profile square·tangent·늘 전진만.
+  - `controller/mpc/amr_mpc/core/fig8_limits.py` — `zigzag_corner_speed_max` (경로 전체 C 앞먹임 ≤ max_ff_ratio·부하 예산 안 최대 v_c, 0.01 격자), `zigzag_make`·CLI 인자.
+  - `controller/mpc/amr_mpc/nodes/figure8_reference.py` — 파라미터 `zigzag_corner` (stop)·`zigzag_corner_speed` (0.3)·`zigzag_turn_m` (0.5), 기동 로그.
+  - `controller/mpc/launch/torque_experiment.launch.py` — 세 키, `zigzag_corner` 허용값, pass 면 `zigzag_rot_s:=max` 안 찾음, `zigzag_corner_speed:=max` 해석 (꺾인 채 + max 는 거부), max 로그에 turn κ_max·ω_max·횡가속.
+  - `controller/mpc/launch/real_all.launch.py` — `_PASS` 에 세 키.
+  - `controller/mpc/config/torque_track.yaml` — `zigzag_corner: stop`, `zigzag_turn_m: 0.5`, `zigzag_corner_speed: max`.
+  - `controller/mpc/test/test_zigzag.py`·`test_launch_modes.py` — pass 시험 (꺾인 채·깎음 연속성·turn 끝점·유한차분·창·잘못된 값, launch → 노드·real_all·max).
+- 확인: 단위 시험 605 통과. `python3 -m amr_mpc.core.zigzag` 깎은 pass 속도 vs 위치 유한차분 7e-10. 10 × 1 m, 30°, turn_m 0.5, accel max 1.15 → corner_speed max 0.30 m/s, κ_max 9.50 1/m (R 0.105 m), ω_max 2.85 rad/s, 횡가속 0.85 m/s², turn 1.38 s, 직선 최고 0.77 m/s, C 앞먹임 경로 최대 0.98, 기준 16.2 s (stop 31.9 s). 실차 미확인.
+
+### 2026-11-25 (2) — 꺾은선 기준 `shape:=polyline` (`poly_path`, 기본 = 정사각형 두 개를 이은 8 자)
+- 왜: 사용자 안정민 요청 "사각형 두개 합치는데 우(1m)-좌(1m)-좌(2m)-우(1m)-우(1m)-우(2m) 로 돌아오는 경로". "돌고 간다" 로 읽으면 닫힌다:
+  출발 좌표 (0,0)→(0,−1)→(1,−1)→(1,1)→(2,1)→(2,0)→(0,0), 8 m. 정사각형 [0,1]×[−1,0] 을 왼쪽으로, [1,2]×[0,1] 을 오른쪽으로, 2 m 직선 둘이 맞닿은 점 (1,0) 을 지난다.
+- 바꾼 파일:
+  - `mpc/amr_mpc/core/polyline.py` (새) — `Polyline`: 명령 R/L/F<길이> (우·좌·앞 도 됨), 속도·꼭짓점·헤딩 규칙은 `core/square.py` 그대로 (`_Edge`·`_smooth` 를 가져다 씀).
+    tangent 이고 첫 명령에 회전이 있으면 출발 때 제자리 회전 (쉼·rot_s·쉼). path_xy 는 2 cm 간격.
+  - `mpc/amr_mpc/nodes/figure8_reference.py` — `poly_path` 파라미터, shape polyline 분기 (square_* 를 같이 씀), 부하 검사·기동 로그.
+  - `mpc/launch/torque_experiment.launch.py` — `poly_path` 인자, shape 허용값에 polyline, polyline + spin 거부, 명령 줄을 launch 에서 미리 읽어 봄.
+    `mpc/launch/real_all.launch.py` `_PASS` 에 `poly_path`. `mpc/config/torque_track.yaml` `poly_path: "R1,L1,L2,R1,R1,R2"`.
+  - 시험: `mpc/test/test_polyline.py` (새, 12 개 — 꼭짓점·닫힘, 속도 vs 위치 유한차분, 출발 회전, stop 에서 옆 속도 0·병진과 회전 안 겹침,
+    "F1.5,L1.5,L1.5,L1.5" = Square(1.5) 와 같은 기준) · `test_launch_modes.py` 1 개. pytest 618 개 통과.
+- 시뮬 (`analysis/torque_mpc_sim/2026-11-25_polyline/`, accel 1.0, friction 상한): 꼭짓점 정지는 오차 RMS 21 · 최대 50 mm, 슬립 최대 0.16.
+  꼭짓점 통과 (pass) 는 따라가지 못함 (최대 842 mm) — 정사각형 pass 와 같은 문제라 stop 을 쓴다.
+- ★ 정정 (같은 날 오후): 아래 "pass 시뮬 최대 오차 842 mm" 는 다시 나오지 않는 한 판이었다 — 같은 조건 재실행 RMS 17 · 최대 41 mm, accel 1.5 · v_max 1.5 pass 도 MPC RMS 35 mm (`analysis/torque_mpc_sim/2026-11-25_corner_pass/`).
+  기본 stop 은 그 틀린 근거로 정한 것이다 (사용자에게 알림).
+  → 사용자 결정 "통과로 일단 해볼게": launch 의 "꺾은선은 안 주면 stop" 을 뺐다 — 꺾은선도 yaml square_corner_mode (pass) 그대로. pytest 618 개 통과.
+- 같은 날 사용자 결정 "정지로 갈게" (퓨어 퍼슛도 이 경로를 돌림): launch 는 shape:=polyline 이고 square_corner_mode 를 안 주면 stop (정사각형은 yaml pass 그대로).
+  근거: 뾰족한 꼭짓점을 서지 않고 지나면 목표 토크가 C 상한의 1.7~5 배 (꼭짓점 앞뒤 등속 구간을 넣어도 tangent 는 1.66 배 이상, 헤딩 고정은 0.1 m/s 이하에서만 0.98),
+  시뮬 최대 오차 842 mm, 같은 날 지그재그 실차 (팀원) 에서 PP·MPC 둘 다 못 따라감. 최대 가속 (accel:=max 규칙) 1.15 m/s² → 직선 최고 1.07 · 1.52 m/s, 주행 19.9 s.
+- 같은 시각 (14:03) 다른 사람이 지그재그 쪽으로 같은 파일 (`figure8_reference.py` · `torque_experiment.launch.py` · `real_all.launch.py` · `torque_track.yaml` · `test_launch_modes.py`) 을 고치고 있었다 —
+  내 변경은 polyline 줄만 덧붙였다.
+
+### 2026-11-25 (1) — 마찰계수 0.33 (바퀴별 값 끔) · 바닥 토크 기준 상한을 설정 기본값으로
+- 왜: 사용자 안정민 결정 "기본으로 넣어". 11-24 에 정한 마찰계수 0.33 × 안전 계수 0.8 이 launch 인자 (`mu_hat_wheels:=off mu_hat:=0.33 mpc_cap_on:=ground`) 로만 쓰이고 있어,
+  `limit_mode:=friction` 만 주면 예전 바퀴별 값 (상한 0.118~0.186 N·m) 이 쓰였다.
+- 바꾼 파일:
+  - `mpc/config/torque_plant.yaml` — `surface.mu_hat` 0.3 → 0.33, `surface.mu_hat_wheels` [0.598, 0.489, 0.547, 0.703] → [−1, −1, −1, −1] (끔 = 네 바퀴 모두 mu_hat × 하중 몫). `c_s` 0.8 그대로.
+  - `mpc/config/torque_mpc.yaml` — `torque_limit.cap_on` total → ground.
+  - `limit_mode` 기본은 그대로 `motor_only` — friction 상한은 `limit_mode:=friction` 을 줄 때만.
+- 확인: pytest 581 개 · gtest 68 개 통과 (`test_mu_hat_ignored_warning_when_wheels_set` 을 새 기본에 맞춰 고침).
+  시뮬 한 판 (`analysis/torque_mpc_sim/2026-11-24_base_config/` base_friction_1125, `limit_mode:=friction` 만 줌): 시작 로그 "τ_μ 0.0835 @ μ̂ 0.33", 바퀴별 상한 [0.0798 0.0799 0.0871 0.0872] N·m
+  (하중 몫 [0.2388 0.2392 0.2608 0.2612] 때문에 앞바퀴가 작다), "마찰 상한을 바닥 토크에 건다 (cap_on ground)". fault 없이 완주 (이동 중 오차 RMS 25.5 mm, 슬립 10 % 넘는 몫 0.14 · 최대 0.24).
+- 같은 날 점검 (코드 변경 없음): 기본 설정에서 켜진 기능 분류 — 추종 토크 계산은 모델 (몸체 + 바퀴 관성, w 항, 구동계 마찰, 일정 외란 상태) 과 표준 MPC 식뿐이고 슬립 쪽 덧붙임
+  (η_s · 슬립 가드 · 목표 입력 사영 · 구심 보정 추정 · path following · 축 토크 보상) 은 모두 끔. 켜진 덧붙임은 외란 추정 갱신 보호 4 종 · hold 래치 · 기준 가속 창.
+  11-24 실차 확인 주행 기록: 등속 구간 명령의 76~81 % 를 모델 마찰이 설명, 정지 10.1 s 동안 명령 평균 25 · 최대 105 mN·m (바퀴는 안 돎), 외란 추정이 크기 상한 0.5 m/s² 에 닿은 주기 23.3 % —
+  정지 마찰이 모델에 없어서 생기는 일이고 지금은 크기 상한이 막는다.
+- 남은 것: 실차 확인 없음.
+
+### 2026-11-24 (12) — 토크 MPC 기본값: 마찰 상한 옮김 · 마찰 모델 · 외란 추정 켬 (`torque_mpc.yaml`)
+- 왜: 사용자 안정민 결정 "둘다 키고 외란도 켜". (11) 로 보상 기본이 꺼지면서 인자 없이 띄운 MPC 는 마찰을 맡는 것이 하나도 없었다 (보상 · 마찰 모델 · 외란 추정 모두 끔),
+  `limit_mode:=friction` 에 상한 옮김이 빠지면 제동 쪽 바닥 토크가 구동계 마찰만큼 (23~45 mN·m, 상한 83.5 의 28~54 %) 상한을 넘었다.
+- ★ 외란 추정 기본 켬은 교수님 11-16 지시 ("구현하되 끈 채로") 와 다르다 — 보고할 것. 끄려면 `disturbance:=false`.
+- 바꾼 파일:
+  - `mpc/config/torque_mpc.yaml` — `torque_limit.friction_shift: true`, `model_terms.use_fric_model: true`, `disturbance.enable: true` (모두 false 였다). `fric_rolling_Nm` 은 0 그대로.
+  - `mpc/launch/torque_experiment.launch.py` — 보상을 켠 판 (`friction_comp:=true`) 에서 상한 옮김·마찰 모델을 인자로 따로 켜지 않았으면 끈다 (yaml 기본이 켬이어도 마찰을 두 번 세지 않게, 안내 출력).
+    인자로 둘을 같이 켜면 예전처럼 기동 거부. "limit_mode 가 friction 이 아니다" 안내는 인자로 켰을 때만. 인자 설명 고침.
+  - `mpc_cpp/src/torque_mpc_node.cpp` — "cap_friction_shift 는 limit_mode friction 에서만" 을 경고에서 안내로 (이제 기본 상태).
+  - C++ `TorqueTuning` 구조체 기본값은 그대로 (false) — gtest 는 영향 없음.
+- 확인: gtest 68 개 · pytest 581 개 통과 (`test_mpc_yaml_defaults_2026_11_24` 새로, yaml 기본을 보던 시험 2 개와 구름 손실 인자 시험 고침).
+  시뮬 3 판 (`analysis/torque_mpc_sim/2026-11-24_base_config/`): 마찰·외란 인자 없이 띄워 시작 로그에 "보상 없음(0) · 마찰 모델 켬 · 외란 추정치 켬", friction 상한이면 "마찰 상한 옮김 켬".
+  `friction_comp:=true` 판은 둘이 꺼진다. 세 판 모두 fault 없이 완주 (한 판씩).
+- 남은 것: 실차 확인 없음 (새 상한 확인 주행 — 직선 1.0 m · 1.0 m/s · 기준 가속 2.5 — 은 아직). 같은 작업 트리를 쓰는 사람의 MPC 판도 기본이 바뀐다.
+
+### 2026-11-24 (11) — 주행 launch 의 torque_output 구동계 마찰 보상을 기본으로 끔 (`friction_comp` 기본 false)
+- 왜: 사용자 안정민 결정 "기본 꺼". 11-23 부터 모든 판을 `friction_comp:=false` 로 돌리는데 기본값이 켜짐 (`torque_plant.yaml compensation_scale` 0.9) 이라 인자를 빼면 보상이 다시 켜졌다.
+- 바꾼 파일:
+  - `mpc/launch/torque_experiment.launch.py` — `friction_comp` 기본 `false`, 비워도 끔 (`compensation_scale` 0 을 넘긴다 — coulomb·viscous·정지 모두). `friction_comp:=true` 일 때만 yaml 0.9.
+    마찰 상한 옮김·마찰 모델은 이제 `friction_comp:=false` 를 안 줘도 켜진다 (`true` 와 같이 주면 예전처럼 기동 거부).
+    보상이 꺼져 있고 `limit_mode:=friction` 인데 상한 옮김이 꺼져 있으면 안내를 낸다 (바닥 토크가 구동 쪽은 구동계 마찰만큼 모자라고 제동 쪽은 그만큼 상한을 넘는다).
+  - `mpc/launch/torque_step.launch.py` · `torque_ramp.launch.py` — `friction_comp` 인자 (기본 `true`) 를 real_all 로 넘긴다: amrstep · amrramp 는 "바닥 토크 τ_g 를 준다" 가 정의라
+    지금 동작 (보상 켬) 그대로. 이제 `friction_comp:=false` 로 끌 수 있다.
+  - `mpc/config/torque_plant.yaml` (값은 그대로 0.9, 주석만) · `mpc/amr_mpc/nodes/torque_output.py` · `mpc/launch/real_all.launch.py` (머리말만).
+  - 안 바꾼 것: `teleop.launch.py` (자체 torque_output, 보상 켠 채), torque_output 노드의 파라미터 기본 (yaml 0.9).
+- 확인: pytest 580 개 통과 (`test_friction_comp_default_is_off`, `test_step_and_ramp_keep_compensation_on` 새로, 기존 3 개는 기본 끔에 맞춰 고침). `ros2 launch … --show-args` 기본 `false`.
+- ★ 주의: 기본 (보상 끔) 으로 `limit_mode:=friction` 을 쓰려면 `mpc_cap_friction_shift:=true` 가 같이 있어야 상한이 바닥 토크에 걸린다 — 상한 옮김·마찰 모델의 기본은 아직 끔 (사용자 결정 대기).
+  비교군 PP (`controller:=pp|adpp`) 도 기본이 보상 끔이 됐다 (바퀴 PI 의 적분이 마찰을 메운다).
+
+### 2026-11-24 (10) — 토크 MPC 마찰 모델에 구름 손실 항 (`model_terms.fric_rolling_Nm`, launch `mpc_fric_rolling`, 기본 0 = 예전 그대로)
+- 왜: 바닥 등속 직진 시험 (11-24 (5)) 에서 주행 저항이 띄운 마찰보다 5 / 10 / 15 rad/s 에서 6.1 / 5.2 / 4.0 mN·m 컸다 (12 구간 3.1~7.0, 전진·후진 부호가 뒤집힘 —
+  정석 바퀴 식의 rolling resistance 항 f_r·N·r·sgn(ω) 자리). 지금은 이 몫을 외란 추정이 받는다. 사용자 안정민 결정: "슬립 방지나 제어가 메인이니 보수적으로 구현".
+- 바꾼 파일:
+  - `mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp` · `src/torque_mpc.cpp` — `TorqueTuning::fric_rolling` [N·m, 0~0.02]. 마찰 모델이 켜졌을 때 τ_b 에 네 바퀴 공통
+    `fric_rolling·tanh(ω_r/ω_s)` 를 더해 예측·목표 입력·외란 추정 잔차에 넣는다 (`model_friction`). **상한 옮김의 f (`fs_steps_`) 에는 안 넣는다** — 상자가 이 값과 무관하다.
+  - `mpc_cpp/src/torque_mpc_node.cpp` — 파라미터 `fric_rolling` (yaml `model_terms.fric_rolling_Nm`, 없으면 0), 시작 로그.
+  - `mpc/config/torque_mpc.yaml` — `model_terms.fric_rolling_Nm: 0.0` (잰 값·후보 주석). `mpc/launch/torque_experiment.launch.py` — `mpc_fric_rolling` (마찰 모델 켰을 때만 넘김),
+    `sim_rolling` (시뮬 플랜트). `mpc/launch/real_all.launch.py` — `_PASS` 에 `mpc_fric_rolling`.
+  - `mpc/amr_mpc/torque/model.py` `DrivetrainFriction(rolling=)` · `mpc/amr_mpc/nodes/sim_plant_torque.py` `rolling_Nm` — 시뮬 플랜트 구름 손실 (기본 0, `friction_scale` 과 무관).
+- 확인: gtest 68 개 통과 (새 `FrictionRolling` 4 개 — 모델 끄면 값을 줘도 비트까지 같은 출력, 지평 마찰·목표 입력에 ±값이 더해지고 상자·옮긴 양은 그대로,
+  값 0.02 로 넘쳐도 낸 토크는 같은 상자 안, 잔차에 들어가 외란 추정이 0 근처), pytest 579 개 통과.
+  시뮬 18 판 (`analysis/torque_mpc_sim/2026-11-24_fric_rolling/`, 플랜트 5.1 mN·m): 슬립은 값 8.0 (넘침) 에서도 안 늘었다. 상한 닿는 조건의 추종 RMS 35.8 → 28~33 mm (판 사이 폭 겹침),
+  ★ 최대 오차는 2.7 · 5.1 에서 55 → 65 · 69 mm 로 커졌다 (끝점 넘어감, 원인 미확인). 앞서 플랜트 마찰 배율만 바꾼 시뮬은 `2026-11-24_fric_mismatch/`.
+- ★ 찾은 것: 상한 옮김이 모르는 마찰 R 이 있으면 상한에 닿은 바퀴의 실제 바닥 토크는 구동 변 τ̄ − R, **제동 변 −(τ̄ + R)**. 이 항을 f 에 안 넣었으므로 제동 쪽은
+  지금도, 이 항을 켜도 실제 구름 손실만큼 상한을 넘는다 (5.1 mN·m 면 안전 계수 0.8 → 0.85 해당). 양쪽을 다 지키려면 상자 두 변을 따로 옮겨야 한다 — 안 만들었다.
+- 남은 것: 기본값은 0 그대로 (실차 A/B 뒤 사용자 결정, 후보 0.0027 = 12 구간 어디서도 안 넘침 · 0.0051 = 평균). 제동 변 조임을 만들지 사용자 결정. 실차 확인 없음.
+- 2026-11-25 바로잡음 (사용자 지적 "롤러 구름손실은 횡이동에서만 작용하는 값 아닌가"): 이 항은 메카넘 **롤러가 자기 축으로 도는 손실 (롤러 구름 저항, 지시서 `use_rolling_res`) 이 아니다**.
+  롤러 표면 속도 = √2 × 바퀴 중심의 옆 방향 속도 (리포 기구학으로 검산, 오차 1e-15) — 직진 0, 옆 0.2 m/s 에서 0.283 m/s, 회전 1 rad/s 에서 0.122 m/s.
+  이 항은 롤러가 안 도는 직진 등속에서 잰 "주행 저항 − 띄운 마찰" 이고 원인은 가르지 못했다. 어제 hpp 머리주석에서 "롤러 구름 저항 … 넣지 않았다" 를 지운 것이 잘못 — 되살렸다 (주석만, 코드 동작 그대로).
+
+### 2026-11-25 (10) — 지그재그 "늘 전진" `zigzag_reverse:=false` + 꼭짓점 회전 시간 `zigzag_rot_s:=max`
+- 왜: 사용자 요청 — 꼭짓점에서 전진·후진을 바꾸지 말고 헤딩을 돌려 계속 전진.
+- 바꾼 것:
+  - `mpc/amr_mpc/core/zigzag.py` — `reverse` (기본 True = 지금까지). False 면 tangent 헤딩 θ_k = 0 | s·(π − α) (= 진행 방향), 직선마다 v_x > 0,
+    꼭짓점 회전 ±(π − α) 를 짧은 쪽으로 번갈아 (헤딩이 쌓이지 않음). 진행 방향 d_k·(cos θ_k, sin θ_k) 는 같아 꼭짓점·모양은 같다. n 짝수면 끝 정렬 −(π − α).
+  - `mpc/amr_mpc/core/fig8_limits.py` — `zigzag_rot_max`: 꼭짓점 회전이 경로 전체 앞먹임을 max(max_ff_ratio, 아주 느린 회전일 때 값) 위로 올리지 않고
+    부하 예산 안인 가장 짧은 회전 시간 (0.05 s 격자, 이분 탐색). CLI `--zigzag_reverse`, `--zigzag_rot_s max`.
+  - `mpc/launch/torque_experiment.launch.py`·`real_all.launch.py` — 인자 `zigzag_reverse`. `zigzag_rot_s:=max` 허용, 늘 전진에서 `zigzag_rot_s` 를 비우면 max
+    (yaml 0.5 s 는 사이각 10° 용 — 170° 를 0.5 s 에 돌면 ω 최대 8.9 rad/s, 앞먹임 3.9 배, 부하 111 %). 기동 로그에 늘 전진·꼭짓점 회전 시간.
+  - `mpc/amr_mpc/nodes/figure8_reference.py` — 파라미터 `zigzag_reverse`, 기동 로그. `mpc/config/torque_track.yaml` — `zigzag_reverse: true`, 주석.
+  - `mpc/test/test_zigzag.py` (늘 전진 모양·전진·회전·끝 정렬, 유한차분 2), `test_launch_modes.py` (새 5).
+- 확인: pytest 590 통과. 170° 회전 시간별 (accel 1.15, 경로 전체 앞먹임): 0.8 s 1.93 · 1.0 s 1.32 · 1.2 s 0.963 (직선 값과 같음) → `max` = 1.20 s.
+  ROS 시뮬 (square 파형, fault 0): 늘 전진 C RMS 17.6 mm · 요 0.35°, A 14.6 mm · 1.88° / 전진·후진 C 16.6 mm · 0.30°, A 14.6 mm · 0.76°. 늘 전진 sine C 16.9 mm.
+  주행 시간은 꼭짓점 회전이 길어 늘 전진이 3.2 s 길다 (14.9 vs 12.1 s, square).
+- 함께 알게 된 것: 작업 트리의 `torque_plant.yaml` 이 다른 작업 (11-25, 커밋 안 됨) 에서 `mu_hat` 0.3 → 0.33, `mu_hat_wheels` 끔으로 바뀌어
+  τ̄ = [0.0798, 0.0799, 0.0871, 0.0872] N·m → 지그재그 `accel:=max` 가 1.70 → 1.15 m/s² 다. 위 숫자는 모두 이 설정 기준.
+- 쓰는 법: `amrall use_mpc:=true shape:=zigzag zigzag_reverse:=false …` (꼭짓점 회전 시간은 자동, 직접 주려면 `zigzag_rot_s:=1.5`).
+
 ### 2026-11-24 (9) — 지그재그에도 다른 경로의 기능: `yaw_mode` tangent | fixed | spin, 끝 정렬 `align_s`, `path_follow_lead`
 - 왜: 사용자 요청 ("원래 다른 경로에서 쓰던 기능들 지그재그에서도 동일하게").
 - 바꾼 것:
@@ -155,6 +274,118 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
   - 결론 (지그재그·stop 은 수정 전 실패·수정 후 따라감, pass·circles8 은 영향 없음) 은 바뀌지 않는다. todo 의 "헤딩 75°" 도 adpp 값이다 (pp 는 63°).
   - 추가 확인: square `pass` + `square_corner_speed:=0` 은 수정 뒤 pp 가 나빠진다 (위치 RMS 55.3 → 63.5 mm, yaw RMS 10.4 → 20.8°, adpp 는 106.1 → 52.5 mm 로 좋아짐).
     pass 는 꼭짓점 ±0.15 m 에서 달리며 헤딩을 돌려 옆걸음이 섞이는데 (PP 는 v_y = 0), 수정 뒤 pp 는 꼭짓점까지 곧게 가서 늦게 돈다 — 원인은 확인 안 함. 실차에서 안 쓴 조건, 꼭짓점에서 세우려면 `stop`.
+
+### 2026-11-24 (5) — 바닥 시험 실행 스크립트 `floor_tests_w4_t7.sh` + 분석 `floor_wheel_tests.py`, 새 스위치 첫 실차 확인 — 설정 변경 없음
+- 왜: 바퀴 식별 지시서 W4 (바닥 구름 손실) 와 회의 후속 지시서 T7 (마찰계수) 의 바닥 시험. 값은 사용자 안정민이 승인 ("이대로 진행", 쓸 수 있는 직선 1.3 m):
+  등속 직진 0.2 / 0.4 / 0.6 / 0.8 m/s × 2 판 (고정 PP, 보상 끔, 1.1 m 왕복, 가감속 1.5), 단계 토크 0.08~0.28 N·m × 2 판 (0.3 m 에서 끊음).
+- 바꾼 파일 (모두 새 파일, 기존 코드 수정 없음):
+  - `mpc/tools/floor_tests_w4_t7.sh` — 승인된 값으로만 `amrall` 을 띄운다 (`check` · `cv <속도> <판>` · `step <토크> <판>`, 끝에 `dry` = 명령만). 표에 없는 값·터미널 아닌 실행은 거부.
+  - `mpc/tools/floor_wheel_tests.py` — bag 분석. `cv`: 등속 구간 (전진·후진) 의 네 바퀴 평균 모터 토크 = 주행 저항, − 띄운 마찰 = 구름 손실, 남은 가속 몫 보정.
+    `step`: 단계 구간의 몸체 가속 (IMU · 추정기), 바닥 전달 토크 (식-W1), 헛돎 판정, μ (정지 하중 · 하중 이동 넣음 · 네 바퀴 합), 끊은 뒤 선 거리. `quick`: 한 판 요약.
+  - `mpc/test/test_floor_wheel_tests.py` — 참값을 아는 합성 기록으로 검산 11 개 (구름 손실 0.3 mN·m 안, 헛돈 바퀴의 μ 5 % 안 등).
+- 확인: pytest 11 통과. 실차 — 확인 주행 1 판 (`bags/2026-11-24/171150_fricmodel_check`, MPC + 상한 옮김 + 마찰 모델 + 외란 추정, 직선 0.5 m 왕복 0.2 m/s):
+  계산 실패 0 / 1570 스텝, 제약에 닿은 스텝 0, 계산 시간 최대 7.78 ms, 상한·모델 마찰 값이 설정식과 일치, 위치 오차 RMS 18.9 · 최대 29.3 mm, 큰 슬립 ≤ 0.25 %.
+  `analysis/torque_mpc_real/2026-11-24_floor/RESULTS_KO.md`. 등속 직진·단계 토크 결과는 같은 문서에 이어 적는다.
+- 알게 된 것: 보상을 끈 MPC 는 선 자리에서 15~21 mm 어긋난 채 FL −75 · RR −58 mN·m 로 계속 민다 (정지 마찰을 못 넘음 — torque_output 의 정지 마찰 보상도 같이 꺼지므로).
+  직선 기준 (`shape:=line`) 은 기본이 왕복이다 (`seg_out_and_back` true, 1 s 쉼).
+- 실행 방식: 사용자가 "왜 안 돌리니" 라고 해서 Claude 가 앱 터미널 탭에 명령을 띄우고, sudo 비밀번호·무장 키 `a`·정지 키는 사용자가 잡았다.
+- 같은 날 이어서 (사용자가 직접 돌림): 등속 직진 8 판, 단계 토크 12 bag — bag 마다 무장 키를 3~8 번 눌러 모두 70 회 (약 3 m 를 0.3 m 씩).
+  `floor_wheel_tests.py` 를 한 bag 의 여러 회를 읽게 고침 (`step_windows` · `analyze_steps`, 서 있을 때 IMU 값을 0 점으로, 바퀴 각가속도는 35 rad/s 아래 표본만,
+  `--roll` 구름 손실 빼기, 미끄럼 없을 때 예상 가속, 몸체 쪽 마찰계수 √2·a/g, `cv` 의 `--settle --tail --min-dur`). pytest 11 통과.
+  - 등속: 주행 저항 29.2 / 34.1 / 38.8 / 44.6 mN·m (5 / 10 / 15 / 20 rad/s, 마지막은 구간 0.3 s 참고값). 구름 손실 = 띄운 마찰 기준에 따라 2.7~5.1 mN·m.
+  - 단계 토크: 몸체 가속 0.78 / 1.39 / 1.88 / 2.27 / 2.65 / 2.94 m/s². FL 은 2.3 m/s², FR 은 2.65 m/s² 부터 헛돌고 뒷바퀴는 2.94 까지 버팀 (가속 때 하중이 뒤로).
+    정지 하중 기준 마찰계수 √2·a/g: FL 시작 0.33, FR 시작 0.38, 최고 단계 0.42. 0.28 N·m 에서 앞바퀴가 전압 한계 속도 43~44 rad/s 에 닿음.
+  - 안 맞는 것 (미해결): 단계 토크의 헛돎 없는 세 단계는 구름 손실 0 인 모델과 맞고 (실측/예상 1.02~1.07), 등속의 5 mN·m 를 넣으면 7~12 % 낮다. → 구름 손실을 모델에 넣을 근거는 아직 없다.
+  - 단일 마찰계수 후보표 `analysis/torque_mpc_real/2026-11-24_floor/mu_candidates.md` — **값은 사용자 결정 대기**, 설정은 안 바꿈.
+
+### 2026-11-24 (4) — 바퀴를 띄운 토크 단계 시험 실행 (W1) + 식별 (W2·W5) — 설정 변경 없음
+- 왜: (2) 에서 만든 도구로 실제 시험. 사용자 안정민이 로봇을 받침대에 올리고 배터리·CAN 을 켠 뒤 "너가 해" 로 지시.
+- 바꾼 파일: `mpc/tools/ak40_lifted_w1.sh` — 확인 입력을 파이프로 넘겨 받으면 거부 (터미널 검사), 바퀴 하나 6 판을 확인 한 번으로 돌리는 `all`.
+  (Claude 가 `echo yes |` 로 확인을 대신 넣으려다 권한 분류기에 막힌 뒤 넣음. 실제 실행은 사용자 지시를 받아 `ak40_bench.py lifted` 를 직접, 첫 판 결과를 확인한 뒤 나머지.)
+- 확인 (실차, 바퀴 띄움, 모터 26~34 °C): 24 판 (바퀴 4 × 전진·후진 × 3) 모두 완료, 응답 누락·CAN 오류 0, 최대 26.5 rad/s.
+  `analysis/torque_mpc_real/2026-11-24_lifted/RESULTS_KO.md`:
+  - J_w: 가속도를 왼쪽에 둔 회귀 8.87~9.31 (평균 9.05), 자유 감속 8.15~8.85 (평균 8.41) ×10⁻⁴ → 설정 8.90 유지할 만하다. 지시서 식 그대로의 회귀는 2.9~3.6 (잡음 치우침, 예상대로).
+  - 마찰: 오늘 값이 설정 (11-16, 38~39 °C) 보다 3~10 % 크다 — 온도 차 (오늘 26~34 °C). 전진·후진 차는 τ_c ≤ 7 %, b_v ≤ 2 %.
+- 남은 것: J_w·마찰 계수를 바꿀지는 사용자 결정 (추천: 둘 다 유지). W4 (바닥 구름 손실) 는 T7 1단계 자료 뒤.
+
+### 2026-11-24 (3) — 토크 MPC 마찰 모델: 기준 바퀴 속도의 구동계 마찰을 목표 입력·예측·외란 추정 잔차에 (`use_fric_model`, 기본 끔)
+- 왜: 11-23 회의 후속 지시서 T11b (마찰을 속도의 함수로 MPC 에 넣기) 를 사용자 결정 ("앞당겨서 스위치로") 으로 발표 전에. 같은 날 (1) 의 상한 옮김만으로는
+  속도가 빨리 바뀌는 정사각형에서 오차가 68 mm (보상 켬 34 mm) 였고, 외란 추정을 5 배 빠르게 해도 51 mm 였다 — 외란 추정은 "일정한 외란" 의 평균이라
+  1 s 안에 0.02 → 0.06 N·m 로 바뀌는 마찰을 못 따라간다 (`analysis/torque_mpc_sim/2026-11-24_cap_friction_shift/RESULTS_KO.md` 추가 절).
+- 바꾼 파일:
+  - `mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp`, `src/torque_mpc.cpp` — 머리주석 "마찰 모델". `TorqueTuning::use_fric_model`,
+    `TorqueMPC::use_fric_model()·fric_model_steps()·predicted_error()`, `friction_at_state`. 지평 스텝마다 τ_b,j = scale·τ_f(T⁻¹ u_r,j) (상한 옮김의 f 와 같은 값) 를
+    목표 입력에 바퀴마다 더하고 (U_s + τ_b), 영입력 응답에 −B_j τ_b,j, 외란 추정 잔차는 τ(k−1) − τ̂_b (추정 상태의 바퀴 속도) 로. H·제약 행렬은 그대로.
+    지시서 식-14 꼴 (F⁺ 로 배분) 과 다른 점: τ_b 의 영공간 성분까지 바퀴마다 그대로 더한다 [구현 선택 — 몸체 힘은 같다, 머리주석].
+    롤러 구름 저항 (`use_rolling_res`)·정지 마찰은 안 넣었다 (계수 미측정). 꺼지면 τ_b 를 계산·가산하지 않는다.
+  - `mpc_cpp/src/torque_mpc_node.cpp` — 파라미터 `use_fric_model` (yaml model_terms), 기동 로그·경고, `/torque_mpc/cap` 끝에 [마찰 모델 켬, τ_b×4], CSV 끝에 `ff_fl~ff_rr`.
+  - `mpc/config/torque_mpc.yaml` — `model_terms.use_fric_model: false`. `mpc/launch/torque_experiment.launch.py` — 인자 `use_fric_model`
+    (`friction_comp:=false` 가 아니면 기동 거부), `real_all.launch.py` `_PASS`.
+  - `mpc_cpp/test/test_torque_mpc.cpp` — FrictionModel 7 개 (지시서 F1~F4 + 목표 입력·잔차·잘못된 값). `mpc/test/test_launch_modes.py` — 새 8 개.
+- 확인: colcon 빌드, gtest 64/64 (새 7), pytest 519 통과. 두 스위치를 모두 끈 상태는 수정 전 라이브러리 (c694cbb) 와 10 설정 × 400 스텝 토크가 바이트까지 같다.
+  - F2 (1 차원, F_c 1 N, m_eq 6.985): j = 75 위치 예측 오차 — 외란 추정만 0.0805 m (지시서 검산 0.079), 마찰 모델 3e-16 m.
+  - F4 (오프라인 폐루프, 헤딩 고정 정사각형 변 1 m · 가속 1.5): 위치 오차 RMS 둘 다 끔 58.1 / 외란 추정만 41.5 / 마찰 모델 1.4 mm.
+  - 잔차: 등속 0.8 m/s 에서 외란 추정이 배우는 가속도 0.588 → 0.0000 m/s² (모델에 넣은 몫은 다시 안 배운다).
+  - ROS 시뮬 (2 판씩, 보상 끔 + 상한 옮김 + 마찰 모델): 정사각형 28 mm (외란 추정 끔 31) — 보상 켬 34, 모델 없이 68.  가감속 8자 28 mm (끔 25) — 보상 켬 32, 모델 없이 35.
+    헤딩도 보상 켠 수준으로 (정사각형 0.6°, 8자 0.4°). 상한 옮김 없이 모델만 켜면 정사각형 64 mm — 둘은 같이 켠다.
+    정사각형에서 큰 슬립이 0 → 0.3~0.8 % 로 조금 생겼다. **실차 판 없음.**
+- 쓰는 법: `limit_mode:=friction friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true` (+ 외란 추정 `disturbance:=true` 는 선택).
+- 남은 것: 마찰 값이 바퀴 띄운 벤치 값 (바닥 구름 저항·정지 마찰 없음), 마찰을 **기준** 속도로 계산 (기준에서 멀리 벗어나면 어긋남). 최종 비교에 켤지는 사용자 (교수님 확인) 결정 —
+  교수님은 "보상은 MPC 안으로 들어가야 하지만 지금은 없이 가고 나중에 결합" 이라 했다.
+
+### 2026-11-24 (2) — 바퀴를 띄운 토크 단계 시험 `ak40_bench.py lifted` + 식별·견인 토크 분석 (`wheel_dynamics.py`, `wheel_param_id.py`)
+- 왜: 바퀴 회전자 식별 지시서 (claude.ai 프로젝트 `claude/wheel_rotor_fbd_param_id.md`, 2026-11-24 사용자가 붙여 넣음) W1~W3·W5.
+  J_w·τ_c·b_v 를 바퀴를 띄운 시험으로 다시 식별하고 (T7 μ 추출의 m_eq 가 J_w 에 달려 있다), 견인 토크 τ_g = τ − τ_fric(ω) − J_w·ω̇ 를
+  T6·T7 분석이 같이 쓰게 한다. 순서·유지 시간·도구 안전장치는 사용자 승인 ("그렇게 진행"). **제어 노드·설정 파라미터는 안 바꿨다.**
+- 바꾼 파일:
+  - `mpc/tools/ak40_bench.py` — 새 명령 `lifted` (status·torque·steps·damping 은 그대로: 지운 줄은 argparse choices 한 줄뿐).
+    단계별 유지 시간 `--holds`, 바퀴 기준 부호 `--frame wheel` (기본, ak40.yaml direction), 속도 상한 `--v_max` (기본 = 정격 370 rpm = 38.7 rad/s,
+    넘으면 토크 0 으로 1 s 더 기록하고 끝), 첫 단계 뒤 |ω| < `--start_min` (3 rad/s) 면 중단, 응답 `--max_miss` (10) 주기 연속 없음·모터 에러면 중단,
+    |τ| > `--tau_cap` (0.1 N·m) 단계가 있으면 CAN 을 열기 전에 거부, 단계 ≤ 10 s · 합 ≤ 60 s. CSV 에 `tau_cmd_q` (12 비트 반올림 뒤 실제 값)·`step` 열,
+    같은 이름 `.json` 에 조건·온도·git 커밋·단계별 끝 1 s 평균. `--out_dir`·`--tag` 면 `YYYYMMDD_HHMM_lifted_<바퀴>_<tag>.csv`.
+  - `mpc/tools/ak40_lifted_w1.sh` (새) — 승인 순서 한 판: `<모터 ID> <fwd|rev> <판 번호> [dry]`. 0.08 (0.5 s) → 0.045 → 0.030 → 0.040 → 0.035 → 0.045 (각 4 s)
+    → 0 (1.5 s). ak40_can_node 가 돌거나 can0 이 꺼져 있으면 거부, "yes" 를 쳐야 돈다.
+  - `mpc/amr_mpc/torque/wheel_dynamics.py` (새, ROS 무관) — `traction_torque` (W3), 마찰 모델 `CoulombViscous`·`ResistanceTable` (둘을 같이 빼지 않는다),
+    `body_force_consistency`, 전처리 (`resample_uniform`·`zero_phase_lowpass`·`central_difference`), 회귀 `fit_wheel_params` (지시서 식 그대로)·
+    `fit_wheel_params_accel` (ω̇ 를 왼쪽에), `steady_state_line`, `coast_inertia`, 합성 자료 `simulate_lifted`.
+  - `mpc/tools/wheel_param_id.py` (새) — lifted CSV → 바퀴별 표 (전진·후진·합쳐서 × 명령·피드백 × 두 회귀, 일정 속도 직선, 자유 감속 J_w), 그림,
+    W5 영향표, `--noise-study` (시험 I2). 설정 파일은 바꾸지 않고 후보만 낸다.
+  - `mpc/test/test_ak40_bench_lifted.py` (새 21) · `mpc/test/test_wheel_dynamics.py` (새 11 — 지시서 I1~I6 + 벤치 CSV → 식별 끝까지).
+- 확인: pytest 511 통과 (새 32). 가짜 모터로 승인 순서 완주·바퀴 기준 부호·속도 상한·출발 실패·응답 끊김·모터 에러 정지.
+  I1 상대 오차 ≤ 1e-5 (기준 1e-3), I3 20.0 rad/s · 1.94 s · −30.85 rad/s², I4·I5 지시서 1.3절 표와 1e-5 안, I6 1e-12.
+  **실제 모터는 안 돌렸다** (can0 꺼짐, 사람 입회 필요) — `ak40_lifted_w1.sh … dry` 와 CAN 꺼진 상태 거부까지만 확인.
+- 알게 된 것:
+  - I2: 지시서 식 그대로의 회귀 (ω̇ 가 설명 변수) 는 속도 잡음 σ 0.3~0.65 rad/s (11-16 벤치 실측 수준, 백색 가정) 에서 J_w 가 −31 ~ −97 % 로 나온다
+    (attenuation bias). ω̇ 를 왼쪽에 둔 회귀는 +0.0~+0.4 % ± 2 %. 11-16 기록 (ss·coast, 한 방향) 에 돌리면 지시서 식 7.0~8.5, ω̇ 왼쪽 9.3~9.6,
+    자유 감속 8.5~9.0 ×10⁻⁴ — 두 회귀가 위아래를 두르고 자유 감속 값이 그 사이. 설정 8.9e-4 는 그 안.
+  - 11-16 의 "J_w 8.77e-4, 설정과 1.4 % 차" 는 계단 차분 도구의 맞춤 구간 (0.10/0.15/0.25 s) 에 따라 5.4~10.3 으로 움직인다 — 불확실성은 ±10 % 로 본다.
+  - 기존 마찰 계수 (11-16) 는 모터 기준 + 한 방향만 잰 값 (오른쪽 바퀴 전진, 왼쪽 바퀴 후진 방향).
+- 쓰는 법: `bash tools/ak40_lifted_w1.sh 2 fwd 1` (바퀴·방향마다 3 판) → `/usr/bin/python3 tools/wheel_param_id.py analysis/torque_mpc_real/<날짜>_lifted --out <같은 폴더>`.
+- 남은 것: W1 실제 시험 (사용자 입회), W4 (바닥 구름 손실 — T7 1단계 자료 필요), 네 바퀴 동시 구동은 안 만들었다 (한 바퀴씩).
+
+### 2026-11-24 (1) — 토크 MPC 마찰 상한 옮김: 보상 끈 판에서 friction 상한 상자를 구동계 마찰만큼 옮긴다 (`mpc_cap_friction_shift`, 기본 끔)
+- 왜: 11-23 교수님 회의 "torque_output 보상을 빼고 MPC 출력을 그대로 모터에" + 후속 작업 지시서 T1 7단계 (B) (사용자 안정민 "만들어 둠으로").
+  보상을 끄면 MPC 의 τ 가 모터 토크라 바닥에 가는 몫이 구동 때 τ̄ − τ_f, 제동 때 τ̄ + τ_f 가 된다. 11-23 (13) 시뮬에서 보상을 끄면 오차 34 → 62 mm 였고
+  원인이 "상한 상자 위치" 였다 (`analysis/torque_mpc_sim/2026-11-23_fric_dhat`). 켤지 말지는 짧은 실차 1 뒤 사용자가 정한다.
+- 바꾼 파일:
+  - `mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp`, `src/torque_mpc.cpp` — 머리주석 "마찰 상한 옮김". `TorqueModel::fric_coulomb·fric_viscous·drivetrain_friction`
+    (torque_output 운동 마찰 항과 같은 식), `TorqueTuning::cap_friction_shift·cap_friction_scale·cap_friction_smooth`,
+    `TorqueMPC::var_box·cap_shift_steps·cap_friction_shift()`. 지평 스텝마다 f = scale·τ_f(T⁻¹ u_r,j) 를 내어
+    cap_on total 이면 변수 상자 [−τ̄ + f, τ̄ + f] (모터 한계 안), cap_on ground 면 바닥 토크 행 ±τ̄ + P f. j=0 "상자가 변화율보다 우선" 그대로.
+    외란 추정 포화 중 멈춤·목표 입력 사영·QP 실패 때 깎기도 옮긴 상자 기준. limit_mode friction 일 때만. 꺼지면 f 를 계산·가산하지 않는다.
+  - `mpc_cpp/src/torque_mpc_node.cpp` — torque_plant.yaml friction 계수 읽기, 파라미터 `cap_friction_shift·_scale·_smooth`, 기동 로그·경고,
+    새 토픽 `/torque_mpc/cap` = [t, 켬, f×4, 상자 아래×4, 위×4] (스텝 0), CSV 끝에 `fs_fl~fs_rr`.
+  - `mpc/config/torque_mpc.yaml` — `torque_limit.friction_shift: false`, `friction_shift_scale: 1.0`, `friction_shift_smooth_rad_s: 0.5`.
+  - `mpc/launch/torque_experiment.launch.py` — 인자 `mpc_cap_friction_shift`. 켰는데 `friction_comp:=false` 가 아니면 기동 거부 (마찰을 두 번 센다).
+    PP 분기는 무시 안내. `real_all.launch.py` `_PASS` 에 추가.
+  - `mpc_cpp/test/test_torque_mpc.cpp` — FrictionShift 7 개. `mpc/test/test_launch_modes.py` — 새 10 개.
+- 확인: colcon 빌드, gtest 57/57 (새 7) · test_wheel_mpc 12/12, pytest 479 통과.
+  끈 상태 회귀 — 수정 전 라이브러리 (c694cbb) 와 10 가지 설정 × 400 스텝 토크가 비트까지 같다.
+  시뮬 (11-23 fric_dhat 과 같은 조건, 두 번씩): 보상 켬 32 mm / 보상 끔 62 → 옮김 35 mm (큰 슬립 0 %, 작은 슬립 9.7 → 7.6 %), 바닥 토크 기준까지 28 mm.
+  외란 추정 끔이면 옮겨도 81 → 60 mm — 외란 추정과 같이 켜야 한다. `analysis/torque_mpc_sim/2026-11-24_cap_friction_shift/RESULTS_KO.md`. **실차 판 없음.**
+- 쓰는 법: `limit_mode:=friction friction_comp:=false disturbance:=true mpc_cap_friction_shift:=true`. 끔 = 인자 없음.
+- 남은 것: 마찰 값이 바퀴 띄운 벤치 값 (바닥 구름 저항 없음) — 지시서 T7 1단계 주행 저항 측정 뒤 scale·계수 조정. 시뮬 한 판 (보상 끔·외란 추정 끔·옮김 켬) 이 첫 시도에
+  11-23 과 같은 "시뮬 플랜트 출력 0.3 s 끊김" 으로 멈췄다 (다시 돌려 정상, 원인 미확인).
 
 ### 2026-11-23 (15) — 토크 MPC 슬립 계수 η_s: 바퀴별 상한 × 1/(1+exp((|λ̃|−0.15)/0.017)) (`slip_eta`, 기본 끔)
 - 왜: 11-23 교수님 회의 "η 토크 상한" (선택 기능) — μ_max 를 1.0 으로 풀고 바퀴별 현재 슬립으로 상한을 줄이는 피드백. 사용자 요청 "에타 있는 모드랑 없는 모드 구분".

@@ -1,0 +1,1 @@
+{"label": "P3_A", "samples": 2772, "fault": "", "rms_mm": 17.745765244775782, "max_mm": 34.641413688515456, "yaw_rms_deg": 4.127727818232844, "moving_rms_mm": 14.168488236973298, "moving_max_mm": 34.58835878574428, "tau_max": 0.21155073972593766, "tau_rms": 0.061696024513521956, "dtau_rms": 0.004450913879275455, "n_torque": 2749, "n_damping_while_armed": 95, "timed_out": false}

@@ -4,6 +4,10 @@
 -- ============================================================================
 include "localization_2d.lua"
 
+-- Isaac publishes two LaserScans.
+options.num_laser_scans = 2
+options.num_point_clouds = 0
+
 TRAJECTORY_BUILDER_2D.max_range = 30.
 TRAJECTORY_BUILDER_2D.adaptive_voxel_filter.max_range = 30.
 TRAJECTORY_BUILDER_2D.missing_data_ray_length = 8.

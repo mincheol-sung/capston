@@ -268,22 +268,27 @@ if __name__ == "__main__":
 # 진짜 쿨롱 마찰에 가깝게 해서, 정지 근처에서는 보상과 실제가 어긋나는 실차 상황을 흉내 낸다.
 # 정지 마찰(stiction)은 따로 두지 않았다 — 힘이 τc 보다 작으면 ω_s 수준으로 아주 천천히 기어간다.
 class DrivetrainFriction:
-    def __init__(self, coulomb, viscous, smooth=0.05):
+    def __init__(self, coulomb, viscous, smooth=0.05, rolling=0.0):
         self.coulomb = wheel_coefficients(coulomb, "coulomb")
         self.viscous = wheel_coefficients(viscous, "viscous")
         self.smooth = max(1e-6, float(smooth))
+        # 2026-11-24 바닥 구름 손실 [N·m, 네 바퀴 공통]: 바퀴 회전 방향을 따르는 일정 토크 (rolling resistance f_r·N·r). 0 이면 예전 그대로
+        self.rolling = float(rolling)
+        if not (self.rolling >= 0.0):
+            raise ValueError("rolling 은 0 이상이어야 한다")
 
     def __call__(self, omega):
         omega = np.asarray(omega, float)
-        return self.coulomb * np.tanh(omega / self.smooth) + self.viscous * omega
+        out = self.coulomb * np.tanh(omega / self.smooth) + self.viscous * omega
+        return out + self.rolling * np.tanh(omega / self.smooth) if self.rolling else out
 
     @property
     def stiffness(self):
         """dτ_fric/dω 의 최댓값 [N·m·s/rad] (ω = 0). 적분 간격을 정할 때 쓴다."""
-        return float(np.max(self.coulomb / self.smooth + self.viscous))
+        return float(np.max((self.coulomb + self.rolling) / self.smooth + self.viscous))
 
     def active(self):
-        return bool(np.any(self.coulomb != 0.0) or np.any(self.viscous != 0.0))
+        return bool(np.any(self.coulomb != 0.0) or np.any(self.viscous != 0.0) or self.rolling != 0.0)
 
     def stable_dt(self, plant, slip=False):
         """RK4 가 안정한 적분 간격 대략값. 슬립 모델은 바퀴 관성(J_w) 하나가, 무슬립은 몸체 전체가 마찰에 붙는다."""

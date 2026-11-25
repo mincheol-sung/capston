@@ -102,3 +102,16 @@ def test_individual_compensation_cancels_each_wheel_friction():
     assert command - f(omega) == pytest.approx(desired, abs=1e-8)
     assert f.stiffness == pytest.approx(np.max(p.fric_coulomb / 0.05 + p.fric_viscous))
     assert f.active() and math.isfinite(f.stable_dt(p, slip=True))
+
+
+def test_rolling_adds_constant_torque_following_wheel_direction():
+    """2026-11-24 바닥 구름 손실: 0 이면 예전 값 그대로, 주면 바퀴마다 rolling·tanh(ω/ω_s) 가 더해진다 (회전 방향)."""
+    p = TorquePlant.from_yaml()
+    omega = np.array([10, -8, 0.0, -4], dtype=float)
+    f0, f1 = DrivetrainFriction(p.fric_coulomb, p.fric_viscous), DrivetrainFriction(p.fric_coulomb, p.fric_viscous, rolling=0.0051)
+    assert np.array_equal(DrivetrainFriction(p.fric_coulomb, p.fric_viscous, rolling=0.0)(omega), f0(omega))
+    assert f1(omega) - f0(omega) == pytest.approx([0.0051, -0.0051, 0.0, -0.0051], abs=1e-12)
+    assert f1.stiffness == pytest.approx(np.max((p.fric_coulomb + 0.0051) / 0.05 + p.fric_viscous))
+    assert DrivetrainFriction(0.0, 0.0, rolling=0.001).active() and not DrivetrainFriction(0.0, 0.0).active()
+    with pytest.raises(ValueError):
+        DrivetrainFriction(p.fric_coulomb, p.fric_viscous, rolling=-0.001)

@@ -192,3 +192,21 @@ def test_cartographer_tracked_cluster_config_has_native_sensor_identity(expand):
         assert node['remappings']['scan_out'] == f'/scan_{side}_static'
     assert nodes['cartographer_node']['remappings']['scan_1'] == '/scan_front_static'
     assert nodes['cartographer_node']['remappings']['scan_2'] == '/scan_rear_static'
+
+
+@pytest.mark.parametrize('enabled', ['true', 'false'])
+def test_real_localization_timed_cloud_routes(expand, tmp_path, enabled):
+    pbstream = tmp_path / 'frozen.pbstream'
+    pbstream.touch()
+    nodes, _ = expand(LAUNCH / 'cartographer.launch.py', mode='localization',
+                      use_dynamic_filter=enabled, pbstream=str(pbstream))
+    remaps = nodes['cartographer_node']['remappings']
+    for i, side in enumerate(('front', 'rear'), 1):
+        source = f'/points_{side}_carto'
+        if enabled == 'true':
+            assert nodes[f'masked_timed_cloud_{side}']['remappings'] == {
+                'points_in': source, 'scan_mask': f'/scan_{side}_static',
+                'points_out': f'/points_{side}_static'}
+            assert remaps[f'points2_{i}'] == f'/points_{side}_static'
+        else:
+            assert remaps[f'points2_{i}'] == source

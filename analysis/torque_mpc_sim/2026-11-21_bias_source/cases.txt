@@ -1,0 +1,8 @@
+# 8자 width 1.2 (R 0.3) · tangent · lap_speeds 0.43/0.61/0.80 · accel 1.0 · d̂ 끔 — 안쪽 치우침의 원인을 하나씩 뺀다
+#   B0 기준 (추정기 상태, 바닥 μ 0.45, C) · B0 반복 · B1 속도만 바퀴 기구학 · B2 참값 상태 · B3 참값 + 슬립 없음 · B4 참값 + 슬립 없음 + 상한 B (포화 없음)
+B0_r1|disturbance:=false surface_mu:=0.45 limit_mode:=friction
+B0_r2|disturbance:=false surface_mu:=0.45 limit_mode:=friction
+B1_r1|disturbance:=false surface_mu:=0.45 limit_mode:=friction velocity_source:=wheels
+B2_r1|disturbance:=false surface_mu:=0.45 limit_mode:=friction state_source:=truth
+B3_r1|disturbance:=false limit_mode:=friction state_source:=truth
+B4_r1|disturbance:=false limit_mode:=motor_only state_source:=truth

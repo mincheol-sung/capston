@@ -1,0 +1,21 @@
+# 2026-11-24 구름 손실 항 (MPC model_terms.fric_rolling_Nm, 상한 옮김에는 안 넣는 보수적 구현) — 시뮬 플랜트에 바닥 구름 손실 5.1 mN·m (등속 12 구간 평균) 를 주고
+#   MPC 값만 바꾼다: 0 (지금) · 2.7 (권장, 모자란 쪽) · 5.1 (플랜트와 같음) · 8.0 (넘치게 — 슬립이 늘지 않는지)
+#   C = 확인 주행 조건 1.0 m/s · 기준 가속 2.5 m/s² · 바닥 μ 0.45 (상한에 닿음) 3 판씩,  G = 0.4 m/s · 0.5 m/s² (상한 안 닿음, 슬립 모델 없음) 2 판씩
+C_r00_1|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_r27_1|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.0027
+C_r80_1|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.008
+C_r00_2|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_r27_2|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.0027
+C_r80_2|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.008
+C_r00_3|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_r27_3|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.0027
+C_r80_3|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.008
+C_r51_1|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.0051
+C_r51_2|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.0051
+C_r51_3|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 mpc_fric_rolling:=0.0051
+G_r00_1|speed:=0.4 accel:=0.5
+G_r27_1|speed:=0.4 accel:=0.5 mpc_fric_rolling:=0.0027
+G_r80_1|speed:=0.4 accel:=0.5 mpc_fric_rolling:=0.008
+G_r00_2|speed:=0.4 accel:=0.5
+G_r27_2|speed:=0.4 accel:=0.5 mpc_fric_rolling:=0.0027
+G_r80_2|speed:=0.4 accel:=0.5 mpc_fric_rolling:=0.008

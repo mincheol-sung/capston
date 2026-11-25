@@ -20,12 +20,20 @@
 ※ 여러 노드가 /cmd_vel 을 쓰는 구성에서는 이것만으로 충분하지 않다. 소유권을 강제하려면
   amr_mpc 의 keyboard_command_gate 를 쓰고, autonomy.launch.py 처럼 use_joystick:=false
   로 띄운다. mpc_tracking_node 는 발행자가 둘 이상이면 ERROR 를 낸다.
+
+AK40 토크 스택에서 쓸 때 (2026-11-23, amr_mpc teleop.launch.py)
+  stamped_output:=true  -> TwistStamped 로 낸다 (wheel_pi_node 의 cmd_topic 꼴).
+  arm_button / disarm_button (기본 -1 = 끔) -> 누르는 순간 한 번 arm_topic(/mpc/arm) 에
+    Bool true / false. 둘이 같이 눌리면 disarm 이 이긴다. disarm 을 누르면 지금 명령도 0 으로.
+  기본값은 전부 예전 동작과 같다 (RoboClaw bringup 은 그대로).
 """
 
 import rclpy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TwistStamped
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
+from std_msgs.msg import Bool
 
 
 class JoyTeleop(Node):
@@ -51,6 +59,11 @@ class JoyTeleop(Node):
         self.declare_parameter("button_rotate_cw", 5)
         self.declare_parameter("enable_button", -1)
         self.declare_parameter("joy_timeout_s", 0.5)
+        self.declare_parameter("stamped_output", False)
+        self.declare_parameter("frame_id", "base_link")
+        self.declare_parameter("arm_button", -1)
+        self.declare_parameter("disarm_button", -1)
+        self.declare_parameter("arm_topic", "/mpc/arm")
 
         self._max_v = float(self.get_parameter("max_linear_vel").value)
         self._max_w = float(self.get_parameter("max_angular_vel").value)
@@ -71,19 +84,31 @@ class JoyTeleop(Node):
         self._btn_cw = int(self.get_parameter("button_rotate_cw").value)
         self._enable_button = int(self.get_parameter("enable_button").value)
         self._joy_timeout_s = float(self.get_parameter("joy_timeout_s").value)
+        self._stamped = bool(self.get_parameter("stamped_output").value)
+        self._frame_id = str(self.get_parameter("frame_id").value)
+        self._btn_arm = int(self.get_parameter("arm_button").value)
+        self._btn_disarm = int(self.get_parameter("disarm_button").value)
 
         self._cmd = Twist()
         self._last_joy_time = None
         self._was_active = False        # 직전 주기에 0 이 아닌 명령을 냈나
+        self._prev_arm = self._prev_disarm = False   # 버튼 누르는 순간(상승 에지)만 보내려고
 
-        self._pub = self.create_publisher(Twist, "cmd_vel", 10)
+        self._pub = self.create_publisher(TwistStamped if self._stamped else Twist, "cmd_vel", 10)
+        self._arm_pub = None
+        if self._btn_arm >= 0 or self._btn_disarm >= 0:
+            self._arm_pub = self.create_publisher(Bool, str(self.get_parameter("arm_topic").value), 10)
         self.create_subscription(Joy, "joy", self._joy_cb, 10)
         self.create_timer(0.05, self._publish)
 
+        # 실제 매핑을 그대로 찍는다 (예전 문구 "right stick x rotate" 는 yaml 과 달랐다)
         self.get_logger().info(
-            "Joy teleop started: left stick x/y strafe/forward, right stick x rotate, "
-            "buttons still enabled "
-            f"(linear {self._max_v} m/s, angular {self._max_w} rad/s)"
+            f"Joy teleop: vx <- axis {self._axis_x}, vy <- axis {self._axis_y}, wz <- axis {self._axis_w} "
+            f"(axis -1 = off), rotate ccw/cw <- button {self._btn_ccw}/{self._btn_cw}, "
+            f"arm/disarm <- button {self._btn_arm}/{self._btn_disarm}; "
+            f"limit vx {self._max_v * self._scale_x:.2f} vy {self._max_v * self._scale_y:.2f} m/s, "
+            f"wz {self._max_w * self._scale_w:.2f} rad/s; "
+            f"{'TwistStamped' if self._stamped else 'Twist'} on {self._pub.topic_name}"
         )
 
     @staticmethod
@@ -103,9 +128,24 @@ class JoyTeleop(Node):
     def _clamp(value: float, limit: float) -> float:
         return max(-limit, min(limit, value))
 
+    def _arm_buttons(self, msg: Joy) -> bool:
+        """arm/disarm 버튼의 상승 에지에서 arm_topic 에 한 번 보낸다. disarm 이 눌려 있으면 True."""
+        arm, disarm = self._pressed(msg, self._btn_arm), self._pressed(msg, self._btn_disarm)
+        if self._arm_pub is not None:
+            if disarm and not self._prev_disarm:
+                self._arm_pub.publish(Bool(data=False))
+                self.get_logger().warn(f"button {self._btn_disarm}: DISARM")
+            elif arm and not self._prev_arm and not disarm:
+                self._arm_pub.publish(Bool(data=True))
+                self.get_logger().info(f"button {self._btn_arm}: ARM")
+        self._prev_arm, self._prev_disarm = arm, disarm
+        return disarm
+
     def _joy_cb(self, msg: Joy):
         cmd = Twist()
-        if self._enabled(msg):
+        if self._arm_buttons(msg):
+            pass                                  # disarm 을 누르고 있는 동안 명령 0
+        elif self._enabled(msg):
             if self._axis_enabled:
                 cmd.linear.x += self._max_v * self._scale_x * self._axis(msg, self._axis_x)
                 cmd.linear.y += self._max_v * self._scale_y * self._axis(msg, self._axis_y)
@@ -152,11 +192,21 @@ class JoyTeleop(Node):
 
         if self._is_idle(self._cmd):
             if self._was_active:                  # 방금 놓았다 -> 정지 한 번만 확실히
-                self._pub.publish(Twist())
+                self._send(Twist())
                 self._was_active = False
             return                                # 그 뒤엔 버스를 놓는다
-        self._pub.publish(self._cmd)
+        self._send(self._cmd)
         self._was_active = True
+
+    def _send(self, cmd: Twist):
+        if not self._stamped:
+            self._pub.publish(cmd)
+            return
+        m = TwistStamped()
+        m.header.stamp = self.get_clock().now().to_msg()
+        m.header.frame_id = self._frame_id
+        m.twist = cmd
+        self._pub.publish(m)
 
 
 def main(args=None):
@@ -164,12 +214,13 @@ def main(args=None):
     node = JoyTeleop()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass        # launch 의 Ctrl+C 는 ExternalShutdownException 으로 온다 (2026-11-23 확인)
     finally:
-        node._pub.publish(Twist())
+        if rclpy.ok():                    # context 가 이미 닫혔으면 못 보낸다 — 정지는 받는 쪽 cmd_timeout 이 맡는다
+            node._send(Twist())
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":

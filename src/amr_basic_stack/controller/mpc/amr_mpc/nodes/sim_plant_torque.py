@@ -99,6 +99,7 @@ class SimPlantTorqueNode(Node):
             ("wheel_efficiency", [1.0, 1.0, 1.0, 1.0]),   # 바퀴별 효율 [FL FR RL RR] (model.py step wheel_eff, 슬립 없는 판만)
             ("friction_scale", 1.0),     # 구동계 마찰 = torque_plant.yaml friction × 이 값. 0 이면 마찰 없음
             ("friction_smooth", 0.05),   # [rad/s] 쿨롱 마찰을 잇는 바퀴 속도 (작을수록 진짜 쿨롱에 가깝고 적분이 잘아진다)
+            ("rolling_Nm", 0.0),         # [N·m] 바닥 구름 손실 (네 바퀴 공통, 바퀴 회전 방향 — 2026-11-24). friction_scale 과 무관, 0 = 없음
             ("can_interface", ""),       # 비우면 ROS 토픽 모드. vcan0 등을 주면 가짜 AK40 모터 모드 (머리주석)
             # 가짜 모터 응답 지연 [s]. 0 = 바로 답함. 실차 slcan(USB 직렬)은 네 모터 응답이 몇 ms 늦을 수 있다
             # (팀원 벤치: 모터 하나 최대 3.6 ms, 네 모터는 9 ms 를 기다림). ak40 reply_wait(4 ms)보다 크게 주면
@@ -114,7 +115,8 @@ class SimPlantTorqueNode(Node):
 
         self.X = np.array([g("x0"), g("y0"), g("yaw0")], float)
         fs = float(g("friction_scale"))
-        self.fric = DrivetrainFriction(fs * self.p.fric_coulomb, fs * self.p.fric_viscous, float(g("friction_smooth")))
+        self.fric = DrivetrainFriction(fs * self.p.fric_coulomb, fs * self.p.fric_viscous, float(g("friction_smooth")),
+                                       rolling=float(g("rolling_Nm")))
         if not self.fric.active():
             self.fric = None
         fe = [float(v) for v in g("floor_efficiency")]

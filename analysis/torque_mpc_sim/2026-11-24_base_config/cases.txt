@@ -1,0 +1,6 @@
+# 2026-11-24 새 기본값 (보상 끔 · 상한 옮김 · 마찰 모델 · 외란 추정 켬) 확인 — 마찰·외란 관련 인자를 하나도 안 주고 띄운다
+base_motor_only|speed:=0.4 accel:=0.5
+base_friction|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 limit_mode:=friction mu_hat_wheels:=off mu_hat:=0.33 mpc_cap_on:=ground
+old_comp_on|speed:=0.4 accel:=0.5 friction_comp:=true
+# 2026-11-25 마찰계수 0.33 (바퀴별 값 끔) · 바닥 토크 기준 상한이 기본값이 된 뒤: limit_mode:=friction 만 준다
+base_friction_1125|speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105 limit_mode:=friction

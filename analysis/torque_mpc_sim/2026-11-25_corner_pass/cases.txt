@@ -1,0 +1,9 @@
+# 2026-11-25 모서리 통과 (corner pass: 꼭짓점 0.1 m/s, 헤딩을 꼭짓점 앞뒤 0.3 m 에서 돌림) — 예전 실차 정사각형 (11-21·11-23, accel 1.5 · v_max 1.5) 조건
+#   지금 상한 (마찰계수 0.33 × 0.8, 바닥 토크) 과 예전 바퀴별 μ̂ (0.598,0.489,0.547,0.703) 비교, 정사각형 vs 꺾은선. 시뮬 바닥 μ 0.45 · 하중 이동 0.105
+sq_now_mpc|shape:=square controller:=mpc limit_mode:=friction accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+sq_old_mpc|shape:=square controller:=mpc limit_mode:=friction accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass mu_hat_wheels:=0.598,0.489,0.547,0.703
+sq_pp|shape:=square controller:=pp accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+pl_now_mpc|shape:=polyline controller:=mpc limit_mode:=friction accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+pl_old_mpc|shape:=polyline controller:=mpc limit_mode:=friction accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass mu_hat_wheels:=0.598,0.489,0.547,0.703
+pl_pp|shape:=polyline controller:=pp accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+pl_now_mpc_F|shape:=polyline poly_path:=F1,L1,L2,R1,R1,R2 controller:=mpc limit_mode:=friction accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass

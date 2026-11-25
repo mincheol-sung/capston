@@ -1,5 +1,6 @@
-import os
 from glob import glob
+import os
+
 from setuptools import find_packages, setup
 
 package_name = 'amr_laser_tools'
@@ -29,6 +30,7 @@ setup(
     entry_points={
         'console_scripts': [
             'scan_merger = amr_laser_tools.scan_merger:main',
+            'masked_timed_cloud = amr_laser_tools.masked_timed_cloud:main',
             'scan_sector_filter = amr_laser_tools.scan_sector_filter:main',
         ],
     },

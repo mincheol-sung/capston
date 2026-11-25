@@ -22,7 +22,8 @@
      limit_mode·disturbance·mu_hat·use_w 같은 MPC 인자는 A 에서 안 쓴다. 2026-11-16 전에는 controller 가 안 넘어가 늘 MPC 가 떴다)
 ※ 카메라 노드(realsense2_camera_node)가 죽으면(2026-11-15 한 번) IMU 가 없어 측위가 위치를 안 낸다 → Ctrl+C 하고 다시.
 ※ use_mpc:=true 이면 게이트가 무장 전에도 DAMPING 을 50 Hz 로 낸다 → basic_motion_test(amrmove)와 같이 쓰지 말 것.
-※ torque_output 의 정지 마찰 보상이 기본으로 켜진다 (plant:=real, 2026-11-16). 보상 없이 비교하려면 stiction_comp:=false
+※ torque_output 의 구동계 마찰 보상 (coulomb·viscous·정지) 은 기본으로 꺼진다 (2026-11-24 사용자 결정). 켜려면 friction_comp:=true
+   (켠 판에서 정지 마찰 보상만 빼려면 stiction_comp:=false. amrstep · amrramp 는 보상을 켠 채 띄운다)
 ※ MPC 모델에는 바퀴 등가 질량 m_w = 4J_w/r² (≈ 2.2 kg) 이 늘 들어간다 (1판 식-3·5, w 항·외란 추정치 지시서 2026-11-16).
   w 항(식-6)은 use_w:=true, 외란 추정치는 disturbance:=true 로 켠다 — 둘 다 기본 끔. yaw_mode:=fixed 면 θ̇ = 0 이라 w = 0.
 """
@@ -42,11 +43,12 @@ _PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_
          "origin_mode", "shape", "crossing_blend_m", "load_budget", "spin_rate", "speed_mod_amp", "speed_mod_cycles", "speed_mod_phase_deg", "speed_mod_shape", "lap_speeds",
          "width", "height", "yaw_mode", "align_s",
          "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_out_and_back", "seg_pause_s", "speed",
-         "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend", "square_corner_mode", "square_rot_s", "square_dwell_s",
-         "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_rot_s", "zigzag_dwell_s",
+         "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend", "square_corner_mode", "square_rot_s", "square_dwell_s", "poly_path",
+         "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_rot_s", "zigzag_dwell_s", "zigzag_reverse",
+         "zigzag_corner", "zigzag_corner_speed", "zigzag_turn_m",
          "accel", "max_ff_ratio", "laps", "hold_s", "max_track_error",
          "ramp_dir", "ramp_tau_max", "ramp_rate", "ramp_distance", "ramp_stop_distance", "ramp_inertia_ff", "ramp_log_dir",
-         "step_dir", "step_tau", "step_distance", "step_max_time", "step_inertia_ff", "step_log_dir", "mpc_W", "mpc_com_height", "mpc_load_weighted_alloc", "mpc_load_dynamic_cap", "mpc_w_delta", "mpc_w_dudt", "mpc_r_u", "mpc_Nc", "mpc_Np", "mpc_q_null", "mpc_dist_alpha", "mpc_dist_accel_only", "mpc_dist_frame", "mpc_dist_freeze", "mpc_dist_acc_max", "mpc_dist_yaw_acc_max", "mpc_dist_observer", "mpc_target_projection", "mpc_cap_on", "slip_eta", "slip_eta_lambda_c", "slip_eta_s", "mpc_ff_normal_scale", "mpc_ff_normal_estimate", "mpc_ff_normal_q", "velocity_source", "est_pose_period", "pp_speed_source", "pp_kp", "pp_ki",
+         "step_dir", "step_tau", "step_distance", "step_max_time", "step_inertia_ff", "step_log_dir", "mpc_W", "mpc_com_height", "mpc_load_weighted_alloc", "mpc_load_dynamic_cap", "mpc_w_delta", "mpc_w_dudt", "mpc_r_u", "mpc_Nc", "mpc_Np", "mpc_q_null", "mpc_dist_alpha", "mpc_dist_accel_only", "mpc_dist_frame", "mpc_dist_freeze", "mpc_dist_acc_max", "mpc_dist_yaw_acc_max", "mpc_dist_observer", "mpc_target_projection", "mpc_cap_on", "mpc_cap_friction_shift", "use_fric_model", "mpc_fric_rolling", "slip_eta", "slip_eta_lambda_c", "slip_eta_s", "mpc_ff_normal_scale", "mpc_ff_normal_estimate", "mpc_ff_normal_q", "velocity_source", "est_pose_period", "pp_speed_source", "pp_kp", "pp_ki",
          "pp_lookahead_min", "pp_lookahead_max", "est_mode", "trip_on_pose_jump", "slip_guard", "est_gains", "est_noise",
          "drive_yaw_deg", "drive_slip_coef", "max_com_height", "path_follow_lead"]                      # 2026-11-23 구동계 방향 보정 (torque_plant.yaml drive)
 

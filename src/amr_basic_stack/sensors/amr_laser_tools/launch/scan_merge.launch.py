@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""두 라이다 스캔 병합 launch.
+"""
+두 라이다 스캔 병합 launch.
 
 /scan_front + /scan_rear -> 단일 /scan (base_link 기준 360°).
 slam_toolbox / sensor_fusion 가 이 /scan 을 소비한다.
@@ -10,6 +11,7 @@ slam_toolbox / sensor_fusion 가 이 /scan 을 소비한다.
   ros2 launch amr_laser_tools scan_merge.launch.py
 """
 import os
+
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -35,6 +37,8 @@ def generate_launch_description():
             remappings=[
                 ('scan_in', '/scan_front'),
                 ('scan_out', '/scan_front_carto'),
+                ('points_in', '/points_front_timed'),
+                ('points_out', '/points_front_carto'),
             ],
         ),
         Node(
@@ -46,6 +50,8 @@ def generate_launch_description():
             remappings=[
                 ('scan_in', '/scan_rear'),
                 ('scan_out', '/scan_rear_carto'),
+                ('points_in', '/points_rear_timed'),
+                ('points_out', '/points_rear_carto'),
             ],
         ),
         Node(

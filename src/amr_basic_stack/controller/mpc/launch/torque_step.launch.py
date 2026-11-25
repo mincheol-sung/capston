@@ -24,6 +24,8 @@ _ARGS = {  # 이 launch 인자 → real_all 인자, 기본값
     "dir": ("step_dir", "fwd"), "tau": ("step_tau", ""), "distance": ("step_distance", ""),
     "max_time": ("step_max_time", "5.0"), "inertia_ff": ("step_inertia_ff", "true"), "log_dir": ("step_log_dir", ""),
     "bag": ("bag", ""), "stiction_comp": ("stiction_comp", ""),
+    # 2026-11-24: 주행 launch 의 마찰 보상 기본이 끔으로 바뀌었다. 이 시험은 "바닥 토크 τ_g 를 준다" 가 정의라 보상을 켠 채로 둔다 (끄려면 friction_comp:=false)
+    "friction_comp": ("friction_comp", "true"),
 }
 
 

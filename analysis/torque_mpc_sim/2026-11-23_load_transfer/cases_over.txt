@@ -1,0 +1,2 @@
+Con200_r1|limit_mode:=friction mpc_com_height:=0.2
+Con200_r2|limit_mode:=friction mpc_com_height:=0.2

@@ -1,0 +1,4 @@
+# 새 d̂ 의 조절: 반복 (r2) / α 0.03 (시정수 0.33 s) / 포화 중 멈춤 끔
+D2_r2|disturbance:=true
+D3_r1|disturbance:=true mpc_dist_alpha:=0.03
+D4_r1|disturbance:=true mpc_dist_freeze:=false

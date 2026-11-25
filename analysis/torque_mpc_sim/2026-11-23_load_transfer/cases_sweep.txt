@@ -1,0 +1,10 @@
+h0|limit_mode:=friction mpc_com_height:=0
+h0.05|limit_mode:=friction mpc_com_height:=0.05
+h0.08|limit_mode:=friction mpc_com_height:=0.08
+h0.10|limit_mode:=friction mpc_com_height:=0.10
+h0.12|limit_mode:=friction mpc_com_height:=0.12
+h0.15|limit_mode:=friction mpc_com_height:=0.15
+h0.20|limit_mode:=friction mpc_com_height:=0.20
+h0.25|limit_mode:=friction mpc_com_height:=0.25
+h0.20_alloc|limit_mode:=friction mpc_com_height:=0.20 mpc_load_dynamic_cap:=false
+h0.12_alloc|limit_mode:=friction mpc_com_height:=0.12 mpc_load_dynamic_cap:=false

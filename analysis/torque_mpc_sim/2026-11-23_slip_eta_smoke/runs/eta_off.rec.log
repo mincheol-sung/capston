@@ -1,0 +1,18 @@
+[WARN] [ros2bag]: Positional "topics" argument deprecated. Please use optional "--topics" argument instead.
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1795438502.034076886] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1795438502.034086238] [rosbag2_recorder]: Event publisher thread: Started
+[INFO] [1795438502.036849772] [rosbag2_recorder]: Starting recording to '/home/smoc/capston/capston/analysis/torque_mpc_sim/2026-11-23_slip_eta_smoke/runs/eta_off'
+[INFO] [1795438502.037968691] [rosbag2_recorder]: Listening for topics...
+[INFO] [1795438502.037990600] [rosbag2_recorder]: Recording...
+[INFO] [1795438502.038008270] [rosbag2_recorder]: Topics discovery started.
+[INFO] [1795438502.143047938] [rosbag2_recorder]: Subscribed to topic '/state_estimator/odom'
+[INFO] [1795438502.144140738] [rosbag2_recorder]: Subscribed to topic '/sim/ground_truth'
+[INFO] [1795438502.145163819] [rosbag2_recorder]: Subscribed to topic '/slip_logger/slip'
+[INFO] [1795438502.147778400] [rosbag2_recorder]: Subscribed to topic '/wheel_states'
+[INFO] [1795438502.760211016] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/cmd_raw'
+[INFO] [1795438502.760628982] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/status'
+[INFO] [1795438502.761538659] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/load'
+[INFO] [1795438502.761920895] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/slip'
+[INFO] [1795438502.992947271] [rosbag2_recorder]: Subscribed to topic '/mpc/armed'
+[INFO] [1795438502.992984637] [rosbag2_recorder]: All requested topics are subscribed. Stopping discovery...
+[INFO] [1795438502.992988917] [rosbag2_recorder]: Topics discovery stopped.

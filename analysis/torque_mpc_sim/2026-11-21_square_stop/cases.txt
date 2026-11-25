@@ -1,0 +1,12 @@
+PP_pass_r1|controller:=pure_pursuit square_corner_mode:=pass
+B_pass_r1|limit_mode:=motor_only square_corner_mode:=pass
+C_pass_r1|limit_mode:=friction square_corner_mode:=pass
+PP_pass_r2|controller:=pure_pursuit square_corner_mode:=pass
+B_pass_r2|limit_mode:=motor_only square_corner_mode:=pass
+C_pass_r2|limit_mode:=friction square_corner_mode:=pass
+PP_stop_r1|controller:=pure_pursuit square_corner_mode:=stop
+B_stop_r1|limit_mode:=motor_only square_corner_mode:=stop
+C_stop_r1|limit_mode:=friction square_corner_mode:=stop
+PP_stop_r2|controller:=pure_pursuit square_corner_mode:=stop
+B_stop_r2|limit_mode:=motor_only square_corner_mode:=stop
+C_stop_r2|limit_mode:=friction square_corner_mode:=stop

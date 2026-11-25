@@ -1,0 +1,3 @@
+# 2026-11-25 꺾은선 shape:=polyline 기본 (정사각형 두 개 8 자, R1,L1,L2,R1,R1,R2) — 새 기본값 (마찰계수 0.33 · 바닥 토크 상한 · 마찰 모델 · 외란 추정)
+stop_a10|square_corner_mode:=stop accel:=1.0 limit_mode:=friction
+pass_a10|square_corner_mode:=pass accel:=1.0 limit_mode:=friction

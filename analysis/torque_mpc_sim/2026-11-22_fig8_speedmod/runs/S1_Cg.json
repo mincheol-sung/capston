@@ -1,0 +1,1 @@
+{"label": "S1_Cg", "samples": 2950, "fault": "", "rms_mm": 13.569351171854564, "max_mm": 30.501693625867087, "yaw_rms_deg": 0.7338331077494753, "moving_rms_mm": 15.34479713427318, "moving_max_mm": 30.501693625867087, "tau_max": 0.18309060146366957, "tau_rms": 0.05949238478918625, "dtau_rms": 0.005839504769681216, "n_torque": 2315, "n_damping_while_armed": 631, "timed_out": false}

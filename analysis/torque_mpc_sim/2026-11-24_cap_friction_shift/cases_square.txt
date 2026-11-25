@@ -1,0 +1,14 @@
+# 2026-11-24 같은 질문을 정사각형 (변 1.5 m, 가속 1.5 m/s², 최고 1.5 m/s, 꼭짓점 0.1 m/s 로 통과, 헤딩 = 변 방향) 에서 — 속도가 크게 오르내리고 꼭짓점에서 바퀴 속도 부호가 바뀐다
+Sq_fc_r1|disturbance:=true
+Sq_fc_r2|disturbance:=true
+Sq_shift_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true
+Sq_shift_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true
+Sq_shift_wide_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0
+Sq_shift_wide_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0
+Sq_shift_nod_r1|disturbance:=false friction_comp:=false mpc_cap_friction_shift:=true
+Sq_shift_nod_r2|disturbance:=false friction_comp:=false mpc_cap_friction_shift:=true
+# d̂ 를 5 배 빠르게 (α 0.05 = 시정수 0.2 s) + 상한 넓힘, 그리고 25 배 (α 0.25 = 0.04 s)
+Sq_shift_a05_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0 mpc_dist_alpha:=0.05
+Sq_shift_a05_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0 mpc_dist_alpha:=0.05
+Sq_shift_a25_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0 mpc_dist_alpha:=0.25
+Sq_shift_a25_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0 mpc_dist_alpha:=0.25

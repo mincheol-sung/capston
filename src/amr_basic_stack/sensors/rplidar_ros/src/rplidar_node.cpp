@@ -36,15 +36,9 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <std_srvs/srv/empty.hpp>
 #include "sl_lidar.h"
-#include "math.h"
+#include "sdk_scan.hpp"
 
 #include <signal.h>
-
-#ifndef _countof
-#define _countof(_Array) (int)(sizeof(_Array) / sizeof(_Array[0]))
-#endif
-
-#define DEG2RAD(x) ((x)*M_PI/180.)
 
 #define ROS2VERSION "1.0.1"
 
@@ -222,67 +216,28 @@ class RPlidarNode : public rclcpp::Node
 
     }
 
-    static float getAngle(const sl_lidar_response_measurement_node_hq_t& node)
+    void publish_sdk_scan(TimedHqNode *nodes, size_t count)
     {
-        return node.angle_z_q14 * 90.f / 16384.f;
-    }
-
-    void publish_scan(rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr& pub,
-                  sl_lidar_response_measurement_node_hq_t *nodes,
-                  size_t node_count, rclcpp::Time start,
-                  double scan_time, bool inverted, bool flip_X_axis,
-                  float angle_min, float angle_max,
-                  float max_distance,
-                  std::string frame_id)
-    {
-        static int scan_count = 0;
-        auto scan_msg = std::make_shared<sensor_msgs::msg::LaserScan>();
-
-        scan_msg->header.stamp = start;
-        scan_msg->header.frame_id = frame_id;
-        scan_count++;
-
-        bool reversed = (angle_max > angle_min);
-        if ( reversed ) {
-            scan_msg->angle_min =  M_PI - angle_max;
-            scan_msg->angle_max =  M_PI - angle_min;
-        } else {
-            scan_msg->angle_min =  M_PI - angle_min;
-            scan_msg->angle_max =  M_PI - angle_max;
+        // Bracket the ROS clock read with the same monotonic clock used by the decoder.
+        const auto before = lidarHostTimeUs();
+        const auto ros_now = this->now();
+        const auto after = lidarHostTimeUs();
+        const auto monotonic_now = before + (after - before) / 2;
+        const auto limits = rplidar_ros::scan_time_bounds(nodes, count);
+        if (limits.end_us > monotonic_now ||
+            (monotonic_now - limits.start_us) > static_cast<sl_u64>(ros_now.nanoseconds() / 1000)) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Cannot map LiDAR time to ROS time yet");
+            return;
         }
-        scan_msg->angle_increment = (scan_msg->angle_max - scan_msg->angle_min) / (double)(node_count-1);
-
-        scan_msg->scan_time = scan_time;
-        scan_msg->time_increment = scan_time / (double)(node_count-1);
-        scan_msg->range_min = 0.15;
-        scan_msg->range_max = max_distance;//8.0;
-
-        scan_msg->intensities.resize(node_count);
-        scan_msg->ranges.resize(node_count);
-        bool reverse_data = (!inverted && reversed) || (inverted && !reversed);
-
-        size_t scan_midpoint = node_count / 2;
-        for (size_t i = 0; i < node_count; i++) {
-            float read_value = (float)nodes[i].dist_mm_q2 / 4.0f / 1000;
-            size_t apply_index = i;
-            if (reverse_data) {
-                apply_index = node_count - 1 - i;
-            }
-            if (flip_X_axis) {
-                if (apply_index >= scan_midpoint)
-                    apply_index = apply_index - scan_midpoint;
-                else
-                    apply_index = apply_index + scan_midpoint;
-            }
-
-            if (read_value == 0.0)
-                scan_msg->ranges[apply_index] = std::numeric_limits<float>::infinity();
-            else
-                scan_msg->ranges[apply_index] = read_value;
-            scan_msg->intensities[apply_index] = (float)(nodes[apply_index].quality >> 2);
-        }
-
-        pub->publish(*scan_msg);
+        const auto age_ns = static_cast<int64_t>(monotonic_now - limits.start_us) * 1000;
+        std_msgs::msg::Header header;
+        header.frame_id = frame_id;
+        header.stamp = ros_now - rclcpp::Duration::from_nanoseconds(age_ns);
+        const auto scan = rplidar_ros::project_sdk_scan(
+            nodes, count, limits, header, angle_compensate ? angle_compensate_multiple : 0,
+            inverted, flip_x_axis, max_distance);
+        scan_pub->publish(scan.laser);
+        points_pub->publish(scan.cloud);
     }
 
     bool set_scan_mode() {
@@ -437,6 +392,7 @@ public:
             return -1;
         }
 
+        points_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("points_timed", 10);
         scan_pub = this->create_publisher<sensor_msgs::msg::LaserScan>(topic_name, rclcpp::QoS(rclcpp::KeepLast(10)));
 
         stop_motor_service = this->create_service<std_srvs::srv::Empty>("stop_motor",  
@@ -446,98 +402,31 @@ public:
 
         //drv->setMotorSpeed();
 
-        rclcpp::Time start_scan_time;
-        rclcpp::Time end_scan_time;
-        double scan_duration;
+        std::vector<TimedHqNode> nodes(8192);
         while (rclcpp::ok() && !need_exit) {
-            sl_lidar_response_measurement_node_hq_t nodes[8192];
-            size_t   count = _countof(nodes);
+            size_t count = nodes.size();
 
             if (auto_standby) {
-                if (scan_pub->get_subscription_count() > 0 && !is_scanning) {
+                const auto subscribers = scan_pub->get_subscription_count() + points_pub->get_subscription_count();
+                if (subscribers > 0 && !is_scanning) {
                     this->start();
                 }
-                else if (scan_pub->get_subscription_count() == 0) {
+                else if (subscribers == 0) {
                     if (is_scanning) {
                         this->stop();
                     }
                 }
             }
 
-            start_scan_time = this->now();
-            op_result = drv->grabScanDataHq(nodes, count);
-            end_scan_time = this->now();
-            scan_duration = (end_scan_time - start_scan_time).seconds();
-
-            if (op_result == SL_RESULT_OK) {
+            op_result = drv->grabTimedScanDataHq(nodes.data(), count);
+            if (op_result == SL_RESULT_OK && count > 0) {
                 if(scan_frequency_tunning_after_scan) { //Set scan frequency(For Slamtec Tof lidar)
                     RCLCPP_INFO(this->get_logger(), "set lidar scan frequency to %.1f Hz(%.1f Rpm) ",scan_frequency,scan_frequency*60);
                     drv->setMotorSpeed(scan_frequency*60); //rpm 
                     scan_frequency_tunning_after_scan = false;
                     continue;
                 }
-                op_result = drv->ascendScanData(nodes, count);
-                float angle_min = DEG2RAD(0.0f);
-                float angle_max = DEG2RAD(359.0f);
-                if (op_result == SL_RESULT_OK) {
-                    if (angle_compensate) {
-                        //const int angle_compensate_multiple = 1;
-                        const int angle_compensate_nodes_count = 360*angle_compensate_multiple;
-                        int angle_compensate_offset = 0;
-                        auto angle_compensate_nodes = new sl_lidar_response_measurement_node_hq_t[angle_compensate_nodes_count];
-                        memset(angle_compensate_nodes, 0, angle_compensate_nodes_count*sizeof(sl_lidar_response_measurement_node_hq_t));
-
-                        size_t i = 0, j = 0;
-                        for( ; i < count; i++ ) {
-                            if (nodes[i].dist_mm_q2 != 0) {
-                                float angle = getAngle(nodes[i]);
-                                int angle_value = (int)(angle * angle_compensate_multiple);
-                                if ((angle_value - angle_compensate_offset) < 0) angle_compensate_offset = angle_value;
-                                for (j = 0; j < angle_compensate_multiple; j++) {
-                                    int angle_compensate_nodes_index = angle_value-angle_compensate_offset + j;
-                                    if(angle_compensate_nodes_index >= angle_compensate_nodes_count)
-                                        angle_compensate_nodes_index = angle_compensate_nodes_count - 1;
-                                    angle_compensate_nodes[angle_compensate_nodes_index] = nodes[i];
-                                }
-                            }
-                        }
-    
-                        publish_scan(scan_pub, angle_compensate_nodes, angle_compensate_nodes_count,
-                                start_scan_time, scan_duration, inverted, flip_x_axis,
-                                angle_min, angle_max, max_distance,
-                                frame_id);
-
-                        if (angle_compensate_nodes) {
-                            delete[] angle_compensate_nodes;
-                            angle_compensate_nodes = nullptr;
-                        }
-                    } else {
-                        int start_node = 0, end_node = 0;
-                        int i = 0;
-                        // find the first valid node and last valid node
-                        while (nodes[i++].dist_mm_q2 == 0);
-                        start_node = i-1;
-                        i = count -1;
-                        while (nodes[i--].dist_mm_q2 == 0);
-                        end_node = i+1;
-
-                        angle_min = DEG2RAD(getAngle(nodes[start_node]));
-                        angle_max = DEG2RAD(getAngle(nodes[end_node]));
-
-                        publish_scan(scan_pub, &nodes[start_node], end_node-start_node +1,
-                                start_scan_time, scan_duration, inverted, flip_x_axis, 
-                                angle_min, angle_max, max_distance,
-                                frame_id);
-                    }
-                } else if (op_result == SL_RESULT_OPERATION_FAIL) {
-                    // All the data is invalid, just publish them
-                    float angle_min = DEG2RAD(0.0f);
-                    float angle_max = DEG2RAD(359.0f);
-                    publish_scan(scan_pub, nodes, count,
-                                start_scan_time, scan_duration, inverted, flip_x_axis,
-                                angle_min, angle_max, max_distance,
-                                frame_id);
-                }
+                publish_sdk_scan(nodes.data(), count);
             }
 
             rclcpp::spin_some(shared_from_this());
@@ -553,6 +442,7 @@ public:
 
   private:
     rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan_pub;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr points_pub;
     rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_motor_service;
     rclcpp::Service<std_srvs::srv::Empty>::SharedPtr stop_motor_service;
 

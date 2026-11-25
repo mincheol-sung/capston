@@ -1,0 +1,24 @@
+Ae_c8_kf_r1|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Ae_sq_kf_r1|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Ae_c8_slam_r1|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Ae_sq_slam_r1|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Aw_c8_kf_r1|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Aw_sq_kf_r1|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Aw_c8_slam_r1|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Aw_sq_slam_r1|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Ae_c8_kf_r2|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Ae_sq_kf_r2|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Ae_c8_slam_r2|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Ae_sq_slam_r2|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Aw_c8_kf_r2|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Aw_sq_kf_r2|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Aw_c8_slam_r2|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Aw_sq_slam_r2|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Ae_c8_kf_r3|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Ae_sq_kf_r3|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Ae_c8_slam_r3|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Ae_sq_slam_r3|controller:=pure_pursuit pp_speed_source:=estimator est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Aw_c8_kf_r3|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=kf shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Aw_sq_kf_r3|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=kf shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass
+Aw_c8_slam_r3|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=slam shape:=circles8 width:=2.0 yaw_mode:=tangent speed:=0.7
+Aw_sq_slam_r3|controller:=pure_pursuit pp_speed_source:=wheels est_mode:=slam shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass

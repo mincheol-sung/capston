@@ -1,0 +1,19 @@
+# 라벨|launch 인자   (2026-11-24 마찰 상한 옮김 — 11-23 회의 후속 지시서 T1 7단계 (B))
+# 공통 (run.sh): circles8 1.6 · laps 2 · speed 0.69 · accel 3.0 계단 변조 · 바닥 μ 0.55 · 플랜트 h 0.2 · C (friction, mpc_com_height 0.2)
+#   = analysis/torque_mpc_sim/2026-11-23_fric_dhat 와 같은 조건. 시뮬 플랜트 구동계 마찰 = torque_plant.yaml 실측값 (정지 마찰 없음)
+# 판마다 2 번 (_r1, _r2)
+Cfc_r1|disturbance:=true
+Cnofc_r1|disturbance:=true friction_comp:=false
+Cshift_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true
+Cshift_nod_r1|disturbance:=false friction_comp:=false mpc_cap_friction_shift:=true
+Cshift_ground_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_cap_on:=ground
+PPnofc_r1|controller:=pp friction_comp:=false
+Cfc_r2|disturbance:=true
+Cnofc_r2|disturbance:=true friction_comp:=false
+Cshift_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true
+Cshift_nod_r2|disturbance:=false friction_comp:=false mpc_cap_friction_shift:=true
+Cshift_ground_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_cap_on:=ground
+PPnofc_r2|controller:=pp friction_comp:=false
+# 2×2 를 채우는 판: 보상 끔 + d̂ 끔 + 상한 그대로 (11-23 에는 시뮬 플랜트 멈춤으로 4/4 실패했던 조합)
+Cnofc_nod_r1|disturbance:=false friction_comp:=false
+Cnofc_nod_r2|disturbance:=false friction_comp:=false

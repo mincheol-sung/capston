@@ -1279,3 +1279,675 @@ TEST(TorqueMPC, SlipScaleCapsWheelAndShiftsTarget)
   EXPECT_LT((F * us_a - F * us_b).cwiseAbs().maxCoeff(), 1e-9);    // 같은 몸체 힘
   EXPECT_LT(std::abs(us_b(0)), 0.01 * std::abs(us_a(0)) + 1e-9);   // FL 몫은 floor² 만큼만
 }
+
+// ── 2026-11-24 마찰 상한 옮김 (torque_mpc.hpp 머리주석, 11-23 회의 후속 지시서 T1 7단계 (B)) ──────────────
+namespace
+{
+// 실차 값 (torque_plant.yaml): 4.56 kg, J_w 8.9e-4, 새 하부 기하, 벤치 실측 구동계 마찰. μ̂ 0.5 · 하중 1/4 씩 → τ̄ 0.1265 N·m
+TorqueModel shift_model(bool uniform_friction = false)
+{
+  TorqueModel md;
+  md.mass = 4.56; md.J_w = 8.9e-4; md.wheel_base = 0.1724; md.robot_width = 0.214;
+  md.tau_rated = 1.3; md.tau_fric_max = 0.1; md.mu_hat = 0.5;
+  if (uniform_friction) {
+    md.fric_coulomb.setConstant(0.02); md.fric_viscous.setConstant(0.001);
+  } else {
+    md.fric_coulomb << 0.0174, 0.0206, 0.0155, 0.0157;
+    md.fric_viscous << 0.001066, 0.001158, 0.001112, 0.001177;
+  }
+  return md;
+}
+
+TorqueTuning shift_tuning(bool on)
+{
+  TorqueTuning tu;
+  tu.limit_mode = TorqueLimitMode::Friction;
+  tu.cap_friction_shift = on;
+  return tu;
+}
+
+// 직선 기준: +x 로 등속 v (헤딩 0). 시각 t 에 x = x0 + v t
+std::vector<TorqueRefPoint> line_ref(double x0, double v, double t, const TorqueTuning & tu)
+{
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= tu.Np; ++j) {ref.push_back({TVec3(x0 + v * (t + j * tu.Ts), 0.0, 0.0), TVec3(v, 0.0, 0.0)});}
+  return ref;
+}
+
+// 왕복 기준: 월드 x 축 위 v(t) = V sin(ω t) (속도 부호가 바뀐다), 헤딩 0
+std::vector<TorqueRefPoint> shuttle_ref(double V, double om, double t, const TorqueTuning & tu)
+{
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= tu.Np; ++j) {
+    const double tt = t + j * tu.Ts;
+    ref.push_back({TVec3(V * (1.0 - std::cos(om * tt)) / om, 0.0, 0.0), TVec3(V * std::sin(om * tt), 0.0, 0.0)});
+  }
+  return ref;
+}
+
+// 구동계 마찰이 보상되지 않는 플랜트: 바퀴에 실제로 걸리는 순토크 = τ − τ_f(실제 바퀴 속도)
+void step_with_friction(Plant & plant, const TVec4 & tau, double Ts)
+{
+  const double c = std::cos(plant.x(2)), s = std::sin(plant.x(2));
+  const TVec3 vb(c * plant.x(3) + s * plant.x(4), -s * plant.x(3) + c * plant.x(4), plant.x(5));
+  plant.step(tau - plant.md.drivetrain_friction(plant.md.wheel_nominal_speeds(vb), 0.5), Ts);
+}
+}  // namespace
+
+// τ_f(ω) = coulomb·tanh(ω/ω_s) + viscous·ω — torque_output.friction_torque 의 운동 마찰 항과 같은 값
+TEST(FrictionShift, DrivetrainFrictionFormula)
+{
+  const TorqueModel md = shift_model();
+  const TVec4 f = md.drivetrain_friction(TVec4(25.0, -25.0, 0.0, 0.1), 0.5);
+  EXPECT_NEAR(f(0), 0.0174 + 0.001066 * 25.0, 1e-12);            // tanh(50) = 1
+  EXPECT_NEAR(f(1), -(0.0206 + 0.001158 * 25.0), 1e-12);         // ω 와 같은 부호
+  EXPECT_NEAR(f(2), 0.0, 1e-15);                                  // ω = 0 에서 연속 (부호 튐 없음)
+  EXPECT_NEAR(f(3), 0.0157 * std::tanh(0.2) + 0.001177 * 0.1, 1e-15);
+  EXPECT_NEAR(TorqueModel{}.drivetrain_friction(TVec4::Constant(30.0), 0.5).norm(), 0.0, 0.0);   // 계수 기본 0
+}
+
+// 끄면 예전과 같은 출력: 마찰 계수가 모델에 들어 있어도 안 쓰인다. 켜도 계수가 0 이면 같은 출력. motor_only 에서는 켜도 안 쓰인다
+TEST(FrictionShift, OffAndZeroFrictionAndMotorOnlyAreUnchanged)
+{
+  TorqueModel md_plain = shift_model();
+  md_plain.fric_coulomb.setZero(); md_plain.fric_viscous.setZero();
+  TorqueMPC base(md_plain, shift_tuning(false)), off(shift_model(), shift_tuning(false)), zero(md_plain, shift_tuning(true));
+  EXPECT_FALSE(off.cap_friction_shift());
+  EXPECT_TRUE(zero.cap_friction_shift());
+  TorqueTuning tm;                                   // motor_only
+  TorqueTuning tm_on = tm;
+  tm_on.cap_friction_shift = true;
+  TorqueMPC mo(shift_model(), tm), mo_on(shift_model(), tm_on);
+  EXPECT_FALSE(mo_on.cap_friction_shift());
+  Plant plant{md_plain};
+  int active = 0;
+  for (int k = 0; k < 150; ++k) {
+    const auto ref = shuttle_ref(1.0, 2.6, k * 0.01, base.tuning());
+    const TVec4 t0 = base.step(plant.x, ref), t1 = off.step(plant.x, ref), t2 = zero.step(plant.x, ref);
+    EXPECT_LT((t0 - t1).cwiseAbs().maxCoeff(), 1e-12) << k;
+    EXPECT_LT((t0 - t2).cwiseAbs().maxCoeff(), 1e-12) << k;
+    EXPECT_LT((mo.step(plant.x, ref) - mo_on.step(plant.x, ref)).cwiseAbs().maxCoeff(), 1e-12) << k;
+    EXPECT_EQ(off.cap_shift_steps().cwiseAbs().maxCoeff(), 0.0);
+    active += base.stats().active > 0;
+    plant.step(t0, 0.01);
+  }
+  EXPECT_GT(active, 50);                             // 상한이 걸리는 판에서 견줬다
+}
+
+// 옮긴 양 = 지평 스텝마다 기준 바퀴 속도의 마찰, 상자 = [−τ̄ + f, τ̄ + f]. 가속 요구면 τ̄ + f 에, 제동 요구면 −τ̄ + f 에 붙는다
+TEST(FrictionShift, BoxIsShiftedByReferenceWheelFriction)
+{
+  const TorqueModel md = shift_model(true);
+  const TorqueTuning tu = shift_tuning(true);
+  const double v = 1.0, tb = md.tau_friction_limit();
+  const double f = 0.02 + 0.001 * v / md.wheel_radius;            // 0.045 N·m (직진 1 m/s → 25 rad/s)
+  ASSERT_NEAR(tb, 0.1265, 1e-4);
+  for (int brake = 0; brake < 2; ++brake) {
+    TorqueMPC mpc(md, tu);
+    TVec6 x;
+    x << (brake ? 0.5 : 0.0), 0.0, 0.0, v, 0.0, 0.0;              // 가속: 기준이 0.5 m 앞.  제동: 로봇이 0.5 m 앞
+    TVec4 tau;
+    for (int k = 0; k < 10; ++k) {
+      tau = mpc.step(x, line_ref(brake ? 0.0 : 0.5, v, 0.0, tu));
+      EXPECT_EQ(mpc.stats().fallback, 0);
+      for (int j = 0; j < tu.Nc; ++j) {
+        for (int i = 0; i < 4; ++i) {
+          double lo, hi;
+          mpc.var_box(i, j, lo, hi);
+          EXPECT_NEAR(mpc.cap_shift_steps()(i, j), f, 1e-12);
+          EXPECT_NEAR(lo, -tb + f, 1e-12);
+          EXPECT_NEAR(hi, tb + f, 1e-12);
+          EXPECT_GE(mpc.solution()(4 * j + i), lo - 1e-9);
+          EXPECT_LE(mpc.solution()(4 * j + i), hi + 1e-9);
+        }
+      }
+    }
+    for (int i = 0; i < 4; ++i) {
+      EXPECT_NEAR(tau(i), brake ? -tb + f : tb + f, 1e-7) << "brake=" << brake << " i=" << i;   // 바닥 쪽 몫 τ − f = ±τ̄
+    }
+  }
+  // 끄면 같은 요구에 ±τ̄ 에 붙는다 — 바닥 쪽 몫은 가속 τ̄ − f (모자람), 제동 −τ̄ − f (넘침)
+  TorqueMPC off(md, shift_tuning(false));
+  TVec6 x;
+  x << 0.0, 0.0, 0.0, v, 0.0, 0.0;
+  TVec4 tau;
+  for (int k = 0; k < 10; ++k) {tau = off.step(x, line_ref(0.5, v, 0.0, tu));}
+  EXPECT_NEAR(tau(0), tb, 1e-7);
+}
+
+// 바퀴별로 다른 마찰 계수·옆걸음 기준: 옮긴 양은 바퀴마다 자기 기준 속도 (부호 포함) 로
+TEST(FrictionShift, PerWheelAndSignFollowsReferenceWheelSpeed)
+{
+  const TorqueModel md = shift_model();
+  const TorqueTuning tu = shift_tuning(true);
+  TorqueMPC mpc(md, tu);
+  std::vector<TorqueRefPoint> ref(tu.Np + 1, {TVec3::Zero(), TVec3(0.0, 0.6, 0.0)});   // 왼쪽 옆걸음 0.6 m/s → ω = [−15, +15, +15, −15]
+  mpc.step(TVec6::Zero(), ref);
+  const TVec4 om = md.wheel_nominal_speeds(TVec3(0.0, 0.6, 0.0));
+  EXPECT_NEAR(om(0), -15.0, 1e-12);
+  const TVec4 f = md.drivetrain_friction(om, 0.5);
+  for (int j = 0; j < tu.Nc; ++j) {EXPECT_LT((mpc.cap_shift_steps().col(j) - f).cwiseAbs().maxCoeff(), 1e-12);}
+  EXPECT_LT(f(0), 0.0);
+  EXPECT_GT(f(1), 0.0);
+  EXPECT_NEAR(f(0), -(0.0174 + 0.001066 * 15.0), 1e-9);
+  // scale 0.5 면 절반
+  TorqueTuning th = tu;
+  th.cap_friction_scale = 0.5;
+  TorqueMPC half(md, th);
+  half.step(TVec6::Zero(), ref);
+  EXPECT_LT((half.cap_shift_steps().col(0) - 0.5 * f).cwiseAbs().maxCoeff(), 1e-12);
+}
+
+// 마찰이 보상되지 않는 플랜트 + 속도 부호가 바뀌는 기준 (왕복, 최대 가속 2.6 m/s² — 상한 밖): QP 실패 없이,
+// 켜면 바닥 쪽 몫 τ − f 가 늘 ±τ̄ 안이고 τ̄ 에 닿는다. 끄면 구동 때 (τ 와 바퀴 속도가 같은 부호) τ̄ − |f| 에 그치고
+// 제동 때 (반대 부호) τ̄ + |f| 로 넘으며 추종이 더 늦다
+TEST(FrictionShift, ClosedLoopWithUncompensatedFriction)
+{
+  const TorqueModel md = shift_model();
+  const double tb = md.tau_friction_limit();
+  struct Out {double g_max, g_min, drive_max, err_rms; int fallback;};   // drive_max: 0.4 m/s 위에서 구동 중인 바퀴의 |τ − f| 최대
+  auto run = [&](bool on) {
+      const TorqueTuning tu = shift_tuning(on);
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      Out o{-1e9, 1e9, 0.0, 0.0, 0};
+      double se = 0.0;
+      const int n = 480;                              // 왕복 2 번 (주기 2.4 s)
+      for (int k = 0; k < n; ++k) {
+        const auto ref = shuttle_ref(1.0, 2.0 * M_PI / 2.4, k * tu.Ts, tu);
+        const TVec4 tau = mpc.step(plant.x, ref);
+        o.fallback += mpc.stats().fallback;
+        // 바닥 쪽 몫: 모터 토크 − 기준 바퀴 속도의 마찰 (MPC 가 본 것과 같은 f — 켠 판의 제약이 지키는 양)
+        const TVec4 fr = md.drivetrain_friction(md.wheel_nominal_speeds(ref[0].second), 0.5);
+        o.g_max = std::max(o.g_max, (tau - fr).maxCoeff());
+        o.g_min = std::min(o.g_min, (tau - fr).minCoeff());
+        const TVec4 omr = md.wheel_nominal_speeds(ref[0].second);
+        for (int i = 0; i < 4; ++i) {
+          if (std::abs(omr(i)) > 10.0 && tau(i) * omr(i) > 0.0) {o.drive_max = std::max(o.drive_max, std::abs(tau(i) - fr(i)));}
+        }
+        step_with_friction(plant, tau, tu.Ts);
+        const double e = plant.x(0) - shuttle_ref(1.0, 2.0 * M_PI / 2.4, (k + 1) * tu.Ts, tu)[0].first(0);
+        se += e * e;
+      }
+      o.err_rms = std::sqrt(se / n);
+      return o;
+    };
+  const Out on = run(true), off = run(false);
+  std::printf("            왕복 2.6 m/s², 마찰 보상 없음 (τ̄ %.4f): 끔 τ−f [%+.4f, %+.4f] 구동 중 최대 %.4f 추종 RMS %.1f mm | "
+    "켬 τ−f [%+.4f, %+.4f] 구동 중 최대 %.4f 추종 RMS %.1f mm\n",
+    tb, off.g_min, off.g_max, off.drive_max, off.err_rms * 1e3, on.g_min, on.g_max, on.drive_max, on.err_rms * 1e3);
+  EXPECT_EQ(on.fallback, 0);
+  EXPECT_EQ(off.fallback, 0);
+  EXPECT_LE(on.g_max, tb + 1e-7);
+  EXPECT_GE(on.g_min, -tb - 1e-7);
+  EXPECT_NEAR(on.g_max, tb, 1e-6);                    // 바닥 쪽 몫이 τ̄ 까지 (양쪽)
+  EXPECT_NEAR(on.g_min, -tb, 1e-6);
+  EXPECT_NEAR(on.drive_max, tb, 1e-6);                // 구동 때도 τ̄ 까지 쓴다
+  EXPECT_LT(off.drive_max, tb - 0.02);                // 끄면 구동 때 τ̄ − |f| 에 그친다 (0.4 m/s 위 |f| ≥ 0.026)
+  EXPECT_GT(off.g_max, tb + 0.01);                    // 끄면 제동 때 τ̄ 를 넘는다 (뒤로 가며 제동)
+  EXPECT_LT(off.g_min, -tb - 0.01);                   //   (앞으로 가며 제동)
+  EXPECT_LT(on.err_rms, off.err_rms);
+}
+
+// cap_on ground 와 같이: 바닥 토크 행이 P f 만큼 옮겨진다 — P (τ − f) 가 ±τ̄ 안, 가속 요구면 τ̄ 에 닿는다
+TEST(FrictionShift, GroundCapRowsShiftByPf)
+{
+  const TorqueModel md = shift_model(true);
+  TorqueTuning tu = shift_tuning(true);
+  tu.cap_on_ground = true;
+  TorqueMPC mpc(md, tu);
+  ASSERT_TRUE(mpc.cap_on_ground() && mpc.cap_friction_shift());
+  const Eigen::Matrix4d P = md.ground_map();
+  const double tb = md.tau_friction_limit(), v = 1.0;
+  TVec6 x;
+  x << 0.0, 0.0, 0.0, v, 0.0, 0.0;
+  double gmax = 0.0;
+  TVec4 tau;
+  for (int k = 0; k < 12; ++k) {
+    tau = mpc.step(x, line_ref(0.5, v, 0.0, tu));
+    EXPECT_EQ(mpc.stats().fallback, 0);
+    for (int j = 0; j < tu.Nc; ++j) {
+      const TVec4 g = P * (mpc.solution().segment<4>(4 * j) - mpc.cap_shift_steps().col(j));
+      EXPECT_LE(g.cwiseAbs().maxCoeff(), tb + 1e-7) << "k=" << k << " j=" << j;
+      double lo, hi;
+      mpc.var_box(0, j, lo, hi);
+      EXPECT_NEAR(hi, md.tau_motor_limit(), 1e-12);   // 바퀴 토크 변수 자체는 모터 한계 (옮기지 않는다)
+      EXPECT_NEAR(lo, -md.tau_motor_limit(), 1e-12);
+    }
+    gmax = std::max(gmax, (P * (tau - mpc.cap_shift_steps().col(0))).maxCoeff());
+  }
+  EXPECT_NEAR(gmax, tb, 1e-6);
+  EXPECT_GT((P * tau).maxCoeff(), tb + 0.02);         // 옮기지 않은 바닥 행 (|P τ| ≤ τ̄) 이었다면 못 낼 토크
+}
+
+// 모터 한계 안으로 자른다. η_s 0 이면 상자가 f 한 점 (바닥 토크 0). 포화 중 멈춤 (d̂) 은 옮긴 상자 기준
+TEST(FrictionShift, MotorLimitSlipScaleAndFreezeUseShiftedBox)
+{
+  TorqueModel md = shift_model(true);
+  md.mu_hat = 2.0;                                    // τ_μ 0.506
+  md.tau_rated = 0.6;                                 // 모터 한계 0.5 → τ̄ = 0.5
+  TorqueTuning tu = shift_tuning(true);
+  {
+    TorqueMPC mpc(md, tu);
+    mpc.step(TVec6::Zero(), line_ref(0.0, 1.0, 0.0, tu));
+    double lo, hi;
+    mpc.var_box(0, 0, lo, hi);
+    EXPECT_NEAR(hi, 0.5, 1e-12);                      // τ̄ + f = 0.545 → 모터 한계 0.5
+    EXPECT_NEAR(lo, -0.5 + 0.045, 1e-12);
+  }
+  const TorqueModel mr = shift_model(true);
+  const double tb = mr.tau_friction_limit(), f = 0.045;
+  {
+    TorqueMPC mpc(mr, tu);
+    TVec6 x;
+    x << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0;
+    for (int k = 0; k < 6; ++k) {mpc.step(x, line_ref(0.5, 1.0, 0.0, tu));}
+    mpc.set_slip_scale(TVec4(0.0, 1.0, 1.0, 1.0));
+    const TVec4 t = mpc.step(x, line_ref(0.5, 1.0, 0.0, tu));
+    EXPECT_EQ(mpc.stats().fallback, 0);
+    EXPECT_NEAR(t(0), f, 1e-9);                       // 바닥 쪽 몫 0 = 모터 토크가 마찰과 같다
+    EXPECT_NEAR(t(1), tb + f, 1e-7);
+  }
+  {
+    TorqueTuning td = tu;
+    td.dist_enable = true; td.dist_alpha = 0.1; td.dist_freeze_on_sat = true; td.dist_skip_xy = -1.0;
+    TorqueMPC on(mr, td);
+    TorqueTuning tdo = td;
+    tdo.cap_friction_shift = false;
+    TorqueMPC off(mr, tdo);
+    TVec6 x;
+    x << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0;
+    for (int k = 0; k < 8; ++k) {on.step(x, line_ref(0.5, 1.0, 0.0, td)); off.step(x, line_ref(0.5, 1.0, 0.0, td));}
+    EXPECT_NEAR(on.tau_prev()(0), tb + f, 1e-7);
+    EXPECT_EQ(on.stats().d_skipped, 3);               // 옮긴 상자 위끝 (τ − f = τ̄) 에 붙었다 → 멈춤
+    EXPECT_EQ(off.stats().d_skipped, 3);              // 끈 판은 예전 판정 그대로 (τ = τ̄)
+  }
+  // 잘못된 값은 거부
+  TorqueTuning bad = tu;
+  bad.cap_friction_scale = 2.0;
+  EXPECT_THROW(TorqueMPC(mr, bad), std::invalid_argument);
+  TorqueModel mneg = mr;
+  mneg.fric_coulomb(2) = -0.01;
+  EXPECT_THROW(TorqueMPC(mneg, tu), std::invalid_argument);
+  TorqueTuning off_bad = bad;
+  off_bad.cap_friction_shift = false;
+  EXPECT_NO_THROW(TorqueMPC(mr, off_bad));            // 끄면 값을 보지 않는다
+}
+
+// ── 2026-11-24 마찰 모델 (torque_mpc.hpp 머리주석, 지시서 T11b 앞당김 — 지시서 6.4절 시험 F1~F4) ──────────────
+namespace
+{
+TorqueTuning fric_tuning(bool model, bool shift = true)
+{
+  TorqueTuning tu = shift_tuning(shift);
+  tu.use_fric_model = model;
+  return tu;
+}
+
+// 헤딩 고정 (θ = 0) 정사각형: 변 L, 변마다 0 에서 가속 a 로 올라갔다 0 으로 선다 (꼭짓점 정지). 방향 +x → +y → −x → −y.
+//   변이 바뀔 때마다 바퀴 속도 부호 조합이 바뀐다 (쿨롱 마찰 부호 전환). 반환 (포즈, 몸체 속도) — 끝난 뒤는 출발점에 정지
+TorqueRefPoint fixed_square(double L, double a, double t)
+{
+  const double T = 2.0 * std::sqrt(L / a);                       // 한 변 시간 (삼각형 속도)
+  const double dirs[4][2] = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+  const double corners[5][2] = {{0, 0}, {L, 0}, {L, L}, {0, L}, {0, 0}};
+  if (t <= 0.0) {return {TVec3(0, 0, 0), TVec3::Zero()};}
+  const int k = static_cast<int>(t / T);
+  if (k >= 4) {return {TVec3(0, 0, 0), TVec3::Zero()};}
+  const double s = t - k * T, h = 0.5 * T;
+  const double v = s < h ? a * s : a * (T - s);
+  const double d = s < h ? 0.5 * a * s * s : L - 0.5 * a * (T - s) * (T - s);
+  return {TVec3(corners[k][0] + dirs[k][0] * d, corners[k][1] + dirs[k][1] * d, 0.0), TVec3(dirs[k][0] * v, dirs[k][1] * v, 0.0)};
+}
+}  // namespace
+
+// F1: 끄면 예전과 같은 출력. 켜도 마찰 계수가 0 이면 같은 출력 (상한 옮김·외란 추정·선형화 방식을 바꿔 가며)
+TEST(FrictionModel, F1_OffAndZeroFrictionAreUnchanged)
+{
+  TorqueModel md0 = shift_model();
+  md0.fric_coulomb.setZero(); md0.fric_viscous.setZero();
+  for (int variant = 0; variant < 3; ++variant) {
+    TorqueTuning tu = fric_tuning(false, variant != 1);
+    if (variant == 2) {
+      tu.dist_enable = true; tu.dist_alpha = 0.1; tu.dist_body_frame = true; tu.dist_accel_only = true;
+      tu.linearization = TorqueLinearization::CurrentState;
+    }
+    TorqueTuning tu_on = tu;
+    tu_on.use_fric_model = true;
+    TorqueMPC base(md0, tu), off(shift_model(), tu), zero(md0, tu_on);
+    EXPECT_FALSE(off.use_fric_model());
+    EXPECT_TRUE(zero.use_fric_model());
+    Plant plant{md0};
+    for (int k = 0; k < 120; ++k) {
+      const auto ref = shuttle_ref(1.0, 2.6, k * 0.01, tu);
+      const TVec4 t0 = base.step(plant.x, ref);
+      if (variant != 0) {      // 상한 옮김이 켜진 variant 0 은 마찰 계수가 있는 off 와 상자가 다르다 — 계수 0 인 것끼리만 견준다
+        EXPECT_LT((t0 - off.step(plant.x, ref)).cwiseAbs().maxCoeff(), variant == 1 ? 1e-12 : 1.0) << variant << " " << k;
+      }
+      EXPECT_LT((t0 - zero.step(plant.x, ref)).cwiseAbs().maxCoeff(), 1e-12) << variant << " " << k;
+      EXPECT_EQ(off.fric_model_steps().cwiseAbs().maxCoeff(), 0.0);
+      plant.step(t0, 0.01);
+    }
+  }
+}
+
+// 목표 입력에 바퀴마다 τ_b 가 그대로 더해지고, 예측의 영입력 응답에는 −B τ_b 가 들어간다 (U = U_s 면 기준을 그대로 따라간다고 예측)
+TEST(FrictionModel, TargetInputAndPredictionCarryFriction)
+{
+  const TorqueModel md = shift_model();
+  TorqueTuning tu = fric_tuning(true);
+  tu.constrained = false;                                      // 제약 없이 — 모델 식만 본다
+  TorqueMPC on(md, tu), off(md, fric_tuning(false));
+  TVec6 x;
+  x << 0.0, 0.0, 0.0, 0.8, 0.0, 0.0;                           // 기준 위, 등속 0.8 m/s
+  const auto ref = line_ref(0.0, 0.8, 0.0, tu);
+  for (int k = 0; k < 200; ++k) {      // 같은 상태·기준을 되풀이 — 토크 변화 벌점이 직전 토크 (처음엔 0) 쪽으로 당기는 과도를 지나 보낸다
+    on.step(x, ref);
+    off.step(x, ref);
+  }
+  const TVec4 tb = md.drivetrain_friction(md.wheel_nominal_speeds(TVec3(0.8, 0.0, 0.0)), 0.5);
+  EXPECT_NEAR(tb(1), 0.0206 + 0.001158 * 20.0, 1e-9);
+  for (int j = 0; j < tu.Np; ++j) {EXPECT_LT((on.fric_model_steps().col(j) - tb).cwiseAbs().maxCoeff(), 1e-12);}
+  for (int j = 0; j < tu.Nc; ++j) {
+    EXPECT_LT((on.target_input().segment<4>(4 * j) - off.target_input().segment<4>(4 * j) - tb).cwiseAbs().maxCoeff(), 1e-12);
+  }
+  // 기준 위·등속이면 모델이 요구하는 토크는 0 → 해는 τ_b (마찰만 메운다), 예측 오차는 0
+  EXPECT_LT((on.solution().head<4>() - tb).cwiseAbs().maxCoeff(), 1e-6);
+  EXPECT_LT(on.predicted_error().cwiseAbs().maxCoeff(), 1e-6);
+  // 마찰 모델이 없으면 해는 0 근처이고, 그 해로는 실제로 0.8 m/s 를 못 지킨다 (모델은 지킨다고 예측)
+  EXPECT_LT(off.solution().head<4>().cwiseAbs().maxCoeff(), 1e-6);
+}
+
+// F2: 1 차원. 몸체 쿨롱 마찰 F_c = 1 N (바퀴마다 r/4 = 0.01 N·m), m_eq = 6.985 kg (4.56 kg + J_w 9.7e-4).
+//   앞으로 가며 수렴한 외란 추정치를 든 채 뒤로 가는 기준을 받으면 (마찰 부호가 지평 전체에서 반대) j = 75 위치 예측이 0.08 m 틀린다
+//   (지시서 검산 0.079 m = (75·74/2)·Ts·2·F_c/m_eq·Ts — 위치 성분 ½Ts² 몫을 뺀 값. 정확히는 ½·(2F_c/m_eq)·0.75² = 0.0805).
+//   마찰 모델 (외란 추정 끔) 은 같은 조건에서 1e-6 m 이하.
+TEST(FrictionModel, F2_SignFlipPredictionError)
+{
+  TorqueModel md;                                              // 기본 J_w 9.7e-4, r 0.04
+  md.mass = 4.56;
+  md.fric_coulomb.setConstant(0.01);
+  ASSERT_NEAR(md.m_eff(), 6.985, 1e-3);
+  const double Fc = 4.0 * 0.01 / md.wheel_radius, v = 0.5;
+  ASSERT_NEAR(Fc, 1.0, 1e-12);
+  auto run = [&](bool model, bool dist) {
+      TorqueTuning tu;
+      tu.Np = 75; tu.Nc = 10;
+      tu.use_fric_model = model;
+      tu.dist_enable = dist; tu.dist_alpha = 1.0; tu.dist_skip_xy = -1.0;
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      plant.x << 0.0, 0.0, 0.0, v, 0.0, 0.0;
+      for (int k = 0; k < 30; ++k) {                           // 앞으로 등속 (마찰 −1 N) — 외란 추정치가 그 부호로 수렴
+        const TVec4 tau = mpc.step(plant.x, line_ref(plant.x(0), v, 0.0, tu));
+        step_with_friction(plant, tau, tu.Ts);
+      }
+      const double d_vel = mpc.d_hat()(3);
+      // 이제 같은 자리에서 뒤로 가는 기준·상태 (마찰 +1 N). 상태 간격을 어긋나게 줘서 이번 주기 외란 추정 갱신은 건너뛴다
+      TVec6 x = plant.x;
+      x(3) = -v;
+      std::vector<TorqueRefPoint> ref;
+      for (int j = 0; j <= tu.Np; ++j) {ref.push_back({TVec3(x(0) - v * j * tu.Ts, 0.0, 0.0), TVec3(-v, 0.0, 0.0)});}
+      mpc.step(x, ref, nullptr, 0.05);
+      EXPECT_EQ(mpc.stats().d_skipped, 1);                     // 외란 추정을 꺼도 계산은 하므로 건너뜀 표시는 늘 남는다
+      // 같은 입력열 (Nc 뒤 유지) 을 실제 마찰이 있는 플랜트에 넣어 j = 75 의 위치를 견준다
+      const Eigen::VectorXd pe = mpc.predicted_error();
+      double xp = x(0), vp = x(3);
+      for (int j = 0; j < tu.Np; ++j) {
+        const TVec4 tau = mpc.solution().segment<4>(4 * std::min(j, tu.Nc - 1));
+        const TVec4 om = md.wheel_nominal_speeds(TVec3(vp, 0.0, 0.0));
+        const double acc = (md.G(0.0) * (tau - md.drivetrain_friction(om, 0.5)))(0);
+        xp += tu.Ts * vp + 0.5 * tu.Ts * tu.Ts * acc;
+        vp += tu.Ts * acc;
+      }
+      const double x_pred = pe(6 * (tu.Np - 1)) + ref[tu.Np].first(0);
+      return std::make_pair(std::abs(x_pred - xp), d_vel);
+    };
+  const auto dhat_only = run(false, true), model_only = run(true, false);
+  std::printf("            F2: j = 75 위치 예측 오차 — 외란 추정만 %.4f m (추정치 속도 성분 %.3e m/s), 마찰 모델 %.2e m\n",
+    dhat_only.first, dhat_only.second, model_only.first);
+  EXPECT_NEAR(dhat_only.second, -Fc / md.m_eff() * 0.01, 2e-5);               // 한 스텝 속도 잔차 −1.43e-3 m/s
+  EXPECT_NEAR(dhat_only.first, 0.5 * (2.0 * Fc / md.m_eff()) * 0.75 * 0.75, 2e-3);   // 0.0805 m
+  EXPECT_NEAR(dhat_only.first, 0.079, 3e-3);                                  // 지시서 검산값
+  EXPECT_LT(model_only.first, 1e-6);
+}
+
+// F3: 기준 속도가 0 을 지날 때 τ_b 와 목표 입력이 연속 (부호 떨림 없음)
+TEST(FrictionModel, F3_ContinuousThroughZeroSpeed)
+{
+  const TorqueModel md = shift_model();
+  double prev = md.drivetrain_friction(TVec4::Constant(-2.0), 0.5)(0);
+  for (double w = -2.0; w <= 2.0; w += 0.01) {                 // 한 칸 0.01 rad/s 에 최대 (c/ω_s + b)·0.01 만큼만 바뀐다
+    const double f = md.drivetrain_friction(TVec4::Constant(w), 0.5)(0);
+    EXPECT_LE(std::abs(f - prev), (0.0174 / 0.5 + 0.001066) * 0.01 + 1e-12);
+    EXPECT_GE(f * w, 0.0);                                     // ω 와 같은 부호
+    prev = f;
+  }
+  TorqueTuning tu = fric_tuning(true);
+  tu.Np = 75; tu.Nc = 40;
+  TorqueMPC mpc(md, tu);
+  double jump = 0.0;
+  for (int k = 0; k < 240; ++k) {                              // 왕복 한 주기 (속도 부호 두 번 바뀜)
+    const auto ref = shuttle_ref(1.0, 2.0 * M_PI / 2.4, k * tu.Ts, tu);
+    TVec6 x;
+    x << ref[0].first(0), 0.0, 0.0, ref[0].second(0), 0.0, 0.0;
+    mpc.step(x, ref);
+    for (int j = 1; j < tu.Nc; ++j) {
+      jump = std::max(jump, (mpc.target_input().segment<4>(4 * j) - mpc.target_input().segment<4>(4 * (j - 1))).cwiseAbs().maxCoeff());
+    }
+  }
+  // 스텝 사이 변화: 기준 가속 2.6 m/s² → 바퀴 0.66 rad/s/스텝 → 마찰 ≤ (0.0206/0.5 + 0.0012)·0.66 = 0.028, 모델 토크 변화는 작다
+  EXPECT_LT(jump, 0.035);
+}
+
+// F4: 오프라인 폐루프. 마찰이 보상되지 않는 강체 플랜트, 헤딩 고정 정사각형 (변마다 바퀴 속도 부호 조합이 바뀐다), 상한 옮김 켬.
+//   마찰 모델이 외란 추정만 쓴 경우 (노드 기본 설정: 평균 1 s, 몸체 좌표, 상한 0.5 · 2.0) 보다 전체·꼭짓점 전후 위치 오차가 작다
+TEST(FrictionModel, F4_SquareClosedLoop)
+{
+  const TorqueModel md = shift_model();
+  const double L = 1.0, a = 1.5, Tside = 2.0 * std::sqrt(L / a);
+  struct Out {double rms, corner_rms, max; int fallback;};
+  auto run = [&](bool model, bool dist) {
+      TorqueTuning tu = fric_tuning(model);
+      tu.Np = 75; tu.Nc = 40;
+      tu.W << 20.0, 20.0, 10.0, 2.0, 2.0, 1.0;
+      tu.w_delta = 100.0; tu.r_u = 10.0;
+      tu.dist_enable = dist; tu.dist_alpha = 0.01; tu.dist_accel_only = true; tu.dist_body_frame = true;
+      tu.dist_freeze_on_sat = true; tu.dist_acc_max = 0.5; tu.dist_yaw_acc_max = 2.0;
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      Out o{0.0, 0.0, 0.0, 0};
+      double se = 0.0, sc = 0.0;
+      int n = 0, nc = 0;
+      const int steps = static_cast<int>(4.0 * Tside / tu.Ts) + 50;
+      for (int k = 0; k < steps; ++k) {
+        const double t = k * tu.Ts;
+        std::vector<TorqueRefPoint> ref;
+        for (int j = 0; j <= tu.Np; ++j) {ref.push_back(fixed_square(L, a, t + j * tu.Ts));}
+        const TVec4 tau = mpc.step(plant.x, ref);
+        o.fallback += mpc.stats().fallback;
+        step_with_friction(plant, tau, tu.Ts);
+        const auto r = fixed_square(L, a, t + tu.Ts);
+        const double e = (plant.x.head<2>() - r.first.head<2>()).norm();
+        se += e * e; ++n;
+        o.max = std::max(o.max, e);
+        const double ph = std::fmod(t + tu.Ts, Tside);                        // 꼭짓점 전후 0.3 s
+        if (t + tu.Ts > 0.3 && (ph < 0.3 || ph > Tside - 0.3)) {sc += e * e; ++nc;}
+      }
+      o.rms = std::sqrt(se / n);
+      o.corner_rms = std::sqrt(sc / std::max(nc, 1));
+      return o;
+    };
+  const Out dhat = run(false, true), model = run(true, false), both = run(true, true), none = run(false, false);
+  std::printf("            F4 정사각형 (헤딩 고정, 변 1 m, 가속 1.5): 위치 오차 RMS / 꼭짓점 전후 RMS / 최대 [mm]\n"
+    "              외란 추정·마찰 모델 모두 끔 %5.1f / %5.1f / %5.1f\n"
+    "              외란 추정만              %5.1f / %5.1f / %5.1f\n"
+    "              마찰 모델만              %5.1f / %5.1f / %5.1f\n"
+    "              둘 다                    %5.1f / %5.1f / %5.1f\n",
+    none.rms * 1e3, none.corner_rms * 1e3, none.max * 1e3, dhat.rms * 1e3, dhat.corner_rms * 1e3, dhat.max * 1e3,
+    model.rms * 1e3, model.corner_rms * 1e3, model.max * 1e3, both.rms * 1e3, both.corner_rms * 1e3, both.max * 1e3);
+  EXPECT_EQ(dhat.fallback + model.fallback + both.fallback + none.fallback, 0);
+  EXPECT_LT(model.rms, dhat.rms);
+  EXPECT_LT(model.corner_rms, dhat.corner_rms);
+  EXPECT_LT(both.rms, dhat.rms);
+}
+
+// 외란 추정 잔차에도 마찰이 들어간다: 플랜트 마찰 = 모델 마찰이면 외란 추정치가 0 근처에 머문다 (이중 반영 없음)
+TEST(FrictionModel, ResidualExcludesModeledFriction)
+{
+  const TorqueModel md = shift_model();
+  auto run = [&](bool model) {
+      TorqueTuning tu = fric_tuning(model);
+      tu.dist_enable = true; tu.dist_alpha = 0.1; tu.dist_skip_xy = -1.0;
+      TorqueMPC mpc(md, tu);
+      Plant plant{md};
+      plant.x << 0.0, 0.0, 0.0, 0.8, 0.0, 0.0;
+      for (int k = 0; k < 200; ++k) {
+        const TVec4 tau = mpc.step(plant.x, line_ref(plant.x(0), 0.8, 0.0, tu));
+        step_with_friction(plant, tau, tu.Ts);
+      }
+      return std::abs(mpc.d_hat()(3)) / tu.Ts;                 // 외란 추정치의 가속도 크기 [m/s²]
+    };
+  const double a_off = run(false), a_on = run(true);
+  std::printf("            등속 0.8 m/s, 마찰 보상 없음: 외란 추정 가속도 — 마찰 모델 끔 %.3f, 켬 %.4f m/s²\n", a_off, a_on);
+  EXPECT_GT(a_off, 0.3);                                       // 마찰 전체 (약 0.6 m/s²) 를 외란으로 배운다
+  EXPECT_LT(a_on, 0.02);                                       // 모델에 넣은 몫은 다시 배우지 않는다
+}
+
+TEST(FrictionModel, BadParamsThrowOnlyWhenOn)
+{
+  TorqueModel md = shift_model();
+  TorqueTuning tu = fric_tuning(true, false);
+  tu.cap_friction_scale = 3.0;
+  EXPECT_THROW(TorqueMPC(md, tu), std::invalid_argument);
+  tu.use_fric_model = false;
+  EXPECT_NO_THROW(TorqueMPC(md, tu));
+  TorqueTuning mo;                                             // motor_only 에서도 마찰 모델은 켜진다 (상한 옮김만 friction 전용)
+  mo.use_fric_model = true;
+  EXPECT_TRUE(TorqueMPC(md, mo).use_fric_model());
+}
+
+// ── 2026-11-24 구름 손실 (torque_mpc.hpp 머리주석 "마찰 모델" 끝, TorqueTuning::fric_rolling) ──────────────
+// R1: 마찰 모델이 꺼져 있으면 값을 줘도 안 쓰인다 (비트까지 같은 출력). 켜고 0 이면 지평의 마찰이 구동계 마찰 그대로다
+TEST(FrictionRolling, R1_ModelOffIgnoresValueAndZeroAddsNothing)
+{
+  const TorqueModel md = shift_model();
+  TorqueTuning tu = fric_tuning(false);
+  tu.dist_enable = true; tu.dist_alpha = 0.1; tu.dist_body_frame = true; tu.dist_accel_only = true;
+  TorqueTuning tr = tu;
+  tr.fric_rolling = 0.005;
+  TorqueMPC a(md, tu), b(md, tr);
+  Plant plant{md};
+  for (int k = 0; k < 150; ++k) {
+    const auto ref = shuttle_ref(1.0, 2.6, k * 0.01, tu);
+    const TVec4 ta = a.step(plant.x, ref);
+    EXPECT_EQ((ta - b.step(plant.x, ref)).cwiseAbs().maxCoeff(), 0.0) << k;
+    step_with_friction(plant, ta, 0.01);
+  }
+  TorqueMPC zero(md, fric_tuning(true));               // fric_rolling 기본 0
+  TVec6 x;
+  x << 0.0, 0.0, 0.0, 0.8, 0.0, 0.0;
+  zero.step(x, line_ref(0.0, 0.8, 0.0, tu));
+  const TVec4 tb = md.drivetrain_friction(md.wheel_nominal_speeds(TVec3(0.8, 0.0, 0.0)), 0.5);
+  for (int j = 0; j < tu.Np; ++j) {EXPECT_EQ((zero.fric_model_steps().col(j) - tb).cwiseAbs().maxCoeff(), 0.0);}
+  TorqueTuning bad = fric_tuning(true);
+  bad.fric_rolling = -0.001;
+  EXPECT_THROW(TorqueMPC(md, bad), std::invalid_argument);
+  bad.fric_rolling = 0.03;
+  EXPECT_THROW(TorqueMPC(md, bad), std::invalid_argument);
+}
+
+// R2: 값을 주면 모델 쪽 마찰 (지평 스텝·목표 입력) 에 바퀴마다 τ_roll·tanh(ω_r/ω_s) 가 더해진다 — 부호는 기준 바퀴 속도.
+//   상한 옮김의 f 와 변수 상자는 그대로다 (허용 모터 토크가 안 바뀐다)
+TEST(FrictionRolling, R2_AddsToModelNotToCapShift)
+{
+  const TorqueModel md = shift_model();
+  const double R = 0.0027, vy = 0.4;
+  const TorqueTuning tu0 = fric_tuning(true);
+  TorqueTuning tu1 = tu0;
+  tu1.fric_rolling = R;
+  TorqueMPC m0(md, tu0), m1(md, tu1);
+  TVec6 x;
+  x << 0.0, 0.0, 0.0, 0.0, vy, 0.0;                     // 옆걸음 0.4 m/s (10 rad/s): 바퀴 속도 부호 [−, +, +, −]
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= tu0.Np; ++j) {ref.push_back({TVec3(0.0, vy * j * tu0.Ts, 0.0), TVec3(0.0, vy, 0.0)});}
+  m0.step(x, ref);
+  m1.step(x, ref);
+  const TVec4 wn = md.wheel_nominal_speeds(TVec3(0.0, vy, 0.0));
+  TVec4 add;
+  for (int i = 0; i < 4; ++i) {add(i) = R * std::tanh(wn(i) / 0.5);}
+  EXPECT_NEAR(add(0), -R, 1e-9); EXPECT_NEAR(add(1), R, 1e-9); EXPECT_NEAR(add(2), R, 1e-9); EXPECT_NEAR(add(3), -R, 1e-9);
+  for (int j = 0; j < tu0.Np; ++j) {
+    EXPECT_LT((m1.fric_model_steps().col(j) - m0.fric_model_steps().col(j) - add).cwiseAbs().maxCoeff(), 1e-15);
+  }
+  for (int j = 0; j < tu0.Nc; ++j) {
+    EXPECT_LT((m1.target_input().segment<4>(4 * j) - m0.target_input().segment<4>(4 * j) - add).cwiseAbs().maxCoeff(), 1e-12);
+    EXPECT_EQ((m1.cap_shift_steps().col(j) - m0.cap_shift_steps().col(j)).cwiseAbs().maxCoeff(), 0.0);
+    for (int i = 0; i < 4; ++i) {
+      double lo0, hi0, lo1, hi1;
+      m0.var_box(i, j, lo0, hi0);
+      m1.var_box(i, j, lo1, hi1);
+      EXPECT_EQ(lo0, lo1);
+      EXPECT_EQ(hi0, hi1);
+    }
+  }
+  // 기준 위·등속이면 해는 τ_b + τ_roll (마찰만 메운다), 예측 오차 0
+  for (int k = 0; k < 200; ++k) {m1.step(x, ref);}
+  EXPECT_LT((m1.solution().head<4>() - m1.fric_model_steps().col(0)).cwiseAbs().maxCoeff(), 1e-6);
+  EXPECT_LT(m1.predicted_error().cwiseAbs().maxCoeff(), 1e-6);
+}
+
+// R3 (보수적): 상한에 닿는 요구에서 값을 실제보다 훨씬 크게 줘도 (0.02 N·m) 낸 토크는 값 0 일 때와 같은 상자 [−τ̄ + f, τ̄ + f] 안이다
+//   — 모델이 세는 바닥 쪽 몫 τ − f 가 ±τ̄ 를 넘지 않는다. (f 에 넣었다면 가속 때 τ̄ + f + 0.02 까지 냈을 것이다)
+//   ★ 제동은 값과 무관하게 −τ̄ + f 에 붙는다 → 실제 마찰이 f + R 이면 실제 바닥 토크는 −(τ̄ + R): 구동 쪽만 보수적이다 (머리주석)
+TEST(FrictionRolling, R3_OverEstimateCannotRaiseTorqueAtCap)
+{
+  const TorqueModel md = shift_model(true);
+  const TorqueTuning tu = fric_tuning(true);
+  TorqueTuning tr = tu;
+  tr.fric_rolling = 0.02;
+  const double v = 1.0, tb = md.tau_friction_limit();
+  const double f = 0.02 + 0.001 * v / md.wheel_radius;            // 0.045 N·m
+  for (int brake = 0; brake < 2; ++brake) {
+    TorqueMPC m0(md, tu), m1(md, tr);
+    TVec6 x;
+    x << (brake ? 0.5 : 0.0), 0.0, 0.0, v, 0.0, 0.0;              // 가속: 기준이 0.5 m 앞.  제동: 로봇이 0.5 m 앞
+    TVec4 t0, t1;
+    for (int k = 0; k < 10; ++k) {
+      t0 = m0.step(x, line_ref(brake ? 0.0 : 0.5, v, 0.0, tu));
+      t1 = m1.step(x, line_ref(brake ? 0.0 : 0.5, v, 0.0, tu));
+      EXPECT_EQ(m1.stats().fallback, 0);
+    }
+    for (int i = 0; i < 4; ++i) {
+      EXPECT_NEAR(t0(i), brake ? -tb + f : tb + f, 1e-7) << "brake=" << brake << " i=" << i;
+      EXPECT_LE(std::abs(t1(i) - f), tb + 1e-7) << "brake=" << brake << " i=" << i;
+      if (!brake) {EXPECT_NEAR(t1(i), tb + f, 1e-7) << i;}        // 가속: 같은 상한에 붙는다 (더 내지 않는다)
+    }
+  }
+}
+
+// R4: 잔차에도 들어간다 — 구름 손실이 있는 플랜트를 등속으로 따라갈 때, 값이 맞으면 외란 추정치가 0 근처에 머물고
+//   값이 0 이면 그만큼 (−4 τ_roll / (r·m_eff)) 을 앞 방향 외란으로 배운다
+TEST(FrictionRolling, R4_ResidualSeesRolling)
+{
+  const TorqueModel md = shift_model();
+  const double R = 0.005, v = 0.4;
+  for (int with = 0; with < 2; ++with) {
+    TorqueTuning tu = fric_tuning(true);
+    tu.dist_enable = true; tu.dist_alpha = 0.05; tu.dist_body_frame = true; tu.dist_accel_only = true;
+    tu.fric_rolling = with ? R : 0.0;
+    TorqueMPC mpc(md, tu);
+    Plant plant{md};
+    plant.x << 0.0, 0.0, 0.0, v, 0.0, 0.0;
+    for (int k = 0; k < 600; ++k) {
+      const TVec4 tau = mpc.step(plant.x, line_ref(0.0, v, k * 0.01, tu));
+      const TVec4 wn = md.wheel_nominal_speeds(TVec3(plant.x(3), plant.x(4), plant.x(5)));     // 헤딩 0 — 몸체 속도 = 관성 속도
+      TVec4 fr = md.drivetrain_friction(wn, 0.5);
+      for (int i = 0; i < 4; ++i) {fr(i) += R * std::tanh(wn(i) / 0.5);}
+      plant.step(tau - fr, 0.01);
+    }
+    const double a_d = mpc.d_hat()(3) / tu.Ts;
+    const double expect = with ? 0.0 : -4.0 * R / (md.wheel_radius * md.m_eff());
+    EXPECT_NEAR(a_d, expect, 0.01) << "with=" << with << "  (값 0 일 때 기대 " << -4.0 * R / (md.wheel_radius * md.m_eff()) << " m/s²)";
+  }
+}

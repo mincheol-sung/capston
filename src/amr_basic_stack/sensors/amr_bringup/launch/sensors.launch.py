@@ -108,6 +108,8 @@ def cartographer_scan_filter_node(prefix, input_topic, output_topic):
         remappings=[
             ("scan_in", input_topic),
             ("scan_out", output_topic),
+            ("points_in", f"/points_{prefix}_timed"),
+            ("points_out", f"/points_{prefix}_carto"),
         ],
     )
 
@@ -130,7 +132,7 @@ def rplidar_s2_node(prefix, scan_topic):
             "scan_mode": LaunchConfiguration("rplidar_s2_scan_mode"),
         }],
         # rplidar_node는 'scan'으로 발행 → 앞/뒤 각각 다른 토픽으로 리매핑
-        remappings=[("scan", scan_topic)],
+        remappings=[("scan", scan_topic), ("points_timed", f"/points_{prefix}_timed")],
     )
 
 

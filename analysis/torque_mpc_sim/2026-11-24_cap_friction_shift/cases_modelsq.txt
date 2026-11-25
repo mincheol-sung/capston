@@ -1,0 +1,7 @@
+# 2026-11-24 마찰 모델 — 정사각형 (cases_square.txt 와 같은 공통 조건), 판마다 2 번
+Sq_model_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true
+Sq_model_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true
+Sq_model_nod_r1|disturbance:=false friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true
+Sq_model_nod_r2|disturbance:=false friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true
+Sq_model_noshift_r1|disturbance:=true friction_comp:=false use_fric_model:=true
+Sq_model_noshift_r2|disturbance:=true friction_comp:=false use_fric_model:=true

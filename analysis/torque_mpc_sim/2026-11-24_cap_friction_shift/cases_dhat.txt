@@ -1,0 +1,6 @@
+# 2026-11-24 "상한을 옮긴 뒤 외란 추정 d̂ 를 더 고쳐야 하나" — 가감속 8자 (run.sh 와 같은 공통 조건), 판마다 2 번
+#   지금 d̂: α 0.01 (시정수 1 s), 상한 0.5 m/s² · 2.0 rad/s²
+Cshift_wide_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0
+Cshift_wide_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0
+Cshift_a05_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0 mpc_dist_alpha:=0.05
+Cshift_a05_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true mpc_dist_acc_max:=1.0 mpc_dist_yaw_acc_max:=4.0 mpc_dist_alpha:=0.05

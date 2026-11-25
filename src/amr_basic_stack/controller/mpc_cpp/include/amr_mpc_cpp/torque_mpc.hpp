@@ -78,6 +78,49 @@
 //   j=0 은 상자가 변화율보다 우선이라 η 가 한 주기에 떨어져도 해가 있다. slip_alloc 이면 목표 입력 U_s 도 η 로 가중 배분
 //   (min Σ (τ_i / (c_i η_i))², η 아래 한계 slip_alloc_floor — 두 바퀴가 0 이면 F W⁻¹ Fᵀ 가 특이). 세 바퀴만으로도 rank 3.
 //   값 근거: analysis/torque_mpc_real/2026-11-23_slip_lpf/RESULTS_KO.md 5~7 절 (λ_c 0.15, s 0.017, f_c 10 Hz, ω_ε 2.5).
+//
+// 마찰 상한 옮김 (2026-11-24, 11-23 교수님 회의 후속 지시서 T1 7단계 (B) — 기본 끔, TorqueTuning::cap_friction_shift):
+//   torque_output 의 구동계 마찰 보상을 끄면 (launch friction_comp:=false) MPC 가 내는 τ 가 곧 모터 토크다.
+//   바퀴 회전: J_w ω̇ = τ − τ_f(ω) − τ_g   (τ_f = 구동계 마찰이 먹는 토크, ω 와 같은 부호.  τ_g = 바닥에 전달되는 토크)
+//   마찰 상한 τ̄ (식-21) 는 바닥 쪽 토크의 한계이므로, 상자를 τ_f 만큼 옮겨 "τ − τ_f" 가 ±τ̄ 안에 들게 한다:
+//     cap_on total :  −τ̄_i,j + f_i,j ≤ τ_i,j ≤ τ̄_i,j + f_i,j            (모터 한계 ±(τ_lim − τ_fric,max) 안으로 자른다)
+//     cap_on ground:  −τ̄_i,j + (P f_j)_i ≤ (P τ_j)_i ≤ τ̄_i,j + (P f_j)_i   (무슬립이면 τ_g = P (τ − f))
+//     f_i,j = scale·(coulomb_i·tanh(ω_r,i,j/ω_s) + viscous_i·ω_r,i,j),   ω_r,j = T⁻¹ u_r,j  (지평 스텝 j 의 기준 몸체 속도 → 무슬립 바퀴 속도)
+//   coulomb·viscous 는 torque_plant.yaml friction (torque_output 보상과 같은 벤치 실측값, 같은 식).
+//   제약 행렬은 그대로이고 상·하한 벡터만 바뀐다. j=0 의 "상자가 변화율보다 우선" 도 옮긴 상자에 그대로.
+//   η_s·하중 이동과 같이 쓰면 τ̄_i,j 에 그것들이 먼저 곱해지고 그 상자를 옮긴다 (η_s 0 이면 τ = f — 바닥 토크 0).
+//   limit_mode friction 일 때만 (motor_only 의 상한은 모터 토크 자체의 한계라 옮기지 않는다).
+//   예측 모델·목표 입력 U_s 는 안 바뀐다 — 마찰을 모델에 넣는 것은 지시서 T11 (발표 후). 꺼지면 f 를 계산하지도 더하지도 않는다.
+//   ★ torque_output 보상을 켠 채 같이 켜면 마찰을 두 번 센다 (바닥 토크가 τ̄ 를 넘는다) — launch 가 막는다.
+//
+// 마찰 모델 (2026-11-24, 같은 지시서 T11b 를 사용자 결정으로 앞당김 — 기본 끔, TorqueTuning::use_fric_model):
+//   구동계 마찰은 "모르는 일정한 외란" 이 아니라 바퀴 속도의 함수다. 기준 궤적에서 미리 계산해 모델에 넣는다 — 선형 (QP) 그대로,
+//   H·제약 행렬은 안 바뀌고 g 와 U_s 만 바뀐다 (w 항과 같은 구조).
+//     τ_b,j = scale·(coulomb·tanh(ω_r,j/ω_s) + viscous·ω_r,j),   ω_r,j = T⁻¹ u_r,j     (위 "마찰 상한 옮김" 의 f 와 같은 값)
+//     예측      x_{j+1} = A x_j + B_j (τ_j − τ_b,j) + …          — 바퀴에 실제로 남는 토크는 τ − τ_b (영입력 응답에 −B_j τ_b,j)
+//     목표 입력 U_s,j = (모델이 요구하는 토크, 식-14) + τ_b,j      — 바퀴마다 자기 마찰만큼 더 낸다
+//     잔차      d̂(k) = x̂(k) − A x̂(k−1) − B (τ(k−1) − τ̂_b(k−1)) − …   τ̂_b 는 추정 상태 x̂(k−1) 의 바퀴 속도로 계산
+//                — 모델에 넣은 마찰을 외란 추정치가 한 번 더 세지 않게 (지시서 6.3절 4항)
+//   지시서 식-14 꼴 (R(θ)ᵀ M (… − f_j) 를 F⁺ 로 배분) 은 τ_b 의 영공간 성분 (몸체 힘이 0 인 [+ + − −] 꼴) 을 버린다. 여기서는
+//   τ_b 를 바퀴마다 그대로 더한다 [구현 선택] — 몸체 힘은 같고, 영공간 몫까지 모터가 메워 바퀴끼리 바닥을 통해 밀고 당기지 않는다.
+//   torque_output 이 하던 보상 (바퀴별 τ + τ_fric) 과 같은 꼴이고, 옮긴 상자의 가운데 (f) 와도 맞는다.
+//   롤러 구름 저항 (지시서 use_rolling_res) 과 정지 마찰은 넣지 않았다 (계수 미측정).
+//     롤러 구름 저항 = 롤러가 자기 축으로 돌 때의 손실. 롤러 표면 속도 = √2·(바퀴 중심의 옆 방향 속도) 라 직진에서는 0 이고
+//     옆걸음·대각선·회전 (곡선) 에서만 생긴다 — 바퀴축 토크가 아니라 롤러 자유 구름 방향의 힘이라 아래 항으로는 표현되지 않는다.
+//   구름 손실 (2026-11-24, 기본 0 = 없음, TorqueTuning::fric_rolling — 정석 바퀴 식의 rolling resistance 항 f_r·N·r·sgn(ω)):
+//     ★ 위 "롤러 구름 저항" 이 아니다 (2026-11-25 사용자 지적으로 이름 혼동을 바로잡음). 직진 등속 (롤러가 자기 축으로 안 도는 운동) 에서 잰
+//     "주행 저항 − 띄운 마찰" 이고, 원인 (접지면 hysteresis · 롤러 넘어감 · 하중에 따른 베어링·기어 마찰 · 온도 차) 은 가르지 못했다.
+//     바닥에서 띄운 값보다 더 드는, 바퀴 회전 방향을 따르는 일정 토크. 네 바퀴 공통 τ_roll·tanh(ω_r,j/ω_s) 를 위 τ_b,j 에 더해
+//     예측·목표 입력·잔차에 넣는다 (배율 scale 은 안 곱한다 — 따로 잰 값).
+//     ★ 상한 옮김의 f 에는 넣지 않는다 [구현 선택, 사용자 결정 "슬립 방지가 메인이니 보수적으로"]: 상자 (허용 모터 토크) 가 이 값과 무관하다.
+//       실제 구름 손실이 R 일 때 상한에 닿은 바퀴의 바닥 토크 (τ − 실제 마찰):
+//         구동 변 (바퀴 회전 방향으로 미는 쪽)  τ̄ − R  — 이 값을 아무리 크게 줘도 τ̄ 를 안 넘는다.
+//         제동 변 (회전 반대로 미는 쪽)        −(τ̄ + R) — 상한을 R 만큼 넘는다. 이 항을 넣기 전에도 그랬고 이 항으로는 안 바뀐다.
+//       f 에 넣으면 제동 변은 맞지만 값이 넘칠 때 구동 변이 넘는다. 양쪽을 다 지키려면 구동 변은 작은 값·제동 변은 큰 값으로
+//       상자 두 변을 따로 옮겨야 한다 — 만들지 않았다 (2026-11-24, 사용자 결정 대기).
+//       대가: 상한에 닿은 동안은 이 값이 맞아도 낼 수 있는 가속이 늘지 않는다 — 예측만 맞아진다.
+//     근거·값: analysis/torque_mpc_real/2026-11-24_floor/RESULTS_KO.md (등속 직진 12 구간, 모자란 양 3.1~7.0 mN·m).
+//   ★ 이것도 torque_output 보상을 끈 판 전용이다 (launch 가 막는다). 상한 옮김과 따로 켜고 끌 수 있다 — 보통 같이 켠다.
 // ---------------------------------------------------------------
 #pragma once
 
@@ -180,6 +223,12 @@ struct TorqueModel
   //   →  P = I − J_w Fᵀ M_eff⁻¹ F.  앞으로 고른 토크면 바닥 몫 1 − m_w/m_eff (4.56 kg · J_w 8.9e-4 → 0.672).
   //   근거·수치: analysis/torque_mpc_real/2026-11-21_line_accel/GROUND_CAP_REVIEW_KO.md
   Eigen::Matrix4d ground_map() const;
+  // 2026-11-24 구동계 마찰 (torque_plant.yaml friction.coulomb_Nm·viscous_Nms_per_rad, [FL FR RL RR], 기본 0).
+  //   마찰 상한 옮김 (머리주석, TorqueTuning::cap_friction_shift) 에만 쓴다 — 동역학 M·G·U_s 에는 안 들어간다
+  TVec4 fric_coulomb = TVec4::Zero();     // [N·m]
+  TVec4 fric_viscous = TVec4::Zero();     // [N·m·s/rad]
+  // τ_f,i(ω) = coulomb_i·tanh(ω_i/ω_s) + viscous_i·ω_i   (amr_mpc/nodes/torque_output.py friction_torque 의 운동 마찰 항과 같은 식)
+  TVec4 drivetrain_friction(const TVec4 & omega, double smooth) const;
 };
 
 // 선형 모델  ẋ = A x + B τ + c (연속)  또는  x(k+1) = A x(k) + B τ(k) + c (이산)
@@ -256,6 +305,15 @@ struct TorqueTuning
   // 2026-11-23 슬립 계수 η_s (머리주석). 상한에 곱하는 값은 set_slip_scale 로 (기본 1 = 예전 그대로)
   bool slip_alloc = true;            // η_s < 1 인 바퀴가 있으면 U_s 를 η_s 로 가중 배분
   double slip_alloc_floor = 0.05;    // 가중 배분에서 η_s 아래 한계
+  // 2026-11-24 마찰 상한 옮김 (머리주석). limit_mode friction 일 때만 쓰인다. false 면 예전 그대로
+  bool cap_friction_shift = false;
+  double cap_friction_scale = 1.0;   // 옮기는 양 f 에 곱하는 배율 (1 = torque_plant.yaml 실측 마찰 그대로). 0 ~ 1.5
+  double cap_friction_smooth = 0.5;  // [rad/s] ω_s — coulomb 항 tanh 폭 (torque_output friction_smooth_rad_s 와 같게)
+  // 2026-11-24 마찰 모델 (머리주석): 기준 바퀴 속도의 구동계 마찰을 예측·목표 입력·잔차에 넣는다. 배율·ω_s 는 위 두 값을 같이 쓴다
+  bool use_fric_model = false;
+  // 2026-11-24 구름 손실 (머리주석 "마찰 모델" 끝): 마찰 모델이 켜졌을 때 τ_b 에 더하는 네 바퀴 공통 토크 [N·m]. 0 = 없음 (예전 그대로).
+  //   상한 옮김 f 에는 안 들어간다. 0 ~ 0.02
+  double fric_rolling = 0.0;
 };
 
 // 슬립 계수 η_s 계산 (머리주석 "슬립 계수 η_s"). ROS 무관 — 노드가 /wheel_states 마다 update 를 부른다
@@ -344,6 +402,16 @@ public:
   // 2026-11-23 하중 이동: 이번 주기 지평 스텝별 상한 τ̄_i,j (4 × Nc, 하중 이동 끄면 열마다 tau_bar()) 와 스텝 0 의 수직력 N_i [N]
   const Eigen::Matrix<double, 4, Eigen::Dynamic> & tau_bar_steps() const {return tb_steps_;}
   const TVec4 & normal_forces_now() const {return n_now_;}
+  // 2026-11-24 마찰 상한 옮김 (머리주석): 실제로 켜졌나 (cap_friction_shift 이고 limit_mode friction), 이번 주기 지평 스텝별 옮긴 양
+  //   f_i,j [N·m] (4 × Nc, 끄면 0), 그리고 스텝 j 의 바퀴 토크 변수 상자 [lo, hi] (j=0 의 변화율 교집합 전 — cap_on ground 면 모터 한계)
+  bool cap_friction_shift() const {return fshift_;}
+  const Eigen::Matrix<double, 4, Eigen::Dynamic> & cap_shift_steps() const {return fs_steps_;}
+  void var_box(int i, int j, double & lo, double & hi) const;
+  // 2026-11-24 마찰 모델 (머리주석): 켜졌나, 이번 주기 지평 스텝별 마찰 토크 τ_b,j [N·m] (4 × Np, 끄면 0)
+  bool use_fric_model() const {return fmodel_;}
+  const Eigen::Matrix<double, 4, Eigen::Dynamic> & fric_model_steps() const {return ff_steps_;}
+  // 이번 주기 해 T* 로 본 예측 오차 x_j − x_r,j (j = 1 … Np, 6Np) = Φ T* + (영입력 응답 − 기준). 시험·기록용 (부를 때 계산)
+  Eigen::VectorXd predicted_error() const {return Phi_ * T_ + e0_;}
 
 private:
   void update_disturbance(const TVec6 & x_hat, double dt_state);
@@ -378,6 +446,13 @@ private:
   TMat34 F_ = TMat34::Zero();                           // force_map (가중 배분용)
   bool ground_ = false;                              // cap_on_ground 이 실제로 켜졌다 (limit_mode friction)
   Eigen::Matrix4d P_ground_ = Eigen::Matrix4d::Identity();
+  bool fshift_ = false;                                 // 2026-11-24 마찰 상한 옮김이 실제로 켜졌다 (limit_mode friction)
+  Eigen::Matrix<double, 4, Eigen::Dynamic> fs_steps_;   // 지평 스텝별 옮긴 양 f_i,j (끄면 0 그대로 — 쓰지 않는다)
+  TVec4 fs_used_ = TVec4::Zero();                       // 직전 step 의 스텝 0 옮긴 양 (포화 중 멈춤 판단은 tau_prev_ 와 같은 상자로)
+  bool fmodel_ = false;                                 // 2026-11-24 마찰 모델이 켜졌다
+  Eigen::Matrix<double, 4, Eigen::Dynamic> ff_steps_;   // 지평 스텝별 마찰 토크 τ_b,j (4 × Np, 끄면 0 그대로 — 쓰지 않는다)
+  TVec4 friction_at_state(const TVec6 & x) const;       // 상태 x 의 몸체 속도 → 무슬립 바퀴 속도 → 마찰 토크 (잔차용)
+  TVec4 model_friction(const TVec4 & omega) const;      // 모델에 넣는 마찰 = scale·구동계 마찰 + 구름 손실 (fric_rolling 0 이면 앞 항만)
   TorqueStepStats stats_;
 
   // 상수부

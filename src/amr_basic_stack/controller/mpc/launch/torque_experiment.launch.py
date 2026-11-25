@@ -40,8 +40,14 @@
   ros2 launch amr_mpc torque_experiment.launch.py disturbance:=true     # 외란 추정치 d̂ 켬 (기본 끔)
   ros2 launch amr_mpc torque_experiment.launch.py stiction_comp:=false  # torque_output 정지 마찰 보상 끔. 기본 auto = plant:=real 에서만 켬
                                                                         #   (torque_plant.yaml friction.static_Nm, 기준 바퀴속도 방향. 2026-11-16)
-  ros2 launch amr_mpc torque_experiment.launch.py friction_comp:=false  # torque_output 구동계 마찰 보상 전부 끔 (coulomb·viscous·정지, compensation_scale 0).
-                                                                        #   마찰을 d̂ (disturbance:=true) 가 외란으로 흡수하게 — 2026-11-23 교수님 지시 시험
+  ros2 launch amr_mpc torque_experiment.launch.py friction_comp:=true   # torque_output 구동계 마찰 보상 켬 (coulomb·viscous·정지 × compensation_scale 0.9).
+                                                                        #   ★ 2026-11-24 사용자 결정: 기본은 끔 (인자를 안 줘도 compensation_scale 0 — 2026-11-23 교수님 지시).
+                                                                        #   끈 판은 마찰을 d̂ (disturbance:=true) 나 마찰 모델 (use_fric_model:=true) 이 맡는다
+  ros2 launch amr_mpc torque_experiment.launch.py friction_comp:=false limit_mode:=friction mpc_cap_friction_shift:=true
+                                                                        # 보상을 끈 판에서 friction 상한 상자를 구동계 마찰만큼 옮긴다 (2026-11-24, 기본 끔).
+                                                                        #   friction_comp:=true 와 같이 켜면 기동 거부 (마찰을 두 번 센다)
+  ros2 launch amr_mpc torque_experiment.launch.py friction_comp:=false limit_mode:=friction mpc_cap_friction_shift:=true use_fric_model:=true
+                                                                        # 위에 더해 그 마찰을 MPC 목표 입력·예측에도 넣는다 (2026-11-24, 기본 끔)
   ros2 launch amr_mpc torque_experiment.launch.py linearization:=current_state   # 선형화를 현재 추정 상태 기준으로.
                                                                         #   기본 reference = 1판 방식(기준궤적)
   ros2 launch amr_mpc torque_experiment.launch.py payload_kg:=5.0       # 적재 +5 kg (플랜트와 제어기 둘 다)
@@ -123,8 +129,11 @@ _TRACK_KEYS = ["origin_mode", "origin_x", "origin_y", "origin_yaw_deg", "start_t
                # 정사각형 (2026-11-20): shape:=square 와 square_* (core/square.py)
                "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend",
                "square_corner_mode", "square_rot_s", "square_dwell_s",                # 2026-11-21 꼭짓점 정지
+               "poly_path",                                                           # 2026-11-25 shape:=polyline (core/polyline.py)
                # 지그재그 (2026-11-24): shape:=zigzag 와 zigzag_* (core/zigzag.py). 가속도·속도는 공용 accel·speed (2026-11-24 (8))
-               "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_rot_s", "zigzag_dwell_s"]
+               "zigzag_n", "zigzag_length", "zigzag_angle_deg", "zigzag_profile", "zigzag_rot_s", "zigzag_dwell_s",
+               "zigzag_reverse",                                                      # 2026-11-24 (10) false = 늘 전진
+               "zigzag_corner", "zigzag_corner_speed", "zigzag_turn_m"]               # 2026-11-25 pass = 꼭짓점에서 안 섬
 
 
 def _est_noise(share, preset, text):
@@ -170,26 +179,45 @@ def _track(context, share):
             if n != int(n) or n < 1:
                 raise RuntimeError(f"zigzag_n 은 1 이상 정수 — {track[k]!r}")
             out[k] = int(n)
-        elif k == "seg_out_and_back":
+        elif k in ("seg_out_and_back", "zigzag_reverse"):
             out[k] = str(track[k]).strip().lower() in ("1", "true", "yes", "on")
-        elif k in ("speed", "accel") and str(track[k]).strip().lower() == "max":
+        elif k in ("speed", "accel", "zigzag_rot_s", "zigzag_corner_speed") and str(track[k]).strip().lower() == "max":
             out[k] = "max"                            # 2026-11-23 아래 _resolve_max 가 숫자로 바꾼다
         else:
             out[k] = str(track[k]) if k in ("origin_mode", "yaw_mode", "shape", "square_corner_mode", "speed_mod_shape",
-                                            "zigzag_profile") else float(track[k])
+                                            "zigzag_profile", "zigzag_corner", "poly_path") else float(track[k])
     # 문자열 인자는 여기서 허용값을 검사한다 (2026-11-16): yaw_mode:=true 로 띄운 판이 6 개 있었다 — figure8_reference_node 가
     # 시작하자마자 ValueError 로 죽는데 오류가 화면에만 나오고 /rosout·bag 에는 안 남아, 무장해도 기준 없이 그냥 서 있었다.
     for k, allowed in _TRACK_CHOICES.items():
         if out[k] not in allowed:
             raise RuntimeError(f"{k}:={out[k]!r} — 허용값은 {' | '.join(allowed)} (torque_track.yaml 또는 launch 인자)")
-    if out["shape"] == "square" and out["yaw_mode"] == "spin":        # 2026-11-20: 노드 기동 오류는 bag 에 안 남는다 (위 주석)
-        raise RuntimeError("shape:=square 는 yaw_mode:=tangent | fixed (spin 은 figure8·circles8 만)")
+    if out["shape"] in ("square", "polyline") and out["yaw_mode"] == "spin":   # 2026-11-20: 노드 기동 오류는 bag 에 안 남는다 (위 주석)
+        raise RuntimeError(f"shape:={out['shape']} 는 yaw_mode:=tangent | fixed (spin 은 figure8·circles8 만)")
+    if out["shape"] == "polyline":                   # 2026-11-25 명령 줄을 여기서 읽어 본다 (노드 기동 오류는 bag 에 안 남는다)
+        # 2026-11-25 오후 사용자 결정 "통과로 일단 해볼게": 꺾은선도 yaml square_corner_mode (pass) 그대로. 오전에 넣었던 "안 주면 stop" 은
+        #   다시 나오지 않는 시뮬 한 판 (최대 842 mm) 을 근거로 한 것이라 뺐다 (analysis/torque_mpc_sim/2026-11-25_corner_pass/RESULTS_KO.md)
+        from amr_mpc.core.polyline import parse_path
+        try:
+            parse_path(out["poly_path"])
+        except ValueError as e:
+            raise RuntimeError(str(e)) from None
     if out["shape"] == "zigzag":                     # yaw_mode tangent | fixed | spin 모두 (2026-11-24 (9), core/zigzag.py 머리말)
         # 2026-11-24 (8): accel = 최대 가속도, speed = 직선 최고 속도 상한. launch 인자를 비우면 yaml 공용 값 (speed 0.5·accel 0.4) 대신 max
         for k in ("speed", "accel"):
             if not LaunchConfiguration(k).perform(context).strip():
                 out[k] = "max"
-    if "max" in (out["speed"], out["accel"]):
+        # 2026-11-24 (10) 늘 전진 (zigzag_reverse:=false) 이면 꼭짓점에서 180° − 사이각을 돈다 — yaml 0.5 s (사이각 10° 용) 로는 앞먹임 3.9 배·부하 111 %.
+        #   zigzag_rot_s 를 비우면 max (경로 전체 앞먹임을 올리지 않는 가장 짧은 회전, fig8_limits.zigzag_rot_max)
+        #   2026-11-25 zigzag_corner:=pass 는 제자리 회전이 없어 그대로 둔다
+        if (not out["zigzag_reverse"] and out["yaw_mode"] == "tangent" and out["zigzag_corner"] == "stop"
+                and not LaunchConfiguration("zigzag_rot_s").perform(context).strip()):
+            out["zigzag_rot_s"] = "max"
+        # 2026-11-25 zigzag_corner_speed:=max (yaml 기본) 는 pass + turn_m > 0 에서만 찾는다. stop 은 안 쓰여 0.3, 꺾인 pass 는 숫자를 달라
+        if out["zigzag_corner_speed"] == "max" and out["zigzag_corner"] == "pass" and not out["zigzag_turn_m"] > 0.0:
+            raise RuntimeError("zigzag_corner_speed:=max 는 zigzag_turn_m > 0 (꼭짓점 깎기) 에서만 — 꺾인 꼭짓점은 어떤 속도도 상한 안에 못 든다. 숫자로 줘라")
+    if out["zigzag_corner_speed"] == "max" and not (out["shape"] == "zigzag" and out["zigzag_corner"] == "pass"):
+        out["zigzag_corner_speed"] = 0.3              # 안 쓰인다 (노드 파라미터 타입만 맞춤)
+    if "max" in (out["speed"], out["accel"], out["zigzag_corner_speed"]) or out["zigzag_rot_s"] == "max":
         _resolve_max(out, context, share)
     return out
 
@@ -242,8 +270,20 @@ def _resolve_max(out, context, share):
         accel = None if out["accel"] == "max" else out["accel"]
         try:
             if out["shape"] == "zigzag":              # 직선 가속 한계 (fig8_limits.line_accel_max, 2026-11-24). speed = 직선 최고 속도 상한, max → 부하 예산
-                v, a, info = fig8_limits.zigzag_max(c, cap, out, accel=accel, v_max=0.0 if out["speed"] == "max" else out["speed"],
+                vmx = 0.0 if out["speed"] == "max" else out["speed"]
+                rot = out["zigzag_rot_s"]
+                if rot == "max" and out["zigzag_corner"] == "pass":   # 2026-11-25 pass 는 회전이 없다
+                    rot = 0.5
+                elif rot == "max":                    # 2026-11-24 (10) 꼭짓점 회전 시간 (tangent 만 쓰임)
+                    rot = (fig8_limits.zigzag_rot_max(c, cap, out, accel if accel is not None else fig8_limits.line_accel_max(c, ratio),
+                                                      vmx, ratio) if out["yaw_mode"] == "tangent" else 0.5)
+                vc = out["zigzag_corner_speed"]
+                if vc == "max":                       # 2026-11-25 pass + turn_m > 0: turn 등속 최대 (fig8_limits.zigzag_corner_speed_max)
+                    vc = fig8_limits.zigzag_corner_speed_max(c, cap, dict(out, zigzag_rot_s=rot),
+                                                             accel if accel is not None else fig8_limits.line_accel_max(c, ratio), vmx, ratio)
+                v, a, info = fig8_limits.zigzag_max(c, cap, dict(out, zigzag_rot_s=rot, zigzag_corner_speed=vc), accel=accel, v_max=vmx,
                                                     max_ff_ratio=ratio)
+                info = dict(info, rot_s=rot, vc=vc)
             elif out["shape"] == "square":            # 꼭짓점은 빼고 변 직선 가속만 (fig8_limits 머리말, 2026-11-23)
                 sq = dict(out, square_v_max=0.0 if out["speed"] == "max" else out["square_v_max"])
                 v, a, info = fig8_limits.square_max(c, cap, sq, accel=accel, max_ff_ratio=ratio)
@@ -256,13 +296,22 @@ def _resolve_max(out, context, share):
         _MAX_CACHE[key] = (v, a, info, ratio, budget)
     v, a, info, ratio, budget = _MAX_CACHE[key]
     if out["shape"] == "zigzag":
-        what = " · ".join(x for x in ("speed:=max" if out["speed"] == "max" else "", "accel:=max" if out["accel"] == "max" else "") if x)
+        what = " · ".join(x for x in ("speed:=max" if out["speed"] == "max" else "", "accel:=max" if out["accel"] == "max" else "",
+                                      "zigzag_rot_s:=max" if out["zigzag_rot_s"] == "max" else "",
+                                      "zigzag_corner_speed:=max" if out["zigzag_corner_speed"] == "max" else "") if x)
+        out["zigzag_rot_s"] = float(info["rot_s"])
+        out["zigzag_corner_speed"] = float(info["vc"])
         cap_txt = "부하 예산에서만 자름" if out["speed"] == "max" else f"speed {out['speed']:g} 에서 자름"
         out["speed"] = 0.0 if out["speed"] == "max" else out["speed"]   # figure8_reference: 지그재그 speed ≤ 0 = load_budget·V_LIMIT 에서 자름
         out["accel"] = float(a)
-        out["_max_msg"] = (f"{what} (zigzag {out['zigzag_profile']}) → accel {a:.2f} m/s², 직선 최고 {v:.2f} m/s "
+        out["_max_msg"] = (f"{what} (zigzag {out['zigzag_profile']}{'' if out['zigzag_reverse'] else ', 늘 전진'}) → accel {a:.2f} m/s², 직선 최고 {v:.2f} m/s, "
+                           + (f"꼭짓점 정지 없이 {out['zigzag_corner_speed']:.2f} m/s "
+                              + (f"(turn κ_max {info['kappa_max']:.2f} 1/m, ω_max {info['w_max']:.2f} rad/s, 횡가속 {info['a_lat']:.2f} m/s²) "
+                                 if "kappa_max" in info else "(꺾인 채) ")
+                              if out["zigzag_corner"] == "pass"
+                              else f"꼭짓점 회전 {out['zigzag_rot_s']:.2f} s ") +
                            f"({cap_txt}, yaw {out['yaw_mode']})  "
-                           + (f"직선 앞먹임 {info['line_ff']:.3f} ≤ {ratio}, 꼭짓점 회전 포함 최대 {info['ff']:.2f}, " if out["yaw_mode"] == "tangent"
+                           + (f"직선 앞먹임 {info['line_ff']:.3f} ≤ {ratio}, {("turn" if out["zigzag_turn_m"] > 0.0 else "꼭짓점 계단") if out["zigzag_corner"] == "pass" else "꼭짓점 회전"} 포함 최대 {info['ff']:.2f}, " if out["yaw_mode"] == "tangent"
                               else f"경로 전체 앞먹임 {info['ff']:.3f} ≤ {ratio}, ") +
                            f"부하 {info['load'] * 100:.0f} % of 예산 {budget:.2f}, 기준 {info['T']:.1f} s")
         return
@@ -280,8 +329,8 @@ def _resolve_max(out, context, share):
                        f"부하 {info['load'] * 100:.0f} % of 예산 {budget:.2f}, 기준 {info['T']:.1f} s, τ̄ {[round(x, 4) for x in info['tau_bar']]} N·m)")
 
 
-_TRACK_CHOICES = {"yaw_mode": ("tangent", "fixed", "spin"), "shape": ("figure8", "circles8", "line", "rotate", "square", "zigzag"),
-                  "zigzag_profile": ("sine", "square"),
+_TRACK_CHOICES = {"yaw_mode": ("tangent", "fixed", "spin"), "shape": ("figure8", "circles8", "line", "rotate", "square", "zigzag", "polyline"),
+                  "zigzag_profile": ("sine", "square"), "zigzag_corner": ("stop", "pass"),
                   "origin_mode": ("robot", "fixed"), "square_corner_mode": ("pass", "stop"),
                   "speed_mod_shape": ("sin", "square")}
 
@@ -367,6 +416,7 @@ def _nodes(context):
                          "sensor_override": g("sim_noise"),                     # 2026-11-21 센서 잡음 덮어쓰기 (비우면 끔)
                          "surface_mu": float(g("surface_mu")) if g("surface_mu") else -1.0,
                          "friction_scale": float(g("friction_scale")),
+                         "rolling_Nm": float(g("sim_rolling")) if g("sim_rolling") else 0.0,   # 2026-11-24 시뮬 바닥 구름 손실
                          "com_height": float(g("sim_com_height")) if g("sim_com_height") else 0.0,   # 2026-11-23 하중 이동
                          "wheel_efficiency": [float(v) for v in g("wheel_eff").split(",")] if g("wheel_eff") else [1.0, 1.0, 1.0, 1.0],
                          "floor_efficiency": [float(v) for v in g("floor_eff").split(",")] if g("floor_eff") else [1.0, 1.0, 1.0],
@@ -536,6 +586,47 @@ def _nodes(context):
             if g("mpc_cap_on") not in ("total", "ground"):
                 raise RuntimeError(f"mpc_cap_on:={g('mpc_cap_on')!r} — total | ground")
             ctrl["cap_on"] = g("mpc_cap_on")
+        # 2026-11-24 마찰 상한 옮김 (torque_mpc.yaml torque_limit.friction_shift, 11-23 회의 후속 지시서 T1 7단계 (B)).
+        #   켠 채 torque_output 마찰 보상도 켜져 있으면 구동계 마찰을 두 번 세어 바닥 토크가 τ̄ 를 넘는다 → 기동 거부
+        with open(os.path.join(share, "config", "torque_mpc.yaml")) as f:
+            yaml_tl = yaml.safe_load(f).get("torque_limit") or {}
+        if g("mpc_cap_friction_shift"):
+            ctrl["cap_friction_shift"] = _truthy(g("mpc_cap_friction_shift"))
+        comp_off = not _truthy(g("friction_comp"))    # 2026-11-24 기본 끔 (비움 = false). friction_comp:=true 일 때만 보상한다
+        # 2026-11-24 yaml 기본이 켬이 됐다 (사용자 결정): 보상을 켠 판에서 인자로 따로 켜지 않았으면 상한 옮김을 끈다 — 마찰을 두 번 세지 않게
+        if not comp_off and not g("mpc_cap_friction_shift") and bool(yaml_tl.get("friction_shift", False)):
+            ctrl["cap_friction_shift"] = False
+            nodes.append(LogInfo(msg="friction_comp:=true — 마찰 상한 옮김 (yaml 기본 켬) 을 끈다 (보상과 같이 쓰면 구동계 마찰을 두 번 센다)"))
+        if comp_off and (g("limit_mode") or yaml_tl.get("mode", "")) == "friction" and \
+                not ctrl.get("cap_friction_shift", bool(yaml_tl.get("friction_shift", False))):
+            nodes.append(LogInfo(msg="★ torque_output 마찰 보상이 꺼져 있는데 (기본) 마찰 상한 옮김도 꺼져 있다 — friction 상한이 모터 토크에 걸려 "
+                                     "바닥 토크가 구동 쪽은 구동계 마찰만큼 모자라고 제동 쪽은 그만큼 상한을 넘는다. mpc_cap_friction_shift:=true 를 같이 준다"))
+        if ctrl.get("cap_friction_shift", bool(yaml_tl.get("friction_shift", False))):
+            if not comp_off:
+                raise RuntimeError("마찰 상한 옮김 (mpc_cap_friction_shift:=true 또는 torque_mpc.yaml friction_shift) 은 friction_comp:=false 와 같이 "
+                                   "써야 한다 — torque_output 보상을 켠 채면 구동계 마찰을 두 번 세어 바닥 토크가 상한을 넘는다")
+            if g("mpc_cap_friction_shift") and (g("limit_mode") or yaml_tl.get("mode", "")) != "friction":     # 인자로 켰을 때만 알린다 (yaml 기본 켬)
+                nodes.append(LogInfo(msg="마찰 상한 옮김을 켰지만 limit_mode 가 friction 이 아니다 — motor_only 상한은 옮기지 않는다 (안 쓰인다)"))
+        # 2026-11-24 마찰 모델 (torque_mpc.yaml model_terms.use_fric_model, 지시서 T11b). 이것도 보상을 끈 판 전용
+        with open(os.path.join(share, "config", "torque_mpc.yaml")) as f:
+            yaml_mt = yaml.safe_load(f).get("model_terms") or {}
+        if g("use_fric_model"):
+            ctrl["use_fric_model"] = _truthy(g("use_fric_model"))
+        elif not comp_off and bool(yaml_mt.get("use_fric_model", False)):      # 2026-11-24 보상을 켠 판: yaml 기본 (켬) 을 끈다
+            ctrl["use_fric_model"] = False
+            nodes.append(LogInfo(msg="friction_comp:=true — 마찰 모델 (yaml 기본 켬) 을 끈다 (보상과 같이 쓰면 구동계 마찰을 두 번 넣는다)"))
+        if ctrl.get("use_fric_model", bool(yaml_mt.get("use_fric_model", False))):
+            if not comp_off:
+                raise RuntimeError("마찰 모델 (use_fric_model:=true 또는 torque_mpc.yaml model_terms.use_fric_model) 은 friction_comp:=false 와 같이 "
+                                   "써야 한다 — torque_output 보상을 켠 채면 구동계 마찰을 두 번 넣는다")
+            if g("mpc_fric_rolling"):     # 2026-11-24 구름 손실 (torque_mpc.yaml model_terms.fric_rolling_Nm). 범위는 노드가 본다
+                ctrl["fric_rolling"] = float(g("mpc_fric_rolling"))
+            if not ctrl.get("cap_friction_shift", bool(yaml_tl.get("friction_shift", False))) and \
+                    (g("limit_mode") or yaml_tl.get("mode", "")) == "friction":
+                nodes.append(LogInfo(msg="마찰 모델을 켰는데 마찰 상한 옮김은 꺼져 있다 — 목표 입력이 마찰만큼 커져 friction 상한에 먼저 닿는다 "
+                                         "(같이 켜려면 mpc_cap_friction_shift:=true)"))
+        elif g("mpc_fric_rolling"):
+            nodes.append(LogInfo(msg="mpc_fric_rolling 은 마찰 모델 (use_fric_model:=true) 이 켜졌을 때만 쓰인다 — 지금은 안 쓰인다"))
         for arg, par in (("mpc_target_projection", "target_projection"), ("mpc_ff_normal_estimate", "ff_normal_estimate"),
                          ("mpc_load_weighted_alloc", "load_weighted_alloc"), ("mpc_load_dynamic_cap", "load_dynamic_cap")):
             if g(arg):
@@ -559,7 +650,7 @@ def _nodes(context):
         #   pp (= 예전 이름 pure_pursuit)  룩어헤드 고정 (pure_pursuit.lookahead_min = max = 0.30 m, 11-20 (9))
         #   adpp                          속도 비례 룩어헤드 (torque_baseline_a.yaml pure_pursuit_adaptive 세 값으로 덮어씀, 2026-11-23). 나머지는 같다
         ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "mu_hat_wheels", "ctrl_payload_kg",
-                               "log_prefix", "slip_eta")
+                               "log_prefix", "slip_eta", "mpc_cap_friction_shift", "use_fric_model")
                    if g(k)]
         if ignored:
             nodes.append(LogInfo(msg=f"controller:={controller} — MPC 인자 {ignored} 는 쓰지 않는다 "
@@ -632,7 +723,8 @@ def _nodes(context):
         parameters=[{"input_topic": torque_in, "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec")),
                      "stiction_comp": stiction_on,
                      # 2026-11-23 friction_comp:=false → 구동계 마찰 보상 전부 끔 (정지 마찰 항도 compensation_scale 을 곱해 같이 0)
-                     **({"compensation_scale": 0.0} if g("friction_comp") and not _truthy(g("friction_comp")) else {}),
+                     # 2026-11-24 사용자 결정 "기본 꺼": 비워도 끔. friction_comp:=true 일 때만 torque_plant.yaml compensation_scale (0.9) 로 보상
+                     **({} if _truthy(g("friction_comp")) else {"compensation_scale": 0.0}),
                      # 2026-11-21 바퀴별 슬립 가드 (amr_mpc/torque/slip_guard.py). 기본 끔
                      "slip_guard": _truthy(g("slip_guard")) if g("slip_guard") else False,
                      # 2026-11-23 구동계 앞방향 δ0 만 (기준 바퀴속도·슬립 가드 T⁻¹)
@@ -703,8 +795,9 @@ def generate_launch_description():
         A("slip_guard", default_value="", description="torque_output 바퀴별 슬립 가드 true/false (기본 끔, 2026-11-21 — amr_mpc/torque/slip_guard.py)"),
         A("stiction_comp", default_value="auto", choices=["auto", "true", "false"],
           description="torque_output 정지 마찰 보상 (torque_plant.yaml friction.static_Nm). auto = plant:=real 에서만 켬"),
-        A("friction_comp", default_value="", choices=["", "true", "false"],
-          description="torque_output 구동계 마찰 보상 (coulomb·viscous·정지). false = 전부 끔 (d̂ 가 외란으로 흡수, 2026-11-23). 비우면 torque_plant.yaml friction.compensation_scale"),
+        A("friction_comp", default_value="false", choices=["", "true", "false"],
+          description="torque_output 구동계 마찰 보상 (coulomb·viscous·정지). 기본 false = 전부 끔 (2026-11-24 사용자 결정, 비워도 끔). "
+                      "true = torque_plant.yaml friction.compensation_scale (0.9) 로 보상 — 상한 옮김·마찰 모델과는 같이 못 쓴다"),
         A("use_mpc", default_value="true", description="false 면 플랜트(+RViz)만 띄운다"),
         A("use_figure8", default_value="true", description="8자 기준궤적 노드. false 면 기준열을 밖에서 준다"),
         A("armed", default_value="false", description="게이트 초기 상태. false 면 터미널에서 'a' 로 무장. plant:=real 에서는 true 금지"),
@@ -735,7 +828,7 @@ def generate_launch_description():
         A("step_log_dir", default_value="", description="step: 판마다 CSV 폴더 (비우면 안 남김)"),
         A("ramp_log_dir", default_value="", description="ramp: 판마다 CSV 폴더 (비우면 안 남김)"),
         A("limit_mode", default_value="", description="motor_only(B) | friction(C) (YAML 기본 motor_only)"),
-        A("disturbance", default_value="", description="외란 추정치 d̂ true/false (YAML 기본 false)"),
+        A("disturbance", default_value="", description="외란 추정치 d̂ true/false (YAML 기본 true — 2026-11-24 사용자 결정. 그 전은 false)"),
         A("linearization", default_value="", description="reference | current_state (YAML 기본 reference)"),
         A("mpc_W", default_value="", description="MPC 상태 가중 'x,y,θ,ẋ,ẏ,θ̇' (비우면 torque_mpc.yaml tuning.W)"),
         A("mpc_w_delta", default_value="", description="MPC 토크 변화 벌점 r_Δ 스텝 단위 [(N·m)⁻²] (주면 w_dudt 보다 우선)"),
@@ -769,6 +862,19 @@ def generate_launch_description():
         A("mpc_dist_yaw_acc_max", default_value="", description="|α_d| 상한 [rad/s²], ≤ 0 이면 없음 (비우면 torque_mpc.yaml disturbance.yaw_acc_max)"),
         A("mpc_dist_observer", default_value="", description="외란 관측기 lpf (α) | kalman (정상상태 Kalman 이득). 비우면 torque_mpc.yaml disturbance.observer"),
         A("mpc_cap_on", default_value="", description="friction 상한을 거는 곳 total | ground (비우면 torque_mpc.yaml torque_limit.cap_on, 2026-11-22)"),
+        A("use_fric_model", default_value="", choices=["", "true", "false"],
+          description="마찰 모델 true/false — 기준 바퀴 속도의 구동계 마찰을 MPC 목표 입력·예측·외란 추정 잔차에 넣는다 (보상 끈 판 전용: "
+                      "friction_comp:=true 와는 같이 못 쓴다. 비우면 torque_mpc.yaml model_terms.use_fric_model = true — 2026-11-24 사용자 결정, "
+                      "보상을 켠 판에서는 알아서 꺼진다. 지시서 T11b)"),
+        A("mpc_fric_rolling", default_value="",
+          description="구름 손실 [N·m, 네 바퀴 공통] — 마찰 모델 (use_fric_model:=true) 에 더하는 바닥 몫. 상한 옮김에는 안 들어간다 "
+                      "(비우면 torque_mpc.yaml model_terms.fric_rolling_Nm = 0, 2026-11-24. 잰 값 0.0027~0.0051)"),
+        A("sim_rolling", default_value="",
+          description="시뮬 플랜트의 구름 손실 [N·m, 네 바퀴 공통, 바퀴 회전 방향] — 구동계 마찰에 더한다, friction_scale 과 무관 (비우면 0, 2026-11-24)"),
+        A("mpc_cap_friction_shift", default_value="", choices=["", "true", "false"],
+          description="마찰 상한 옮김 true/false — friction 상한 상자를 기준 바퀴 속도의 구동계 마찰만큼 옮긴다 (보상 끈 판 전용: "
+                      "limit_mode:=friction 에서만 쓰인다, friction_comp:=true 와는 같이 못 쓴다. 비우면 torque_mpc.yaml torque_limit.friction_shift = true — "
+                      "2026-11-24 사용자 결정, 보상을 켠 판에서는 알아서 꺼진다)"),
         A("path_follow_lead", default_value="",
           description="path following: 기준 시각을 로봇 경로 진행 + 이 값 [s] 안에 묶는다 (0~1, 비우면 끔 = 시간 추종). 늦은 만큼은 주행 시간으로 (2026-11-23)"),
         A("max_com_height", default_value="",

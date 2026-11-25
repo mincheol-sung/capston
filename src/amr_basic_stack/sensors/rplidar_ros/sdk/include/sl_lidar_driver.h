@@ -88,6 +88,16 @@ namespace sl {
         char    scan_mode[64];
     };
 
+    // Host-side record. The serial protocol's packed HQ node stays unchanged.
+    struct TimedHqNode
+    {
+        sl_lidar_response_measurement_node_hq_t node;
+        sl_u64 timestamp_us;
+    };
+
+    sl_result ascendTimedScanData(TimedHqNode* nodes, size_t count);
+    sl_u64 lidarHostTimeUs();
+
     template <typename T>
     struct Result
     {
@@ -535,6 +545,10 @@ namespace sl {
         ///                          If NULL is specified, a driver cached version of the connected LIDAR will be used
         /// \param timeout           The timeout value used by potential data communication
         virtual sl_result getModelNameDescriptionString(std::string& out_description, bool fetchAliasName = true, const sl_lidar_response_device_info_t* devInfo = nullptr, sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
+
+        /// Fetch one revolution with the decoder's host-clock estimate for each return.
+        virtual sl_result grabTimedScanDataHq(TimedHqNode* nodes, size_t& count,
+                                              sl_u32 timeout = DEFAULT_TIMEOUT) = 0;
 
 };
 

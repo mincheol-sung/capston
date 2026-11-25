@@ -1,0 +1,208 @@
+[run_square] P1a 시작 19:21:16: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit
+[run_square] P1a 무장 19:21:51  출발 SLAM (-0.7685266167362061 1.45382345646431)
+[state_estimator_node-16] [WARN] [1795256497.487947909] [state_estimator_node]: SLAM 포즈 튐: 잔차 163.4 cm, -67.3° — 버림 (누적 1)
+[wheel_pi_node-19] [INFO] [1795256511.124544696] [wheel_pi_node]: 게이트 무장
+[pure_pursuit_node-18] [INFO] [1795256511.124613103] [pure_pursuit_node]: 게이트 무장 — 추종 가능
+[wheel_pi_node-19] [INFO] [1795256529.383520009] [wheel_pi_node]: 정지(DAMPING): 속도 명령 끊김 (퓨어 퍼슛 정지)
+[run_square] P1a 끝 19:22:16  bag bags/2026-11-21/192116  끝 SLAM (-0.7921494344957017 1.4410301856738676)  남은 노드 0
+[run_square] 출발점 ↔ 끝 거리 0.027 m
+RESULT P1a try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/192116
+[run_square] C1a 시작 19:22:19: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469
+[run_square] C1a 무장 19:22:53  출발 SLAM (-0.7912735092826118 1.4476562833217201)
+[state_estimator_node-16] [WARN] [1795256560.797535188] [state_estimator_node]: SLAM 포즈 튐: 잔차 165.4 cm, -67.3° — 버림 (누적 1)
+[torque_mpc_node-18] [INFO] [1795256573.519044867] [torque_mpc_node]: 게이트 무장 — 추종 가능
+[torque_mpc_node-18] [INFO] [1795256591.652477750] [torque_mpc_node]: 정지(DAMPING): 기준열 끊김
+[run_square] C1a 끝 19:23:19  bag bags/2026-11-21/192220  끝 SLAM (-0.6924102321756713 1.4544805764481603)  남은 노드 0
+[run_square] 출발점 ↔ 끝 거리 0.099 m
+RESULT C1a try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/192220
+[run_square] P2a 시작 19:23:22: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit pp_lookahead_min:=0.15 pp_lookahead_max:=0.60
+[run_square] P2a 무장 19:23:57  출발 SLAM (-0.6939660701789551 1.454430902129387)
+[state_estimator_node-16] [WARN] [1795256624.179757652] [state_estimator_node]: SLAM 포즈 튐: 잔차 156.3 cm, -75.4° — 버림 (누적 1)
+[wheel_pi_node-19] [INFO] [1795256637.081913435] [wheel_pi_node]: 게이트 무장
+[pure_pursuit_node-18] [INFO] [1795256637.083269093] [pure_pursuit_node]: 게이트 무장 — 추종 가능
+[pure_pursuit_node-18] [INFO] [1795256651.794478143] [pure_pursuit_node]: hold 진입: 오차 9.9 mm, -0.47° — 명령 끊음 (DAMPING)
+[wheel_pi_node-19] [INFO] [1795256651.838894285] [wheel_pi_node]: 정지(DAMPING): 속도 명령 끊김 (퓨어 퍼슛 정지)
+[run_square] P2a 끝 19:24:19  bag bags/2026-11-21/192323  끝 SLAM (-0.7055493372327566 1.4508299670351041)  남은 노드 0
+[run_square] 출발점 ↔ 끝 거리 0.012 m
+RESULT P2a try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/192323
+[run_square] C2a 시작 19:24:22: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C2a try1 rc=2 /home/smoc/capston/capston/bags/2026-11-21/192422
+[run_square] C2a 시작 19:24:56: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] C2a 무장 19:25:31  출발 SLAM (-0.6655589904722515 1.4704677700037394)
+[state_estimator_node-16] [WARN] [1795256718.056226822] [state_estimator_node]: SLAM 포즈 튐: 잔차 161.1 cm, -65.3° — 버림 (누적 1)
+[torque_mpc_node-18] [INFO] [1795256730.883007343] [torque_mpc_node]: 게이트 무장 — 추종 가능
+[torque_mpc_node-18] [INFO] [1795256749.010566464] [torque_mpc_node]: 정지(DAMPING): 기준열 끊김
+[run_square] C2a 끝 19:25:57  bag bags/2026-11-21/192457  끝 SLAM (-0.6640291782111636 1.4688350597587658)  남은 노드 0
+[run_square] 출발점 ↔ 끝 거리 0.002 m
+RESULT C2a try2 rc=0 /home/smoc/capston/capston/bags/2026-11-21/192457
+[run_square] P1b 시작 19:26:00: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT P1b try1 rc=2 /home/smoc/capston/capston/bags/2026-11-21/192600
+[run_square] P1b 시작 19:26:36: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT P1b try2 rc=2 /home/smoc/capston/capston/bags/2026-11-21/192637
+ABORT at P1b (rc=2)
+[run_square] P1b 시작 19:28:14: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit
+[run_square] P1b 무장 19:28:48  출발 SLAM (-0.6670131610497086 1.467993494603765)
+[state_estimator_node-16] [WARN] [1795256915.883949656] [state_estimator_node]: SLAM 포즈 튐: 잔차 161.5 cm, -75.3° — 버림 (누적 1)
+[wheel_pi_node-19] [INFO] [1795256928.550712637] [wheel_pi_node]: 게이트 무장
+[pure_pursuit_node-18] [INFO] [1795256928.550799251] [pure_pursuit_node]: 게이트 무장 — 추종 가능
+[pure_pursuit_node-18] [INFO] [1795256942.644664816] [pure_pursuit_node]: hold 진입: 오차 9.9 mm, -0.02° — 명령 끊음 (DAMPING)
+[wheel_pi_node-19] [INFO] [1795256942.686634010] [wheel_pi_node]: 정지(DAMPING): 속도 명령 끊김 (퓨어 퍼슛 정지)
+[run_square] P1b 끝 19:29:10  bag bags/2026-11-21/192815  끝 SLAM (-0.675802790069936 1.4790674026287116)  남은 노드 0
+[run_square] 출발점 ↔ 끝 거리 0.014 m
+RESULT P1b try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/192815
+[run_square] C1b 시작 19:29:14: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C1b try1 rc=2 /home/smoc/capston/capston/bags/2026-11-21/192914
+[run_square] C1b 시작 19:29:48: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C1b try2 rc=2 /home/smoc/capston/capston/bags/2026-11-21/192948
+[run_square] C1b 시작 19:30:24: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C1b try3 rc=2 /home/smoc/capston/capston/bags/2026-11-21/193025
+ABORT at C1b (rc=2)
+[run_square] P2b 시작 19:34:56: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit pp_lookahead_min:=0.15 pp_lookahead_max:=0.60
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT P2b try1 rc=2 /home/smoc/capston/capston/bags/2026-11-21/193456
+[run_square] P2b 시작 19:35:31: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit pp_lookahead_min:=0.15 pp_lookahead_max:=0.60
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT P2b try2 rc=2 /home/smoc/capston/capston/bags/2026-11-21/193531
+[run_square] P2b 시작 19:36:05: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit pp_lookahead_min:=0.15 pp_lookahead_max:=0.60
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT P2b try3 rc=2 /home/smoc/capston/capston/bags/2026-11-21/193605
+ABORT at P2b (rc=2)
+[run_square] P2b 시작 19:37:24: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit pp_lookahead_min:=0.15 pp_lookahead_max:=0.60
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT P2b try1 rc=2 /home/smoc/capston/capston/bags/2026-11-21/193724
+[run_square] P2b 시작 19:38:01: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit pp_lookahead_min:=0.15 pp_lookahead_max:=0.60
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT P2b try2 rc=2 /home/smoc/capston/capston/bags/2026-11-21/193801
+[run_square] P2b 시작 19:38:37: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit pp_lookahead_min:=0.15 pp_lookahead_max:=0.60
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT P2b try3 rc=2 /home/smoc/capston/capston/bags/2026-11-21/193837
+ABORT at P2b (rc=2)
+[run_square] P2b 시작 19:42:24: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit pp_lookahead_min:=0.15 pp_lookahead_max:=0.60
+[run_square] P2b 무장 19:42:59  출발 SLAM (-0.6393604633758598 1.4994974008156052)
+[state_estimator_node-16] [WARN] [1795257766.375299824] [state_estimator_node]: SLAM 포즈 튐: 잔차 165.0 cm, -65.3° — 버림 (누적 1)
+[pure_pursuit_node-18] [INFO] [1795257779.635647856] [pure_pursuit_node]: 게이트 무장 — 추종 가능
+[wheel_pi_node-19] [INFO] [1795257779.635647453] [wheel_pi_node]: 게이트 무장
+[pure_pursuit_node-18] [INFO] [1795257792.343311570] [pure_pursuit_node]: hold 진입: 오차 5.3 mm, 0.61° — 명령 끊음 (DAMPING)
+[wheel_pi_node-19] [INFO] [1795257792.388962288] [wheel_pi_node]: 정지(DAMPING): 속도 명령 끊김 (퓨어 퍼슛 정지)
+[run_square] P2b 끝 19:43:18  bag bags/2026-11-21/194225  끝 SLAM (-0.6432142056058474 1.5059701558118326)  남은 노드 8
+[run_square] 출발점 ↔ 끝 거리 0.008 m
+RESULT P2b try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/194225
+[run_square] C2b 시작 19:43:22: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C2b try1 rc=2 /home/smoc/capston/capston/bags/2026-11-21/194322
+[run_square] C2b 시작 19:43:58: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: 측위 결과(/tracked_pose·스캔)를 못 받음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C2b try2 rc=2 /home/smoc/capston/capston/bags/2026-11-21/194359
+[run_square] C2b 시작 19:44:33: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: 측위 결과(/tracked_pose·스캔)를 못 받음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C2b try3 rc=2 /home/smoc/capston/capston/bags/2026-11-21/194433
+ABORT at C2b (rc=2)
+[run_square] C2b 시작 19:46:29: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: 측위 결과(/tracked_pose·스캔)를 못 받음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C2b try1 rc=2 /home/smoc/capston/capston/bags/2026-11-21/194629
+[run_square] C2b 시작 19:47:03: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: 측위 결과(/tracked_pose·스캔)를 못 받음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C2b try2 rc=2 /home/smoc/capston/capston/bags/2026-11-21/194703
+[run_square] C2b 시작 19:47:37: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: 측위 결과(/tracked_pose·스캔)를 못 받음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT C2b try3 rc=2 /home/smoc/capston/capston/bags/2026-11-21/194738
+ABORT at C2b (rc=2)
+[run_square] C2b 시작 19:56:36: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,2.5,2,2,1
+[run_square] C2b 무장 19:57:11  출발 SLAM (-0.6405140810175827 1.480432147805969)
+[state_estimator_node-16] [WARN] [1795258618.074754221] [state_estimator_node]: SLAM 포즈 튐: 잔차 161.2 cm, -70.3° — 버림 (누적 1)
+[torque_mpc_node-18] [INFO] [1795258631.616204949] [torque_mpc_node]: 게이트 무장 — 추종 가능
+[torque_mpc_node-18] [INFO] [1795258649.759895292] [torque_mpc_node]: 정지(DAMPING): 기준열 끊김
+[run_square] C2b 끝 19:57:36  bag bags/2026-11-21/195636  끝 SLAM (-0.640803199938403 1.4800027709839096)  남은 노드 1
+[run_square] 출발점 ↔ 끝 거리 0.001 m
+RESULT C2b try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/195636
+ALL_DONE
+[run_square] C3a 시작 20:14:11: use_mpc:=true shape:=square yaw_mode:=tangent accel:=1.5 square_v_max:=1.5 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction mu_hat_wheels:=0.486,0.495,0.513,0.469 mpc_W:=20,20,10,2,2,1
+[run_square] C3a 무장 20:14:47  출발 SLAM (-0.7067414564039516 1.4053044195652915)
+[state_estimator_node-16] [WARN] [1795259673.335785584] [state_estimator_node]: SLAM 포즈 튐: 잔차 156.0 cm, -65.3° — 버림 (누적 1)
+[torque_mpc_node-18] [INFO] [1795259687.210939926] [torque_mpc_node]: 게이트 무장 — 추종 가능
+[torque_mpc_node-18] [INFO] [1795259705.411624056] [torque_mpc_node]: 정지(DAMPING): 기준열 끊김
+[run_square] C3a 끝 20:15:13  bag bags/2026-11-21/201411  끝 SLAM (-0.7049830063249256 1.3929995563214108)  남은 노드 10
+[run_square] 출발점 ↔ 끝 거리 0.012 m
+RESULT C3a try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/201411
+ALL_DONE
+[run_square] F8C3 시작 20:31:32: use_mpc:=true shape:=circles8 width:=1.2 yaw_mode:=tangent lap_speeds:=[0.43,0.61,0.8] accel:=1.0 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction
+[run_square] F8C3 무장 20:32:07  출발 SLAM (0.012506812375096339 1.4410235669987206)
+[state_estimator_node-16] [WARN] [1795260714.699068243] [state_estimator_node]: SLAM 포즈 튐: 잔차 139.6 cm, 24.5° — 버림 (누적 1)
+[torque_mpc_node-18] [INFO] [1795260727.600305539] [torque_mpc_node]: 게이트 무장 — 추종 가능
+[torque_mpc_node-18] [INFO] [1795260756.871826443] [torque_mpc_node]: 정지(DAMPING): 기준열 끊김
+[run_square] F8C3 끝 20:32:43  bag bags/2026-11-21/203133  끝 SLAM (0.003003513177542114 1.3905462861547941)  남은 노드 1
+[run_square] 출발점 ↔ 끝 거리 0.051 m
+RESULT F8C3 try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/203133
+[run_square] F8W2C3 시작 20:33:01: use_mpc:=true shape:=circles8 width:=2.0 yaw_mode:=tangent lap_speeds:=[0.43,0.61,0.8] accel:=1.0 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction
+[run_square] 측위 맞음 없음 — 무장 안 함
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+██  측위 맞추기 실패: 측위 결과(/tracked_pose·스캔)를 못 받음 — 무장하지 말 것 (위 check_localization 출력 확인)
+RESULT F8W2C3 try1 rc=2 /home/smoc/capston/capston/bags/2026-11-21/203301
+[run_square] F8W2C3 시작 20:33:40: use_mpc:=true shape:=circles8 width:=2.0 yaw_mode:=tangent lap_speeds:=[0.43,0.61,0.8] accel:=1.0 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction
+[run_square] F8DH 시작 21:21:04: use_mpc:=true shape:=circles8 width:=1.2 yaw_mode:=tangent lap_speeds:=[0.43,0.61,0.8] accel:=1.0 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction disturbance:=true
+[run_square] F8DH 무장 21:21:38  출발 SLAM (0.022548754164562253 1.4646336344243753)
+[state_estimator_node-16] [WARN] [1795263685.937914214] [state_estimator_node]: SLAM 포즈 튐: 잔차 139.2 cm, 24.5° — 버림 (누적 1)
+[torque_mpc_node-18] [INFO] [1795263698.642089991] [torque_mpc_node]: 게이트 무장 — 추종 가능
+[torque_mpc_node-18] [INFO] [1795263727.851227657] [torque_mpc_node]: 정지(DAMPING): 기준열 끊김
+[run_square] F8DH 끝 21:22:14  bag bags/2026-11-21/212105  끝 SLAM (0.0357997601701316 1.3905400779007806)  남은 노드 0
+[run_square] 출발점 ↔ 끝 거리 0.075 m
+RESULT F8DH try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/212105
+[run_square] F8W2DH 시작 21:25:02: use_mpc:=true shape:=circles8 width:=2.0 yaw_mode:=tangent lap_speeds:=[0.43,0.61,0.8] accel:=1.0 origin_mode:=robot max_track_error:=0.5 bag:=true limit_mode:=friction disturbance:=true
+[run_square] F8W2DH 무장 21:25:36  출발 SLAM (0.045756466935300534 1.3939467780397636)
+[state_estimator_node-16] [WARN] [1795263923.330512619] [state_estimator_node]: SLAM 포즈 튐: 잔차 140.0 cm, 24.5° — 버림 (누적 1)
+[torque_mpc_node-18] [INFO] [1795263935.903613203] [torque_mpc_node]: 게이트 무장 — 추종 가능
+[torque_mpc_node-18] [INFO] [1795263978.286811187] [torque_mpc_node]: 정지(DAMPING): 기준열 끊김
+[run_square] F8W2DH 끝 21:26:26  bag bags/2026-11-21/212502  끝 SLAM (0.0580248206332486 1.3555178398296674)  남은 노드 0
+[run_square] 출발점 ↔ 끝 거리 0.040 m
+RESULT F8W2DH try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/212502
+[run_square] F8W2PP 시작 21:26:29: use_mpc:=true shape:=circles8 width:=2.0 yaw_mode:=tangent lap_speeds:=[0.43,0.61,0.8] accel:=1.0 origin_mode:=robot max_track_error:=0.5 bag:=true controller:=pure_pursuit
+[run_square] F8W2PP 무장 21:27:04  출발 SLAM (0.05768883003137054 1.3604286519963256)
+[state_estimator_node-16] [WARN] [1795264010.947115672] [state_estimator_node]: SLAM 포즈 튐: 잔차 129.3 cm, 24.4° — 버림 (누적 1)
+[pure_pursuit_node-18] [INFO] [1795264024.503490483] [pure_pursuit_node]: 게이트 무장 — 추종 가능
+[wheel_pi_node-19] [INFO] [1795264024.503596133] [wheel_pi_node]: 게이트 무장
+[wheel_pi_node-19] [INFO] [1795264066.908225731] [wheel_pi_node]: 정지(DAMPING): 속도 명령 끊김 (퓨어 퍼슛 정지)
+[run_square] F8W2PP 끝 21:27:53  bag bags/2026-11-21/212629  끝 SLAM (0.047363211370719825 1.3855564497693533)  남은 노드 0
+[run_square] 출발점 ↔ 끝 거리 0.027 m
+RESULT F8W2PP try1 rc=0 /home/smoc/capston/capston/bags/2026-11-21/212629

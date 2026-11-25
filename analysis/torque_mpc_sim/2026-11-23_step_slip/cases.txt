@@ -1,0 +1,4 @@
+C_r1|limit_mode:=friction
+PP_r1|controller:=pure_pursuit
+C_r2|limit_mode:=friction
+PP_r2|controller:=pure_pursuit

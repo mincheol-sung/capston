@@ -33,7 +33,8 @@ cartographer 자체는 TF 를 발행하지 않는다(lua 의 publish_to_tf = fal
 
 전제
   full_system 또는 bringup 이 실행 중이어야 한다
-  (/scan_front_carto, /scan_rear_carto, /odom, /camera/imu,
+  (실차 측위는 /points_front_carto, /points_rear_carto,
+   매핑·Isaac은 /scan_front_carto, /scan_rear_carto. /odom, /camera/imu,
    odom->base_footprint TF).
   slam_toolbox(slam.launch.py) 와 semantic_slam stub 은 /map 이 겹치므로 끌 것.
 
@@ -107,6 +108,7 @@ def launch_setup(context, *args, **kwargs):
     use_dynamic_filter = IfCondition(LaunchConfiguration('use_dynamic_filter')).evaluate(context)
     scan_front = cfg('scan_front_topic')
     scan_rear = cfg('scan_rear_topic')
+    points_topics = [cfg('points_front_topic'), cfg('points_rear_topic')]
     filters = []
     if use_dynamic_filter:
         outputs = ('/scan_front_static', '/scan_rear_static')
@@ -122,6 +124,20 @@ def launch_setup(context, *args, **kwargs):
                 remappings=[('scan_in', source), ('scan_out', target)],
             ))
         scan_front, scan_rear = outputs
+        if mode == 'localization' and lua_basename != 'localization_sim_2d.lua':
+            static_clouds = ['/points_front_static', '/points_rear_static']
+            if any('/' + topic.lstrip('/') in static_clouds for topic in points_topics):
+                raise RuntimeError('Dynamic filter source topics must differ from static outputs')
+            for side, cloud, mask, target in zip(
+                    ('front', 'rear'), points_topics, outputs, static_clouds):
+                filters.append(Node(
+                    package='amr_laser_tools', executable='masked_timed_cloud',
+                    name=f'masked_timed_cloud_{side}', output='screen',
+                    parameters=[{'use_sim_time': use_sim_time}],
+                    remappings=[('points_in', cloud), ('scan_mask', mask),
+                                ('points_out', target)],
+                ))
+            points_topics = static_clouds
 
     map_topic = cfg('map_topic') or default_map_topic
 
@@ -152,11 +168,12 @@ def launch_setup(context, *args, **kwargs):
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}],
             arguments=carto_args,
-            # num_laser_scans=2이면 고정 구독명이 scan_1, scan_2가 된다.
-            # 두 원본의 stamp/time_increment를 보존한 섹터 필터 출력을 사용한다.
+            # Lua selects the cloud pair for real localization and the scan pair for mapping/Isaac.
             remappings=[
                 ('scan_1', scan_front),
                 ('scan_2', scan_rear),
+                ('points2_1', points_topics[0]),
+                ('points2_2', points_topics[1]),
                 ('odom', cfg('odom_topic')),
                 ('imu', cfg('imu_topic')),
             ],
@@ -309,6 +326,8 @@ def generate_launch_description():
             description='모드 기본 lua 대신 쓸 config/*.lua 파일명. 예: mapping_sim_2d.lua / '
                         'localization_sim_2d.lua (Isaac 창고, max_range 30). 비면 모드 기본값.'),
 
+        DeclareLaunchArgument('points_front_topic', default_value='/points_front_carto'),
+        DeclareLaunchArgument('points_rear_topic', default_value='/points_rear_carto'),
         DeclareLaunchArgument(
             'scan_front_topic', default_value='/scan_front_carto',
             description='시간 정보를 보존하고 섹터 마스킹한 전방 LaserScan.'),

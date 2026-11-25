@@ -41,6 +41,7 @@
 #include "hal/waiter.h"
 #include "hal/byteorder.h"
 #include "sl_lidar_driver.h"
+#include "scan_data_holder.h"
 #include "sl_crc.h" 
 #include <algorithm>
 #include <memory>
@@ -119,6 +120,10 @@ namespace sl {
         return node.dist_mm_q2;
     }
    
+    static inline float getAngle(const TimedHqNode& sample) { return getAngle(sample.node); }
+    static inline void setAngle(TimedHqNode& sample, float angle) { setAngle(sample.node, angle); }
+    static inline sl_u32 getDistanceQ2(const TimedHqNode& sample) { return sample.node.dist_mm_q2; }
+
     template <class TNode>
     static bool angleLessThan(const TNode& a, const TNode& b)
     {
@@ -183,6 +188,17 @@ namespace sl {
         return SL_RESULT_OK;
     }
 
+    sl_result ascendTimedScanData(TimedHqNode* nodes, size_t count)
+    {
+        if (!nodes || !count) return SL_RESULT_INVALID_DATA;
+        return ascendScanData_(nodes, count);
+    }
+
+    sl_u64 lidarHostTimeUs()
+    {
+        return getus();
+    }
+
     template<typename T>
     class RawSampleNodeHolder
     {
@@ -232,142 +248,6 @@ namespace sl {
         rp::hal::Event  _data_waiter;
         std::deque<T>   _data_queue;
         
-    };
-
-    template<typename T>
-    class ScanDataHolder
-    {
-    public:
-        ScanDataHolder(size_t maxcount = 8192) 
-            : _scan_node_buffer_size(maxcount)
-            , _scan_node_available_id(-1)
-            , _new_scan_ready(false)
-        {
-            _scanbuffer[0].reserve(_scan_node_buffer_size);
-            _scanbuffer[1].reserve(_scan_node_buffer_size);
-
-            memset(_scan_begin_timestamp_uS, 0, sizeof(_scan_begin_timestamp_uS));
-        }
-
-        size_t getMaxCacheCount() const {
-            return _scan_node_buffer_size;
-        }
-
-
-        void reset() {
-            rp::hal::AutoLocker l(_locker);
-            _scan_node_available_id = -1;
-            _new_scan_ready = false;
-            _scanbuffer[0].clear();
-            _scanbuffer[1].clear();
-            _data_waiter.set(false);
-            memset(_scan_begin_timestamp_uS, 0, sizeof(_scan_begin_timestamp_uS));
-        }
-
-        bool checkNewScanSignalAndReset()
-        {
-            return _new_scan_ready.exchange(false);
-        }
-
-        void pushScanNodeData(_u64 currentSampleTsUs, const T* hqNode)
-        {
-            rp::hal::AutoLocker l(_locker);
-
-            int  operationBufID = _getOperationBufferID_locked();
-            auto operationalBuf = &_scanbuffer[operationBufID];
-            
-            if (hqNode->flag & RPLIDAR_RESP_HQ_FLAG_SYNCBIT) {
-                if (operationalBuf->size()) {
-                    operationBufID = _finishCurrentScanAndSwap_locked();
-                    operationalBuf = &_scanbuffer[operationBufID];
-
-                    // publish the available scan
-                    _new_scan_ready = true;
-                    _data_waiter.set();
-
-                }
-                
-                assert(operationalBuf->size() == 0);
-
-                //store the timestamp info
-                _scan_begin_timestamp_uS[operationBufID] = currentSampleTsUs;
-            }
-            else {
-                if (operationalBuf->size() == 0) {
-                    //discard the data, do not form partial scan
-                    return;
-                }
-            }
-
-            if (operationalBuf->size() >= _scan_node_buffer_size) {
-                //replace the last entry if buffer is full
-                operationalBuf->at(operationalBuf->size() - 1) = *hqNode;
-            }
-            else {
-                operationalBuf->push_back(*hqNode);
-            }
-
-        }
-
-        void rewindCurrentScanData() {
-            rp::hal::AutoLocker l(_locker);
-            _getOperationalBuffer_locked().clear();
-        }
-
-        std::vector<T>* waitAndLockAvailableScan(_u32 timeout, _u64 * out_timestamp_uS = nullptr)
-        {
-            if (_data_waiter.wait(timeout) == rp::hal::Event::EVENT_OK)
-            {
-                _locker.lock();
-                assert(_scan_node_available_id >= 0);
-                _new_scan_ready = false;
-                if (out_timestamp_uS) {
-                    *out_timestamp_uS = _scan_begin_timestamp_uS[_scan_node_available_id];
-                }
-                return &_scanbuffer[_scan_node_available_id];
-            }
-            else {
-                return nullptr;
-            }
-        }
-
-        void unlockScan(std::vector<T>* scan) {
-            if (scan) {
-                _locker.unlock();
-            }
-        }
-
-    protected:
-        int _finishCurrentScanAndSwap_locked() {
-            _scan_node_available_id = _getOperationBufferID_locked();
-            int newOperationalID  =  1 - _scan_node_available_id;
-
-            _scanbuffer[newOperationalID].clear();
-            return newOperationalID;
-        }
-
-        int _getOperationBufferID_locked() {
-            if (_scan_node_available_id < 0) return 0;
-            return 1 - _scan_node_available_id;
-        }
-
-        std::vector<T>& _getOperationalBuffer_locked()
-        {
-            return _scanbuffer[_getOperationBufferID_locked()];
-        }
-
-
-        rp::hal::Locker _locker;
-        rp::hal::Event  _data_waiter;
-
-        
-
-        _u64   _scan_begin_timestamp_uS[2];
-        size_t _scan_node_buffer_size;
-        int    _scan_node_available_id;
-        std::atomic<bool>   _new_scan_ready;
-
-        std::vector<T> _scanbuffer[2];
     };
 
     class SlamtecLidarDriver : 
@@ -783,20 +663,13 @@ namespace sl {
         sl_result grabScanDataHqWithTimeStamp(sl_lidar_response_measurement_node_hq_t* nodebuffer, size_t& count, sl_u64& timestamp_uS, sl_u32 timeout = DEFAULT_TIMEOUT)
         {
             rp::hal::AutoLocker l(_op_locker);
+            return _scanHolder.readScan(nodebuffer, nullptr, count, &timestamp_uS, timeout);
+        }
 
-            if (!nodebuffer)
-                return SL_RESULT_INVALID_DATA;
-
-            auto availBuffer = _scanHolder.waitAndLockAvailableScan(timeout, &timestamp_uS);
-            if (!availBuffer) return SL_RESULT_OPERATION_TIMEOUT;
-
-            count = std::min<size_t>(count, availBuffer->size());
-
-            std::copy(availBuffer->begin(), availBuffer->begin() + count, nodebuffer);
-
-            _scanHolder.unlockScan(availBuffer);
-
-            return RESULT_OK;
+        sl_result grabTimedScanDataHq(TimedHqNode* nodebuffer, size_t& count, sl_u32 timeout) override
+        {
+            rp::hal::AutoLocker l(_op_locker);
+            return _scanHolder.readScan(nullptr, nodebuffer, count, nullptr, timeout);
         }
 
         sl_result grabScanDataHq(sl_lidar_response_measurement_node_hq_t* nodebuffer, size_t& count, sl_u32 timeout = DEFAULT_TIMEOUT)
@@ -1685,7 +1558,7 @@ namespace sl {
         rp::hal::Locker           _data_locker;
         rp::hal::Waiter<_u32>     _response_waiter;
 
-        ScanDataHolder<sl_lidar_response_measurement_node_hq_t> _scanHolder;
+        ScanDataHolder _scanHolder;
         RawSampleNodeHolder<sl_lidar_response_measurement_node_hq_t> _rawSampleNodeHolder;
         _u32                          _waiting_packet_type;
         internal::message_autoptr_t   _lastAnsPkt;

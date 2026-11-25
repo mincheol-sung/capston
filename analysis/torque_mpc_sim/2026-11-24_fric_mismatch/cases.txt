@@ -1,0 +1,19 @@
+# 2026-11-24 마찰 모델 값이 실제 마찰과 다를 때 닫힌 고리 추종 — MPC 모델 마찰은 설정 그대로 (배율 1.0), 시뮬 플랜트 마찰만 바꾼다.
+#   under = 플랜트 1.17 배 (모델이 17 % 모자람 = 지금 바닥 상태 흉내),  match = 1.0 (모델 = 실제),  over = 0.855 배 (모델이 17 % 넘침)
+#   G = 0.4 m/s · 기준 가속 0.5 m/s² (상한 안 닿음, 슬립 모델 없음),  C = 확인 주행 조건 1.0 m/s · 2.5 m/s² · 바닥 μ 0.45
+G_under_r1|friction_scale:=1.17 speed:=0.4 accel:=0.5
+G_match_r1|friction_scale:=1.0 speed:=0.4 accel:=0.5
+G_over_r1|friction_scale:=0.855 speed:=0.4 accel:=0.5
+G_under_r2|friction_scale:=1.17 speed:=0.4 accel:=0.5
+G_match_r2|friction_scale:=1.0 speed:=0.4 accel:=0.5
+G_over_r2|friction_scale:=0.855 speed:=0.4 accel:=0.5
+C_under|friction_scale:=1.17 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_match|friction_scale:=1.0 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_over|friction_scale:=0.855 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+# 되풀이 (판 사이 흔들림 확인)
+C_under_r2|friction_scale:=1.17 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_match_r2|friction_scale:=1.0 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_over_r2|friction_scale:=0.855 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_under_r3|friction_scale:=1.17 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_match_r3|friction_scale:=1.0 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105
+C_over_r3|friction_scale:=0.855 speed:=1.0 accel:=2.5 surface_mu:=0.45 sim_com_height:=0.105

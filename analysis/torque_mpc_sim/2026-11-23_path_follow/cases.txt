@@ -1,0 +1,5 @@
+# 라벨|launch 인자  (공통: circles8 1.6 · laps 1 · speed 0.69 · accel 3.0 계단 변조 · μ 0.55 · 플랜트 h 0.2)
+Ctrack|limit_mode:=friction mpc_com_height:=0.2
+Cpf|limit_mode:=friction mpc_com_height:=0.2 path_follow_lead:=0.05
+PPtrack|controller:=pure_pursuit
+PPpf|controller:=pure_pursuit path_follow_lead:=0.05

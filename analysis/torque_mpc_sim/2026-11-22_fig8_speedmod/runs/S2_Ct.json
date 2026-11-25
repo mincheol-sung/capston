@@ -1,0 +1,1 @@
+{"label": "S2_Ct", "samples": 3920, "fault": "", "rms_mm": 12.343952778238943, "max_mm": 32.027450914521445, "yaw_rms_deg": 0.627951666329028, "moving_rms_mm": 13.957443705646405, "moving_max_mm": 32.027450914521445, "tau_max": 0.1640705446443689, "tau_rms": 0.04544145250654888, "dtau_rms": 0.005763729704643002, "n_torque": 3284, "n_damping_while_armed": 629, "timed_out": false}

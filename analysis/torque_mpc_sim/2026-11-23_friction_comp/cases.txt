@@ -1,0 +1,6 @@
+PP_on|controller:=pure_pursuit friction_scale:=1.0
+B_on|limit_mode:=motor_only friction_scale:=1.0
+C_on|limit_mode:=friction friction_scale:=1.0
+PP_off|controller:=pure_pursuit friction_scale:=1.9
+B_off|limit_mode:=motor_only friction_scale:=1.9
+C_off|limit_mode:=friction friction_scale:=1.9

@@ -1,0 +1,67 @@
+# Xbox Wireless Controller (BLE, 펌웨어 5.23.6.0, 커널 hid-microsoft) 용 joy_node + joy_teleop 설정.
+# F710 판은 joy_teleop.yaml. 조작 배치는 F710 과 같게 맞췄다 (전후 = 왼쪽 스틱, 좌우 = 오른쪽 스틱, 회전 = LB/RB).
+#
+# 인덱스 근거 — 2026-11-23 실측 (joy_node /joy 를 버튼 하나씩 눌러 기록, joydev 원시값과 같음):
+#   버튼  A0 B1 X3 Y4 LB6 RB7 View10 Menu11 L스틱누름13 R스틱누름14
+#         2·5·8·9 는 비어 있다 — 커널이 이 패드에 실제로 없는 BTN_C·BTN_Z·BTN_TL2·BTN_TR2 비트까지 올려서
+#         SDL 이 그 자리에 번호를 준다. F710(xpad) 은 A0 B1 X2 Y3 LB4 RB5 라 그대로 쓰면 어긋난다.
+#   축    0 왼쪽 X (왼쪽 +)   1 왼쪽 Y (위 +)   2 오른쪽 X (왼쪽 +)   3 오른쪽 Y (위 +)
+#         4 RT   5 LT   (둘 다 놓으면 +1.0, 끝까지 당기면 −1.0)   6 십자 X (왼쪽 +)   7 십자 Y (위 +)
+#   ⚠ 축 4·5(트리거)를 axis_* 에 넣지 말 것 — 놓은 상태가 +1.0 이라 손을 안 대도 최대 명령이 나간다.
+#
+# 부호: joy_teleop 은 cmd = max × scale × axis 이고 REP-103 몸체 좌표(x 앞, y 왼쪽, z 반시계)다.
+#   왼쪽 스틱 위 = axis1 +  → vx +  (전진)
+#   오른쪽 스틱 왼쪽 = axis2 + → vy + (왼쪽 횡이동)
+#   LB = 반시계(wz +), RB = 시계(wz −)
+
+joy_node:
+  ros__parameters:
+    # F710 수신기가 같이 꽂혀 있으면 SDL index 가 F710 = 0, Xbox = 1 이 된다 (joy_enumerate_devices).
+    # 꽂힌 순서에 기대지 않게 이름으로 연다. 이름은 joy_node 기동 로그 "Opened joystick: ..." 와 같다.
+    device_name: "Xbox Series X Controller"
+    deadzone: 0.05
+    autorepeat_rate: 20.0
+
+joy_teleop:
+  ros__parameters:
+    # 속도 한계 (출력 상한 = max × scale, 이 판은 scale 을 1 로 두고 max 에 바로 적는다)
+    #   vx, vy ≤ 0.60 m/s,  wz ≤ 1.80 rad/s (한 바퀴 3.5 s)
+    #
+    # 정하는 법 — 세 축을 동시에 끝까지 밀어도 가장 빠른 바퀴가 AK40 정격을 넘지 않게 (2026-11-23 사용자 요청 "동시에 하면 부하 100"):
+    #   바퀴 ω_i = (±vx ± vy ± k·wz)/r 이므로 최악 바퀴 = (vx + vy + k·wz)/r ≤ ω_rated
+    #   → vx + vy + k·wz ≤ ω_rated·r = 38.75 × 0.04 = 1.550 m/s
+    #   (torque_plant.yaml: r 0.04 m, k = (0.1724 + 0.2140)/2 = 0.1932 m, 정격 370 rpm = 38.75 rad/s)
+    #   vx = vy = 0.60 → k·wz ≤ 0.350 → wz ≤ 1.811.  1.80 으로: 최악 바퀴 (0.60 + 0.60 + 0.3478)/0.04 = 38.69 rad/s = 정격의 99.9 %
+    #   (Tinv 로 부호 8 가지를 다 넣어 검산: 38.69 rad/s)
+    #   이전 값 0.72 / 1.00 은 같은 계산으로 40.8 rad/s (105 %) 였다.
+    # 이 경로에는 바퀴 목표 속도를 자르는 곳이 없다 (torque_output 의 max_wheel_rad_per_sec 는 마찰 여유 경고용) — 그래서 여기서 맞춘다.
+    # F710 판(joy_teleop.yaml)의 0.72 m/s · 0.20 rad/s 는 Cartographer 매핑 정합 때문에 낮춘 값이라 따르지 않는다.
+    max_linear_vel: 0.60
+    max_angular_vel: 1.80
+    scale_linear_x: 1.0
+    scale_linear_y: 1.0
+    scale_angular_z: 1.0
+    axis_deadzone: 0.08
+
+    enable_axis_control: true
+    axis_linear_x: 1      # 왼쪽 스틱 위아래 → 전후
+    axis_linear_y: 2      # 오른쪽 스틱 좌우 → 횡이동 (F710 은 3)
+    axis_angular_z: -1    # 회전은 버튼으로만 (F710 판과 같다)
+
+    enable_button: -1     # 누르고 있어야 움직이는 버튼(deadman) 없음
+
+    enable_button_control: true
+    button_forward: -1
+    button_backward: -1
+    button_left: -1
+    button_right: -1
+    button_rotate_ccw: 6  # LB (F710 은 4)
+    button_rotate_cw: 7   # RB (F710 은 5)
+
+    # 게이트 무장/해제 (AK40 teleop.launch.py 에서만 의미 있다 — /mpc/arm 을 듣는 게이트가 있을 때)
+    #   Menu(☰) 를 누르면 무장, B 를 누르면 즉시 해제(DAMPING). B 를 누르고 있는 동안 명령도 0.
+    arm_button: 11
+    disarm_button: 1
+    arm_topic: /mpc/arm
+
+    joy_timeout_s: 0.5

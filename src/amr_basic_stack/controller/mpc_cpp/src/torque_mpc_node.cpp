@@ -145,6 +145,23 @@ public:
     }
     md.c_s = yp["surface"]["c_s"].as<double>();
     md.gravity = yp["model"]["gravity"].as<double>();
+    {   // 2026-11-24 구동계 마찰 계수 (torque_plant.yaml friction — torque_output 보상과 같은 실측값). 마찰 상한 옮김에만 쓴다
+        //   (torque_mpc.hpp 머리주석 "마찰 상한 옮김"). 스칼라면 네 바퀴 같은 값, 4 개면 [FL, FR, RL, RR]
+      auto coef4 = [&](const char * key) {
+          TVec4 v = TVec4::Zero();
+          const YAML::Node n = yp["friction"] ? yp["friction"][key] : YAML::Node();
+          if (n && n.IsSequence() && n.size() == 4) {
+            for (int i = 0; i < 4; ++i) {v(i) = n[i].as<double>();}
+          } else if (n && n.IsScalar()) {
+            v.setConstant(n.as<double>());
+          } else if (n) {
+            throw std::invalid_argument(std::string("friction.") + key + " 는 스칼라이거나 4 개 [FL, FR, RL, RR]");
+          }
+          return v;
+        };
+      md.fric_coulomb = coef4("coulomb_Nm");
+      md.fric_viscous = coef4("viscous_Nms_per_rad");
+    }
     {   // 2026-11-23 구동계 방향 보정 (torque_plant.yaml drive, 기본 0). launch drive_yaw_deg·drive_slip_coef 로 덮어쓴다
       const YAML::Node yd = yp["drive"];
       const double yaw_deg = declare_parameter<double>("drive_yaw_offset_deg", yd ? yd["yaw_offset_deg"].as<double>(0.0) : 0.0);
@@ -198,6 +215,21 @@ public:
     cap_on_ = declare_parameter<std::string>("cap_on", ym["torque_limit"]["cap_on"].as<std::string>("total"));
     if (cap_on_ != "total" && cap_on_ != "ground") {throw std::invalid_argument("cap_on 은 total | ground — " + cap_on_);}
     tu.cap_on_ground = cap_on_ == "ground";
+    {   // 2026-11-24 마찰 상한 옮김 (torque_mpc.hpp 머리주석, 지시서 T1 7단계 (B)). yaml 에 없으면 끔 = 예전 그대로
+      const YAML::Node yl = ym["torque_limit"];
+      tu.cap_friction_shift = declare_parameter<bool>(
+        "cap_friction_shift", yl["friction_shift"] ? yl["friction_shift"].as<bool>(false) : false);
+      tu.cap_friction_scale = declare_parameter<double>(
+        "cap_friction_scale", yl["friction_shift_scale"] ? yl["friction_shift_scale"].as<double>(1.0) : 1.0);
+      tu.cap_friction_smooth = declare_parameter<double>(
+        "cap_friction_smooth", yl["friction_shift_smooth_rad_s"] ? yl["friction_shift_smooth_rad_s"].as<double>(0.5) : 0.5);
+      // 2026-11-24 마찰 모델 (torque_mpc.hpp 머리주석, 지시서 T11b). yaml model_terms.use_fric_model, 없으면 끔. 배율·ω_s 는 위 두 값
+      tu.use_fric_model = declare_parameter<bool>(
+        "use_fric_model", ym["model_terms"] && ym["model_terms"]["use_fric_model"] ? ym["model_terms"]["use_fric_model"].as<bool>(false) : false);
+      // 2026-11-24 구름 손실 (torque_mpc.hpp 머리주석 "마찰 모델" 끝). yaml model_terms.fric_rolling_Nm, 없으면 0 = 예전 그대로
+      tu.fric_rolling = declare_parameter<double>(
+        "fric_rolling", ym["model_terms"] && ym["model_terms"]["fric_rolling_Nm"] ? ym["model_terms"]["fric_rolling_Nm"].as<double>(0.0) : 0.0);
+    }
     tu.dist_enable = declare_parameter<bool>("disturbance_enable", ym["disturbance"]["enable"].as<bool>());
     tu.dist_alpha = declare_parameter<double>("disturbance_alpha", ym["disturbance"]["alpha"].as<double>());
     tu.dist_dt_tol = declare_parameter<double>("disturbance_dt_tol", ym["disturbance"]["dt_tol"].as<double>(0.002));
@@ -297,6 +329,7 @@ public:
     pub_adapt_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/adapt", 10);
     pub_load_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/load", 10);
     pub_slip_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/slip", 10);
+    pub_cap_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/cap", 10);
     sub_state_ = create_subscription<nav_msgs::msg::Odometry>(
       state_topic, 20, [this](nav_msgs::msg::Odometry::ConstSharedPtr m) {on_state(*m);});
     sub_ref_ = create_subscription<amr_interfaces::msg::PlanarReferenceArray>(
@@ -339,6 +372,40 @@ public:
         md.tau_motor_limit(), fwd, P(0, 0), P(1, 1), P(2, 2), P(3, 3));
     } else if (cap_on_ == "ground") {
       RCLCPP_WARN(get_logger(), "  cap_on ground 은 limit_mode friction 에서만 — 지금은 바퀴 토크 상한 그대로");
+    }
+    if (mpc_->cap_friction_shift()) {     // 2026-11-24 마찰 상한 옮김 (torque_mpc.hpp 머리주석)
+      const TVec4 f1 = tu.cap_friction_scale * md.drivetrain_friction(TVec4::Constant(1.0 / md.wheel_radius), tu.cap_friction_smooth);
+      RCLCPP_INFO(
+        get_logger(), "  마찰 상한 옮김 켬: 상자를 기준 바퀴 속도의 구동계 마찰 f 만큼 옮긴다 (%s).  coulomb [%.4f %.4f %.4f %.4f] N·m, "
+        "viscous [%.6f %.6f %.6f %.6f] N·m·s/rad, × %.2f — 직진 1.0 m/s 에서 f [%.3f %.3f %.3f %.3f] N·m → /torque_mpc/cap",
+        mpc_->cap_on_ground() ? "바닥 토크 행 ±τ̄ + P f" : "바퀴 토크 ±τ̄ + f, 모터 한계 안",
+        md.fric_coulomb(0), md.fric_coulomb(1), md.fric_coulomb(2), md.fric_coulomb(3),
+        md.fric_viscous(0), md.fric_viscous(1), md.fric_viscous(2), md.fric_viscous(3), tu.cap_friction_scale,
+        f1(0), f1(1), f1(2), f1(3));
+      RCLCPP_WARN(
+        get_logger(), "  마찰 상한 옮김은 torque_output 구동계 마찰 보상을 끈 판 (launch friction_comp:=false) 에서만 맞다 — "
+        "보상을 켠 채면 마찰을 두 번 세어 바닥 토크가 τ̄ 를 넘는다");
+      if (!(md.fric_coulomb.array() > 0.0).any() && !(md.fric_viscous.array() > 0.0).any()) {
+        RCLCPP_WARN(get_logger(), "  마찰 상한 옮김을 켰는데 torque_plant.yaml friction 계수가 모두 0 — 옮기는 양이 0 이다");
+      }
+    } else if (tu.cap_friction_shift) {
+      RCLCPP_INFO(get_logger(), "  cap_friction_shift (yaml 기본 켬) 는 limit_mode friction 에서만 쓰인다 — 지금은 상한 그대로");
+    }
+    if (mpc_->use_fric_model()) {     // 2026-11-24 마찰 모델 (torque_mpc.hpp 머리주석)
+      const TVec4 f1 = tu.cap_friction_scale * md.drivetrain_friction(TVec4::Constant(1.0 / md.wheel_radius), tu.cap_friction_smooth);
+      RCLCPP_INFO(
+        get_logger(), "  마찰 모델 켬: 기준 바퀴 속도의 구동계 마찰 τ_b 를 목표 입력 (U_s + τ_b)·예측 (B (τ − τ_b))·외란 추정 잔차에 넣는다.  "
+        "× %.2f, ω_s %.2f rad/s — 직진 1.0 m/s 에서 τ_b [%.3f %.3f %.3f %.3f] N·m%s",
+        tu.cap_friction_scale, tu.cap_friction_smooth, f1(0), f1(1), f1(2), f1(3),
+        mpc_->cap_friction_shift() ? "" : "  (상한은 안 옮긴다 — cap_friction_shift 끔)");
+      if (tu.fric_rolling != 0.0) {     // 2026-11-24 구름 손실
+        RCLCPP_INFO(
+          get_logger(), "  구름 손실 %.4f N·m (네 바퀴 공통, 기준 바퀴 회전 방향) 를 마찰 모델에 더한다 — 예측·목표 입력·잔차에만. "
+          "상한 옮김에는 안 넣는다 (허용 모터 토크 그대로)", tu.fric_rolling);
+      }
+      RCLCPP_WARN(
+        get_logger(), "  마찰 모델은 torque_output 구동계 마찰 보상을 끈 판 (launch friction_comp:=false) 에서만 맞다 — "
+        "보상을 켠 채면 마찰을 두 번 넣는다");
     }
     if (tu.dist_kalman) {
       const auto & K = mpc_->dist_kalman_gain();
@@ -416,7 +483,9 @@ public:
     std::ofstream f(csv_path_);
     f.precision(15);
     f << "t,x,y,th,xd,yd,thd,xr,yr,thr,ex,ey,eth,tau_fl,tau_fr,tau_rl,tau_rr,tau_bar,active,qp_iters,fallback,"
-      "step_ms,ref_age,d_x,d_y,d_th,d_xd,d_yd,d_thd,eta_fl,eta_fr,eta_rl,eta_rr\n";   // eta_*: 상한에 곱한 η_s (끄면 1)
+      "step_ms,ref_age,d_x,d_y,d_th,d_xd,d_yd,d_thd,eta_fl,eta_fr,eta_rl,eta_rr,"     // eta_*: 상한에 곱한 η_s (끄면 1)
+      "fs_fl,fs_fr,fs_rl,fs_rr,"                                                       // fs_*: 마찰 상한 옮긴 양 f (스텝 0, 끄면 0) 2026-11-24
+      "ff_fl,ff_fr,ff_rl,ff_rr\n";                                                     // ff_*: 마찰 모델이 U_s 에 더한 τ_b (스텝 0, 끄면 0)
     double se = 0.0, emax = 0.0, step_sum = 0.0, step_max = 0.0;
     for (const auto & r : rows_) {
       for (size_t i = 0; i < r.size(); ++i) {f << (i ? "," : "") << r[i];}
@@ -642,11 +711,14 @@ private:
     const TVec6 & d = mpc_->d_hat();
     if (!csv_path_.empty()) {
       const TVec4 & es = mpc_->slip_scale();
+      const TVec4 fs = mpc_->cap_shift_steps().col(0);      // 마찰 상한 옮긴 양 (끄면 0)
+      const TVec4 ff = mpc_->fric_model_steps().col(0);     // 마찰 모델 τ_b (끄면 0)
       rows_.push_back(
         {t_state, x(0), x(1), x(2), x(3), x(4), x(5), Xr(0), Xr(1), Xr(2), Xe(0), Xe(1), Xe(2),
           tau(0), tau(1), tau(2), tau(3), mpc_->tau_bar().maxCoeff(), static_cast<double>(stt.active),
           static_cast<double>(stt.iters), static_cast<double>(stt.fallback), ms, ref_age,
-          d(0), d(1), d(2), d(3), d(4), d(5), es(0), es(1), es(2), es(3)});
+          d(0), d(1), d(2), d(3), d(4), d(5), es(0), es(1), es(2), es(3), fs(0), fs(1), fs(2), fs(3),
+          ff(0), ff(1), ff(2), ff(3)});
     }
     if (debug_) {
       TVec4 us = TVec4::Zero();                         // 이번 주기 목표 입력 U_s,0 (식-14, 지평 첫 스텝)
@@ -705,6 +777,18 @@ private:
     sl.data = {now, slip_on_ ? 1.0 : 0.0, lr(0), lr(1), lr(2), lr(3), lf(0), lf(1), lf(2), lf(3),
       ec(0), ec(1), ec(2), ec(3), ea(0), ea(1), ea(2), ea(3)};
     pub_slip_->publish(sl);
+    // 2026-11-24 /torque_mpc/cap = [t, 마찰 상한 옮김 켬 0/1, 옮긴 양 f×4 [N·m], 바퀴 토크 상자 아래×4, 위×4,
+    //                               마찰 모델 켬 0/1, 마찰 모델 τ_b×4 [N·m]] (스텝 0, 바퀴 FL FR RL RR).
+    //   상자는 변화율 교집합 전 값. 끄면 f = 0, 상자 = ±τ̄ (cap_on ground 면 ± 모터 한계 — 마찰 상한은 바닥 토크 행에 있다)
+    std_msgs::msg::Float64MultiArray cp;
+    const auto & fss = mpc_->cap_shift_steps();
+    double lo[4], hi[4];
+    for (int i = 0; i < 4; ++i) {mpc_->var_box(i, 0, lo[i], hi[i]);}
+    const auto & ffs = mpc_->fric_model_steps();
+    cp.data = {now, mpc_->cap_friction_shift() ? 1.0 : 0.0, fss(0, 0), fss(1, 0), fss(2, 0), fss(3, 0),
+      lo[0], lo[1], lo[2], lo[3], hi[0], hi[1], hi[2], hi[3],
+      mpc_->use_fric_model() ? 1.0 : 0.0, ffs(0, 0), ffs(1, 0), ffs(2, 0), ffs(3, 0)};
+    pub_cap_->publish(cp);
   }
 
   std::unique_ptr<TorqueMPC> mpc_;
@@ -724,6 +808,7 @@ private:
   TVec3 est_vb_ = TVec3::Zero();
   double est_rx_ = 0.0, slip_rx_ = 0.0, slip_t_ = 0.0;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_slip_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_cap_;   // 2026-11-24 마찰 상한 옮김 기록
   double last_state_rx_ = 0.0, last_state_stamp_ = 0.0, ref_rx_ = 0.0, armed_since_ = 0.0;
   double state_timeout_ = 0.3, ref_timeout_ = 0.5, hold_stopped_speed_ = 0.04;
   double acc_dt_ = 0.2;

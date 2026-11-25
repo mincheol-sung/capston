@@ -56,7 +56,9 @@ include_directories(
   ${Boost_INCLUDE_DIRS}
 )
 
-add_executable(rplidar_node	src/rplidar_node.cpp ${RPLIDAR_SDK_SRC})
+add_library(rplidar_sdk STATIC ${RPLIDAR_SDK_SRC})
+add_executable(rplidar_node src/rplidar_node.cpp)
+target_link_libraries(rplidar_node rplidar_sdk)
 # target_link_libraries(rplidar_node ${ament_cmake_LIBRARIES})
 ament_target_dependencies(rplidar_node
   rclcpp
@@ -64,12 +66,16 @@ ament_target_dependencies(rplidar_node
   sensor_msgs
 )
 
-add_executable(rplidar_composition src/rplidar_node.cpp ${RPLIDAR_SDK_SRC})
+add_executable(rplidar_composition src/rplidar_node.cpp)
+target_link_libraries(rplidar_composition rplidar_sdk)
 ament_target_dependencies(rplidar_composition
   rclcpp
   std_srvs
   sensor_msgs
 )
+
+add_executable(scan_to_timed_cloud src/scan_to_timed_cloud.cpp)
+ament_target_dependencies(scan_to_timed_cloud rclcpp sensor_msgs)
 
 add_executable(rplidar_client src/rplidar_client.cpp)
 ament_target_dependencies(rplidar_client
@@ -85,7 +91,7 @@ install(DIRECTORY launch rviz
 )
 
 install(
-  TARGETS rplidar_node rplidar_composition rplidar_client
+  TARGETS rplidar_node rplidar_composition rplidar_client scan_to_timed_cloud
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -96,4 +102,15 @@ ament_export_dependencies(rclcpp)
 ament_export_dependencies(std_msgs)
 ament_export_dependencies(sensor_msgs)
 ament_export_include_directories(include)
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_timed_cloud test/test_timed_cloud.cpp)
+  target_include_directories(test_timed_cloud PRIVATE src)
+  ament_target_dependencies(test_timed_cloud sensor_msgs)
+  find_package(cartographer_ros REQUIRED)
+  ament_add_gtest(test_sdk_scan test/test_sdk_scan.cpp)
+  target_include_directories(test_sdk_scan PRIVATE src)
+  ament_target_dependencies(test_sdk_scan cartographer_ros sensor_msgs)
+  target_link_libraries(test_sdk_scan rplidar_sdk cartographer)
+endif()
 ament_package()

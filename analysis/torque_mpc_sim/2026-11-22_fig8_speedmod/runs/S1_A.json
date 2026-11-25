@@ -1,0 +1,1 @@
+{"label": "S1_A", "samples": 2811, "fault": "", "rms_mm": 19.34797377930347, "max_mm": 34.403218744263796, "yaw_rms_deg": 3.6561185836401995, "moving_rms_mm": 15.278571198810551, "moving_max_mm": 34.0471489711398, "tau_max": 0.22222239096700985, "tau_rms": 0.06122050810638112, "dtau_rms": 0.0042129108379788515, "n_torque": 2715, "n_damping_while_armed": 95, "timed_out": false}

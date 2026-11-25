@@ -1,0 +1,2 @@
+Cpf|limit_mode:=friction mpc_com_height:=0.2 path_follow_lead:=0.05
+PPpf|controller:=pure_pursuit path_follow_lead:=0.05

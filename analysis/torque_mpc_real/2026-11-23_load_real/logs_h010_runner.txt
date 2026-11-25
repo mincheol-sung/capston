@@ -1,0 +1,6 @@
+[run] h010: accel:=3.0 auto_localize:=true bag:=h010 disturbance:=true laps:=2 limit_mode:=friction localization:=true localize_delay:=15.0 lua:=localization_torque_2d.lua map:=smoc_lab max_track_error:=0.5 sensors:=true shape:=circles8 slip_guard:=true speed:=0.69 speed_mod_amp:=0.5 speed_mod_cycles:=2 speed_mod_phase_deg:=-90 speed_mod_shape:=square use_mpc:=true velocity_source:=wheels viz:=true width:=1.6 yaw_mode:=tangent mpc_com_height:=0.10
+[run] banner OK (635 lines) — arm in 2 s
+[run] ARM sent 15:57:34
+[run] stop: lap done
+[run] TERM
+[run] DONE

@@ -1,0 +1,20 @@
+[WARN] [ros2bag]: Positional "topics" argument deprecated. Please use optional "--topics" argument instead.
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1795260549.600982219] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1795260549.600996400] [rosbag2_recorder]: Event publisher thread: Started
+[INFO] [1795260549.603556453] [rosbag2_recorder]: Starting recording to '/home/smoc/capston/capston/analysis/torque_mpc_sim/2026-11-21_est_kf_vs_slam/runs/Aw_sq_kf_r3'
+[INFO] [1795260549.604893180] [rosbag2_recorder]: Listening for topics...
+[INFO] [1795260549.604980226] [rosbag2_recorder]: Recording...
+[INFO] [1795260549.604924701] [rosbag2_recorder]: Topics discovery started.
+[INFO] [1795260549.709483709] [rosbag2_recorder]: Subscribed to topic '/wheel_states'
+[INFO] [1795260549.711453553] [rosbag2_recorder]: Subscribed to topic '/sim/ground_truth'
+[INFO] [1795260549.712308246] [rosbag2_recorder]: Subscribed to topic '/slip_logger/slip'
+[INFO] [1795260550.503544440] [rosbag2_recorder]: Subscribed to topic '/fault_monitor/fault'
+[INFO] [1795260550.540767479] [rosbag2_recorder]: Subscribed to topic '/dra_mppi/reference_trajectory'
+[INFO] [1795260550.541509410] [rosbag2_recorder]: Subscribed to topic '/figure8/path'
+[INFO] [1795260550.607662804] [rosbag2_recorder]: Subscribed to topic '/wheel_pi/cmd_raw'
+[INFO] [1795260550.609139593] [rosbag2_recorder]: Subscribed to topic '/wheel_pi/status'
+[INFO] [1795260550.629553041] [rosbag2_recorder]: Subscribed to topic '/pure_pursuit/cmd_vel'
+[INFO] [1795260550.630134092] [rosbag2_recorder]: Subscribed to topic '/pure_pursuit/status'
+[INFO] [1795260550.656334440] [rosbag2_recorder]: Subscribed to topic '/mpc/armed'
+[INFO] [1795260550.680257013] [rosbag2_recorder]: Subscribed to topic '/state_estimator/status'
+[INFO] [1795260550.680982095] [rosbag2_recorder]: Subscribed to topic '/state_estimator/odom'

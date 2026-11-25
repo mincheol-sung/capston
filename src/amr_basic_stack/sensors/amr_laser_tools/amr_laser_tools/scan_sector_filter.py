@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""LaserScan의 원래 시간 정보를 보존하면서 담당 방위각 밖의 빔을 가린다.
-
-두 회전식 라이다를 하나의 LaserScan으로 래스터화하면 서로 다른 측정 시각을
-단일 ``time_increment``로 표현할 수 없다. Cartographer에는 이 노드가 만든
-앞/뒤 LaserScan 두 개를 직접 전달한다. 메시지의 frame, stamp, scan_time,
-time_increment와 빔 순서는 바꾸지 않고 담당 섹터 밖 range만 ``inf``로 만든다.
-메타데이터 보존은 드라이버 timing 정확성의 검증을 뜻하지 않는다.
-"""
+"""Apply the same robot-centric sector to LaserScan and timed PointCloud2 inputs."""
 
 import copy
 import math
@@ -15,10 +8,11 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, PointCloud2
 import tf2_ros
 
 from .scan_merger import yaw_from_quat
+from .timed_cloud import records, select_records
 
 
 def angle_in_sector(angles, lo, hi):
@@ -30,10 +24,26 @@ def angle_in_sector(angles, lo, hi):
     return (angles >= lo) | (angles <= hi)
 
 
+def endpoint_bearings(px, py, transform):
+    """Calculate endpoint directions in the target frame."""
+    tx, ty, yaw = transform
+    c, s = math.cos(yaw), math.sin(yaw)
+    return np.arctan2(ty + s * px + c * py, tx + c * px - s * py)
+
+
+def filter_cloud(cloud, transform, sector):
+    """Test endpoints in the target frame and emit records in the lidar frame."""
+    points = records(cloud)
+    px, py = points['x'].astype(np.float64), points['y'].astype(np.float64)
+    keep = np.isfinite(px) & np.isfinite(py)
+    keep &= angle_in_sector(endpoint_bearings(px, py, transform), *sector)
+    return select_records(cloud, points, keep)
+
+
 def filter_ranges(ranges, angles, transform, sector):
     """Return ranges with endpoints outside ``sector`` replaced by infinity."""
     values = np.asarray(ranges, dtype=np.float64)
-    tx, ty, yaw = transform
+    yaw = transform[2]
 
     # 무한 거리 빔도 섹터를 판정할 수 있도록 우선 빔 방향만 회전시킨다.
     bearings = np.arctan2(np.sin(angles + yaw), np.cos(angles + yaw))
@@ -41,10 +51,7 @@ def filter_ranges(ranges, angles, transform, sector):
     if finite.any():
         px = values[finite] * np.cos(angles[finite])
         py = values[finite] * np.sin(angles[finite])
-        c, s = math.cos(yaw), math.sin(yaw)
-        bx = tx + c * px - s * py
-        by = ty + s * px + c * py
-        bearings[finite] = np.arctan2(by, bx)
+        bearings[finite] = endpoint_bearings(px, py, transform)
 
     keep = angle_in_sector(bearings, *sector)
     filtered = values.copy()
@@ -88,8 +95,10 @@ class ScanSectorFilter(Node):
         # RELIABLE publisher is compatible with Cartographer's BEST_EFFORT
         # SensorDataQoS subscriber and with ordinary diagnostic subscribers.
         self.pub = self.create_publisher(LaserScan, 'scan_out', 10)
+        self.create_subscription(PointCloud2, 'points_in', self._on_cloud, qos_profile_sensor_data)
+        self.points_pub = self.create_publisher(PointCloud2, 'points_out', 10)
         self.get_logger().info(
-            f'LaserScan timing 보존 섹터 필터: {lo_deg:.1f}° ~ {hi_deg:.1f}° '
+            f'LaserScan / timed PointCloud2 섹터 필터: {lo_deg:.1f}° ~ {hi_deg:.1f}° '
             f'(기준 {self.target_frame})')
 
     def _get_tf(self, frame_id):
@@ -109,6 +118,11 @@ class ScanSectorFilter(Node):
         result = (t.x, t.y, yaw_from_quat(q.x, q.y, q.z, q.w))
         self.tf_cache[frame_id] = result
         return result
+
+    def _on_cloud(self, msg):
+        transform = self._get_tf(msg.header.frame_id)
+        if transform is not None:
+            self.points_pub.publish(filter_cloud(msg, transform, self.sector))
 
     def _on_scan(self, msg):
         transform = self._get_tf(msg.header.frame_id)

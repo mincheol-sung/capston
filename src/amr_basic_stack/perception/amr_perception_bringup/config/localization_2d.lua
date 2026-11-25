@@ -2,7 +2,7 @@
 -- localization_2d.lua — 저장된 맵(.pbstream) 위에서 순수 측위만 수행.
 --
 -- mapping_2d.lua 를 베이스로 하고 달라지는 것만 덮어쓴다. 여기 없는 항목은
--- 매핑과 완전히 동일하다(센서 토픽, IMU 사용, 상관 스캔매칭, TF 소유권 등).
+-- 매핑과 완전히 동일하다(IMU 사용, 상관 스캔매칭, TF 소유권 등).
 --
 -- 실행 시 반드시 -load_state_filename 으로 .pbstream 을 넘겨야 한다.
 -- 초기 위치는 set_initial_pose_node 가 RViz "2D Pose Estimate" 로 받아
@@ -26,6 +26,9 @@ include "mapping_2d.lua"
 -- RViz /initialpose 는 base_link 방향으로 주어진다. optical 프레임을 tracking_frame
 -- 으로 쓰면 새 trajectory 의 로컬 좌표축이 base_link 와 약 90도 어긋나므로,
 -- IMU와 같은 위치이면서 축이 로봇과 정렬된 gyro_frame 을 측위에 사용한다.
+-- 실차 드라이버가 점별 상대 시각을 담은 앞뒤 PointCloud2를 발행한다.
+options.num_laser_scans = 0
+options.num_point_clouds = 2
 options.tracking_frame = "camera_gyro_frame"
 options.pose_publish_period_sec = 1e-2         -- 매핑: 5e-3
 options.trajectory_publish_period_sec = 30e-3

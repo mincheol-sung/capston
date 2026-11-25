@@ -81,6 +81,16 @@ track:
   square_rot_s: 1.0         # [s] stop + tangent: 꼭짓점 제자리 90° 회전 시간 (ω 최대 1.5·(π/2)/rot_s = 2.36 rad/s)
   square_dwell_s: 0.1       # [s] stop: 회전 앞·뒤 정지 (fixed 면 회전 없이 2·dwell)
 
+  # ── 꺾은선 (2026-11-25, core/polyline.py). shape:=polyline. 꼭짓점·속도·헤딩은 위 square_* 와 공용 accel·yaw_mode·align_s 를 쓴다
+  #   명령 R<길이> = 오른쪽 90° 돌고 그만큼, L<길이> = 왼쪽, F<길이> = 그대로 (첫 명령의 회전은 출발 헤딩 기준).
+  #   기본 = 정사각형 두 개 (1 m) 를 꼭짓점 하나로 이은 8 자: 출발 좌표 (0,0)→(0,−1)→(1,−1)→(1,1)→(2,1)→(2,0)→(0,0), 8 m.
+  #     첫 정사각형은 왼쪽으로, 둘째는 오른쪽으로 돈다. 2 m 직선 두 개가 맞닿은 점 (1,0) 을 지난다. 필요한 바닥 2 m × 2 m.
+  #     tangent 면 첫 R 때문에 출발 때 제자리에서 오른쪽 90° 먼저 돈다. 안 돌게 하려면 "F1,L1,L2,R1,R1,R2" (같은 모양, 90° 돌린 것).
+  #   꼭짓점은 위 square_corner_mode (기본 pass = 꼭짓점 0.1 m/s 로 지나며 앞뒤 0.3 m 에서 헤딩을 돌림). 2026-11-25 오후: 예전 실차 정사각형 조건
+  #   (accel 1.5 · square_v_max 1.5) 시뮬 MPC RMS 35 mm · PP 76 mm (analysis/torque_mpc_sim/2026-11-25_corner_pass). stop 은 square_corner_mode:=stop.
+  #   예) amrall use_mpc:=true controller:=mpc shape:=polyline accel:=1.5 square_v_max:=1.5 limit_mode:=friction
+  poly_path: "R1,L1,L2,R1,R1,R2"
+
   # ── 지그재그 (2026-11-24, core/zigzag.py). shape:=zigzag. 출발 포즈에서 길이 zigzag_length 직선 zigzag_n 개,
   #   이웃 직선 사이각 zigzag_angle_deg (진행 방향은 꼭짓점마다 180° − 각 꺾이고, 꺾는 쪽이 번갈아). + 왼쪽 / − 오른쪽으로 나아간다.
   #   직선 양 끝 속도 0. 속도 파형 zigzag_profile: sine = 반 사인 v = V_p sin(πτ/T) (최대 가속 = 양 끝) | square = 사다리꼴
@@ -104,8 +114,17 @@ track:
   zigzag_length: 1.0        # [m] 직선 하나 길이
   zigzag_angle_deg: 10.0    # [deg] 이웃 직선 사이각 (0 < |값| < 180)
   zigzag_profile: sine      # sine | square
-  zigzag_rot_s: 0.5         # [s] 꼭짓점 제자리 회전 시간 (스무스스텝, 10° 면 ω 최대 1.5·α/rot_s = 0.52 rad/s)
+  zigzag_rot_s: 0.5         # [s] 또는 max. 꼭짓점 제자리 회전 시간 (스무스스텝, 10° 면 ω 최대 1.5·α/rot_s = 0.52 rad/s). max = 경로 전체 앞먹임을
+                            #   max_ff_ratio (또는 직선 값) 위로 올리지 않는 가장 짧은 시간 (fig8_limits.zigzag_rot_max). zigzag_reverse false 에서 비우면 max
   zigzag_dwell_s: 0.1       # [s] 회전 앞·뒤 정지
+  zigzag_reverse: true      # tangent 만 (2026-11-24 (10)). true = 홀수 직선 후진 (꼭짓점에서 사이각만 돎) | false = 늘 전진 —
+                            #   꼭짓점에서 헤딩을 진행 방향으로 ±(180° − 사이각) 돌린다 (짧은 쪽으로 번갈아, 헤딩이 쌓이지 않음). 모양·꼭짓점은 같다
+  zigzag_corner: stop       # 2026-11-25. stop = 꼭짓점마다 서서 (쉼 → 회전 → 쉼) | pass = 서지 않고 zigzag_corner_speed 로 지남.
+                            #   zigzag_profile square 만, zigzag_rot_s 는 안 쓴다. 늘 전진 (zigzag_reverse false)
+  zigzag_turn_m: 0.5        # [m] pass: 꼭짓점 앞뒤 이 거리를 cubic spiral 로 깎는다 (0 < 값 ≤ zigzag_length/2, 곡률이 직선과 이어짐 → 퓨어 퍼슛도 낼 수 있음).
+                            #   turn 앞뒤 zigzag_dwell_s 동안 v_c 등속. 0 = 꺾인 채 (꼭짓점에서 속도 방향·헤딩 계단, 11-25 실차 PP·MPC 둘 다 못 따라감)
+  zigzag_corner_speed: max  # [m/s] 또는 max. pass 의 꼭짓점 (turn) 속도. max = 경로 전체 C 앞먹임 ≤ max_ff_ratio·부하 예산 안의 최대
+                            #   (fig8_limits.zigzag_corner_speed_max, turn_m > 0 만). 10 × 1 m, 30°, turn_m 0.5 → 0.30 m/s
 
   # 기준열 간격 (R4 리뷰 2026-11-13). MPC·퓨어 퍼슛은 행 사이를 직선으로 보간한다 → 곡선 안쪽으로 줄이 생긴다
   # (현 오차 ≈ v²·dt²/(8R)). 3 × 1.5 m 8자(R_min 0.31 m)에서 최대 보간 오차:

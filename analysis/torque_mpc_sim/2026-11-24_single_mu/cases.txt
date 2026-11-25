@@ -1,0 +1,4 @@
+# 2026-11-24 단일 마찰계수 0.33 (안전 계수 0.8) — 실차 확인 주행 전에 같은 조건을 시뮬로. 직선 1.0 m 왕복, 1.0 m/s, 기준 가속 2.5 m/s² (상한 1.83 보다 큼 → 상한에 닿는다)
+L_mu033_ground|mu_hat_wheels:=off mu_hat:=0.33 mpc_cap_on:=ground
+L_mu033_total|mu_hat_wheels:=off mu_hat:=0.33
+L_wheels_total|

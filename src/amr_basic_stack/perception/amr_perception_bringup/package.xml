@@ -22,6 +22,7 @@
   <exec_depend>python3-pil</exec_depend>
   <exec_depend>sensor_fusion</exec_depend>
   <exec_depend>object_tracker</exec_depend>
+  <exec_depend>amr_laser_tools</exec_depend>
   <exec_depend>dynamic_filter</exec_depend>
   <exec_depend>semantic_slam</exec_depend>
   <exec_depend>motion_predictor</exec_depend>

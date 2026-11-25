@@ -1,0 +1,80 @@
+[INFO] [launch]: All log files can be found below /home/smoc/.ros/log/2026-11-21-19-46-30-073340-smoc-NUC-259421
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [sim_plant_torque_node-1]: process started with pid [259704]
+[INFO] [state_estimator_node-2]: process started with pid [259705]
+[INFO] [figure8_reference_node-3]: process started with pid [259706]
+[INFO] [torque_mpc_node-4]: process started with pid [259707]
+[INFO] [torque_output_node-5]: process started with pid [259708]
+[INFO] [fault_monitor_node-6]: process started with pid [259709]
+[INFO] [slip_logger_node-7]: process started with pid [259710]
+[INFO] [keyboard_command_gate-8]: process started with pid [259711]
+[torque_mpc_node-4] [INFO] [1795257990.286262512] [torque_mpc_node]: 토크 MPC (C++/DAQP).  기준 /dra_mppi/reference_trajectory  상태 /state_estimator/odom → /torque_mpc/cmd_raw
+[torque_mpc_node-4]   Ts 10 ms  Np 50  Nc 5   m 4.56 kg  I_z 0.060  바퀴 등가 질량 m_w 2.225 kg (M 에 늘)  w 항 켬
+[torque_mpc_node-4]   상한 모드 friction: τ̄ 0.1093 N·m, Δτ̄ 0.0364 N·m/스텝  (모터 1.200, 마찰 τ_μ 0.0759 @ μ̂ 0.30)   외란 추정치 끔 (α 0.10)
+[torque_mpc_node-4] [INFO] [1795257990.286367941] [torque_mpc_node]:   바퀴별 μ̂ [0.432 0.440 0.456 0.417] (mg/4 기준, - = μ̂ 0.30 × 하중 몫)  하중 몫 FL 0.2388 FR 0.2392 RL 0.2608 RR 0.2612
+[torque_mpc_node-4]   → 마찰 τ_μ,i [0.1093 0.1113 0.1154 0.1055] N·m, 쓰는 τ̄ [0.1093 0.1113 0.1154 0.1055]
+[torque_mpc_node-4] [INFO] [1795257990.286379048] [torque_mpc_node]:   가중: W [5, 5, 2.5, 2, 2, 1]  r_Δ 100 /스텝 (= w_dudt 0.010000 (N·m/s)⁻² / Ts²)  r_U 10  q_null 0
+[torque_mpc_node-4] [INFO] [1795257990.286386478] [torque_mpc_node]:   속도 상태: 추정기 그대로
+[torque_mpc_node-4] [INFO] [1795257990.286389344] [torque_mpc_node]:   선형화 reference (1판: 지평의 기준 방향 θ_r 을 대입)
+[torque_mpc_node-4] [WARN] [1795257990.336457097] [torque_mpc_node]: 상태 추정값 대기/끊김
+[slip_logger_node-7] [INFO] [1795257990.924613405] [slip_logger_node]: slip_logger: 바퀴 /wheel_states + 차체 /state_estimator/odom + 참값 /sim/ground_truth → /slip_logger/slip (ω_ε 2.5 rad/s, 잡음 바닥 |λ| 0.1)
+[torque_output_node-5] [INFO] [1795257991.170322244] [torque_output_node]: torque_output: /torque_mpc/cmd_raw → /torque_output/cmd_raw   마찰 보상 coulomb [0.01566 0.01854 0.01395 0.01413] N·m, viscous [0.0009594 0.0010422 0.0010008 0.0010593] N·m·s/rad (실측 × 0.9)   정지 마찰 끔   안전 클램프 ±1.3 N·m
+[state_estimator_node-2] [INFO] [1795257991.756977100] [state_estimator_node]: state_estimator: /imu/base_link + /tracked_pose [stamped] → /state_estimator/odom (100 Hz)
+[state_estimator_node-2]   IMU·포즈 기준점 (0.109, 0.017) m (base_footprint 기준)
+[state_estimator_node-2]   모드 slam (SLAM 덮어쓰기): 포즈 시각의 위치·방향 = SLAM, 속도 = 두 포즈 차분 + 저역통과 2 Hz, 바이어스는 기동 값 고정, 튐도 따름 (개수만 셈)
+[state_estimator_node-2]   정지 상태에서 1.0 s 동안 바이어스를 잡는다 — 그동안 로봇을 움직이지 말 것
+[fault_monitor_node-6] [INFO] [1795257991.801734539] [fault_monitor_node]: fault_monitor: 무장 중 검사 — 포즈 튐 켬, 추종 오차 > 150 cm, 모터 에러, 센서 끊김 > 0.3 s → /mpc/arm false
+[keyboard_command_gate-8] [WARN] [1795257991.803648012] [torque_command_gate]: MPC command gate is DISARMED. Press 'a' to arm; press 's' or SPACE to stop.
+[keyboard_command_gate-8] [WARN] [1795257991.803856110] [torque_command_gate]: Keyboard arming unavailable: cannot open /dev/tty ([Errno 6] No such device or address: '/dev/tty'). Use std_msgs/Bool on /mpc/arm instead.
+[keyboard_command_gate-8] [INFO] [1795257991.804246744] [torque_command_gate]: Command gate [torques]: /torque_output/cmd_raw -> /wheel_torque_cmd, arm topic=/mpc/arm, forward on receive.
+[sim_plant_torque_node-1] [INFO] [1795257991.808748760] [sim_plant_torque_node]: 시뮬 플랜트: m=4.56 kg  I_z=0.060  바퀴관성 켬 (μ=2.225 kg)  kd=0.02  피크 4.1 N·m  물리 틱 200 Hz  슬립 모델 μ 0.45 (바퀴별 최대 [FL FR RL RR] [4.81 4.82 5.25 5.26] N, 토크로 [0.136 0.136 0.148 0.149] N·m)  구동계 마찰 [FL FR RL RR] coulomb [0.0174 0.0206 0.0155 0.0157] N·m + viscous [0.00107 0.00116 0.00111 0.00118]·ω (ω_s 0.05 rad/s)
+[sim_plant_torque_node-1]   센서 흉내: IMU 200 Hz @ (0.109, 0.017) m, SLAM scan_time 지연 130 ms, 잡음 배율 1
+[figure8_reference_node-3] [INFO] [1795257991.833850067] [figure8_reference_node]: 정사각형 한 변 1.50 m × 4 변 (왼쪽으로), yaw tangent (꼭짓점 헤딩 완화 0.30 m), 꼭짓점 0.10 m/s, 가감속 1.50 m/s²
+[figure8_reference_node-3]   변별 시작→최고→끝: [0] 0.00→1.50→0.10 m/s 1.9 s  [1] 0.10→1.50→0.10 m/s 1.9 s  [2] 0.10→1.50→0.10 m/s 1.9 s  [3] 0.10→1.50→0.00 m/s 1.9 s
+[figure8_reference_node-3]   시간  대기 3.0 s + 주행 7.6 s + 정렬 1.5 s + 유지 5.0 s   부하 주행 97 %  정렬 20 % (예산 100 %, V_LIMIT 1.55 m/s)
+[torque_mpc_node-4] [WARN] [1795257992.386390384] [torque_mpc_node]: 상태 추정값 대기/끊김
+[state_estimator_node-2] [INFO] [1795257992.863294698] [state_estimator_node]: 준비 끝. 바이어스: 가속도 (-0.152, +0.129) m/s², 자이로 +0.0003 rad/s — 출력 시작
+[torque_mpc_node-4] [INFO] [1795257998.109547804] [torque_mpc_node]: 게이트 무장 — 추종 가능
+[keyboard_command_gate-8] [WARN] [1795257998.109860308] [torque_command_gate]: MPC command gate ARMED by ROS arm topic.
+[figure8_reference_node-3] [INFO] [1795257998.110053637] [figure8_reference_node]: 출발: 출발점에서 0.2 cm, 0.1° — 진입 3.0 s 뒤 8자 시작 (교차점 x 0.000  y 0.000  0.0°)
+[torque_mpc_node-4] [INFO] [1795257998.133493286] [torque_mpc_node]: 추종 시작. 기준열 80×0.05 s
+[figure8_reference_node-3] [INFO] [1795258015.825253412] [figure8_reference_node]: 8자 완주 + 유지 5.0 s 끝 — 발행 중단. MPC 가 곧 타임아웃으로 정지한다.
+[torque_mpc_node-4] [INFO] [1795258016.232783645] [torque_mpc_node]: 정지(DAMPING): 기준열 끊김
+[torque_mpc_node-4] [WARN] [1795258016.232811544] [torque_mpc_node]: 기준열 0.51 s 없음
+[torque_mpc_node-4] [WARN] [1795258018.242667098] [torque_mpc_node]: 기준열 2.52 s 없음
+[torque_mpc_node-4] [WARN] [1795258020.243062941] [torque_mpc_node]: 기준열 4.52 s 없음
+[torque_mpc_node-4] [WARN] [1795258022.243148992] [torque_mpc_node]: 기준열 6.52 s 없음
+[torque_mpc_node-4] [WARN] [1795258024.245734836] [torque_mpc_node]: 기준열 8.52 s 없음
+[torque_mpc_node-4] [WARN] [1795258026.247944317] [torque_mpc_node]: 기준열 10.52 s 없음
+[torque_mpc_node-4] [WARN] [1795258028.249020083] [torque_mpc_node]: 기준열 12.52 s 없음
+[torque_mpc_node-4] [WARN] [1795258030.258072600] [torque_mpc_node]: 기준열 14.53 s 없음
+[torque_mpc_node-4] [WARN] [1795258032.259913751] [torque_mpc_node]: 기준열 16.53 s 없음
+[torque_mpc_node-4] [WARN] [1795258034.268096710] [torque_mpc_node]: 기준열 18.54 s 없음
+[torque_mpc_node-4] [WARN] [1795258036.268247432] [torque_mpc_node]: 기준열 20.54 s 없음
+[torque_mpc_node-4] [WARN] [1795258038.277778003] [torque_mpc_node]: 기준열 22.55 s 없음
+[torque_mpc_node-4] [WARN] [1795258040.280623362] [torque_mpc_node]: 기준열 24.56 s 없음
+[torque_mpc_node-4] [WARN] [1795258042.288410406] [torque_mpc_node]: 기준열 26.56 s 없음
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [keyboard_command_gate-8]: sending signal 'SIGINT' to process[keyboard_command_gate-8]
+[INFO] [slip_logger_node-7]: sending signal 'SIGINT' to process[slip_logger_node-7]
+[INFO] [fault_monitor_node-6]: sending signal 'SIGINT' to process[fault_monitor_node-6]
+[INFO] [torque_output_node-5]: sending signal 'SIGINT' to process[torque_output_node-5]
+[INFO] [torque_mpc_node-4]: sending signal 'SIGINT' to process[torque_mpc_node-4]
+[INFO] [figure8_reference_node-3]: sending signal 'SIGINT' to process[figure8_reference_node-3]
+[INFO] [state_estimator_node-2]: sending signal 'SIGINT' to process[state_estimator_node-2]
+[INFO] [sim_plant_torque_node-1]: sending signal 'SIGINT' to process[sim_plant_torque_node-1]
+[torque_mpc_node-4] [INFO] [1795258043.664980223] [torque_mpc_node]: 게이트 정지 — DAMPING, MPC 리셋
+[keyboard_command_gate-8] [WARN] [1795258043.665306929] [torque_command_gate]: MPC command gate DISARMED by node shutdown.
+[slip_logger_node-7] [slip_logger] 5079행, 움직인 구간 1011행 (차체 속도 > 0.05 m/s)
+[slip_logger_node-7]   FL: λ 평균 -0.204  RMS 0.458  최대 |λ| 1.537  |λ|>0.1 비율 75.8 %   | 참값 λ RMS 0.092  최대 0.371
+[slip_logger_node-7]   FR: λ 평균 -0.049  RMS 0.273  최대 |λ| 0.906  |λ|>0.1 비율 59.9 %   | 참값 λ RMS 0.037  최대 0.197
+[slip_logger_node-7]   RL: λ 평균 -0.169  RMS 0.533  최대 |λ| 1.989  |λ|>0.1 비율 68.9 %   | 참값 λ RMS 0.079  최대 0.347
+[slip_logger_node-7]   RR: λ 평균 -0.129  RMS 0.293  최대 |λ| 0.906  |λ|>0.1 비율 71.2 %   | 참값 λ RMS 0.035  최대 0.186
+[INFO] [torque_mpc_node-4]: process has finished cleanly [pid 259707]
+[INFO] [fault_monitor_node-6]: process has finished cleanly [pid 259709]
+[INFO] [keyboard_command_gate-8]: process has finished cleanly [pid 259711]
+[INFO] [figure8_reference_node-3]: process has finished cleanly [pid 259706]
+[INFO] [sim_plant_torque_node-1]: process has finished cleanly [pid 259704]
+[INFO] [torque_output_node-5]: process has finished cleanly [pid 259708]
+[INFO] [slip_logger_node-7]: process has finished cleanly [pid 259710]
+[INFO] [state_estimator_node-2]: process has finished cleanly [pid 259705]

@@ -1,0 +1,6 @@
+Coff_r1|limit_mode:=friction mpc_com_height:=0
+Con_r1|limit_mode:=friction mpc_com_height:=0.105
+PP_r1|controller:=pure_pursuit
+Coff_r2|limit_mode:=friction mpc_com_height:=0
+Con_r2|limit_mode:=friction mpc_com_height:=0.105
+PP_r2|controller:=pure_pursuit

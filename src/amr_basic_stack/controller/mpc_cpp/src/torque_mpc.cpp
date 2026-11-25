@@ -104,6 +104,14 @@ TVec4 TorqueModel::tau_friction_limits() const
   return out;
 }
 
+TVec4 TorqueModel::drivetrain_friction(const TVec4 & omega, double smooth) const
+{
+  // 2026-11-24 (hpp 머리주석 "마찰 상한 옮김"): torque_output.friction_torque 의 운동 마찰 항과 같은 식
+  TVec4 out;
+  for (int i = 0; i < 4; ++i) {out(i) = fric_coulomb(i) * std::tanh(omega(i) / smooth) + fric_viscous(i) * omega(i);}
+  return out;
+}
+
 TVec4 TorqueModel::wheel_normal_forces(double ax, double ay, double h, double min_frac) const
 {
   // 머리주석 (hpp) 의 식. h ≤ 0 이면 정지 하중 그대로. 합 Σ N_i = m g 는 가속도와 상관없이 보존된다 (자르기 전)
@@ -238,6 +246,24 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
     throw std::invalid_argument("slip_alloc_floor 는 0 < 값 ≤ 1 (가중 배분에서 η_s 아래 한계)");
   }
   tb_steps_.setZero(4, tu_.Nc);
+  // 2026-11-24 마찰 상한 옮김·마찰 모델 (머리주석). 옮김은 friction 모드에서만 실제로 켠다
+  if (tu_.cap_friction_shift || tu_.use_fric_model) {
+    if (!(tu_.cap_friction_scale >= 0.0 && tu_.cap_friction_scale <= 1.5 && tu_.cap_friction_smooth > 0.0)) {
+      throw std::invalid_argument("cap_friction_shift·use_fric_model: 0 ≤ scale ≤ 1.5, smooth > 0 이어야 한다");
+    }
+    if ((md_.fric_coulomb.array() < 0.0).any() || (md_.fric_viscous.array() < 0.0).any() ||
+      !md_.fric_coulomb.allFinite() || !md_.fric_viscous.allFinite())
+    {
+      throw std::invalid_argument("cap_friction_shift·use_fric_model: 구동계 마찰 계수 (coulomb·viscous) 는 0 이상의 유한한 값이어야 한다");
+    }
+    if (!(tu_.fric_rolling >= 0.0 && tu_.fric_rolling <= 0.02)) {     // 2026-11-24 구름 손실 (잰 값 최대 7 mN·m 의 3 배까지 [구현 선택])
+      throw std::invalid_argument("fric_rolling: 0 ≤ 값 ≤ 0.02 N·m 이어야 한다 (구름 손실 — 마찰 모델에 더하는 네 바퀴 공통 토크)");
+    }
+  }
+  fshift_ = tu_.cap_friction_shift && tu_.limit_mode == TorqueLimitMode::Friction;
+  fs_steps_.setZero(4, tu_.Nc);
+  fmodel_ = tu_.use_fric_model;
+  ff_steps_.setZero(4, tu_.Np);
   if (tu_.dist_kalman) {         // 축별 정상상태 Kalman 이득 (머리주석 "외란 관측기 이득")
     if (!((tu_.dist_kq.array() > 0.0).all() && (tu_.dist_kr_pos.array() > 0.0).all() && (tu_.dist_kr_vel.array() > 0.0).all())) {
       throw std::invalid_argument("dist_kalman: kalman_q·r_pos·r_vel 은 모두 양수여야 한다");
@@ -273,6 +299,7 @@ void TorqueMPC::reset()
   has_lin_ = false;
   x_prev_.setZero();
   tau_prev_.setZero();
+  fs_used_.setZero();
   d_hat_.setZero();
   a_hat_.setZero();
   rho_have_ = false;             // d 몫은 지우고 η̂ 와 그 분산은 남긴다 (머리주석)
@@ -313,13 +340,15 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat, double dt_state)
   }
   // 식-9: 한 스텝 전 상태·토크로 예측한 값과 지금 추정값의 차
   TVec6 pred;
+  TVec4 tau_res = tau_prev_;     // 잔차 모델에 넣는 토크. 2026-11-24 마찰 모델이면 바퀴에 남는 몫 τ − τ̂_b (추정 상태의 바퀴 속도로 계산)
+  if (fmodel_) {tau_res -= friction_at_state(x_prev_);}
   if (tu_.linearization == TorqueLinearization::CurrentState && has_lin_) {
     // 직전 주기에 MPC 가 쓴 바로 그 모델 (x̂(k−1), τ(k−2) 에서 선형화) 의 한 스텝 예측
-    pred = lin_prev_.A * x_prev_ + lin_prev_.B * tau_prev_ + lin_prev_.c;
+    pred = lin_prev_.A * x_prev_ + lin_prev_.B * tau_res + lin_prev_.c;
   } else {
     const double Ts = tu_.Ts;
     const TVec3 Xp = x_prev_.head<3>(), Vp = x_prev_.tail<3>();
-    const TVec3 a = md_.G(Xp(2)) * tau_prev_ + md_.w(Vp);
+    const TVec3 a = md_.G(Xp(2)) * tau_res + md_.w(Vp);
     pred.head<3>() = Xp + Ts * Vp + 0.5 * Ts * Ts * a;
     pred.tail<3>() = Vp + Ts * a;
   }
@@ -338,8 +367,13 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat, double dt_state)
   // 포화 중 갱신 멈춤 (2026-11-21, 머리주석): 직전에 낸 τ 가 상한에 붙었거나 목표 입력이 상한 밖이면 잔차가 "못 낸 힘" 을 담는다
   if (tu_.dist_freeze_on_sat) {
     const TVec4 tb = tau_bar().cwiseProduct(slip_scale_used_);   // 2026-11-23 η_s: tau_prev_ 를 낸 상자 (η_s 1 이면 예전 그대로)
-    const TVec4 tp = ground_ ? TVec4(P_ground_ * tau_prev_) : tau_prev_;          // 바닥 토크 상한이면 바닥 몫으로 견준다
-    const TVec4 us0 = Us_.size() >= 4 ? (ground_ ? TVec4(P_ground_ * Us_.head<4>()) : TVec4(Us_.head<4>())) : TVec4::Zero();
+    TVec4 tp = ground_ ? TVec4(P_ground_ * tau_prev_) : tau_prev_;                // 바닥 토크 상한이면 바닥 몫으로 견준다
+    TVec4 us0 = Us_.size() >= 4 ? (ground_ ? TVec4(P_ground_ * Us_.head<4>()) : TVec4(Us_.head<4>())) : TVec4::Zero();
+    if (fshift_) {     // 2026-11-24 마찰 상한 옮김: 상자가 f 만큼 옮겨져 있으니 τ − f (바닥 쪽 몫) 로 견준다
+      const TVec4 fs = ground_ ? TVec4(P_ground_ * fs_used_) : fs_used_;
+      tp -= fs;
+      us0 -= fs;
+    }
     const bool sat = (tp.cwiseAbs().array() >= 0.98 * tb.array()).any() || us_clipped_ ||
       (Us_.size() >= 4 && (us0.cwiseAbs().array() > tb.array()).any());
     if (sat) {
@@ -456,19 +490,54 @@ TVec6 TorqueMPC::d_hat_world(double theta) const
   return out;
 }
 
+TVec4 TorqueMPC::friction_at_state(const TVec6 & x) const
+{
+  // 관성 좌표 속도 → 몸체 속도 R(θ)ᵀ → 무슬립 바퀴 속도 T⁻¹ → 마찰 토크 (지평에서 쓰는 것과 같은 배율·ω_s)
+  const double c = std::cos(x(2)), s = std::sin(x(2));
+  const TVec3 vb(c * x(3) + s * x(4), -s * x(3) + c * x(4), x(5));
+  return model_friction(md_.wheel_nominal_speeds(vb));
+}
+
+TVec4 TorqueMPC::model_friction(const TVec4 & omega) const
+{
+  // 모델 (예측·목표 입력·잔차) 에 넣는 마찰: 배율을 곱한 구동계 마찰 + 구름 손실 (2026-11-24, 머리주석). 상한 옮김은 앞 항만 쓴다
+  TVec4 out = tu_.cap_friction_scale * md_.drivetrain_friction(omega, tu_.cap_friction_smooth);
+  if (tu_.fric_rolling != 0.0) {
+    for (int i = 0; i < 4; ++i) {out(i) += tu_.fric_rolling * std::tanh(omega(i) / tu_.cap_friction_smooth);}
+  }
+  return out;
+}
+
+void TorqueMPC::var_box(int i, int j, double & lo, double & hi) const
+{
+  // 바퀴 i, 지평 스텝 j 의 바퀴 토크 변수 상자 (j=0 의 변화율 교집합 전)
+  const double tmot = md_.tau_motor_limit();
+  const double box = ground_ ? tmot : tb_steps_(i, j);     // 바닥 토크 상한이면 바퀴 토크 자체는 모터 한계까지 (마찰 상한은 일반 제약)
+  lo = -box;
+  hi = box;
+  if (fshift_ && !ground_) {     // 2026-11-24 마찰 상한 옮김 (머리주석): f 만큼 옮기고 모터 한계 안으로
+    const double f = fs_steps_(i, j);
+    lo = std::max(-box + f, -tmot);
+    hi = std::min(box + f, tmot);
+    if (lo > hi) {lo = hi = std::clamp(f, -tmot, tmot);}   // |f| 가 모터 한계 + 상자보다 클 때만 (실제 값으로는 안 생긴다)
+  }
+}
+
 bool TorqueMPC::solve_qp(const TVec4 & tau_bar)
 {
   const int mg = static_cast<int>(A_gen_.rows());
   const int mg_rate = 4 * (tu_.Nc - 1);
-  const double tmot = md_.tau_motor_limit();
   for (int j = 0; j < tu_.Nc; ++j) {
+    TVec4 pf = TVec4::Zero();     // 바닥 토크 행을 옮기는 양 (P f)_i — 마찰 상한 옮김 + cap_on ground 일 때만 쓴다
+    if (fshift_ && ground_) {pf = P_ground_ * fs_steps_.col(j);}
     for (int i = 0; i < 4; ++i) {
       const double tb = tb_steps_(i, j), dtb = dtau_bar_of(tau_bar(i));   // 상자는 스텝별 (하중 이동), 변화율은 정지 상한 기준
-      const double box = ground_ ? tmot : tb;     // 바닥 토크 상한이면 바퀴 토크 자체는 모터 한계까지 (마찰 상한은 아래 일반 제약)
-      double lo = -box, hi = box;
+      double lo, hi;
+      var_box(i, j, lo, hi);
       if (j == 0) {     // 첫 스텝의 변화율은 단일 변수라 bound 에 합친다. 상한이 우선 (머리주석)
-        lo = std::clamp(tau_prev_(i) - dtb, -box, box);
-        hi = std::clamp(tau_prev_(i) + dtb, -box, box);
+        const double blo = lo, bhi = hi;
+        lo = std::clamp(tau_prev_(i) - dtb, blo, bhi);
+        hi = std::clamp(tau_prev_(i) + dtb, blo, bhi);
       } else {
         lb_(nU_ + 4 * (j - 1) + i) = -dtb;
         ub_(nU_ + 4 * (j - 1) + i) = dtb;
@@ -478,6 +547,10 @@ bool TorqueMPC::solve_qp(const TVec4 & tau_bar)
       if (ground_) {
         lb_(nU_ + mg_rate + 4 * j + i) = -tb;
         ub_(nU_ + mg_rate + 4 * j + i) = tb;
+        if (fshift_) {     // 2026-11-24: −τ̄ + (P f)_i ≤ (P τ)_i ≤ τ̄ + (P f)_i
+          lb_(nU_ + mg_rate + 4 * j + i) += pf(i);
+          ub_(nU_ + mg_rate + 4 * j + i) += pf(i);
+        }
       }
     }
   }
@@ -584,7 +657,16 @@ TVec4 TorqueMPC::step(
         rho_n_prev_ = n_c;
       }
     }
+    // 2026-11-24 마찰 상한 옮김·마찰 모델 (머리주석): 스텝 i 의 기준 바퀴 속도에서 구동계 마찰 τ_b,i. 둘 다 꺼지면 계산하지 않는다
+    TVec4 tau_b = TVec4::Zero();
+    if (fmodel_ || (fshift_ && i < Nc)) {
+      tau_b = tu_.cap_friction_scale * md_.drivetrain_friction(md_.wheel_nominal_speeds(u_i), tu_.cap_friction_smooth);
+    }
+    // 2026-11-24 구름 손실 (머리주석): 모델 쪽 마찰 τ_m = τ_b + τ_roll·tanh(ω_r/ω_s). 상한 옮김 (fs_steps_) 은 τ_b 그대로 둔다
+    const TVec4 tau_m = fmodel_ && tu_.fric_rolling != 0.0 ? model_friction(md_.wheel_nominal_speeds(u_i)) : tau_b;
+    if (fmodel_) {ff_steps_.col(i) = tau_m;}
     if (i < Nc) {
+      if (fshift_) {fs_steps_.col(i) = tau_b;}
       // 식-14 목표 입력: U_s,i = F⁺ R(θ_r,i)ᵀ M (p̈_r,i − w_i − â_d − a_ρ)
       const TVec3 rhs = Mdiag * (acc - md_.w(Xdot_r) - a_d - a_rho);
       const TVec3 rb(c * rhs(0) + s * rhs(1), -s * rhs(0) + c * rhs(1), rhs(2));   // R(θ_r)ᵀ
@@ -605,7 +687,25 @@ TVec4 TorqueMPC::step(
       } else {
         Us_.segment<4>(4 * i) = F_pinv_ * rb;
       }
-      if (tu_.target_projection && ground_) {   // 바닥 토크 상한이면 P·U_s 가 상자 안에 들도록 같은 비율로 줄인다
+      if (fmodel_) {Us_.segment<4>(4 * i) += tau_m;}     // 2026-11-24 마찰 모델: 바퀴마다 자기 마찰만큼 더 낸다 (머리주석)
+      if (tu_.target_projection && fshift_) {   // 2026-11-24 마찰 상한 옮김: 옮긴 상자에 사영한다
+        if (ground_) {     // P (U_s − f) 가 ±τ̄ 안에 들도록 f 쪽으로 같은 비율로 줄인다 (f = 0 이면 아래 ground 분기와 같다)
+          const TVec4 fs = fs_steps_.col(i);
+          const TVec4 du = Us_.segment<4>(4 * i) - fs;
+          const TVec4 ug = P_ground_ * du;
+          double sc = 1.0;
+          for (int q = 0; q < 4; ++q) {if (std::abs(ug(q)) > tb_steps_(q, i)) {sc = std::min(sc, tb_steps_(q, i) / std::abs(ug(q)));}}
+          if (sc < 1.0) {Us_.segment<4>(4 * i) = fs + sc * du; if (i == 0) {us_clipped_ = true;}}
+        } else {
+          for (int q = 0; q < 4; ++q) {
+            double blo, bhi;
+            var_box(q, i, blo, bhi);
+            const double u = Us_(4 * i + q), uc = std::clamp(u, blo, bhi);
+            if (i == 0 && uc != u) {us_clipped_ = true;}
+            Us_(4 * i + q) = uc;
+          }
+        }
+      } else if (tu_.target_projection && ground_) {   // 바닥 토크 상한이면 P·U_s 가 상자 안에 들도록 같은 비율로 줄인다
         const TVec4 ug = P_ground_ * Us_.segment<4>(4 * i);
         double sc = 1.0;
         for (int q = 0; q < 4; ++q) {if (std::abs(ug(q)) > tb_steps_(q, i)) {sc = std::min(sc, tb_steps_(q, i) / std::abs(ug(q)));}}
@@ -623,6 +723,7 @@ TVec4 TorqueMPC::step(
     if (current) {
       // x_{i+1} = A_d x_i + B_d τ + c_d + d̂ + d_ρ   — 지평 전체에 같은 (A_d, B_d, c_d)
       xf = lin.A * xf + lin.c + d_use + d_rho;
+      if (fmodel_) {xf -= lin.B * tau_m;}                // 2026-11-24 마찰 모델: 바퀴에 남는 토크는 τ − τ_b
       Phi_j = (lin.A * Phi_j).eval();
       Phi_j.block<6, 4>(0, 4 * cidx) += lin.B;
       Phi_.block(6 * i, 0, 6, nU_) = Phi_j;
@@ -635,6 +736,11 @@ TVec4 TorqueMPC::step(
       xf.head<3>() += Ts * xf.tail<3>() + 0.5 * Ts * Ts * w_i;
       xf.tail<3>() += Ts * w_i;
       xf += d_use + d_rho;
+      if (fmodel_) {                                     // 2026-11-24 마찰 모델: −B_i τ_b,i = −[½Ts² G_i τ_b; Ts G_i τ_b]
+        const TVec3 af = G_i * tau_m;
+        xf.head<3>() -= 0.5 * Ts * Ts * af;
+        xf.tail<3>() -= Ts * af;
+      }
       P += Ts * V;
       P.block<3, 4>(0, 4 * cidx) += 0.5 * Ts * Ts * G_i;
       V.block<3, 4>(0, 4 * cidx) += Ts * G_i;
@@ -671,14 +777,22 @@ TVec4 TorqueMPC::step(
     stats_.fallback = 1;
     for (int i = 0; i < 4; ++i) {
       const double dtb = dtau_bar_of(tb(i)), b0 = tb_steps_(i, 0);
+      double blo = -b0, bhi = b0;
+      if (fshift_) {     // 2026-11-24 마찰 상한 옮김: 깎는 상자도 f 만큼 옮긴다 (cap_on ground 도 여기서는 바퀴 토크 기준 근사)
+        const double f = fs_steps_(i, 0), tmot = md_.tau_motor_limit();
+        blo = std::max(-b0 + f, -tmot);
+        bhi = std::min(b0 + f, tmot);
+        if (blo > bhi) {blo = bhi = std::clamp(f, -tmot, tmot);}
+      }
       T_(i) = std::clamp(
-        T_(i), std::clamp(tau_prev_(i) - dtb, -b0, b0), std::clamp(tau_prev_(i) + dtb, -b0, b0));
+        T_(i), std::clamp(tau_prev_(i) - dtb, blo, bhi), std::clamp(tau_prev_(i) + dtb, blo, bhi));
     }
   }
   const TVec4 tau = T_.head<4>();
   x_prev_ = x_hat;
   tau_prev_ = tau;
   slip_scale_used_ = eta_s;
+  if (fshift_) {fs_used_ = fs_steps_.col(0);}
   has_prev_ = true;
   lin_prev_ = lin;
   has_lin_ = current;

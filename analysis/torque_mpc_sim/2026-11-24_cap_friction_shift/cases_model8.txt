@@ -1,0 +1,5 @@
+# 2026-11-24 마찰 모델 (use_fric_model, 지시서 T11b 앞당김) — 가감속 8자 (run.sh 와 같은 공통 조건), 판마다 2 번
+Cmodel_r1|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true
+Cmodel_r2|disturbance:=true friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true
+Cmodel_nod_r1|disturbance:=false friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true
+Cmodel_nod_r2|disturbance:=false friction_comp:=false mpc_cap_friction_shift:=true use_fric_model:=true
