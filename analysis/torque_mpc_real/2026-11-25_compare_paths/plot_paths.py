@@ -38,7 +38,7 @@ SCEN = [
          title="꺾은선 (정사각형 두 개) · 모서리 통과 (꼭짓점 0.1 m/s) · 가속 1.5 m/s² · 최고 1.5 m/s",
          groups={"MPC (추정기 속도)": ["162408_sq2p_mpc_r1", "162830_sq2p_mpc_r2"],
                  "MPC (바퀴 속도)": ["154715_sq2p_mpcw_r1", "155359_sq2p_mpcw_r2", "155804_sq2p_mpcw_r3"],
-                 "MPC (바퀴 속도 + 구동 방향 2.4°)": ["162531_sq2p_mpcwd_r1", "162653_sq2p_mpcwd_r2"],
+                 # 2026-11-25 사용자 결정 "보정 빼고 비교": 구동 방향 2.4° 판 (mpcwd r1 · r2 · r5) 은 PP 에 같은 보정을 안 줬으므로 비교에서 뺀다
                  "PP (룩어헤드 고정 0.30 m)": ["154855_sq2p_pp_r1", "155511_sq2p_pp_r2", "155933_sq2p_pp_r3"],
                  "어댑티브 PP": ["155018_sq2p_adpp_r1", "155632_sq2p_adpp_r2", "160100_sq2p_adpp_r3"]}),
     dict(key="stop_a20", folder="2026-11-25_polyline_a20_real",

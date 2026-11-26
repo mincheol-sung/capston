@@ -23,6 +23,19 @@ step (단계 토크, 지시서 T7 2·3단계)
   (h = 무게중심 높이 — 실측 없음, --com-height 기본 0.105 는 URDF 추정). 네 바퀴 합 √2·Στ_g/(r·m g) 는 h 와 무관하다.
   헛돌지 않은 바퀴의 μ 는 "적어도 이만큼" (하한) 이고, 헛돈 바퀴의 μ 가 그 바퀴의 한계값이다.
   토크를 끊은 뒤 선 거리 (추정기 위치, 몸체·바퀴가 다 멈춘 때까지) 도 낸다 — 다음 단계로 올려도 되는지 보려고.
+rot (제자리 회전 단계 토크, 2026-11-25) — floor_tests_w4_t7.sh rot · 옛 basic_motion_test.py ccw/cw bag 모두 읽는다
+  회전 운동 방정식 (바퀴 관성을 몸체 쪽에 합친 꼴, 미끄럼 없음):  M_w(t) = I_eff·ψ̈ + M_c·sgn(ψ̇) + B·ψ̇
+    M_w = Σ_i c_i·(τ_i − τ_fric,i(ω_i))   c_i = T⁻¹ 의 회전 열 (±k/r = ±4.83), τ_fric = 띄운 상태 마찰 (torque_plant.yaml)
+    I_eff = I_z + J_w·Σc_i²  (모델 0.06 + 0.083 = 0.143),  M_c·sgn + B·ψ̇ = 띄운 마찰 밖의 바닥 회전 저항 (모델에 없음)
+  ψ̇ = IMU 자이로 z (서 있을 때 평균을 0 점으로), ψ̈ = Savitzky–Golay 미분 (0.15 s — 0.04·0.08 s 는 미분 잡음이 관성을 0 쪽으로 깎았다, 11-25 실차). 회전 속도 0.2 rad/s 넘은 표본만 (정지 마찰 구간 뺌),
+  토크를 켠·끊은 순간에서 미분 창 반폭 안 표본도 뺀다 (창이 끊은 뒤 DAMPING 감속을 걸치면 가속이 음수로 섞인다).
+  두 길로 맞춘다: (1) 표본 전부 최소제곱 (equation-error, Ljung 1999 7장), (2) 회마다 평균 가속 (자이로 직선 맞춤) → 회들끼리 최소제곱.
+  검산: 바퀴 각가속도를 따로 빼서 I_z 를 직접 — Σ c_i·(τ_i − τ_fric,i − J_w·ω̇_i) = I_z·ψ̈ + 저항.
+lat (옆걸음 단계 토크, 2026-11-25) — floor_tests_w4_t7.sh lat · 옛 basic_motion_test left/right · amrstep dir:=left bag
+  Σ c_y,i·(τ_i − τ_fric,i(ω_i)) = m_eff·a_y + F_c·sgn(v_y) [+ B·v_y]    c_y = T⁻¹ 의 옆 열 (±1/r), m_eff = m + J_w·Σc_y² = 6.785 kg
+  몸체 중심 옆 가속 = IMU 옆 가속 (서 있을 때 평균을 0 점으로) − ψ̈·r_x + ψ̇²·r_y  (IMU 위치 r = torque_estimator.yaml imu_offset — 옆걸음 중 돌면 IMU 점 가속이 다르다).
+  회마다 평균 가속 세 길: IMU (중심으로 옮김), 추정기 옆 속도 기울기, 추정기 거리 2d/T².  옆 저항 F_c 는 (1) m_eff 를 6.785 로 두고 회마다 F − m_eff·a,
+  (2) 회들끼리 m·F_c 를 같이 맞춤. 비교: 롤러 구름 저항 가설 (회전 저항 0.40 N·m / l_x) 4.6 N, 지금 모델 0.
 """
 import argparse
 import glob
@@ -270,15 +283,15 @@ def step_window(run, frac=0.5):
     return max(w, key=lambda x: x[1] - x[0]) if w else None
 
 
-def imu_rest_baseline(run, w_still=0.2, guard=0.4):
-    """서 있을 때의 IMU 앞 방향 가속 평균 (바닥 기울기·바이어스) — 바퀴가 멈춰 있고 단계 구간에서 guard 초 넘게 떨어진 표본들."""
+def imu_rest_baseline(run, w_still=0.2, guard=0.4, col=1):
+    """서 있을 때의 IMU 가속 평균 (바닥 기울기·바이어스) — 바퀴가 멈춰 있고 단계 구간에서 guard 초 넘게 떨어진 표본들. col 1 = 앞, 2 = 옆."""
     imu, ws = run["imu"], run["ws"]
     if imu.shape[1] < 3 or len(imu) < 50 or len(ws) < 10:
         return math.nan
     still = np.interp(imu[:, 0], ws[:, 0], np.abs(ws[:, 5:9]).max(axis=1)) < w_still
     for t0, t1 in step_windows(run):
         still &= (imu[:, 0] < t0 - 0.02) | (imu[:, 0] > t1 + guard)
-    return float(imu[still, 1].mean()) if still.sum() > 50 else math.nan
+    return float(imu[still, col].mean()) if still.sum() > 50 else math.nan
 
 
 def analyze_step(run, pv, window=None, lead=0.05, com_height=0.105, slip_ratio=1.15, roll=0.0, w_cap=35.0, t_next=None, imu0=None):
@@ -435,6 +448,347 @@ def report_step(results, pv, com_height=0.105, roll=0.0):
     return "\n".join(L) + "\n"
 
 
+def rot_geometry():
+    """회전 열 c (4,), 바퀴→몸체 pinv(T⁻¹), 모델 I_z·바퀴 관성 켬 여부 (torque_plant.yaml)."""
+    from amr_mpc.torque.model import TorquePlant
+    p = TorquePlant.from_yaml()
+    Tinv = np.asarray(p.Tinv, float)
+    c = Tinv[:, 2]
+    I_w = float(p.J_w) * float(c @ c)
+    return {"c": c, "fk": np.linalg.pinv(Tinv), "Iz": float(p.inertia_z), "I_w": I_w,
+            "I_model": float(p.inertia_z) + (I_w if p.use_wheel_inertia else 0.0)}
+
+
+def gyro_rest_bias(run, w_still=0.2, guard=0.4):
+    """서 있을 때 자이로 z 평균 (바이어스) — 바퀴가 멈춰 있고 토크 구간에서 guard 초 넘게 떨어진 표본."""
+    imu, ws = run["imu"], run["ws"]
+    if imu.shape[1] < 4 or len(imu) < 50 or len(ws) < 10:
+        return 0.0
+    still = np.interp(imu[:, 0], ws[:, 0], np.abs(ws[:, 5:9]).max(axis=1)) < w_still
+    for t0, t1 in step_windows(run):
+        still &= (imu[:, 0] < t0 - 0.02) | (imu[:, 0] > t1 + guard)
+    return float(imu[still, 3].mean()) if still.sum() > 50 else 0.0
+
+
+def analyze_rot(run, pv, rg, window, bias=0.0, w_move=0.2, sg_s=0.15, t_next=None):
+    """제자리 회전 단계 구간 하나. 반환 dict (표본 배열 포함) 또는 None."""
+    from scipy.signal import savgol_filter
+    t0, t1 = window
+    ws, imu, cmd, sl = run["ws"], run["imu"], run["cmd"], run["slam"]
+    if imu.shape[1] < 4 or len(ws) < 20:
+        return None
+    cm = (cmd[:, 0] >= t0) & (cmd[:, 0] <= t1) & (cmd[:, 1] == 0.0)
+    tau = np.median(np.vectorize(quantize)(cmd[cm, 2:6]), axis=0)
+    yaw_amp = float(rg["c"] @ tau) / float(np.abs(rg["c"]).sum())                 # 회전 꼴 성분 (바퀴당, 부호 = 반시계 +)
+    if abs(yaw_amp) < 0.5 * np.abs(tau).mean():                                    # 회전 판이 아니다
+        return None
+    sg = float(np.sign(yaw_amp))
+    pad = 0.3
+    mi = (imu[:, 0] >= t0 - pad) & (imu[:, 0] <= t1 + pad)
+    ti, wz = imu[mi, 0], imu[mi, 3] - bias
+    if len(ti) < 30:
+        return None
+    fs = 1.0 / np.median(np.diff(ti))
+    n = max(5, int(round(sg_s * fs)) | 1)
+    wz_s = savgol_filter(wz, n, 2)
+    al = savgol_filter(wz, n, 2, deriv=1, delta=1.0 / fs)
+    om = np.column_stack([np.interp(ti, ws[:, 0], ws[:, 5 + i]) for i in range(4)])
+    fb = np.column_stack([np.interp(ti, ws[:, 0], ws[:, 9 + i]) for i in range(4)])
+    wdot = np.gradient(savgol_filter(om, n, 2, axis=0), ti, axis=0)
+    fr = wd.CoulombViscous(pv["tc"], pv["bv"], smooth=0.5)
+    f_om = np.array([fr(o) for o in om])
+    M_cmd = (tau - f_om) @ rg["c"]
+    M_fb = (fb - f_om) @ rg["c"]
+    M_wh = (tau - f_om - pv["J"] * wdot) @ rg["c"]                                  # 바퀴 관성 뺀 몸체 몫 (검산)
+    inwin = (ti >= t0) & (ti <= t1)
+    h = 0.5 * n / fs                                                              # 미분 창 반폭: 토크 켠·끊은 순간을 걸친 표본은 뺀다
+    moved = inwin & (sg * wz_s > w_move) & (ti >= t0 + h) & (ti <= t1 - h)
+    started = inwin & (sg * wz_s > w_move)
+    out = {"t": (t0, t1), "dur": t1 - t0, "tau": tau, "yaw_amp": yaw_amp, "sg": sg, "temp": np.nanmean(ws[(ws[:, 0] >= t0) & (ws[:, 0] <= t1), 13:17], axis=0),
+           "moved": bool(started.any()), "w_peak": float(np.max(sg * wz_s[inwin])) if inwin.any() else math.nan,
+           "w_start": float(np.interp(t0, ti, wz_s))}                              # 토크 켤 때 이미 돌고 있었나 (앞 회가 덜 멈춤)
+    out["breakaway"] = float(ti[started][0] - t0) if started.any() else math.nan
+    # 회전각: 토크 구간 · 끊은 뒤 멈출 때까지 (자이로 적분)
+    t_end = min(t1 + 1.5, t_next if t_next is not None else math.inf)
+    me = (imu[:, 0] >= t0) & (imu[:, 0] <= t_end)
+    te, we = imu[me, 0], imu[me, 3] - bias
+    ang = np.concatenate([[0.0], np.cumsum(0.5 * (we[1:] + we[:-1]) * np.diff(te))])
+    out["ang_torque"] = float(np.degrees(np.interp(t1, te, ang)))
+    out["ang_total"] = float(np.degrees(ang[-1]))
+    # 바퀴로 계산한 회전 속도 대 자이로 (미끄럼) — 토크 구간 끝 0.1 s
+    tail = inwin & (ti >= t1 - 0.1) & moved
+    if tail.any():
+        w_wh = (om[tail] @ rg["fk"].T)[:, 2]
+        out["eff"] = float(np.mean(wz_s[tail]) / np.mean(w_wh)) if abs(np.mean(w_wh)) > 0.1 else math.nan
+    else:
+        out["eff"] = math.nan
+    # 회마다 평균 가속: 자이로 직선 맞춤 (움직인 표본)
+    if moved.sum() >= 10:
+        out["alpha_fit"] = float(np.polyfit(ti[moved], wz[moved], 1)[0])
+        out["w_mean"] = float(np.mean(wz[moved]))
+        out["M_mean"] = float(np.mean(M_cmd[moved]))
+        out["M_fb_mean"] = float(np.mean(M_fb[moved]))
+    else:
+        out["alpha_fit"] = out["w_mean"] = out["M_mean"] = out["M_fb_mean"] = math.nan
+    out["alpha_model"] = out["M_mean"] / rg["I_model"] if math.isfinite(out["M_mean"]) else math.nan
+    out["samples"] = {"al": al[moved], "w": wz_s[moved], "M": M_cmd[moved], "M_fb": M_fb[moved], "M_wh": M_wh[moved]}
+    # SLAM 제자리 오차 (회전 중심이 얼마나 움직였나 — SLAM 추적점은 IMU 점이라 회전하면 원을 그린다: 참고용 끝점끼리)
+    if sl.shape[1] >= 3 and len(sl) > 5:
+        s0 = sl[(sl[:, 0] >= t0 - 0.5) & (sl[:, 0] <= t0), 1:3]
+        s1 = sl[(sl[:, 0] >= t_end - 0.3) & (sl[:, 0] <= t_end), 1:3]
+        out["slam_move"] = float(np.hypot(*(s1.mean(0) - s0.mean(0)))) if len(s0) and len(s1) else math.nan
+    return out
+
+
+def fit_rot(rows, key="M", alpha="al", with_b=True):
+    """M = I·α + M_c·sgn(ψ̇) [+ B·ψ̇] 최소제곱. 반환 (계수, 표준오차, 잔차 RMS, 표본 수)."""
+    A, y = [], []
+    for a in rows:
+        S = a["samples"]
+        if len(S["M"]) == 0:
+            continue
+        cols = [S[alpha], np.sign(S["w"])] + ([S["w"]] if with_b else [])
+        A.append(np.column_stack(cols))
+        y.append(S[key])
+    if not A:
+        return None
+    A, y = np.vstack(A), np.concatenate(y)
+    x, *_ = np.linalg.lstsq(A, y, rcond=None)
+    res = y - A @ x
+    dof = max(1, len(y) - A.shape[1])
+    s2 = float(res @ res) / dof
+    se = np.sqrt(np.diag(s2 * np.linalg.inv(A.T @ A)))
+    return x, se, math.sqrt(s2), len(y)
+
+
+def fit_rot_runs(rows, key="M_mean", with_b=True):
+    """회마다 평균 (자이로 직선 기울기·평균 회전 속도·평균 모멘트) 로 같은 식을 맞춘다 — 회 수가 계수 수보다 많아야."""
+    R = [a for a in rows if math.isfinite(a["alpha_fit"])]
+    k = 3 if with_b else 2
+    if len(R) <= k:
+        return None
+    A = np.array([[a["alpha_fit"], np.sign(a["w_mean"])] + ([a["w_mean"]] if with_b else []) for a in R])
+    y = np.array([a[key] for a in R])
+    x, *_ = np.linalg.lstsq(A, y, rcond=None)
+    res = y - A @ x
+    s2 = float(res @ res) / max(1, len(y) - k)
+    return x, np.sqrt(np.diag(s2 * np.linalg.inv(A.T @ A))), math.sqrt(s2), len(y)
+
+
+def analyze_rots(run, pv, rg):
+    wins = step_windows(run)
+    bias = gyro_rest_bias(run)
+    out = []
+    for k, w in enumerate(wins):
+        a = analyze_rot(run, pv, rg, w, bias=bias, t_next=wins[k + 1][0] if k + 1 < len(wins) else None)
+        if a is not None:
+            a["k"], a["bias"] = k + 1, bias
+            out.append(a)
+    return out
+
+
+def report_rot(results, pv, rg):
+    flat = [(n, x) for n, a in results for x in (a or [])]
+    csum = float(np.abs(rg["c"]).sum())                                           # Σ|c_i| = 4k/r — 바퀴당 토크 ↔ 몸체 모멘트
+    L = ["# 제자리 회전 단계 토크 — 회전 관성·바닥 회전 저항\n",
+         f"식: Σ c_i·(모터 토크 − 띄운 마찰) = I_eff·ψ̈ + M_c·sgn(ψ̇) + B·ψ̇.  c = ±{rg['c'][1]:.2f} (k/r), 바퀴당 토크 1 mN·m = 몸체 모멘트 {csum:.2f} mN·m.",
+         f"모델: I_z {rg['Iz']:.3f} + 바퀴 몫 J_w·Σc² {rg['I_w']:.3f} = {rg['Iz'] + rg['I_w']:.3f} kg·m² (지금 모델이 쓰는 값 {rg['I_model']:.3f}). 띄운 마찰 밖 저항은 모델에 없다 (0).\n"]
+    for name, a in results:
+        if not a:
+            L.append(f"- {name}: 회전 단계 구간을 못 찾음")
+    if not flat:
+        return "\n".join(L) + "\n"
+    L += ["## 회별\n",
+          "| 판 · 회 | 바퀴당 토크 mN·m (회전 꼴) | 온도 °C | 토크 구간 s | 시작 회전 속도 rad/s | 출발까지 s | 최고 회전 속도 rad/s | 회전각 ° 토크 중 · 끝 | 평균 가속 rad/s² 측정 · 모델 (비) | 자이로/바퀴 회전 속도 | SLAM 끝점 이동 cm |",
+          "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for name, a in flat:
+        ratio = a["alpha_fit"] / a["alpha_model"] if math.isfinite(a["alpha_model"]) and a["alpha_model"] != 0 else math.nan
+        L.append(f"| {name} · {a['k']} | {a['yaw_amp'] * 1e3:+.0f} | {np.nanmean(a['temp']):.0f} | {a['dur']:.2f} | {a['w_start']:+.2f} | {a['breakaway']:.2f} | {a['w_peak']:.2f} | "
+                 f"{a['ang_torque']:+.1f} · {a['ang_total']:+.1f} | {a['alpha_fit']:+.1f} · {a['alpha_model']:+.1f} ({ratio:.2f}) | {a['eff']:.2f} | {100 * a.get('slam_move', math.nan):.1f} |")
+    L.append("\n(출발까지 = 토크를 준 뒤 자이로가 0.2 rad/s 를 넘은 때. 안 넘었으면 nan — 정지 마찰을 못 넘은 판. 모델 가속 = 평균 모멘트 / 지금 모델 관성 — 바닥 저항 0 이라고 본 값.)")
+    names = {0: "I_eff kg·m²", 1: "M_c N·m", 2: "B N·m·s/rad"}
+    L += ["\n## 맞춘 값\n", "| 방법 | I_eff kg·m² | M_c N·m (바퀴당 mN·m) | B N·m·s/rad | 잔차 RMS N·m | 표본 |", "|---|---|---|---|---|---|"]
+    for lab, f in (("표본 전부, 모멘트 = 명령", fit_rot([a for _, a in flat], "M")),
+                   ("표본 전부, B 없이", fit_rot([a for _, a in flat], "M", with_b=False)),
+                   ("표본 전부, 모멘트 = 피드백 토크", fit_rot([a for _, a in flat], "M_fb")),
+                   ("회마다 평균 → 회들끼리", fit_rot_runs([a for _, a in flat])),
+                   ("회마다 평균, B 없이", fit_rot_runs([a for _, a in flat], with_b=False))):
+        if f is None:
+            L.append(f"| {lab} | 표본 모자람 | | | | |")
+            continue
+        x, se, rms, n = f
+        b = f"{x[2]:.4f} ± {se[2]:.4f}" if len(x) > 2 else "(0 으로 둠)"
+        L.append(f"| {lab} | {x[0]:.4f} ± {se[0]:.4f} | {x[1]:.3f} ± {se[1]:.3f} ({x[1] / csum * 1e3:.1f}) | {b} | {rms:.3f} | {n} |")
+    g = fit_rot([a for _, a in flat], "M_wh")
+    f0 = fit_rot([a for _, a in flat], "M")
+    if g is not None and f0 is not None and g[2] > 5.0 * f0[2]:
+        L.append(f"\n검산 (바퀴 쪽 I_z) 은 못 했다: 바퀴 각가속도 (/wheel_states 받은 시각 미분) 잡음으로 잔차 RMS {g[2]:.2f} N·m — 위 맞춤 {f0[2]:.3f} 의 {g[2] / f0[2]:.0f} 배.")
+    elif g is not None:
+        x, se, rms, n = g
+        L.append(f"\n검산 (바퀴 각가속도 몫을 바퀴 쪽에서 뺌 → I_z 직접): I_z {x[0]:.4f} ± {se[0]:.4f} kg·m², M_c {x[1]:.3f}, 잔차 RMS {rms:.3f}. "
+                 f"위 I_eff − 바퀴 몫 {rg['I_w']:.3f} 와 같아야 한다 (미끄럼이 없으면).")
+    L.append("\n± 는 최소제곱 표준오차 (표본끼리 독립이라 본 값 — 실제 불확도는 회들끼리 차이가 더 정직하다).")
+    return "\n".join(L) + "\n"
+
+
+def lat_geometry():
+    """옆 열 c_y (4,), 실제 m_eff (바퀴 관성 포함), 모델 m, IMU 위치 (torque_estimator.yaml)."""
+    from amr_mpc.torque.model import TorquePlant
+    p = TorquePlant.from_yaml()
+    Tinv = np.asarray(p.Tinv, float)
+    c = Tinv[:, 1]
+    est = config.load("torque_estimator.yaml")
+
+    def find(d, key):
+        if isinstance(d, dict):
+            if key in d:
+                return d[key]
+            for v in d.values():
+                x = find(v, key)
+                if x is not None:
+                    return x
+        return None
+    m_w = float(p.J_w) * float(c @ c)
+    return {"c": c, "fk": np.linalg.pinv(Tinv), "m_eff": float(p.mass) + m_w, "m_model": float(p.mass) + (m_w if p.use_wheel_inertia else 0.0),
+            "r_imu": np.array([float(find(est, "imu_offset_x") or 0.0), float(find(est, "imu_offset_y") or 0.0)]),
+            "lx": 0.5 * float(p.wheel_base)}
+
+
+def analyze_lat(run, pv, lg, window, base=(0.0, 0.0, 0.0), lead=0.05, tail=0.03, sg_s=0.15, v_move=0.05, t_next=None):
+    """옆걸음 단계 구간 하나. base = (IMU 앞 0 점, 옆 0 점, 자이로 0 점). 반환 dict 또는 None."""
+    from scipy.signal import savgol_filter
+    t0, t1 = window
+    ws, imu, cmd, od = run["ws"], run["imu"], run["cmd"], run["odom"]
+    if imu.shape[1] < 4 or len(ws) < 20:
+        return None
+    cm = (cmd[:, 0] >= t0) & (cmd[:, 0] <= t1) & (cmd[:, 1] == 0.0)
+    tau = np.median(np.vectorize(quantize)(cmd[cm, 2:6]), axis=0)
+    amp = float(lg["c"] @ tau) / float(np.abs(lg["c"]).sum())                     # 옆 꼴 성분 (바퀴당, + = 왼쪽)
+    if abs(amp) < 0.5 * np.abs(tau).mean():
+        return None
+    sg = float(np.sign(amp))
+    pad = 0.3
+    mi = (imu[:, 0] >= t0 - pad) & (imu[:, 0] <= t1 + pad)
+    ti = imu[mi, 0]
+    if len(ti) < 30:
+        return None
+    fs = 1.0 / np.median(np.diff(ti))
+    n = max(5, int(round(sg_s * fs)) | 1)
+    wz = imu[mi, 3] - base[2]
+    al = savgol_filter(wz, n, 2, deriv=1, delta=1.0 / fs)
+    rx, ry = lg["r_imu"]
+    ay = imu[mi, 2] - base[1] - al * rx + wz ** 2 * ry                           # 몸체 중심 옆 가속
+    ax = imu[mi, 1] - base[0] + al * ry + wz ** 2 * rx
+    om = np.column_stack([np.interp(ti, ws[:, 0], ws[:, 5 + i]) for i in range(4)])
+    fr = wd.CoulombViscous(pv["tc"], pv["bv"], smooth=0.5)
+    F = (tau - np.array([fr(o) for o in om])) @ lg["c"]                           # 바퀴 쪽 옆 힘 [N] (띄운 마찰 뺌)
+    v_wh = (om @ lg["fk"].T)[:, 1]
+    inwin = (ti >= t0) & (ti <= t1)
+    h = 0.5 * n / fs                                                              # ψ̈ 미분 창 반폭 — 켠·끊은 순간을 걸친 표본은 뺀다 (rot 과 같음)
+    mv = inwin & (ti >= t0 + max(lead, h)) & (ti <= t1 - max(tail, h)) & (sg * v_wh > v_move)
+    out = {"t": (t0, t1), "dur": t1 - t0, "tau": tau, "amp": amp, "sg": sg,
+           "temp": np.nanmean(ws[(ws[:, 0] >= t0) & (ws[:, 0] <= t1), 13:17], axis=0),
+           "v_start": float(np.interp(t0, ti, v_wh)), "moved": bool(mv.any())}
+    started = inwin & (sg * v_wh > v_move)
+    out["breakaway"] = float(ti[started][0] - t0) if started.any() else math.nan
+    ang = np.concatenate([[0.0], np.cumsum(0.5 * (wz[1:] + wz[:-1]) * np.diff(ti))])
+    out["dyaw"] = float(np.degrees(np.interp(t1, ti, ang) - np.interp(t0, ti, ang)))
+    nan = math.nan
+    out.update(a_imu=nan, a_fwd=nan, F=nan, a_est=nan, a_dist=nan, v_end_est=nan, v_end_wh=nan, w_end=np.full(4, nan))
+    if mv.sum() >= 10:
+        out["a_imu"], out["a_fwd"] = float(ay[mv].mean()), float(ax[mv].mean())
+        out["F"] = float(F[mv].mean())
+        e = ti[inwin][-1]
+        out["v_end_wh"] = float(np.interp(e, ti, v_wh))
+        out["w_end"] = np.abs(om[inwin][-1])
+    if od.shape[1] >= 7 and len(od) > 10:
+        mo = (od[:, 0] >= t0 + lead) & (od[:, 0] <= t1)
+        if mo.sum() > 5:
+            out["a_est"] = float(np.polyfit(od[mo, 0], od[mo, 5], 1)[0])
+            out["v_end_est"] = float(np.interp(t1, od[:, 0], od[:, 5]))
+        p0 = np.array([np.interp(t0, od[:, 0], od[:, c]) for c in (1, 2, 3)])
+        p1 = np.array([np.interp(t1, od[:, 0], od[:, c]) for c in (1, 2)])
+        d = p1 - p0[:2]
+        d_lat = -math.sin(p0[2]) * d[0] + math.cos(p0[2]) * d[1]                  # 출발 때 몸체 옆 방향 성분
+        out["d_lat"] = float(d_lat)
+        out["a_dist"] = 2.0 * d_lat / (t1 - t0) ** 2 if t1 > t0 else nan
+    m = lg["m_eff"]
+    out["F_res"] = sg * (out["F"] - m * out["a_imu"])                           # 옆 저항 (m_eff 고정, + = 움직임 반대)
+    out["F_res_est"] = sg * (out["F"] - m * out["a_est"])
+    out["a_model"] = out["F"] / lg["m_model"] if math.isfinite(out["F"]) else nan
+    out["slip"] = out["v_end_wh"] / out["v_end_est"] if math.isfinite(out["v_end_est"]) and abs(out["v_end_est"]) > 0.05 else nan
+    return out
+
+
+def analyze_lats(run, pv, lg):
+    wins = step_windows(run)
+    base = (imu_rest_baseline(run, col=1), imu_rest_baseline(run, col=2), gyro_rest_bias(run))
+    base = tuple(0.0 if not math.isfinite(b) else b for b in base)
+    out = []
+    for k, w in enumerate(wins):
+        a = analyze_lat(run, pv, lg, w, base=base, t_next=wins[k + 1][0] if k + 1 < len(wins) else None)
+        if a is not None:
+            a["k"] = k + 1
+            out.append(a)
+    return out
+
+
+def fit_lat_runs(rows, key="a_imu", with_b=False):
+    """회마다 평균으로 F = m·a + F_c·sgn(v) [+ B·v] — m 도 같이 맞춘다. 서 있다가 시작한 회만."""
+    R = [a for a in rows if math.isfinite(a[key]) and math.isfinite(a["F"]) and abs(a["v_start"]) < 0.05]
+    k = 3 if with_b else 2
+    if len(R) <= k:
+        return None
+    A = np.array([[a[key], a["sg"]] + ([a["v_end_wh"] / 2.0] if with_b else []) for a in R])
+    y = np.array([a["F"] for a in R])
+    x, *_ = np.linalg.lstsq(A, y, rcond=None)
+    res = y - A @ x
+    s2 = float(res @ res) / max(1, len(y) - k)
+    return x, np.sqrt(np.diag(s2 * np.linalg.inv(A.T @ A))), math.sqrt(s2), len(y)
+
+
+def report_lat(results, pv, lg, M_rot=0.40):
+    flat = [(n, x) for n, a in results for x in (a or [])]
+    pred = M_rot / lg["lx"]
+    L = ["# 옆걸음 단계 토크 — 옆 저항 (롤러 구름 저항 가설 확인)\n",
+         f"식: Σ c_y,i·(모터 토크 − 띄운 마찰) = m_eff·a_y + F_c·sgn(v_y).  c_y = ±{abs(lg['c'][0]):.0f} 1/m (1/r), 바퀴당 1 mN·m = 옆 힘 {abs(lg['c'][0]) * 4e-3:.2f} N.",
+         f"m_eff = {lg['m_eff']:.3f} kg (바퀴 관성 포함, 지금 모델 {lg['m_model']:.3f}). IMU 위치 ({lg['r_imu'][0]:.4f}, {lg['r_imu'][1]:.4f}) m 로 중심 가속을 옮김.",
+         f"예측: 롤러 구름 저항 가설 (회전 저항 {M_rot:.2f} N·m / l_x {lg['lx']:.4f} m) → **F_c {pred:.1f} N**, 지금 모델 → 0.\n"]
+    for name, a in results:
+        if not a:
+            L.append(f"- {name}: 옆걸음 단계 구간을 못 찾음")
+    if not flat:
+        return "\n".join(L) + "\n"
+    L += ["## 회별\n",
+          "| 판 · 회 | 바퀴당 토크 mN·m (옆 꼴, + 왼쪽) | 온도 °C | 구간 s | 시작 옆 속도 m/s | 출발까지 s | 옆 가속 m/s² IMU · 추정기 · 거리 · 모델 | 앞 가속 IMU | 바퀴 쪽 옆 힘 N | 옆 저항 N (IMU · 추정기) | 회전 ° | 끝 바퀴 속도 FL FR RL RR | 바퀴/추정기 옆 속도 |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for name, a in flat:
+        L.append(f"| {name} · {a['k']} | {a['amp'] * 1e3:+.0f} | {np.nanmean(a['temp']):.0f} | {a['dur']:.2f} | {a['v_start']:+.2f} | {a['breakaway']:.2f} | "
+                 f"{a['a_imu']:+.2f} · {a['a_est']:+.2f} · {a['a_dist']:+.2f} · {a['a_model']:+.2f} | {a['a_fwd']:+.2f} | {a['F']:+.2f} | {a['F_res']:.2f} · {a['F_res_est']:.2f} | "
+                 f"{a['dyaw']:+.1f} | {_fmt(a['w_end'], 1.0, 1)} | {a['slip']:.2f} |")
+    levels = sorted({round(abs(a["amp"]), 3) for _, a in flat})
+    L += ["\n## 토크별 (서 있다가 시작한 회의 중앙값)\n",
+          "| 바퀴당 토크 mN·m | 회 (왼쪽 · 오른쪽) | 옆 가속 IMU · 모델 m/s² (비) | 옆 저항 N: IMU · 추정기 | 회전 ° (중앙 · 최대) | 바퀴/추정기 옆 속도 |", "|---|---|---|---|---|---|"]
+    for lv in levels:
+        G = [a for _, a in flat if abs(abs(a["amp"]) - lv) < 2e-3 and abs(a["v_start"]) < 0.05]
+        if not G:
+            continue
+        md = lambda k: float(np.nanmedian([a[k] for a in G]))
+        ai = np.nanmedian([abs(a["a_imu"]) for a in G]); am = np.nanmedian([abs(a["a_model"]) for a in G])
+        L.append(f"| {lv * 1e3:.0f} | {sum(a['sg'] > 0 for a in G)} · {sum(a['sg'] < 0 for a in G)} | {ai:.2f} · {am:.2f} ({ai / am:.2f}) | {md('F_res'):.2f} · {md('F_res_est'):.2f} | "
+                 f"{np.nanmedian([abs(a['dyaw']) for a in G]):.1f} · {np.nanmax([abs(a['dyaw']) for a in G]):.1f} | {md('slip'):.2f} |")
+    L += ["\n## 회들끼리 맞춤 (질량도 같이)\n", "| 가속 출처 | m kg | F_c N | 잔차 N | 회 |", "|---|---|---|---|---|"]
+    for key, lab in (("a_imu", "IMU (중심)"), ("a_est", "추정기 기울기"), ("a_dist", "추정기 거리")):
+        f = fit_lat_runs([a for _, a in flat], key)
+        if f is None:
+            L.append(f"| {lab} | 회 모자람 | | | |")
+            continue
+        x, se, rms, n = f
+        L.append(f"| {lab} | {x[0]:.2f} ± {se[0]:.2f} | {x[1]:.2f} ± {se[1]:.2f} | {rms:.2f} | {n} |")
+    L.append("\n옆 저항 = 바퀴 쪽 옆 힘 − m_eff × 옆 가속 (움직임 반대가 +). 헛도는 바퀴가 있으면 그 바퀴 토크가 바닥에 다 안 가서 저항이 크게 나온다 — 끝 바퀴 속도로 본다.")
+    return "\n".join(L) + "\n"
+
+
 def quick(run, pv):
     w = torque_window(run)
     if w is None:
@@ -459,7 +813,7 @@ def quick(run, pv):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("what", choices=["cv", "step", "quick"])
+    ap.add_argument("what", choices=["cv", "step", "quick", "rot", "lat"])
     ap.add_argument("bags", nargs="+")
     ap.add_argument("--out", default="", help="결과 폴더 (floor_cv.md / floor_step.md)")
     ap.add_argument("--lifted-tc", default="", help="cv: 다른 띄운 시험의 τ_c [N·m] 네 개 (쉼표)")
@@ -477,6 +831,26 @@ def main():
     if a.what == "quick":
         for b in bags:
             print(f"── {os.path.basename(b)}\n{quick(load_bag(b), pv)}")
+        return
+    if a.what == "lat":
+        lg = lat_geometry()
+        results = [(os.path.basename(b), analyze_lats(load_bag(b), pv, lg)) for b in bags]
+        txt = report_lat(results, pv, lg)
+        print(txt)
+        if a.out:
+            os.makedirs(a.out, exist_ok=True)
+            with open(os.path.join(a.out, "floor_lat.md"), "w") as f:
+                f.write(txt)
+        return
+    if a.what == "rot":
+        rg = rot_geometry()
+        results = [(os.path.basename(b), analyze_rots(load_bag(b), pv, rg)) for b in bags]
+        txt = report_rot(results, pv, rg)
+        print(txt)
+        if a.out:
+            os.makedirs(a.out, exist_ok=True)
+            with open(os.path.join(a.out, "floor_rot.md"), "w") as f:
+                f.write(txt)
         return
     lifted = None
     if a.lifted_tc and a.lifted_bv:

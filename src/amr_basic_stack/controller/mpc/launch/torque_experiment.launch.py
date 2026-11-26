@@ -417,6 +417,8 @@ def _nodes(context):
                          "surface_mu": float(g("surface_mu")) if g("surface_mu") else -1.0,
                          "friction_scale": float(g("friction_scale")),
                          "rolling_Nm": float(g("sim_rolling")) if g("sim_rolling") else 0.0,   # 2026-11-24 시뮬 바닥 구름 손실
+                         "roller_rr_N": float(g("sim_roller_rr")) if g("sim_roller_rr") else 0.0,   # 2026-11-25 시뮬 롤러 구름 저항
+                         "inertia_z": float(g("sim_inertia_z")) if g("sim_inertia_z") else -1.0,    # 2026-11-25 시뮬 회전 관성 (비우면 yaml)
                          "com_height": float(g("sim_com_height")) if g("sim_com_height") else 0.0,   # 2026-11-23 하중 이동
                          "wheel_efficiency": [float(v) for v in g("wheel_eff").split(",")] if g("wheel_eff") else [1.0, 1.0, 1.0, 1.0],
                          "floor_efficiency": [float(v) for v in g("floor_eff").split(",")] if g("floor_eff") else [1.0, 1.0, 1.0],
@@ -627,6 +629,12 @@ def _nodes(context):
                                          "(같이 켜려면 mpc_cap_friction_shift:=true)"))
         elif g("mpc_fric_rolling"):
             nodes.append(LogInfo(msg="mpc_fric_rolling 은 마찰 모델 (use_fric_model:=true) 이 켜졌을 때만 쓰인다 — 지금은 안 쓰인다"))
+        # 2026-11-25 롤러 구름 저항 [N/롤러] · 회전 관성 I_z [kg·m²] — 제어기만 (비우면 torque_mpc.yaml model_terms.roller_rr_N = 0 ·
+        #   torque_plant.yaml body.inertia_z_kgm2). 범위는 노드가 본다. 실차 식별 analysis/torque_mpc_real/2026-11-25_rot · _lat
+        if g("mpc_roller_rr"):
+            ctrl["roller_rr"] = float(g("mpc_roller_rr"))
+        if g("mpc_inertia_z"):
+            ctrl["inertia_z"] = float(g("mpc_inertia_z"))
         for arg, par in (("mpc_target_projection", "target_projection"), ("mpc_ff_normal_estimate", "ff_normal_estimate"),
                          ("mpc_load_weighted_alloc", "load_weighted_alloc"), ("mpc_load_dynamic_cap", "load_dynamic_cap")):
             if g(arg):
@@ -650,7 +658,7 @@ def _nodes(context):
         #   pp (= 예전 이름 pure_pursuit)  룩어헤드 고정 (pure_pursuit.lookahead_min = max = 0.30 m, 11-20 (9))
         #   adpp                          속도 비례 룩어헤드 (torque_baseline_a.yaml pure_pursuit_adaptive 세 값으로 덮어씀, 2026-11-23). 나머지는 같다
         ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "mu_hat_wheels", "ctrl_payload_kg",
-                               "log_prefix", "slip_eta", "mpc_cap_friction_shift", "use_fric_model")
+                               "log_prefix", "slip_eta", "mpc_cap_friction_shift", "use_fric_model", "mpc_roller_rr", "mpc_inertia_z")
                    if g(k)]
         if ignored:
             nodes.append(LogInfo(msg=f"controller:={controller} — MPC 인자 {ignored} 는 쓰지 않는다 "
@@ -701,7 +709,7 @@ def _nodes(context):
     elif controller == "step":
         # 바닥 토크 스텝 시험 (2026-11-17, torque_step.py): τ* = (I + K)·tau·pattern 일정, distance 가면 정지
         step = {"state_topic": state_topic, "direction": g("step_dir") or "fwd"}
-        for arg, par in (("step_tau", "tau"), ("step_distance", "distance"), ("step_max_time", "max_time")):
+        for arg, par in (("step_tau", "tau"), ("step_distance", "distance"), ("step_max_time", "max_time"), ("step_angle_deg", "angle_deg")):
             if g(arg):
                 step[par] = float(g(arg))
         if g("step_inertia_ff"):
@@ -820,9 +828,10 @@ def generate_launch_description():
         A("ramp_distance", default_value="", description="ramp: 자동 기울기의 목표 이동 거리 [m] (기본 3.0)"),
         A("ramp_stop_distance", default_value="", description="ramp: 이만큼 가면 끊음 [m] (기본 1.15 × ramp_distance)"),
         A("ramp_inertia_ff", default_value="", description="ramp: 바퀴 관성 feedforward true/false (기본 true)"),
-        A("step_dir", default_value="", description="step: fwd | left (비우면 fwd)"),
+        A("step_dir", default_value="", description="step: fwd | back | left | right | ccw | cw (비우면 fwd, ccw·cw = 제자리 회전 2026-11-25)"),
         A("step_tau", default_value="", description="step: 바퀴–바닥 토크 τ_g [N·m] (꼭 준다)"),
-        A("step_distance", default_value="", description="step: 끊는 이동 거리 [m] (꼭 준다)"),
+        A("step_distance", default_value="", description="step: 끊는 이동 거리 [m] (병진은 꼭 준다, 회전은 벗어남 한도 — 비우면 0.3)"),
+        A("step_angle_deg", default_value="", description="step: 회전 판의 끊는 회전각 [°] (ccw·cw 면 꼭 준다)"),
         A("step_max_time", default_value="", description="step: 최대 시간 [s] (기본 5)"),
         A("step_inertia_ff", default_value="", description="step: 바퀴 관성 feedforward true/false (기본 true)"),
         A("step_log_dir", default_value="", description="step: 판마다 CSV 폴더 (비우면 안 남김)"),
@@ -869,6 +878,15 @@ def generate_launch_description():
         A("mpc_fric_rolling", default_value="",
           description="구름 손실 [N·m, 네 바퀴 공통] — 마찰 모델 (use_fric_model:=true) 에 더하는 바닥 몫. 상한 옮김에는 안 들어간다 "
                       "(비우면 torque_mpc.yaml model_terms.fric_rolling_Nm = 0, 2026-11-24. 잰 값 0.0027~0.0051)"),
+        A("mpc_roller_rr", default_value="",
+          description="MPC 롤러 구름 저항 [N, 롤러 하나당] — 옆·회전에만 걸리는 몸체 저항을 목표 입력·예측·외란 추정 잔차에 넣는다 "
+                      "(비우면 torque_mpc.yaml model_terms.roller_rr_N = 0 = 끔, 2026-11-25. 실차 0.88 → 옆 4.98 N · 회전 0.43 N·m)"),
+        A("mpc_inertia_z", default_value="",
+          description="MPC 가 믿는 몸체 회전 관성 I_z [kg·m²] — 제어기만 (비우면 torque_plant.yaml 0.06). 실차 식별 I_eff 0.11~0.12 − 바퀴 몫 0.083 → 0.03"),
+        A("sim_inertia_z", default_value="",
+          description="시뮬 플랜트 몸체 회전 관성 I_z [kg·m²] (비우면 torque_plant.yaml 0.06, 2026-11-25. 실차 식별 0.03)"),
+        A("sim_roller_rr", default_value="",
+          description="시뮬 플랜트 롤러 구름 저항 [N, 롤러 하나당] (비우면 0, 2026-11-25. 실차 0.88)"),
         A("sim_rolling", default_value="",
           description="시뮬 플랜트의 구름 손실 [N·m, 네 바퀴 공통, 바퀴 회전 방향] — 구동계 마찰에 더한다, friction_scale 과 무관 (비우면 0, 2026-11-24)"),
         A("mpc_cap_friction_shift", default_value="", choices=["", "true", "false"],

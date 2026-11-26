@@ -1,0 +1,7 @@
+# 2026-11-25 롤러 구름 저항 시뮬 확인 — 꺾은선 통과 (지난 실차 비교 조건: accel 1.5 · v_max 1.5 · friction 상한 · 바퀴 속도), 바닥 μ 0.45 · 하중 이동 0.105
+#   A0 = 지금 시뮬 플랜트 (롤러 0, I_z 0.06) · 지금 MPC.   B = 실차 닮은 플랜트 (롤러 0.88, I_z 0.03) · 지금 MPC (끔).   D = 같은 플랜트 · MPC 켬 (롤러 0.88 + I_z 0.03)
+A0_r1|
+B_r1|sim_roller_rr:=0.88 sim_inertia_z:=0.03
+D_r1|sim_roller_rr:=0.88 sim_inertia_z:=0.03 mpc_roller_rr:=0.88 mpc_inertia_z:=0.03
+B_r2|sim_roller_rr:=0.88 sim_inertia_z:=0.03
+D_r2|sim_roller_rr:=0.88 sim_inertia_z:=0.03 mpc_roller_rr:=0.88 mpc_inertia_z:=0.03

@@ -104,9 +104,18 @@
 //   지시서 식-14 꼴 (R(θ)ᵀ M (… − f_j) 를 F⁺ 로 배분) 은 τ_b 의 영공간 성분 (몸체 힘이 0 인 [+ + − −] 꼴) 을 버린다. 여기서는
 //   τ_b 를 바퀴마다 그대로 더한다 [구현 선택] — 몸체 힘은 같고, 영공간 몫까지 모터가 메워 바퀴끼리 바닥을 통해 밀고 당기지 않는다.
 //   torque_output 이 하던 보상 (바퀴별 τ + τ_fric) 과 같은 꼴이고, 옮긴 상자의 가운데 (f) 와도 맞는다.
-//   롤러 구름 저항 (지시서 use_rolling_res) 과 정지 마찰은 넣지 않았다 (계수 미측정).
+//   정지 마찰은 넣지 않았다 (계수 미측정). 롤러 구름 저항은 2026-11-25 에 몸체 쪽 항으로 따로 넣었다 (아래 "롤러 구름 저항").
 //     롤러 구름 저항 = 롤러가 자기 축으로 돌 때의 손실. 롤러 표면 속도 = √2·(바퀴 중심의 옆 방향 속도) 라 직진에서는 0 이고
 //     옆걸음·대각선·회전 (곡선) 에서만 생긴다 — 바퀴축 토크가 아니라 롤러 자유 구름 방향의 힘이라 아래 항으로는 표현되지 않는다.
+// 롤러 구름 저항 (2026-11-25, 기본 0 = 없음, TorqueTuning::roller_rr — 실차 회전·옆 단계 토크 식별,
+//   analysis/torque_mpc_real/2026-11-25_rot · 2026-11-25_lat, 안 analysis/torque_mpc_sim/2026-11-25_roller_plan/PLAN_KO.md):
+//   롤러 상대 속도 (접점 속도 − 바퀴 림 속도 r ω_i) 는 앞바퀴 s_f = √2 (v_y + l_x ω_z), 뒷바퀴 s_r = √2 (v_y − l_x ω_z), l_x = wheel_base/2.
+//   롤러마다 일정한 저항 F_rr (rolling resistance, Gillespie 1992 F_r = C_rr N 꼴) → 일률 P = F_rr Σ|s_i|, 몸체가 받는 힘 Q = −∂P/∂v
+//   (|s| ≈ √(s² + s₀²)). 순수 옆걸음 Q_y = −4√2 F_rr, 순수 회전 Q_z = −4√2 l_x F_rr, 앞 속도에는 0. 옆이 우세하면 (|v_y| > l_x|ω_z|) Q_z = 0.
+//   실차: 옆 4.99 ± 0.11 N → F_rr 0.88 N, 회전 0.37~0.44 N·m → 0.76~0.90 N.
+//   MPC 에는 구심 feedforward 의 a_ρ 와 같은 꼴로 넣는다: a_rr = M⁻¹ R(θ_r) Q(u_r) (기준 몸체 속도) 를 목표 입력 U_s 에서 빼고 예측 x_free 에 더한다.
+//   외란 추정 잔차의 한 스텝 예측에도 추정 상태 속도의 a_rr 을 넣는다 — 안 넣으면 같은 저항을 d̂ 가 한 번 더 배워 두 번 보상한다.
+//   상한 (바닥 토크 τ̄) 은 그대로다: 저항은 바닥 토크로 이겨야 하는 힘이라 상한 안에서 토크를 더 쓴다.
 //   구름 손실 (2026-11-24, 기본 0 = 없음, TorqueTuning::fric_rolling — 정석 바퀴 식의 rolling resistance 항 f_r·N·r·sgn(ω)):
 //     ★ 위 "롤러 구름 저항" 이 아니다 (2026-11-25 사용자 지적으로 이름 혼동을 바로잡음). 직진 등속 (롤러가 자기 축으로 안 도는 운동) 에서 잰
 //     "주행 저항 − 띄운 마찰" 이고, 원인 (접지면 hysteresis · 롤러 넘어감 · 하중에 따른 베어링·기어 마찰 · 온도 차) 은 가르지 못했다.
@@ -211,6 +220,8 @@ struct TorqueModel
   TVec3 w(const TVec3 & Xdot) const;
   // use_w 와 상관없이 w 의 실제 값 (기록·시험용)
   TVec3 w_value(const TVec3 & Xdot) const;
+  // 2026-11-25 롤러 구름 저항 (머리주석): 몸체 속도 v = [v_x, v_y, ω_z] → 몸체가 받는 저항 [F_x, F_y, M_z] (몸체 좌표). F_rr ≤ 0 이면 0
+  TVec3 roller_force(const TVec3 & v, double F_rr, double s0) const;
   double tau_motor_limit() const {return tau_rated - tau_fric_max;}                       // 비교군 B
   double tau_friction_limit() const;                                                      // τ_μ, 식-21 (N = mg/4, 평균 바퀴)
   TVec4 tau_friction_limits() const;                                                      // 바퀴별 τ_μ,i = (r/√2)·μ̂_i·N_i·c_s
@@ -314,6 +325,9 @@ struct TorqueTuning
   // 2026-11-24 구름 손실 (머리주석 "마찰 모델" 끝): 마찰 모델이 켜졌을 때 τ_b 에 더하는 네 바퀴 공통 토크 [N·m]. 0 = 없음 (예전 그대로).
   //   상한 옮김 f 에는 안 들어간다. 0 ~ 0.02
   double fric_rolling = 0.0;
+  // 2026-11-25 롤러 구름 저항 (머리주석): 롤러 하나당 저항 F_rr [N]. 0 = 없음 (예전 그대로). 0 ~ 2. 마찰 모델 스위치와 무관하다
+  double roller_rr = 0.0;
+  double roller_s0 = 0.02;           // [m/s] |s| 를 √(s² + s₀²) 로 매끈하게 하는 폭
 };
 
 // 슬립 계수 η_s 계산 (머리주석 "슬립 계수 η_s"). ROS 무관 — 노드가 /wheel_states 마다 update 를 부른다
@@ -453,6 +467,7 @@ private:
   Eigen::Matrix<double, 4, Eigen::Dynamic> ff_steps_;   // 지평 스텝별 마찰 토크 τ_b,j (4 × Np, 끄면 0 그대로 — 쓰지 않는다)
   TVec4 friction_at_state(const TVec6 & x) const;       // 상태 x 의 몸체 속도 → 무슬립 바퀴 속도 → 마찰 토크 (잔차용)
   TVec4 model_friction(const TVec4 & omega) const;      // 모델에 넣는 마찰 = scale·구동계 마찰 + 구름 손실 (fric_rolling 0 이면 앞 항만)
+  TVec3 roller_accel(const TVec3 & v_body, double theta) const;   // 2026-11-25 a_rr = M⁻¹ R(θ) Q(v_body) (관성 좌표). roller_rr 0 이면 0
   TorqueStepStats stats_;
 
   // 상수부

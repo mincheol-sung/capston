@@ -1161,3 +1161,41 @@ def test_polyline_shape_and_path_reach_node(launch_mod):
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     assert "poly_path" in m._PASS
+
+
+def test_step_rotation_args_2026_11_25(launch_mod, monkeypatch):
+    """제자리 회전 단계: step_dir:=ccw step_angle_deg 가 노드 angle_deg 로. real_all·amrstep 도 넘긴다. amrstep 은 회전이면 angle 을 꼭 받는다."""
+    monkeypatch.setattr(os.path, "exists", lambda p: True)
+    _, _, out = build(launch_mod, plant="real", use_mpc="true", controller="step", step_dir="ccw", step_tau="0.08", step_angle_deg="90")
+    p = _node_params(out, "torque_step_node")
+    import yaml
+    assert p["angle_deg"] == 90.0 and yaml.safe_load("".join(getattr(x, "text", str(x)) for x in p["direction"])) == "ccw"
+    spec = importlib.util.spec_from_file_location("real_all_rot", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "step_angle_deg" in m._PASS
+    spec = importlib.util.spec_from_file_location("torque_step_launch_rot", os.path.join(HERE, "..", "launch", "torque_step.launch.py"))
+    s = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(s)
+    assert s._ARGS["angle"] == ("step_angle_deg", "")
+
+
+def test_roller_and_inertia_args_2026_11_25(launch_mod, monkeypatch):
+    """mpc_roller_rr·mpc_inertia_z 는 MPC 노드 roller_rr·inertia_z 로, sim_roller_rr 는 시뮬 플랜트 roller_rr_N 으로. 비우면 안 넘긴다 (yaml 0·0.06). real_all 도 넘긴다."""
+    _, _, out = build(launch_mod, mpc_roller_rr="0.88", mpc_inertia_z="0.03", sim_roller_rr="0.88", sim_inertia_z="0.03")
+    p = _node_params(out, "torque_mpc_node")
+    assert p["roller_rr"] == 0.88 and p["inertia_z"] == 0.03
+    sp = _node_params(out, "sim_plant_torque_node")
+    assert sp["roller_rr_N"] == 0.88 and sp["inertia_z"] == 0.03
+    _, _, out = build(launch_mod)
+    p = _node_params(out, "torque_mpc_node")
+    assert "roller_rr" not in p and "inertia_z" not in p
+    assert _node_params(out, "sim_plant_torque_node")["roller_rr_N"] == 0.0 and _node_params(out, "sim_plant_torque_node")["inertia_z"] == -1.0
+    spec = importlib.util.spec_from_file_location("real_all_roller", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "mpc_roller_rr" in m._PASS and "mpc_inertia_z" in m._PASS
+    import yaml
+    with open(os.path.join(HERE, "..", "config", "torque_mpc.yaml")) as f:
+        y = yaml.safe_load(f)
+    assert y["model_terms"]["roller_rr_N"] == 0.0 and y["model_terms"]["roller_s0_mps"] == 0.02

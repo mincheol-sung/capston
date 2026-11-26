@@ -61,6 +61,58 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-25 (5) — 롤러 구름 저항을 MPC·시뮬 모델에 (on/off) · MPC·시뮬 회전 관성 덮어쓰기 · 실차 A/B 스크립트
+- 왜: (3)(4) 실차 식별에서 롤러 하나당 구름 저항 0.88 N 이 옆 저항 4.99 N 과 회전 저항 0.43 N·m 를 둘 다 설명. 모델에는 없었다.
+  코너 제자리 회전 계산 (`analysis/torque_mpc_sim/2026-11-25_roller_plan/`): 지금 모델은 가속 국면 15.5, 감속 국면 29.1 mN·m/바퀴 만큼
+  회전 방향 토크를 모자라게 계획 (관성 과대 + 저항 누락) — 실차 MPC 회전각 오차가 마지막 4 분의 1 에서 크게 느는 것과 같은 쪽.
+- 사용자 결정 (같은 날): E 까지 on/off 로 구현하고 실차 비교. 값 0.88 N (측정 중앙), 켜는 판은 I_z 0.06 → 0.03 같이, 비교는 꺾은선 통과 3 판씩.
+- 식: 롤러 상대 속도 앞 √2(v_y + l_x ω_z), 뒤 √2(v_y − l_x ω_z). 일률 P = F_rr Σ√(s² + s₀²), 몸체 힘 Q = −∂P/∂v. 앞 0, 옆 −4√2F, 회전 −4√2 l_x F,
+  옆이 우세하면 회전 저항 0 (옆 시험에서 몸체가 돈 것과 맞다).
+- 바꾼 파일:
+  - `mpc_cpp` `torque_mpc.hpp/.cpp`: `TorqueModel::roller_force`, `TorqueTuning::roller_rr` (0~2 N, 기본 0)·`roller_s0` (0.02 m/s).
+    a_rr = M⁻¹R(θ)Q(기준 몸체 속도) 를 a_ρ 와 같은 자리에서 U_s 에서 빼고 예측에 더함. 외란 추정 잔차의 한 스텝 예측에도 추정 상태 속도의 a_rr (두 번 보상 방지).
+  - `mpc_cpp` `torque_mpc_node.cpp`: 파라미터 `roller_rr`·`roller_s0` (yaml `model_terms.roller_rr_N`·`roller_s0_mps`), 켜면 시작 로그. `inertia_z` 는 원래 있던 파라미터.
+  - `mpc/config/torque_mpc.yaml`: `roller_rr_N: 0.0`, `roller_s0_mps: 0.02`
+  - `mpc/amr_mpc/torque/model.py`: `RollerResistance` (바퀴 위치·T⁻¹ 행으로 롤러 상대 속도 벡터를 만드는 다른 길), `TorquePlant.step(roller=)`, `SlipPlant(roller=)`
+  - `mpc/amr_mpc/nodes/sim_plant_torque.py`: 파라미터 `roller_rr_N`·`roller_s0_mps`·`inertia_z` (덮어쓰기, < 0 = yaml)
+  - `mpc/launch/torque_experiment.launch.py`: `mpc_roller_rr`·`mpc_inertia_z` (제어기만), `sim_roller_rr`·`sim_inertia_z` (시뮬 플랜트). PP 에서는 무시 알림
+  - `mpc/launch/real_all.launch.py`: `_PASS` 에 `mpc_roller_rr`·`mpc_inertia_z`
+  - `mpc/tools/roller_ab.sh`: 실차 A/B (`off <판>` / `on <판>`, 지난 sq2p_mpcw 조건)
+- 확인: gtest 72 개 (새 RR1~RR4: 식 = 일률 유한차분 (바퀴 위치로 따로 만든 롤러 속도), 0 이면 비트까지 같음, U_s 차이의 몸체 힘 = −Q, 저항 있는 플랜트에서 값이 맞으면 d̂ ≈ 0·헤딩 오차 < 1e-3 rad),
+  Python 628 개 (새 롤러 3 개 — 시뮬 플랜트가 실차 회전 가속비 0.45·0.70·0.81 을 ±0.12 안에서 재현, 옆은 4.75 N (출발 직후 s₀ 몫), launch 1 개).
+  끄면 (0) 지금과 같은 출력. 실차 미확인.
+
+### 2026-11-25 (4) — 옆걸음 단계 토크 시험 (`floor_tests_w4_t7.sh lat`) · 분석 `floor_wheel_tests.py lat` — 롤러 구름 저항 가설 확인용
+- 왜: 회전 시험 (3) 의 바닥 회전 저항 0.40 N·m 를 롤러 구름 저항으로 보면 옆 저항이 0.40 / l_x = 4.6 N (앞 0) 이어야 한다. 옆 단계 토크로 확인한다.
+- 바꾼 파일 (`controller/mpc`):
+  - `tools/floor_tests_w4_t7.sh lat <토크> <left|right> <판>`: 0.08·0.10·0.12 N·m, 0.3 m, 보상 끔 — 사용자 승인 (같은 날). 시간 한도는 옆 저항 5.5 N 가정 × 1.3 + 0.15 s
+  - `tools/floor_wheel_tests.py lat`: Σc_y(τ − 띄운 마찰) = m_eff·a_y + F_c·sgn v_y. IMU 옆 가속을 몸체 중심으로 옮김 (− ψ̈·r_x + ψ̇²·r_y, imu_offset).
+    가속 세 길 (IMU · 추정기 기울기 · 추정기 거리). `imu_rest_baseline(col=)` 인자 추가 (기본 1 = 앞, 기존 동작 그대로)
+  - `launch/torque_step.launch.py`·`torque_step.py`·`torque_experiment.launch.py`: 방향 back·right 도 받음 (노드는 원래 받았고 launch 검사만 막혀 있었다)
+- 확인: Python 시험 624 개 통과 (합성 옆걸음 2 개 — 저항 3 % 안, 몸체가 돌아도 IMU 위치 몫을 빼서 같은 값). 시뮬 right 0.10 → 0.31 m (0.74 s), left 0.08 → 0.30 m (0.88 s, 저항 없는 시뮬 예측 0.85 s).
+- 옛 bag 1 차 (`analysis/torque_mpc_real/2026-11-25_lat_prior`, 11-15 lat1): 옆 저항 회마다 4.9~5.5 N (헛돈 0.20 N·m 빼고), 회들끼리 5.0~5.4 N — 예측 4.6 N 과 같은 크기.
+- 실차 (같은 날 17:35~17:48, 0.08·0.10·0.12 × 왼쪽·오른쪽, 서 있다가 시작한 83 회, `analysis/torque_mpc_real/2026-11-25_lat/RESULTS_KO.md`):
+  옆 저항 4.92~5.06 ± 0.1 N (가속 세 길), 같이 맞춘 질량 6.1~6.4 kg. 옆 저항 × l_x = 0.43 N·m = 회전 시험 범위 안 → 롤러 구름 저항 한 값 (롤러당 0.88 N) 이 둘 다 설명.
+  왼쪽이 약 10 % 큼, 옆걸음 중 움직이는 쪽으로 돎 (원인 미확인). 모델 값은 안 바꿨다.
+
+### 2026-11-25 (3) — 제자리 회전 단계 토크 시험 (`step_dir:=ccw|cw`, `step_angle_deg`) · 분석 `floor_wheel_tests.py rot`
+- 왜: 실차 MPC 가 제자리 회전을 기준의 0.74~0.83 배로 덜 돈다. 회전 관성과 띄운 마찰 밖의 바닥 회전 저항을 따로 재서 모델과 견준다 (시스템 식별, Ljung 1999).
+- 바꾼 파일 (`controller/mpc`):
+  - `amr_mpc/nodes/torque_step.py`: 방향 `ccw`·`cw` (몸체 [0,0,±1] → 패턴 [−,+,−,+]). 회전 판은 `angle_deg` (추정기 yaw 누적) 에서 끊고,
+    `distance` 는 벗어남 한도 (안 주면 0.3 m). 정지 마찰 방향용 기준에 yaw_rate 1.5 rad/s. CSV 끝에 `dyaw` 열. fwd·left 는 그대로.
+  - `launch/torque_step.launch.py` (`angle:=`, 회전이면 angle 을 꼭 받음) · `launch/torque_experiment.launch.py` (`step_angle_deg`) · `launch/real_all.launch.py` (`_PASS`)
+  - `tools/floor_tests_w4_t7.sh rot <토크> <ccw|cw> <판>`: 0.06·0.08·0.10 N·m, 90°, 벗어남 0.5 m, 보상 끔 — **후보 (사용자 승인 전)**
+  - `tools/floor_wheel_tests.py rot`: Σc_i(τ_i − 띄운 마찰) = I_eff·ψ̈ + M_c·sgn ψ̇ + B·ψ̇ 를 IMU 자이로로 최소제곱 (표본 전부 · 회 평균 두 길, 바퀴 쪽 검산)
+- 확인: Python 시험 622 개 통과 (합성 회전 3 개 — 참값 I·M_c·B 3 % 안, launch 1 개). 시뮬 ccw 0.1 → +92.5° 에서 끊김 (0.58 s), cw 0.06 → −90.8°, fwd 0.1 → 0.31 m (그대로).
+- 고친 것: 처음 짠 분석은 Savitzky–Golay 미분 창이 토크를 끊은 뒤 DAMPING 감속을 걸쳐 관성을 30 % 낮게 냈다 (합성 시험이 잡음) → 켠·끊은 순간 ±0.04 s 표본 뺌.
+- 옛 bag 으로 미리 본 값 (`analysis/torque_mpc_real/2026-11-25_rot_prior/floor_rot.md`, 11-15 rot1 · 11-16 rot_slow, 0.10~0.20 N·m × 0.14~0.24 s):
+  바닥 회전 저항 M_c 0.43~0.45 N·m (바퀴당 22 mN·m — 띄운 쿨롱 17 보다 크다, 모델에는 0), I_eff 0.115~0.127 (모델 0.143), B 는 방법마다 0~0.21 로 안 정해짐.
+  자이로/바퀴 회전 속도 0.86~0.95. 짧은 구간·높은 토크뿐이라 MPC 가 쓰는 낮은 토크·낮은 회전 속도 쪽은 새 시험으로 잰다. 모델 값은 안 바꿨다.
+- 실차 (같은 날 17:16~17:23, 0.06·0.08·0.10 N·m × 반시계·시계, 54 회, `analysis/torque_mpc_real/2026-11-25_rot/RESULTS_KO.md`):
+  바닥 회전 저항 0.37~0.44 N·m (바퀴당 19~23), 회전 관성 0.11~0.12 (모델 0.143), 속도 비례 몫 작음. 실측/모델 가속 0.45 · 0.70 · 0.81.
+  분석 미분 창 기본 0.08 → 0.15 s (짧은 창은 미분 잡음이 관성을 깎음, errors-in-variables). 바퀴 쪽 검산은 미분 잡음으로 못 씀 → 보고서에 그렇게 적게 함.
+  분석 회별 표에 "시작 회전 속도" 열 (앞 회가 덜 멈춘 채 'a').
+
 ### 2026-11-25 (2) — 지그재그 꼭짓점에서 서지 않기: `zigzag_corner:=pass` (cubic spiral 로 깎기 `zigzag_turn_m`, 꼭짓점 속도 `zigzag_corner_speed`)
 - 왜: 사용자 — PP 와 MPC 를 같은 경로·속도·가속도 부하에서 비교 (PP 는 미끄러지고 MPC 는 제약을 지키며 따라가는지). 지그재그가 꼭짓점마다 서서 (쉼 0.1 s → 제자리 150° 1.10 s → 쉼 0.1 s) 주행 30.35 s 중 11.7 s (38.6 %) 를 병진 0 으로 보냈다.
   처음엔 꺾인 채 꼭짓점을 v_c 로 지나게만 했다 (`zigzag_turn_m:=0` 으로 남김) — 11-25 실차에서 PP·MPC 둘 다 못 따라감 (꼭짓점에서 속도 방향 150°·heading 계단, v_c 0.5 면 C 앞먹임 6.36 배). 그래서 꼭짓점을 곡률이 이어지게 깎는다.

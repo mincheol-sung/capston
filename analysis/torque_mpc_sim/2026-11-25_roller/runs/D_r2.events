@@ -1,0 +1,2 @@
+[fault_monitor_node-6] [ERROR] [1795598812.918980181] [fault_monitor_node]: 정지: wheel_timeout: 0.34 s 동안 안 옴 / state_timeout: 0.34 s 동안 안 옴
+[state_estimator_node-2] [ERROR] [1795598813.042420120] [state_estimator_node]: SLAM 포즈가 0.51 s 동안 반영되지 않음 (한계 0.5 s) — IMU 적분만으로는 위치가 흘러가므로 출력을 멈춘다

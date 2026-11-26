@@ -230,6 +230,11 @@ public:
       tu.fric_rolling = declare_parameter<double>(
         "fric_rolling", ym["model_terms"] && ym["model_terms"]["fric_rolling_Nm"] ? ym["model_terms"]["fric_rolling_Nm"].as<double>(0.0) : 0.0);
     }
+    // 2026-11-25 롤러 구름 저항 (torque_mpc.hpp 머리주석). yaml model_terms.roller_rr_N, 없으면 0 = 예전 그대로
+    tu.roller_rr = declare_parameter<double>(
+      "roller_rr", ym["model_terms"] && ym["model_terms"]["roller_rr_N"] ? ym["model_terms"]["roller_rr_N"].as<double>(0.0) : 0.0);
+    tu.roller_s0 = declare_parameter<double>(
+      "roller_s0", ym["model_terms"] && ym["model_terms"]["roller_s0_mps"] ? ym["model_terms"]["roller_s0_mps"].as<double>(0.02) : 0.02);
     tu.dist_enable = declare_parameter<bool>("disturbance_enable", ym["disturbance"]["enable"].as<bool>());
     tu.dist_alpha = declare_parameter<double>("disturbance_alpha", ym["disturbance"]["alpha"].as<double>());
     tu.dist_dt_tol = declare_parameter<double>("disturbance_dt_tol", ym["disturbance"]["dt_tol"].as<double>(0.002));
@@ -406,6 +411,14 @@ public:
       RCLCPP_WARN(
         get_logger(), "  마찰 모델은 torque_output 구동계 마찰 보상을 끈 판 (launch friction_comp:=false) 에서만 맞다 — "
         "보상을 켠 채면 마찰을 두 번 넣는다");
+    }
+    if (tu.roller_rr > 0.0) {     // 2026-11-25 롤러 구름 저항
+      const TVec3 qy = md.roller_force(TVec3(0.0, 1.0, 0.0), tu.roller_rr, tu.roller_s0);
+      const TVec3 qz = md.roller_force(TVec3(0.0, 0.0, 1.0), tu.roller_rr, tu.roller_s0);
+      RCLCPP_INFO(
+        get_logger(), "  롤러 구름 저항 켬: 롤러당 %.3f N (s₀ %.3f m/s) → 옆걸음 1 m/s 에서 %.2f N, 제자리 회전 1 rad/s 에서 %.3f N·m, 앞 0. "
+        "기준 속도로 목표 입력·예측·외란 추정 잔차에 넣는다 (상한 그대로).  관성 I_z %.4f → I_eff %.4f kg·m²",
+        tu.roller_rr, tu.roller_s0, qy(1), qz(2), md.inertia_z, md.I_eff());
     }
     if (tu.dist_kalman) {
       const auto & K = mpc_->dist_kalman_gain();

@@ -1951,3 +1951,134 @@ TEST(FrictionRolling, R4_ResidualSeesRolling)
     EXPECT_NEAR(a_d, expect, 0.01) << "with=" << with << "  (값 0 일 때 기대 " << -4.0 * R / (md.wheel_radius * md.m_eff()) << " m/s²)";
   }
 }
+
+// ── 2026-11-25 롤러 구름 저항 (torque_mpc.hpp 머리주석 "롤러 구름 저항", TorqueTuning::roller_rr) ──────────────
+namespace
+{
+// 독립 경로: 바퀴 위치·바퀴 림 속도 (wheel_nominal_speeds) 로 롤러 상대 속도 벡터를 직접 만들어 일률 P = F Σ √(|rel|² + s0²) 를 계산
+double roller_power(const TorqueModel & md, const TVec3 & v, double F, double s0)
+{
+  const double lx = 0.5 * md.wheel_base, ly = md.k() - lx;
+  const double xs[4] = {lx, lx, -lx, -lx}, ys[4] = {ly, -ly, ly, -ly};
+  const TVec4 w = md.wheel_nominal_speeds(v);
+  double P = 0.0;
+  for (int i = 0; i < 4; ++i) {
+    const double rx = v(0) - v(2) * ys[i] - md.wheel_radius * w(i), ry = v(1) + v(2) * xs[i];
+    P += F * std::sqrt(rx * rx + ry * ry + s0 * s0);
+  }
+  return P;
+}
+std::vector<TorqueRefPoint> spin_ref(double th0, double wz, double t, const TorqueTuning & tu)
+{
+  std::vector<TorqueRefPoint> ref;
+  for (int j = 0; j <= tu.Np; ++j) {ref.push_back({TVec3(0.0, 0.0, th0 + wz * (t + j * tu.Ts)), TVec3(0.0, 0.0, wz)});}
+  return ref;
+}
+}  // namespace
+
+// RR1: 식 — 옆걸음 −4√2 F, 제자리 회전 −4√2 l_x F, 앞 0, 옆이 우세하면 회전 저항 0. 일률의 유한차분 (바퀴 위치로 직접 만든 롤러 속도) 과 같다
+TEST(RollerResistance, RR1_FormulaMatchesPowerGradient)
+{
+  const TorqueModel md = shift_model();
+  const double F = 0.88, s0 = 0.02, lx = 0.5 * md.wheel_base, r2 = std::sqrt(2.0);
+  EXPECT_NEAR(md.roller_force(TVec3(0.0, 0.3, 0.0), F, 1e-9)(1), -4.0 * r2 * F, 1e-9);
+  EXPECT_NEAR(md.roller_force(TVec3(0.0, 0.0, 1.0), F, 1e-9)(2), -4.0 * r2 * lx * F, 1e-9);
+  EXPECT_EQ(md.roller_force(TVec3(1.0, 0.0, 0.0), F, s0).cwiseAbs().maxCoeff(), 0.0);
+  EXPECT_NEAR(md.roller_force(TVec3(0.0, 0.3, 1.0), F, 1e-9)(2), 0.0, 1e-9);      // |v_y| > l_x|ω_z|
+  EXPECT_EQ(md.roller_force(TVec3(0.3, 0.2, 1.0), 0.0, s0).cwiseAbs().maxCoeff(), 0.0);
+  for (const TVec3 & v : {TVec3(0.4, 0.1, 0.5), TVec3(-0.2, 0.05, -2.0), TVec3(0.0, -0.01, 0.1), TVec3(1.0, 0.3, 1.0)}) {
+    const double h = 1e-7;
+    for (int k = 0; k < 3; ++k) {
+      TVec3 e = TVec3::Zero();
+      e(k) = h;
+      const double fd = -(roller_power(md, v + e, F, s0) - roller_power(md, v - e, F, s0)) / (2.0 * h);
+      EXPECT_NEAR(md.roller_force(v, F, s0)(k), fd, 1e-6) << "k=" << k << " v=" << v.transpose();
+    }
+  }
+}
+
+// RR2: 0 이면 비트까지 같은 출력. 범위 밖은 거부
+TEST(RollerResistance, RR2_ZeroIsIdenticalAndRangeChecked)
+{
+  const TorqueModel md = shift_model();
+  TorqueTuning tu = fric_tuning(true);
+  tu.dist_enable = true; tu.dist_alpha = 0.1; tu.dist_body_frame = true; tu.dist_accel_only = true;
+  TorqueTuning t0 = tu;
+  t0.roller_rr = 0.0; t0.roller_s0 = 0.05;
+  TorqueMPC a(md, tu), b(md, t0);
+  Plant plant{md};
+  for (int k = 0; k < 150; ++k) {
+    const auto ref = shuttle_ref(1.0, 2.6, k * 0.01, tu);
+    const TVec4 ta = a.step(plant.x, ref);
+    EXPECT_EQ((ta - b.step(plant.x, ref)).cwiseAbs().maxCoeff(), 0.0) << k;
+    step_with_friction(plant, ta, 0.01);
+  }
+  TorqueTuning bad = tu;
+  bad.roller_rr = -0.1;
+  EXPECT_THROW(TorqueMPC(md, bad), std::invalid_argument);
+  bad.roller_rr = 2.5;
+  EXPECT_THROW(TorqueMPC(md, bad), std::invalid_argument);
+  bad.roller_rr = 0.88; bad.roller_s0 = 0.0;
+  EXPECT_THROW(TorqueMPC(md, bad), std::invalid_argument);
+}
+
+// RR3: 목표 입력 — 제자리 회전 기준에서 켠 것과 끈 것의 U_s 차이가 몸체 힘으로 정확히 −Q (저항을 메우는 토크) 다. 상자는 그대로
+TEST(RollerResistance, RR3_TargetInputCancelsResistance)
+{
+  const TorqueModel md = shift_model();
+  const TorqueTuning tu0 = fric_tuning(false);
+  TorqueTuning tu1 = tu0;
+  tu1.roller_rr = 0.88;
+  TorqueMPC m0(md, tu0), m1(md, tu1);
+  const double wz = 1.5;
+  TVec6 x;
+  x << 0.0, 0.0, 0.3, 0.0, 0.0, wz;
+  m0.step(x, spin_ref(0.3, wz, 0.0, tu0));
+  m1.step(x, spin_ref(0.3, wz, 0.0, tu1));
+  const TVec3 q = md.roller_force(TVec3(0.0, 0.0, wz), 0.88, 0.02);
+  EXPECT_LT(q(2), -0.4);
+  for (int j = 0; j < tu0.Nc; ++j) {
+    const TVec4 du = m1.target_input().segment<4>(4 * j) - m0.target_input().segment<4>(4 * j);
+    EXPECT_LT((md.force_map() * du + q).cwiseAbs().maxCoeff(), 1e-9) << j;
+    for (int i = 0; i < 4; ++i) {
+      double lo0, hi0, lo1, hi1;
+      m0.var_box(i, j, lo0, hi0);
+      m1.var_box(i, j, lo1, hi1);
+      EXPECT_EQ(lo0, lo1);
+      EXPECT_EQ(hi0, hi1);
+    }
+  }
+}
+
+// RR4: 롤러 저항이 있는 플랜트를 제자리 회전으로 따라갈 때 — 값이 맞으면 외란 추정치가 0 근처 (두 번 보상하지 않는다), 헤딩 오차가 작다.
+//   값이 0 이면 외란 추정이 Q_z / I_eff 를 회전 외란으로 배운다
+TEST(RollerResistance, RR4_ObserverDoesNotDoubleCount)
+{
+  const TorqueModel md = shift_model();
+  const double F = 0.88, wz = 1.5;
+  const double qz = md.roller_force(TVec3(0.0, 0.0, wz), F, 0.02)(2);
+  double err_off = 0.0, err_on = 0.0;
+  for (int with = 0; with < 2; ++with) {
+    TorqueTuning tu = fric_tuning(false);
+    tu.dist_enable = true; tu.dist_alpha = 0.05; tu.dist_body_frame = true; tu.dist_accel_only = true;
+    tu.roller_rr = with ? F : 0.0;
+    TorqueMPC mpc(md, tu);
+    Plant plant{md};
+    plant.x << 0.0, 0.0, 0.0, 0.0, 0.0, wz;
+    double e = 0.0;
+    for (int k = 0; k < 600; ++k) {
+      const TVec4 tau = mpc.step(plant.x, spin_ref(0.0, wz, k * 0.01, tu));
+      const double c = std::cos(plant.x(2)), s = std::sin(plant.x(2));
+      const TVec3 vb(c * plant.x(3) + s * plant.x(4), -s * plant.x(3) + c * plant.x(4), plant.x(5));
+      const TVec3 q = md.roller_force(vb, F, 0.02);
+      plant.force_ext = TVec3(c * q(0) - s * q(1), s * q(0) + c * q(1), q(2));
+      plant.step(tau, 0.01);
+      if (k > 100 && k < 200) {const double d = plant.x(2) - wz * (k + 1) * 0.01; e = std::max(e, std::abs(std::atan2(std::sin(d), std::cos(d))));}
+    }
+    const double a_d = mpc.d_hat()(5) / tu.Ts;
+    EXPECT_NEAR(a_d, with ? 0.0 : qz / md.I_eff(), 0.05) << "with=" << with << " (값 0 이면 기대 " << qz / md.I_eff() << " rad/s²)";
+    (with ? err_on : err_off) = e;
+  }
+  EXPECT_LT(err_on, 1e-3);
+  EXPECT_GT(err_off, 5.0 * err_on);
+}

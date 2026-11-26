@@ -201,7 +201,7 @@ class TorquePlant:
         return self.tau_rated - self.fric_max
 
     # ── 적분 ────────────────────────────────────────────────
-    def step(self, X, Xdot, tau, dt, fric=None, eff=None, wheel_eff=None):
+    def step(self, X, Xdot, tau, dt, fric=None, eff=None, wheel_eff=None, roller=None):
         """τ 를 dt 동안 일정하게 두고 RK4 로 한 스텝. 반환 (X, Xdot).
 
         fric: 구동계 마찰 (DrivetrainFriction, 시뮬 플랜트 전용). 주면 바퀴에 전달되는 토크가 τ − τ_fric(ω) 가 된다.
@@ -211,6 +211,7 @@ class TorquePlant:
               롤러 손실을 힘 배율로 흉내 낸 것이라 제동에도 똑같이 걸린다. MPC 예측 모델은 모른다(1 로 본다).
         wheel_eff: 바퀴별 효율 [FL, FR, RL, RR] — 바퀴가 바닥에 전하는 힘의 배율 (접지력이 약한 바퀴 흉내, 2026-11-16).
               Ẍ = M⁻¹ R(θ) diag(η) Tinv^T diag(η_w) τ.
+        roller: 롤러 구름 저항 (RollerResistance, 시뮬 플랜트 전용, 2026-11-25). 주면 Ẍ 에 M⁻¹ R(θ) Q(v_body) 를 더한다.
         """
         tau = np.asarray(tau, float)
         E = None if eff is None else np.diag(np.asarray(eff, float))
@@ -224,6 +225,8 @@ class TorquePlant:
                 a = self.accel(s[:3], s[3:], t)
             else:
                 a = np.linalg.solve(self.M_eff, self.R(s[2]) @ (E @ (self.Tinv.T @ t))) + self.w(s[3:])
+            if roller is not None:
+                a = a + np.linalg.solve(self.M_eff, self.R(s[2]) @ roller.force(self.body_velocity(s[:3], s[3:])))
             return np.concatenate([s[3:], a])
 
         s = np.concatenate([X, Xdot])
@@ -303,6 +306,43 @@ class DrivetrainFriction:
         return 2.0 / lam                      # RK4 실축 안정 한계 2.78/λ 에 여유
 
 
+class RollerResistance:
+    """메카넘 롤러 구름 저항 (2026-11-25, 시뮬 플랜트 전용 — torque_mpc.hpp 머리주석 "롤러 구름 저항" 과 같은 식을 다른 길로 계산).
+
+    롤러 상대 속도 rel_i = 접점 속도 − 바퀴 림 속도 (r ω_i, 바퀴 앞 방향) = E_i v_body  (E_i 2×3, 바퀴 위치와 T⁻¹ 행으로 만든다).
+    롤러마다 일정한 저항 F_rr → 일률 P = F_rr Σ √(|rel_i|² + s0²), 몸체가 받는 힘 Q = −∂P/∂v = −F_rr Σ E_iᵀ rel_i / √(|rel_i|² + s0²).
+    앞 속도에는 0 (rel 에 v_x 가 안 들어간다), 옆걸음 −4√2 F_rr, 제자리 회전 −4√2 l_x F_rr.
+    실차 (analysis/torque_mpc_real/2026-11-25_lat · _rot): F_rr 0.88 N (옆 4.99 N), 회전 0.37~0.44 N·m.
+    """
+
+    def __init__(self, plant, F_rr, s0=0.02):
+        self.F_rr, self.s0 = float(F_rr), float(s0)
+        if not (self.F_rr >= 0.0 and self.s0 > 0.0):
+            raise ValueError("roller: F_rr ≥ 0, s0 > 0 이어야 한다")
+        lx = 0.5 * plant.wheel_base if plant.wheel_base > 0.0 else 0.5 * plant.k
+        ly = plant.k - lx
+        Tinv = np.asarray(plant.Tinv, float)
+        E = []
+        for i, (x, y) in enumerate(((lx, ly), (lx, -ly), (-lx, ly), (-lx, -ly))):       # FL FR RL RR
+            E.append(np.array([[1.0, 0.0, -y], [0.0, 1.0, x]]) - np.outer([1.0, 0.0], plant.r * Tinv[i]))
+        self.E = np.array(E)                                                                # (4, 2, 3)
+
+    def rel(self, v):
+        """바퀴별 롤러 상대 속도 벡터 (4, 2) [m/s]."""
+        return self.E @ np.asarray(v, float)
+
+    def force(self, v):
+        """몸체 속도 [v_x, v_y, ω_z] → 몸체가 받는 저항 [F_x, F_y, M_z] (몸체 좌표)."""
+        if self.F_rr == 0.0:
+            return np.zeros(3)
+        rel = self.rel(v)
+        n = np.sqrt(np.sum(rel ** 2, axis=1) + self.s0 ** 2)
+        return -self.F_rr * np.einsum("ijk,ij->k", self.E, rel / n[:, None])
+
+    def active(self):
+        return self.F_rr > 0.0
+
+
 S_SIGN = np.array([-1.0, 1.0, 1.0, -1.0])
 C_SIGN = np.array([-1.0, 1.0, -1.0, 1.0])
 
@@ -315,9 +355,10 @@ class SlipPlant:
     """com_height > 0 이면 하중 이동 (2026-11-23): 매 적분 스텝 시작에 직전 스텝의 몸체 가속도 (관성 가속도의 몸체 성분 a_x, a_y) 로
     N_i = 몫_i m g − s_x m a_x h/(2L) − s_y m a_y h/(2W) (≥ 0, 0 이면 바퀴가 뜸). torque_mpc 의 TorqueModel::wheel_normal_forces 와 같은 식."""
 
-    def __init__(self, plant, mu, v_eps=0.02, fric=None, com_height=0.0):
+    def __init__(self, plant, mu, v_eps=0.02, fric=None, com_height=0.0, roller=None):
         self.p = plant
         self.fric = fric                     # 구동계 마찰 (DrivetrainFriction) 또는 None
+        self.roller = roller                 # 롤러 구름 저항 (RollerResistance, 2026-11-25) 또는 None
         self.mu = float(mu)
         self.v_eps = float(v_eps)
         self.h = max(0.0, float(com_height))
@@ -352,6 +393,10 @@ class SlipPlant:
         Fb = np.array([np.sum(F) / math.sqrt(2.0), np.sum(F * S_SIGN) / math.sqrt(2.0)])
         Mz = np.sum(F * C_SIGN) * p.k / math.sqrt(2.0)
         c, sn = math.cos(X[2]), math.sin(X[2])
+        if self.roller is not None:                     # 2026-11-25 롤러 구름 저항 (몸체 좌표 힘을 더한다)
+            q = self.roller.force(np.array([c * Xd[0] + sn * Xd[1], -sn * Xd[0] + c * Xd[1], Xd[2]]))
+            Fb = Fb + q[:2]
+            Mz = Mz + q[2]
         acc = np.array([(c * Fb[0] - sn * Fb[1]) / p.mass, (sn * Fb[0] + c * Fb[1]) / p.mass, Mz / p.inertia_z])
         tau = np.asarray(tau, float)
         if self.fric is not None:

@@ -7,6 +7,8 @@ imu_to_base_node 가 한 회전(base_footprint ← camera_imu_optical_frame)을 
 """
 import numpy as np
 import rclpy
+from builtin_interfaces.msg import Time
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Imu
@@ -20,6 +22,8 @@ R = np.array([[1 - 2 * (QY * QY + QZ * QZ), 2 * (QX * QY - QZ * QW), 2 * (QX * Q
 class Relay(Node):
     def __init__(self):
         super().__init__("imu_relay_replay")
+        # 2026-11-25: IMU stamp 를 이만큼 옮겨 낸다 [s] (자이로·라이다 시각 차 가설 시험, 기본 0 = 그대로)
+        self.off_ns = int(round(float(self.declare_parameter("stamp_offset", 0.0, ParameterDescriptor(dynamic_typing=True)).value) * 1e9))
         self.pub = self.create_publisher(Imu, "/camera/imu", qos_profile_sensor_data)
         self.create_subscription(Imu, "/imu/base_link", self.cb, qos_profile_sensor_data)
 
@@ -27,7 +31,11 @@ class Relay(Node):
         a = R.T @ [m.linear_acceleration.x, m.linear_acceleration.y, m.linear_acceleration.z]
         g = R.T @ [m.angular_velocity.x, m.angular_velocity.y, m.angular_velocity.z]
         o = Imu()
-        o.header.stamp = m.header.stamp
+        if self.off_ns:
+            ns = m.header.stamp.sec * 1_000_000_000 + m.header.stamp.nanosec + self.off_ns
+            o.header.stamp = Time(sec=ns // 1_000_000_000, nanosec=ns % 1_000_000_000)
+        else:
+            o.header.stamp = m.header.stamp
         o.header.frame_id = "camera_imu_optical_frame"
         o.linear_acceleration.x, o.linear_acceleration.y, o.linear_acceleration.z = map(float, a)
         o.angular_velocity.x, o.angular_velocity.y, o.angular_velocity.z = map(float, g)

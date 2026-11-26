@@ -73,6 +73,16 @@ TVec3 TorqueModel::w_value(const TVec3 & Xdot) const
   return TVec3(-m * Xdot(2) * Xdot(1) / m_eff(), m * Xdot(2) * Xdot(0) / m_eff(), 0.0);
 }
 
+TVec3 TorqueModel::roller_force(const TVec3 & v, double F_rr, double s0) const
+{
+  if (!(F_rr > 0.0)) {return TVec3::Zero();}
+  const double lx = 0.5 * wheel_base, r2 = std::sqrt(2.0);
+  const double sf = r2 * (v(1) + lx * v(2)), sr = r2 * (v(1) - lx * v(2));    // 앞·뒤 롤러 상대 속도 (머리주석 "롤러 구름 저항")
+  const double gf = sf / std::sqrt(sf * sf + s0 * s0), gr = sr / std::sqrt(sr * sr + s0 * s0);   // ∂|s|/∂s
+  // Q = −F_rr Σ ∂|s_i|/∂v,  ∂s_f/∂v = √2 [0, 1, l_x], ∂s_r/∂v = √2 [0, 1, −l_x], 앞·뒤 바퀴가 두 개씩
+  return TVec3(0.0, -2.0 * r2 * F_rr * (gf + gr), -2.0 * r2 * F_rr * lx * (gf - gr));
+}
+
 TVec3 TorqueModel::w(const TVec3 & Xdot) const
 {
   if (!use_w) {return TVec3::Zero();}             // s_w = 0: 더하지 않는다 (지시서 0.3)
@@ -261,6 +271,9 @@ TorqueMPC::TorqueMPC(const TorqueModel & model, const TorqueTuning & tuning)
     }
   }
   fshift_ = tu_.cap_friction_shift && tu_.limit_mode == TorqueLimitMode::Friction;
+  if (!(tu_.roller_rr >= 0.0 && tu_.roller_rr <= 2.0) || !(tu_.roller_s0 > 0.0)) {     // 2026-11-25 롤러 구름 저항 (잰 값 0.88 N 의 약 2 배까지 [구현 선택])
+    throw std::invalid_argument("roller_rr: 0 ≤ 값 ≤ 2 N, roller_s0 > 0 이어야 한다 (롤러 하나당 구름 저항)");
+  }
   fs_steps_.setZero(4, tu_.Nc);
   fmodel_ = tu_.use_fric_model;
   ff_steps_.setZero(4, tu_.Np);
@@ -351,6 +364,13 @@ void TorqueMPC::update_disturbance(const TVec6 & x_hat, double dt_state)
     const TVec3 a = md_.G(Xp(2)) * tau_res + md_.w(Vp);
     pred.head<3>() = Xp + Ts * Vp + 0.5 * Ts * Ts * a;
     pred.tail<3>() = Vp + Ts * a;
+  }
+  if (tu_.roller_rr > 0.0) {      // 2026-11-25 롤러 구름 저항: 한 스텝 예측에도 넣는다 (안 넣으면 d̂ 가 같은 저항을 한 번 더 배운다)
+    const double th = x_prev_(2), c = std::cos(th), s = std::sin(th);
+    const TVec3 vb(c * x_prev_(3) + s * x_prev_(4), -s * x_prev_(3) + c * x_prev_(4), x_prev_(5));
+    const TVec3 a_rr = roller_accel(vb, th);
+    pred.head<3>() += 0.5 * tu_.Ts * tu_.Ts * a_rr;
+    pred.tail<3>() += tu_.Ts * a_rr;
   }
   TVec6 d = x_hat - pred;
   d(2) = wrap(d(2));
@@ -496,6 +516,14 @@ TVec4 TorqueMPC::friction_at_state(const TVec6 & x) const
   const double c = std::cos(x(2)), s = std::sin(x(2));
   const TVec3 vb(c * x(3) + s * x(4), -s * x(3) + c * x(4), x(5));
   return model_friction(md_.wheel_nominal_speeds(vb));
+}
+
+TVec3 TorqueMPC::roller_accel(const TVec3 & v_body, double theta) const
+{
+  if (!(tu_.roller_rr > 0.0)) {return TVec3::Zero();}
+  const TVec3 q = md_.roller_force(v_body, tu_.roller_rr, tu_.roller_s0);
+  const double c = std::cos(theta), s = std::sin(theta);
+  return TVec3((c * q(0) - s * q(1)) / md_.m_eff(), (s * q(0) + c * q(1)) / md_.m_eff(), q(2) / md_.I_eff());
 }
 
 TVec4 TorqueMPC::model_friction(const TVec4 & omega) const
@@ -657,6 +685,8 @@ TVec4 TorqueMPC::step(
         rho_n_prev_ = n_c;
       }
     }
+    // 2026-11-25 롤러 구름 저항 (머리주석): 기준 몸체 속도의 저항 가속도. a_ρ 와 같이 U_s 에서 빼고 예측에 더한다. 0 이면 0
+    const TVec3 a_rr = roller_accel(u_i, th_r);
     // 2026-11-24 마찰 상한 옮김·마찰 모델 (머리주석): 스텝 i 의 기준 바퀴 속도에서 구동계 마찰 τ_b,i. 둘 다 꺼지면 계산하지 않는다
     TVec4 tau_b = TVec4::Zero();
     if (fmodel_ || (fshift_ && i < Nc)) {
@@ -668,7 +698,7 @@ TVec4 TorqueMPC::step(
     if (i < Nc) {
       if (fshift_) {fs_steps_.col(i) = tau_b;}
       // 식-14 목표 입력: U_s,i = F⁺ R(θ_r,i)ᵀ M (p̈_r,i − w_i − â_d − a_ρ)
-      const TVec3 rhs = Mdiag * (acc - md_.w(Xdot_r) - a_d - a_rho);
+      const TVec3 rhs = Mdiag * (acc - md_.w(Xdot_r) - a_d - a_rho - a_rr);
       const TVec3 rb(c * rhs(0) + s * rhs(1), -s * rhs(0) + c * rhs(1), rhs(2));   // R(θ_r)ᵀ
       TVec4 cw = TVec4::Ones();          // 배분 가중 c_i (가중이 없으면 최소 노름 F⁺)
       bool weighted = false;
@@ -719,7 +749,7 @@ TVec4 TorqueMPC::step(
       }
     }
     TVec6 d_rho;
-    d_rho << 0.5 * Ts * Ts * a_rho, Ts * a_rho;      // ρ 외란의 한 스텝 몫 (가속도 외란 꼴)
+    d_rho << 0.5 * Ts * Ts * (a_rho + a_rr), Ts * (a_rho + a_rr);      // ρ 외란·롤러 저항의 한 스텝 몫 (가속도 외란 꼴)
     if (current) {
       // x_{i+1} = A_d x_i + B_d τ + c_d + d̂ + d_ρ   — 지평 전체에 같은 (A_d, B_d, c_d)
       xf = lin.A * xf + lin.c + d_use + d_rho;

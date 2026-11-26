@@ -71,6 +71,11 @@ model_terms:
   #      0.0027 은 12 구간 어디서도 넘치지 않는 값, 0.0051 은 평균 (6 구간에서 넘침). 옆걸음·가속 중은 안 쟀다.
   #    0 이면 예전 그대로. 이번 실행 한 번만: launch 인자 mpc_fric_rolling:=0.0027 (amrall 도 같음). 기본값은 실차 A/B 뒤 사용자가 정한다
   fric_rolling_Nm: 0.0
+  # 2026-11-25 롤러 구름 저항 [N, 롤러 하나당] (torque_mpc.hpp 머리주석 "롤러 구름 저항"). 0 = 끔 (예전 그대로). launch mpc_roller_rr:=.
+  #   옆·회전에만 걸리는 몸체 저항 (앞 0): 옆걸음 4√2 F, 제자리 회전 4√2 l_x F. 실차 식별 0.88 N (옆 4.99 N, 회전 0.43 N·m) —
+  #   analysis/torque_mpc_real/2026-11-25_lat · _rot. 켜는 판은 회전 관성도 같이 (mpc_inertia_z:=0.03, 사용자 결정 11-25)
+  roller_rr_N: 0.0
+  roller_s0_mps: 0.02
 
 # ── 하중 이동 (2026-11-23, torque_mpc.hpp TorqueTuning load_*). com_height_m 0 = 끔 (예전 동작).
 #    실차 계단 변조 8자 (151038): 선회 원심 가속이 클수록 안쪽 바퀴가 미끄러졌다 (a_y 2.2~3.5 에서 안쪽 앞 끌림 40 %·안쪽 뒤 헛돎 66 %).

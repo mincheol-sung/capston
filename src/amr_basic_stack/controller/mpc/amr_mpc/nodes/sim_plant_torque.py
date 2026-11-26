@@ -49,7 +49,7 @@ from rclpy.signals import SignalHandlerOptions
 from tf2_ros import TransformBroadcaster
 
 from amr_interfaces.msg import WheelStates, WheelTorqueCommand
-from amr_mpc.torque.model import DrivetrainFriction, SlipPlant, TorquePlant
+from amr_mpc.torque.model import DrivetrainFriction, RollerResistance, SlipPlant, TorquePlant
 from amr_mpc.ak40 import protocol as AKP
 from amr_mpc.ak40.bus import CanBus
 from amr_mpc.ak40.fake import FakeAk40Motors
@@ -74,6 +74,7 @@ class SimPlantTorqueNode(Node):
             ("x0", 0.0), ("y0", 0.0), ("yaw0", 0.0),
             # 아래는 비우면 torque_plant.yaml 값. 적재 조건 바꿀 때 launch 인자로 덮어쓴다.
             ("payload_kg", -1.0),
+            ("inertia_z", -1.0),         # [kg·m²] 몸체 회전 관성 덮어쓰기 (2026-11-25). < 0 = torque_plant.yaml (0.06). 실차 식별 0.03
             ("use_wheel_inertia", base.use_wheel_inertia),
             ("wheel_load_share", [float(v) for v in base.wheel_load_share]),   # 바퀴별 수직력 몫 (슬립 모델 N_i, 2026-11-19)
             # 센서 흉내
@@ -100,6 +101,8 @@ class SimPlantTorqueNode(Node):
             ("friction_scale", 1.0),     # 구동계 마찰 = torque_plant.yaml friction × 이 값. 0 이면 마찰 없음
             ("friction_smooth", 0.05),   # [rad/s] 쿨롱 마찰을 잇는 바퀴 속도 (작을수록 진짜 쿨롱에 가깝고 적분이 잘아진다)
             ("rolling_Nm", 0.0),         # [N·m] 바닥 구름 손실 (네 바퀴 공통, 바퀴 회전 방향 — 2026-11-24). friction_scale 과 무관, 0 = 없음
+            ("roller_rr_N", 0.0),        # [N] 롤러 하나당 구름 저항 (model.py RollerResistance, 2026-11-25). 0 = 없음. 실차 0.88
+            ("roller_s0_mps", 0.02),     # [m/s] 롤러 상대 속도 매끈하게 하는 폭
             ("can_interface", ""),       # 비우면 ROS 토픽 모드. vcan0 등을 주면 가짜 AK40 모터 모드 (머리주석)
             # 가짜 모터 응답 지연 [s]. 0 = 바로 답함. 실차 slcan(USB 직렬)은 네 모터 응답이 몇 ms 늦을 수 있다
             # (팀원 벤치: 모터 하나 최대 3.6 ms, 네 모터는 9 ms 를 기다림). ak40 reply_wait(4 ms)보다 크게 주면
@@ -111,6 +114,8 @@ class SimPlantTorqueNode(Node):
                     "wheel_load_share": [float(v) for v in g("wheel_load_share")]}
         if float(g("payload_kg")) >= 0.0:
             override["mass"] = float(config.section("body", "torque_plant.yaml")["mass_kg"]) + float(g("payload_kg"))
+        if float(g("inertia_z")) > 0.0:
+            override["inertia_z"] = float(g("inertia_z"))
         self.p = TorquePlant.from_yaml(**override)
 
         self.X = np.array([g("x0"), g("y0"), g("yaw0")], float)
@@ -127,7 +132,10 @@ class SimPlantTorqueNode(Node):
             raise SystemExit("[sim_plant_torque] wheel_efficiency 는 슬립 없는 판(surface_mu ≤ 0)에만")
         if self.eff is not None and float(g("surface_mu")) > 0:
             raise SystemExit("[sim_plant_torque] floor_efficiency 는 슬립 없는 판(surface_mu ≤ 0)에만 — 둘 중 하나만")
-        self.slip = (SlipPlant(self.p, float(g("surface_mu")), float(g("slip_v_eps")), fric=self.fric, com_height=float(g("com_height")))
+        self.roller = (RollerResistance(self.p, float(g("roller_rr_N")), float(g("roller_s0_mps")))
+                       if float(g("roller_rr_N")) > 0.0 else None)
+        self.slip = (SlipPlant(self.p, float(g("surface_mu")), float(g("slip_v_eps")), fric=self.fric, com_height=float(g("com_height")),
+                               roller=self.roller)
                      if float(g("surface_mu")) > 0 else None)
         self.w = np.zeros(4)                                      # 슬립 모델의 바퀴 각속도
         self.Xd = np.zeros(3)
@@ -210,6 +218,9 @@ class SimPlantTorqueNode(Node):
             + ("  구동계 마찰 없음" if self.fric is None else
                f"  구동계 마찰 [FL FR RL RR] coulomb {np.array2string(self.fric.coulomb, precision=4)} N·m"
                f" + viscous {np.array2string(self.fric.viscous, precision=5)}·ω (ω_s {self.fric.smooth} rad/s)")
+            + ("" if self.roller is None else
+               f"  롤러 구름 저항 {self.roller.F_rr:.3f} N/롤러 (옆 1 m/s {self.roller.force([0, 1, 0])[1]:.2f} N, "
+               f"회전 1 rad/s {self.roller.force([0, 0, 1])[2]:.3f} N·m)")
             + ("" if self.sensors is None else
                f"\n  센서 흉내: IMU {1/self.dt:.0f} Hz @ ({self.sensors.r[0]:.3f}, {self.sensors.r[1]:.3f}) m, "
                f"SLAM {self.sensors.c['slam_mode']} 지연 {self.sensors.c['slam_latency']*1e3:.0f} ms, "
@@ -299,7 +310,8 @@ class SimPlantTorqueNode(Node):
             if self.slip is not None:
                 self.X, self.Xd, self.w = self.slip.step(self.X, self.Xd, self.w, tau, h)
             else:
-                self.X, self.Xd = self.p.step(self.X, self.Xd, tau, h, fric=self.fric, eff=self.eff, wheel_eff=self.wheel_eff)
+                self.X, self.Xd = self.p.step(self.X, self.Xd, tau, h, fric=self.fric, eff=self.eff, wheel_eff=self.wheel_eff,
+                                              roller=self.roller)
             self.wheel_pos += 0.5 * h * (w_before + self._wheel_speeds())
         self.applied = tau
         self.can_lock.release()

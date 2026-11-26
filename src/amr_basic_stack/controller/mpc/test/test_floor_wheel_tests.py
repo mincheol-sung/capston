@@ -237,3 +237,132 @@ def test_step_report_and_quick_run():
     txt = fw.report_step(runs + [("빈 판", None)], PV)
     assert "헛돈 바퀴" in txt and "단계 구간을 못 찾음" in txt and "실측이 아니다" in txt
     assert "토크 모드 구간" in fw.quick(synth_cv(V=0.4), PV)
+
+
+# ── 제자리 회전 (2026-11-25, rot) ─────────────────────────────────────────────
+# R1 참값 I_eff·M_c·B 로 만든 회전 단계 네 번 (반시계 0.06 · 0.10, 시계 0.08 · 0.07) 에서 세 값을 되찾는다 (표본 전부 3 %, 회 평균 10 %)
+# R2 바퀴 각가속도 몫을 바퀴 쪽에서 뺀 검산이 I_z = I_eff − J_w·Σc² 를 낸다
+# R3 정지 마찰을 못 넘은 판은 출발 nan, 맞춤에 표본을 안 보탠다
+def _rot_run(levels, I=0.12, Mc=0.46, B=0.07, stuck=(), bias=0.01):
+    rg = fw.rot_geometry()
+    c = rg["c"]
+    dt, t, w, ws, imu, cmd = 0.001, 0.0, 0.0, [], [], []
+    pos = np.zeros(4)
+    sched, tt = [], 1.0
+    for k, tau in enumerate(levels):
+        sched.append((tt, tt + 0.8, fw.quantize(abs(tau)) * np.sign(tau) * np.sign(c), k in stuck))
+        tt += 3.0
+    while t < tt:
+        on = [s for s in sched if s[0] <= t < s[1]]
+        if on:
+            tq, stk = on[0][2], on[0][3]
+            M = float(c @ (tq - fric(c * w))) - Mc * math.tanh(w / 0.05) - B * w
+            w = 0.0 if stk else w + M / I * dt
+        else:
+            tq = None
+            w = 0.0 if abs(w) < 0.05 else w - math.copysign(20.0, w) * dt       # DAMPING 으로 선다
+        om = c * w
+        pos = pos + om * dt
+        n = int(round(t / dt))
+        if n % 5 == 0:
+            imu.append([t, 0.0, 0.0, w + bias])
+        if n % 10 == 0:
+            ws.append([t, *pos, *om, *(tq if tq is not None else np.zeros(4)), *[30.0] * 4])
+            cmd.append([t, 0.0, *tq] if tq is not None else [t, 2.0, *NAN4])
+        t += dt
+    E = np.zeros((0, 3))
+    return {"ws": np.array(ws), "imu": np.array(imu), "cmd": np.array(cmd), "odom": np.zeros((0, 7)), "slam": E}, rg
+
+
+def test_rot_recovers_inertia_and_resistance():
+    run, rg = _rot_run([0.06, -0.08, 0.10, -0.07])                       # 회마다 평균 맞춤은 회 4 개 이상 (계수 3 개)
+    rows = fw.analyze_rots(run, PV, rg)
+    assert len(rows) == 4 and [r["sg"] for r in rows] == [1.0, -1.0, 1.0, -1.0]
+    assert fw.fit_rot_runs(rows[:3]) is None
+    assert abs(rows[0]["bias"] - 0.01) < 1e-6
+    x, se, rms, n = fw.fit_rot(rows, "M")
+    assert x[0] == pytest.approx(0.12, rel=0.03) and x[1] == pytest.approx(0.46, rel=0.03) and x[2] == pytest.approx(0.07, rel=0.1)
+    xr, *_ = fw.fit_rot_runs(rows)
+    assert xr[0] == pytest.approx(0.12, rel=0.1) and xr[1] == pytest.approx(0.46, rel=0.1)
+    txt = fw.report_rot([("synthetic", rows)], PV, rg)
+    assert "맞춘 값" in txt and "검산" in txt
+
+
+def test_rot_wheel_side_check_gives_body_inertia():
+    rg = fw.rot_geometry()
+    run, _ = _rot_run([0.06, -0.08, 0.10], I=0.06 + rg["I_w"])
+    x, *_ = fw.fit_rot(fw.analyze_rots(run, PV, rg), "M_wh")
+    assert x[0] == pytest.approx(0.06, rel=0.05)
+
+
+def test_rot_stuck_run_has_no_samples():
+    run, rg = _rot_run([0.06, -0.08, 0.10], stuck=(0,))
+    rows = fw.analyze_rots(run, PV, rg)
+    assert math.isnan(rows[0]["breakaway"]) and not rows[0]["moved"] and len(rows[0]["samples"]["M"]) == 0
+    assert math.isnan(rows[0]["alpha_fit"]) and math.isfinite(rows[1]["breakaway"])
+    x, *_ = fw.fit_rot(rows, "M")
+    assert x[0] == pytest.approx(0.12, rel=0.05)
+
+
+# ── 옆걸음 (2026-11-25, lat) ─────────────────────────────────────────────────
+# L1 참값 옆 저항 F_c 로 만든 왼쪽·오른쪽 단계 네 번에서 회마다 저항 (m_eff 고정) 과 회들끼리 맞춤 (m·F_c) 이 참값 (3 %)
+# L2 옆걸음 중 몸체가 돌아도 (ψ̈ 일정) IMU 위치 몫을 빼서 같은 값 — 안 빼면 어긋난다
+def _lat_run(levels, Fc=4.6, alpha=0.0, tilt=(0.05, -0.03)):
+    lg = fw.lat_geometry()
+    c, m = lg["c"], lg["m_eff"]
+    rx, ry = lg["r_imu"]
+    dt, t, v, y, w = 0.001, 0.0, 0.0, 0.0, 0.0
+    ws, imu, cmd, od = [], [], [], []
+    pos = np.zeros(4)
+    sched, tt = [], 1.0
+    for tau in levels:
+        sched.append((tt, tt + 1.0, fw.quantize(abs(tau)) * np.sign(tau) * np.sign(c)))
+        tt += 3.0
+    while t < tt:
+        on = [s for s in sched if s[0] <= t < s[1]]
+        al = 0.0 if on or abs(w) < 0.02 else -math.copysign(10.0, w)
+        if on:
+            tq = on[0][2]
+            F = float(c @ (tq - fric(c * v))) - Fc * math.tanh(v / 0.02)
+            a = F / m
+            al = alpha
+        else:
+            tq = None
+            a = 0.0 if abs(v) < 0.02 else -math.copysign(3.0, v)
+            if abs(v) < 0.02:
+                v = 0.0
+        v += a * dt
+        w = w + al * dt if on else (0.0 if abs(w) < 0.02 else w - math.copysign(10.0, w) * dt)   # 끊은 뒤 회전도 감속해 선다
+        y += v * dt
+        om = c * v
+        pos = pos + om * dt
+        n = int(round(t / dt))
+        if n % 5 == 0:
+            imu.append([t, tilt[0] - al * ry - w ** 2 * rx, tilt[1] + a + al * rx - w ** 2 * ry, w])
+        if n % 10 == 0:
+            ws.append([t, *pos, *om, *(tq if tq is not None else np.zeros(4)), *[30.0] * 4])
+            cmd.append([t, 0.0, *tq] if tq is not None else [t, 2.0, *NAN4])
+            od.append([t, 0.0, y, 0.0, 0.0, v, w])
+        t += dt
+    return {"ws": np.array(ws), "imu": np.array(imu), "cmd": np.array(cmd), "odom": np.array(od), "slam": np.zeros((0, 3))}, lg
+
+
+def test_lat_recovers_resistance():
+    run, lg = _lat_run([0.10, -0.10, 0.12, -0.12])
+    rows = fw.analyze_lats(run, PV, lg)
+    assert [r["sg"] for r in rows] == [1.0, -1.0, 1.0, -1.0]
+    for r in rows:
+        assert r["F_res"] == pytest.approx(4.6, rel=0.03) and r["F_res_est"] == pytest.approx(4.6, rel=0.05)
+    x, *_ = fw.fit_lat_runs(rows)
+    assert x[0] == pytest.approx(lg["m_eff"], rel=0.03) and x[1] == pytest.approx(4.6, rel=0.03)
+    assert "롤러 구름 저항 가설" in fw.report_lat([("synthetic", rows)], PV, lg)
+
+
+def test_lat_imu_lever_arm_removed_when_body_rotates():
+    run, lg = _lat_run([0.10, -0.12], alpha=3.0)
+    rows = fw.analyze_lats(run, PV, lg)
+    for r in rows:
+        assert r["F_res"] == pytest.approx(4.6, rel=0.03)
+    lg_bad = dict(lg, r_imu=np.zeros(2))                                     # IMU 를 중심에 있다고 보면 α·r_x = 0.33 m/s² 만큼 틀린다
+    bad = fw.analyze_lats(run, PV, lg_bad)
+    assert abs(bad[0]["F_res"] - 4.6) > 1.0

@@ -10,6 +10,7 @@
 #     --lua   : localization_torque_2d.lua(기본) 또는 variants/ 의 파일 이름. variants 의 lua 는 설치된 설정을 include 한다
 #     --odom  : 바퀴 오돔을 예측에 쓰는 판 (localization_torque_odom_2d.lua 와 함께, wheel_odometry_node 를 같이 띄움)
 #     --play  : 재생 시간 [s] (기본 = bag 길이). bag 은 처음부터 튼다 (/tf_static 이 맨 앞에 있어서)
+#     --imu-offset : Cartographer 에 넣는 IMU stamp 를 이만큼 옮긴다 [s] (2026-11-25 자이로·라이다 시각 차 시험, 기본 0)
 #   결과: <out>/<label>/pose.csv (재생 중 /tracked_pose) 와 노드 로그. out 기본 ~/slam_replay_out
 #   비교: tools/slam_replay/compare.py
 #
@@ -19,11 +20,11 @@
 # (set -u 는 ROS setup.bash 와 충돌해서 쓰지 않는다)
 HERE=$(cd "$(dirname "$0")" && pwd)
 WS=$(cd "$HERE/../../../../../.." && pwd)
-BAG=""; LABEL=""; INIT=""; LUA=localization_torque_2d.lua; ODOM=0; PLAY=""; OUT=$HOME/slam_replay_out; DOM=89
+BAG=""; LABEL=""; INIT=""; LUA=localization_torque_2d.lua; ODOM=0; PLAY=""; OUT=$HOME/slam_replay_out; DOM=89; IMUOFF=0
 while (( $# )); do
   case "$1" in
     --bag) BAG=$2; shift 2;; --label) LABEL=$2; shift 2;; --init) INIT=$2; shift 2;; --lua) LUA=$2; shift 2;;
-    --odom) ODOM=1; shift;; --play) PLAY=$2; shift 2;; --out) OUT=$2; shift 2;; --domain) DOM=$2; shift 2;;
+    --odom) ODOM=1; shift;; --play) PLAY=$2; shift 2;; --out) OUT=$2; shift 2;; --domain) DOM=$2; shift 2;; --imu-offset) IMUOFF=$2; shift 2;;
     *) echo "모르는 인자 $1"; exit 1;;
   esac
 done
@@ -54,8 +55,10 @@ for side in front rear; do
     -p use_sim_time:=true -r "scan_in:=/scan_$side" -r "scan_out:=/scan_${side}_carto" \
     -r "points_in:=/points_${side}_timed" -r "points_out:=/points_${side}_carto" > "$L/filter_$side.log" 2>&1 & P+=($!)
 done
-/usr/bin/python3 "$HERE/imu_relay.py" --ros-args -p use_sim_time:=true > "$L/imu_relay.log" 2>&1 & P+=($!)
-if (( ODOM )); then ros2 run amr_mpc wheel_odometry_node --ros-args -p use_sim_time:=true > "$L/wheel_odom.log" 2>&1 & P+=($!); fi
+/usr/bin/python3 "$HERE/imu_relay.py" --ros-args -p use_sim_time:=true -p stamp_offset:=$IMUOFF > "$L/imu_relay.log" 2>&1 & P+=($!)
+# 2026-11-25: ros2 run 을 거치면 kill 이 감싼 프로세스에만 가서 노드가 남는다 (다음 판에 /wheel_odom 이 두 번 → Cartographer
+#   map_by_time "Check failed: data.time >" 로 죽음). 설치된 실행 파일을 바로 띄운다
+if (( ODOM )); then "$(ros2 pkg prefix amr_mpc)/lib/amr_mpc/wheel_odometry_node" --ros-args -p use_sim_time:=true > "$L/wheel_odom.log" 2>&1 & P+=($!); fi
 ros2 run cartographer_ros cartographer_node -configuration_directory "$CFG" -configuration_basename "$LUA" \
   -load_state_filename "$PB" -load_frozen_state true --ros-args -p use_sim_time:=true \
   -r points2_1:=/points_front_carto -r points2_2:=/points_rear_carto \

@@ -8,6 +8,10 @@
 #                                                           속도 0.2 | 0.4 | 0.6 | 0.8  (바퀴 5·10·15·20 rad/s), 속도마다 2 판
 #   bash tools/floor_tests_w4_t7.sh step <모터 토크> <판>    시험 B 단계 토크: 정지에서 네 바퀴 같은 모터 토크, 0.3 m 가면 끊음
 #                                                           토크 0.08 | 0.12 | 0.16 | 0.20 | 0.24 | 0.28 N·m, 토크마다 2 판
+#   bash tools/floor_tests_w4_t7.sh rot <모터 토크> <ccw|cw> <판>   제자리 회전 단계 토크 (2026-11-25 이 값으로 실차 54 회):
+#                                                           바퀴당 0.06 | 0.08 | 0.10 N·m 회전 꼴 [−,+,−,+], 90° 돌면 끊음, 토크·방향마다 2 판
+#   bash tools/floor_tests_w4_t7.sh lat <모터 토크> <left|right> <판>   옆걸음 단계 토크 (2026-11-25 사용자 승인 값):
+#                                                           바퀴당 0.08 | 0.10 | 0.12 N·m 옆 꼴 [−,+,+,−], 0.3 m 가면 끊음, 토크·방향마다 2 판 이상
 #   … 끝에 dry 를 붙이면 실행할 명령만 보여 준다
 #
 # 사람이 터미널에서 직접 실행한다 (sudo 비밀번호, 'a' 무장, 's'·스페이스 정지, Ctrl+C 로 끝). 쓸 수 있는 직선은 1.3 m — 출발점을 벽에서 멀리 둔다.
@@ -18,7 +22,13 @@
 #   cv    controller:=pp friction_comp:=false shape:=line seg_distance:=1.1 accel:=1.5 speed:=<속도>
 #   step  controller:=step step_dir:=fwd step_distance:=0.3 step_inertia_ff:=false friction_comp:=false step_tau:=<토크> step_max_time:=<표>
 #         (관성 몫을 더하지 않으므로 준 값이 곧 모터 토크다 — amrstep 은 보상을 끌 수 없어 쓰지 않는다)
-# 녹화: bags/<오늘>/<시분초>_<이름>.  분석: tools/floor_wheel_tests.py cv … · step … · quick <bag>
+#   rot   controller:=step step_dir:=<ccw|cw> step_angle_deg:=90 step_distance:=0.5 step_inertia_ff:=false friction_comp:=false step_tau:=<토크> step_max_time:=<표>
+#         시간 한도 = 11-15·11-16 회전 bag 으로 맞춘 값 (I_eff 0.120, 바닥 회전 저항 0.46 N·m) 의 90° 도달 예상 × 1.3 + 0.15 s.
+#         0.06 은 정지 마찰 근처라 안 돌 수 있다 (11-15 에 0.05 는 0°) — 그러면 시간 한도에 끊긴다. 벗어남 0.5 m 는 추정기 거짓 속도로 일찍 끊기지 않게.
+#   lat   controller:=step step_dir:=<left|right> step_distance:=0.3 step_inertia_ff:=false friction_comp:=false step_tau:=<토크> step_max_time:=<표>
+#         시간 한도 = 옆 저항 5.5 N (11-15 lat1 맞춤 5.0~5.4 위쪽) 일 때 0.3 m 도달 예상 × 1.3 + 0.15 s. 0.08 은 저항 근처라 천천히 가거나 안 갈 수 있다.
+#         옆으로 0.3 m + 제동 거리 — 왼쪽·오른쪽을 번갈아 돌려 제자리 근처로 돌아오게 한다.
+# 녹화: bags/<오늘>/<시분초>_<이름>.  분석: tools/floor_wheel_tests.py cv … · step … · rot … · lat … · quick <bag>
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 WS=$(cd "$HERE/../../../../.." && pwd)
@@ -32,8 +42,10 @@ case "$KIND" in
     echo "  check                                   1 판"
     echo "  cv   0.2 0.4 0.6 0.8 m/s                 속도마다 2 판 (8 판)"
     echo "  step 0.08 0.12 0.16 0.20 0.24 0.28 N·m   토크마다 2 판 (12 판), 낮은 토크부터"
+    echo "  rot  0.06 0.08 0.10 N·m × ccw·cw         토크·방향마다 2 판 (12 판), 낮은 토크부터 (11-25 실차)"
+    echo "  lat  0.08 0.10 0.12 N·m × left·right     토크·방향마다 2 판 이상, 낮은 토크부터 (11-25 승인)"
     echo "오늘 녹화된 판:"
-    ls -d "$WS/bags/$(date +%F)"/*_{fricmodel_check,w4_cv_,t7_step_}* 2> /dev/null | sed 's|.*/|  |' || echo "  (없음)"
+    ls -d "$WS/bags/$(date +%F)"/*_{fricmodel_check,w4_cv_,t7_step_,rot_,lat_}* 2> /dev/null | sed 's|.*/|  |' || echo "  (없음)"
     exit 0 ;;
   check)
     ARGS=(use_mpc:=true controller:=mpc shape:=line seg_distance:=0.5 speed:=0.2 limit_mode:=friction friction_comp:=false
@@ -52,7 +64,27 @@ case "$KIND" in
     case "$RUN" in ''|*[!0-9]*) echo "판 번호를 준다 (1, 2 …)"; exit 2 ;; esac
     ARGS=(use_mpc:=true controller:=step step_dir:=fwd "step_tau:=$TAU" step_distance:=0.3 "step_max_time:=$TMAX" step_inertia_ff:=false
           friction_comp:=false "step_log_dir:=$WS/analysis/torque_mpc_real/$(date +%F)_step" "bag:=t7_step_$(tag "$TAU")_r$RUN") ;;
-  *) echo "list | check | cv <속도> <판> | step <모터 토크> <판>   (끝에 dry = 명령만 보기)"; exit 2 ;;
+  rot)
+    TAU=$2; DIR=$3; RUN=$4
+    case "$TAU" in
+      0.06) TMAX=1.90 ;; 0.08) TMAX=1.30 ;; 0.10) TMAX=1.00 ;;
+      *) echo "바퀴당 모터 토크는 0.06 | 0.08 | 0.10 (11-25 실차 값)"; exit 2 ;;
+    esac
+    case "$DIR" in ccw|cw) ;; *) echo "방향은 ccw (반시계) | cw (시계)"; exit 2 ;; esac
+    case "$RUN" in ''|*[!0-9]*) echo "판 번호를 준다 (1, 2 …)"; exit 2 ;; esac
+    ARGS=(use_mpc:=true controller:=step "step_dir:=$DIR" "step_tau:=$TAU" step_angle_deg:=90 step_distance:=0.5 "step_max_time:=$TMAX"
+          step_inertia_ff:=false friction_comp:=false "step_log_dir:=$WS/analysis/torque_mpc_real/$(date +%F)_rot" "bag:=rot_${DIR}_$(tag "$TAU")_r$RUN") ;;
+  lat)
+    TAU=$2; DIR=$3; RUN=$4
+    case "$TAU" in
+      0.08) TMAX=3.70 ;; 0.10) TMAX=1.90 ;; 0.12) TMAX=1.45 ;;
+      *) echo "바퀴당 모터 토크는 0.08 | 0.10 | 0.12 (11-25 승인된 값)"; exit 2 ;;
+    esac
+    case "$DIR" in left|right) ;; *) echo "방향은 left (왼쪽) | right (오른쪽)"; exit 2 ;; esac
+    case "$RUN" in ''|*[!0-9]*) echo "판 번호를 준다 (1, 2 …)"; exit 2 ;; esac
+    ARGS=(use_mpc:=true controller:=step "step_dir:=$DIR" "step_tau:=$TAU" step_distance:=0.3 "step_max_time:=$TMAX"
+          step_inertia_ff:=false friction_comp:=false "step_log_dir:=$WS/analysis/torque_mpc_real/$(date +%F)_lat" "bag:=lat_${DIR}_$(tag "$TAU")_r$RUN") ;;
+  *) echo "list | check | cv <속도> <판> | step <모터 토크> <판> | rot <모터 토크> <ccw|cw> <판> | lat <모터 토크> <left|right> <판>   (끝에 dry = 명령만 보기)"; exit 2 ;;
 esac
 if [ "$DRY" = 1 ]; then echo "amrall ${ARGS[*]}"; exit 0; fi
 if [ ! -t 0 ]; then echo "사람이 터미널에서 직접 실행한다 — 입력을 넘겨 받는 실행은 거부한다"; exit 1; fi
