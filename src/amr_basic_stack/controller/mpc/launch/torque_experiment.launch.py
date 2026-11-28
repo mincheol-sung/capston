@@ -10,6 +10,9 @@
                                           └── /state_estimator/odom ◀── state_estimator_node ◀───────┘ 가짜 SLAM 포즈 10 Hz (0.13 s 늦게)
     controller:=pp · adpp (비교군 A, 룩어헤드 고정 · 속도 비례 — 예전 이름 pure_pursuit = pp) 이면 torque_mpc_node 자리에
         pure_pursuit_node ─(v_x, ω_z)─▶ wheel_pi_node (+ /wheel_states) ─▶ torque_output_node ─▶ … (뒤는 같다)
+    controller:=all (2026-11-28) 이면 위 세 제어기 노드를 다 띄우고 controller_select_node 가 회차마다 하나만 무장시킨다
+        /mpc/armed ─▶ controller_select ─▶ /ctrl/mpc/armed (MPC) · /ctrl/pp/armed (PP·PI), /ctrl/active (JSON)
+        torque_output · fault_monitor 는 /ctrl/active 가 고른 제어기의 토크·상태만 받는다. 순서 주행은 tools/seq.py (amrseq)
   7단계:  plant:=sim_can → 시뮬 플랜트가 가짜 AK40 모터(vcan0)가 되고 ak40_can_node 가 토픽과 잇는다 (CAN 전 구간 시험)
           plant:=real    → ak40_can_node(can0) + IMU 회전 노드. 센서·Cartographer 는 따로 띄운다
 
@@ -56,6 +59,15 @@
   8자 위치·모양·속도는 config/torque_track.yaml (지도 고정, 2026-11-11). 한 번만 바꿀 때: speed:=0.8 laps:=2 origin_x:=1.0
     로봇을 출발점(origin) 근처에 놓고 'a' — 30 cm·30° 안이면 천천히 출발점으로 들어간 뒤 8자, 밖이면 출발 거부.
     예전처럼 로봇이 있는 곳을 교차점으로: origin_mode:=robot
+
+게임패드 (2026-11-28 사용자 요청, joy:= — 기본 auto = plant:=real 에서만 켬. Xbox, amr_bringup/config/joy_teleop_xbox.yaml)
+  RT = 자율 무장 (AUTO, 키보드 'a' 와 같다)   LT = 수동 주행 (TELEOP, 키보드 't')   B = 둘 다 정지 (DAMPING, 키보드 's'/SPACE)
+  TELEOP: 왼쪽 스틱 위/아래 = 전후, 오른쪽 스틱 좌/우 = 옆, LB/RB = 반시계/시계 회전 (최대 0.6 m/s · 1.8 rad/s)
+    joy_node ─/joy─▶ joy_teleop ─/teleop/cmd_vel─▶ teleop_pi_node (바퀴별 PI, 비교군 A 게인, 엔코더 속도) ─/teleop_pi/cmd_raw─▶ 게이트
+    게이트는 AUTO 면 /torque_output/cmd_raw, TELEOP 이면 /teleop_pi/cmd_raw 만 중계한다 (keyboard_command_gate 머리주석).
+    /mpc/armed 는 AUTO 일 때만 true — TELEOP 동안 기준 시간은 멈춰 있다. 처음 RT 를 당긴 자리가 출발점 (origin_mode robot).
+  ⚠ 도중에 LT 로 넘겨받아 옮긴 뒤 RT 로 다시 무장하면, 기준은 멈춘 시각 앞뒤 2 s (figure8_reference resync_window_s) 안에서 가장 가까운 경로 점으로 이어 간다.
+    멀리 옮겼으면 MPC 가 그 거리를 한 번에 메우려 하고, 1.5 m 를 넘으면 fault_monitor 가 세운다 — 판을 새로 하려면 Ctrl+C 뒤 다시.
 
 비워 두는 인자는 config/*.yaml 값을 쓴다 (torque_plant, torque_mpc, torque_track).
 """
@@ -121,6 +133,7 @@ _TRACK_KEYS = ["origin_mode", "origin_x", "origin_y", "origin_yaw_deg", "start_t
                "start_tolerance_yaw_deg", "lead_speed", "lead_yaw_rate", "width", "height", "yaw_mode", "crossing_blend_m",
                "spin_rate",                                  # 2026-11-19 yaw_mode:=spin 의 순항 요레이트 [rad/s]
                "speed_mod_amp", "speed_mod_cycles", "speed_mod_phase_deg", "speed_mod_shape",
+               "first_turn",                                 # 2026-11-28 figure8·circles8 첫 회전 left | right
                "speed", "accel", "laps", "align_s", "start_delay", "abort_error", "hold_s", "lap_speeds",
                "dt", "horizon_steps",
                # 5-3 단일 축 기준 (2026-11-16): shape:=line|rotate 와 seg_* (figure8_reference.py)
@@ -184,7 +197,7 @@ def _track(context, share):
         elif k in ("speed", "accel", "zigzag_rot_s", "zigzag_corner_speed") and str(track[k]).strip().lower() == "max":
             out[k] = "max"                            # 2026-11-23 아래 _resolve_max 가 숫자로 바꾼다
         else:
-            out[k] = str(track[k]) if k in ("origin_mode", "yaw_mode", "shape", "square_corner_mode", "speed_mod_shape",
+            out[k] = str(track[k]) if k in ("origin_mode", "yaw_mode", "shape", "square_corner_mode", "speed_mod_shape", "first_turn",
                                             "zigzag_profile", "zigzag_corner", "poly_path") else float(track[k])
     # 문자열 인자는 여기서 허용값을 검사한다 (2026-11-16): yaw_mode:=true 로 띄운 판이 6 개 있었다 — figure8_reference_node 가
     # 시작하자마자 ValueError 로 죽는데 오류가 화면에만 나오고 /rosout·bag 에는 안 남아, 무장해도 기준 없이 그냥 서 있었다.
@@ -332,11 +345,13 @@ def _resolve_max(out, context, share):
 _TRACK_CHOICES = {"yaw_mode": ("tangent", "fixed", "spin"), "shape": ("figure8", "circles8", "line", "rotate", "square", "zigzag", "polyline"),
                   "zigzag_profile": ("sine", "square"), "zigzag_corner": ("stop", "pass"),
                   "origin_mode": ("robot", "fixed"), "square_corner_mode": ("pass", "stop"),
-                  "speed_mod_shape": ("sin", "square")}
+                  "speed_mod_shape": ("sin", "square"), "first_turn": ("left", "right")}
 
 
 def _drive_args(g):
-    """2026-11-23 구동계 방향 보정 launch 인자 → 노드 파라미터 (비우면 torque_plant.yaml drive 절, 기본 0). 범위는 노드가 검사."""
+    """2026-11-23 구동계 방향 보정 launch 인자 → 노드 파라미터 (비우면 torque_plant.yaml drive 절). 범위는 노드가 검사.
+    2026-11-26: yaml 기본이 3.1° · +0.8 (실차 값) 이 됐다. 시뮬 플랜트에는 이 물리가 없으므로 plant 가 real 이 아니면 비운 인자를 0 으로 넘긴다
+    (안 그러면 제어기가 없는 어긋남을 보정해 시뮬이 옆으로 밀린다). 직접 준 값은 그대로 쓴다."""
     out = {}
     for arg, par in (("drive_yaw_deg", "drive_yaw_offset_deg"), ("drive_slip_coef", "drive_slip_coef_deg")):
         if g(arg):
@@ -344,6 +359,8 @@ def _drive_args(g):
                 out[par] = float(g(arg))
             except ValueError:
                 raise RuntimeError(f"{arg} 는 숫자 [°] — {g(arg)!r}") from None
+        elif g("plant") != "real":
+            out[par] = 0.0
     return out
 
 
@@ -417,8 +434,8 @@ def _nodes(context):
                          "surface_mu": float(g("surface_mu")) if g("surface_mu") else -1.0,
                          "friction_scale": float(g("friction_scale")),
                          "rolling_Nm": float(g("sim_rolling")) if g("sim_rolling") else 0.0,   # 2026-11-24 시뮬 바닥 구름 손실
-                         "roller_rr_N": float(g("sim_roller_rr")) if g("sim_roller_rr") else 0.0,   # 2026-11-25 시뮬 롤러 구름 저항
-                         "inertia_z": float(g("sim_inertia_z")) if g("sim_inertia_z") else -1.0,    # 2026-11-25 시뮬 회전 관성 (비우면 yaml)
+                         "roller_rr_N": float(g("sim_roller_rr")) if g("sim_roller_rr") else -1.0,  # 2026-11-25 시뮬 롤러 구름 저항 (비우면 yaml sim_plant)
+                         "inertia_z": float(g("sim_inertia_z")) if g("sim_inertia_z") else -1.0,    # 2026-11-25 시뮬 회전 관성 (비우면 yaml sim_plant)
                          "com_height": float(g("sim_com_height")) if g("sim_com_height") else 0.0,   # 2026-11-23 하중 이동
                          "wheel_efficiency": [float(v) for v in g("wheel_eff").split(",")] if g("wheel_eff") else [1.0, 1.0, 1.0, 1.0],
                          "floor_efficiency": [float(v) for v in g("floor_eff").split(",")] if g("floor_eff") else [1.0, 1.0, 1.0],
@@ -483,6 +500,7 @@ def _nodes(context):
 
     if not _truthy(g("use_mpc")):
         return nodes
+    joy_on = plant == "real" if g("joy") == "auto" else _truthy(g("joy"))     # 2026-11-28 게임패드 (머리주석)
 
     # ── 기준궤적: 8자 시간 기준 (기동 포즈가 교차점)
     if use_ref:
@@ -507,7 +525,8 @@ def _nodes(context):
     # ── 제어기. controller:=mpc (비교군 B·C, 기본) | pp (= pure_pursuit, 비교군 A, 6단계) | adpp (어댑티브 PP, 2026-11-23)
     #    둘 다 같은 기준열·같은 상태를 받고, 바퀴 토크를 같은 torque_output → 게이트 → 플랜트 경로로 낸다.
     controller = g("controller")
-    if controller == "mpc":
+    every = controller == "all"                       # 2026-11-28 세 제어기를 다 띄우고 controller_select 가 고른다 (머리주석)
+    if controller in ("mpc", "all"):
         # payload_kg 는 "제어기가 믿는" 적재 (비우면 플랜트와 같게)
         ctrl = {"state_topic": state_topic, "armed_topic": "/mpc/armed",
                 "payload_kg": float(g("ctrl_payload_kg")) if g("ctrl_payload_kg") else payload,
@@ -629,8 +648,8 @@ def _nodes(context):
                                          "(같이 켜려면 mpc_cap_friction_shift:=true)"))
         elif g("mpc_fric_rolling"):
             nodes.append(LogInfo(msg="mpc_fric_rolling 은 마찰 모델 (use_fric_model:=true) 이 켜졌을 때만 쓰인다 — 지금은 안 쓰인다"))
-        # 2026-11-25 롤러 구름 저항 [N/롤러] · 회전 관성 I_z [kg·m²] — 제어기만 (비우면 torque_mpc.yaml model_terms.roller_rr_N = 0 ·
-        #   torque_plant.yaml body.inertia_z_kgm2). 범위는 노드가 본다. 실차 식별 analysis/torque_mpc_real/2026-11-25_rot · _lat
+        # 2026-11-25 롤러 구름 저항 [N/롤러] · 회전 관성 I_z [kg·m²] — 제어기만 (비우면 torque_mpc.yaml model_terms.roller_rr_N 0.88 ·
+        #   inertia_z_kgm2 0.03, 2026-11-26 기본 켬). 범위는 노드가 본다. 실차 식별 analysis/torque_mpc_real/2026-11-25_rot · _lat
         if g("mpc_roller_rr"):
             ctrl["roller_rr"] = float(g("mpc_roller_rr"))
         if g("mpc_inertia_z"):
@@ -644,33 +663,47 @@ def _nodes(context):
                          ("slip_eta_lambda_c", "slip_eta_lambda_c"), ("slip_eta_s", "slip_eta_s")):
             if g(arg):
                 ctrl[par] = float(g(arg))
-        if g("slip_eta"):                             # 2026-11-23 슬립 계수 η_s 켬/끔 (torque_mpc.yaml slip_eta)
+        if g("slip_fb"):                              # 2026-11-27 슬립 되먹임 켬/끔 (torque_mpc.yaml slip_feedback)
+            ctrl["slip_fb_enable"] = _truthy(g("slip_fb"))
+        if g("slip_fb_scale"):
+            ctrl["slip_fb_scale"] = float(g("slip_fb_scale"))
+        if g("slip_fb_gain"):                         # 2026-11-27 (3) 바퀴 공간 K_ω 설계 lqr | ik
+            ctrl["slip_fb_gain"] = g("slip_fb_gain")
+        if g("slip_eta"):                           # 2026-11-23 슬립 계수 η_s 켬/끔 (torque_mpc.yaml slip_eta)
             ctrl["slip_eta_enable"] = _truthy(g("slip_eta"))
             if ctrl["slip_eta_enable"] and (g("limit_mode") or "") == "friction" and (g("mu_hat_wheels") or "") != "off":
                 nodes.append(LogInfo(msg="slip_eta:=true 인데 mu_hat_wheels:=off 가 없다 — 바퀴별 μ̂ 상한에 η_s 를 곱한다. "
                                          "회의 결정 (μ_max 1.0 + η_s) 이면 mu_hat_wheels:=off mu_hat:=1.0"))
+        if every:
+            ctrl["armed_topic"] = "/ctrl/mpc/armed"
         nodes.append(Node(
             package="amr_mpc_cpp", executable="torque_mpc_node", name="torque_mpc_node", output="screen",
             parameters=[ctrl]))
         torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"
-    elif controller in ("pp", "adpp", "pure_pursuit"):
+    if controller in ("pp", "adpp", "pure_pursuit", "all"):
         # 비교군 A: 퓨어 퍼슛 (v_x, ω_z) → 바퀴별 PI → 토크. 게인은 config/torque_baseline_a.yaml
         #   pp (= 예전 이름 pure_pursuit)  룩어헤드 고정 (pure_pursuit.lookahead_min = max = 0.30 m, 11-20 (9))
         #   adpp                          속도 비례 룩어헤드 (torque_baseline_a.yaml pure_pursuit_adaptive 세 값으로 덮어씀, 2026-11-23). 나머지는 같다
         ignored = [k for k in ("limit_mode", "disturbance", "linearization", "mu_hat", "mu_hat_wheels", "ctrl_payload_kg",
-                               "log_prefix", "slip_eta", "mpc_cap_friction_shift", "use_fric_model", "mpc_roller_rr", "mpc_inertia_z")
+                               "log_prefix", "slip_eta", "mpc_cap_friction_shift", "use_fric_model", "mpc_roller_rr", "mpc_inertia_z",
+                               "slip_fb", "slip_fb_scale", "slip_fb_gain")
                    if g(k)]
-        if ignored:
+        if ignored and not every:
             nodes.append(LogInfo(msg=f"controller:={controller} — MPC 인자 {ignored} 는 쓰지 않는다 "
                                      f"(log_prefix 는 slip_logger 에만 쓴다)"))
         with open(os.path.join(share, "config", "torque_baseline_a.yaml")) as f:
             ya = yaml.safe_load(f)
-        pp = {"state_topic": state_topic, "armed_topic": "/mpc/armed"}
+        pp = {"state_topic": state_topic, "armed_topic": "/ctrl/pp/armed" if every else "/mpc/armed"}
         if controller == "adpp":
             pp.update({k: float(ya["pure_pursuit_adaptive"][k]) for k in ("lookahead_time", "lookahead_min", "lookahead_max")})
         # 2026-11-21: 룩어헤드 덮어쓰기 (비우면 위 값 또는 torque_baseline_a.yaml pure_pursuit). 두 모드 모두 이 인자가 우선
-        pp.update({par: float(g(arg)) for arg, par in (("pp_lookahead_min", "lookahead_min"), ("pp_lookahead_max", "lookahead_max"))
-                   if g(arg)})
+        la_over = {par: float(g(arg)) for arg, par in (("pp_lookahead_min", "lookahead_min"), ("pp_lookahead_max", "lookahead_max"))
+                   if g(arg)}
+        pp.update(la_over)
+        if every:                                     # all: pp·adpp 묶음 둘 다 넘기고 /ctrl/active 로 고른다 (덮어쓰기는 둘 다에)
+            pp["variant_topic"] = "/ctrl/active"
+            pp.update({"adpp_" + k: float(ya["pure_pursuit_adaptive"][k]) for k in ("lookahead_time", "lookahead_min", "lookahead_max")})
+            pp.update({"adpp_" + k: v for k, v in la_over.items()})
         eff = {k: pp.get(k, float(ya["pure_pursuit"][k])) for k in ("lookahead_time", "lookahead_min", "lookahead_max")}
         ld = (f"고정 L_d {eff['lookahead_min']:.2f} m" if eff["lookahead_min"] == eff["lookahead_max"] else
               f"속도 비례 L_d = clamp({eff['lookahead_time']:.2f} s·|v_ref|, {eff['lookahead_min']:.2f}, {eff['lookahead_max']:.2f}) m")
@@ -679,7 +712,7 @@ def _nodes(context):
             package="amr_mpc", executable="pure_pursuit_node", name="pure_pursuit_node", output="screen",
             parameters=[pp]))
         # 2026-11-19: pp_speed_source:=estimator 면 PI 되먹임이 추정기 속도 (MPC 와 같은 정보). pp_kp·pp_ki 로 게인 덮어쓰기
-        pi = {"armed_topic": "/mpc/armed", "speed_topic": state_topic}
+        pi = {"armed_topic": "/ctrl/pp/armed" if every else "/mpc/armed", "speed_topic": state_topic}
         if g("pp_speed_source"):
             pi["speed_source"] = g("pp_speed_source")
         for arg, par in (("pp_kp", "kp"), ("pp_ki", "ki")):
@@ -690,6 +723,16 @@ def _nodes(context):
             package="amr_mpc", executable="wheel_pi_node", name="wheel_pi_node", output="screen",
             parameters=[pi]))
         torque_in, track_status = "/wheel_pi/cmd_raw", "/pure_pursuit/status"
+    select = {}
+    if every:
+        # 2026-11-28: 무장 신호를 고른 제어기에만 (nodes/controller_select.py). 토크·상태는 torque_output·fault_monitor 가 고른다
+        nodes.append(Node(
+            package="amr_mpc", executable="controller_select_node", name="controller_select_node", output="screen",
+            parameters=[{"active": g("ctrl_start") or "mpc"}]))
+        torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"     # 쓰이지 않는다 (select 가 이긴다)
+        select = {"select_topic": "/ctrl/active"}
+    elif controller in ("mpc", "pp", "adpp", "pure_pursuit"):
+        pass
     elif controller == "ramp":
         # 바닥 토크 램프 시험 (2026-11-17, torque_ramp.py): MPC 자리에서 τ* = τ_g + 관성 ff 를 /torque_mpc/cmd_raw 로.
         # 뒤(torque_output 마찰 보상·게이트·fault_monitor)는 MPC 와 같다
@@ -721,14 +764,14 @@ def _nodes(context):
             parameters=[step]))
         torque_in, track_status = "/torque_mpc/cmd_raw", "/torque_mpc/status"
     else:
-        raise RuntimeError(f"controller:={controller!r} — mpc, pp, adpp (pure_pursuit = pp), ramp 또는 step")
+        raise RuntimeError(f"controller:={controller!r} — mpc, pp, adpp (pure_pursuit = pp), all, ramp 또는 step")
 
     # 정지 마찰 보상 (2026-11-16): auto = 실차에서만. 시뮬 플랜트에는 정지 마찰이 없어 켜면 없는 마찰을 보상하게 된다
     stiction = g("stiction_comp")
     stiction_on = plant == "real" if stiction == "auto" else _truthy(stiction)
     nodes.append(Node(
         package="amr_mpc", executable="torque_output_node", name="torque_output_node", output="screen",
-        parameters=[{"input_topic": torque_in, "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec")),
+        parameters=[{"input_topic": torque_in, **select, "max_wheel_rad_per_sec": float(g("max_wheel_rad_per_sec")),
                      "stiction_comp": stiction_on,
                      # 2026-11-23 friction_comp:=false → 구동계 마찰 보상 전부 끔 (정지 마찰 항도 compensation_scale 을 곱해 같이 0)
                      # 2026-11-24 사용자 결정 "기본 꺼": 비워도 끔. friction_comp:=true 일 때만 torque_plant.yaml compensation_scale (0.9) 로 보상
@@ -742,9 +785,11 @@ def _nodes(context):
     if source == "estimator":                         # 참값 모드에는 추정기 출력이 없어 끊김으로 오판한다
         nodes.append(Node(
             package="amr_mpc", executable="fault_monitor_node", name="fault_monitor_node", output="screen",
-            parameters=[{"max_track_error": float(g("max_track_error")), "track_status_topic": track_status,
+            parameters=[{"max_track_error": float(g("max_track_error")), "track_status_topic": track_status, **select,
                          # 2026-11-19: 포즈 튐 정지 스위치 (est_mode:=slam 과 같이 시뮬로 정하려고). 비우면 노드 기본 true
-                         **({"trip_on_pose_jump": _truthy(g("trip_on_pose_jump"))} if g("trip_on_pose_jump") else {})}]))
+                         **({"trip_on_pose_jump": _truthy(g("trip_on_pose_jump"))} if g("trip_on_pose_jump") else {}),
+                         # 2026-11-28 패드 텔레옵 중에는 모터 에러·바퀴 끊김만 본다
+                         **({"teleop_armed_topic": "/teleop/armed"} if joy_on else {})}]))
 
     # 슬립률 기록 (로깅 전용). 시뮬이면 참값으로 구한 슬립률도 같이 남긴다
     nodes.append(Node(
@@ -762,7 +807,27 @@ def _nodes(context):
             "arm_topic": "/mpc/arm", "initially_armed": _truthy(g("armed")),
             "keyboard_enabled": True, "command_timeout": 0.20, "publish_frequency": 50.0,
             "forward_on_receive": True,
+            **({"teleop_input_topic": "/teleop_pi/cmd_raw"} if joy_on else {}),    # 2026-11-28 패드 텔레옵 (머리주석)
         }]))
+
+    # ── 게임패드 (2026-11-28): RT = AUTO 무장, LT = TELEOP, B = 정지. 버튼·축 번호는 joy_teleop_xbox.yaml 머리 표 (실측)
+    #    Menu 무장 (arm_button 11) 은 끈다 — teleop.launch.py 에서는 Menu 가 "텔레옵 무장" 이라, 여기서 누르면 뜻이 달라 자율 주행이 나간다.
+    #    teleop_pi_node: teleop.launch.py 와 같은 바퀴별 PI (cmd_timeout 0.25 s = joy_teleop 20 Hz 의 5 주기). torque_output 을 거치지 않는다 —
+    #      그 노드의 일은 마찰 보상 (주행 launch 기본 꺼짐)·정지 마찰 (MPC 기준열 방향이라 텔레옵엔 틀림)·안전 클램프인데, PI 가 이미 |τ| ≤ τ̄ 로 자른다.
+    if joy_on:
+        joy_cfg = os.path.join(get_package_share_directory("amr_bringup"), "config", "joy_teleop_xbox.yaml")
+        nodes.append(Node(package="joy", executable="joy_node", name="joy_node", output="screen", parameters=[joy_cfg]))
+        nodes.append(Node(
+            package="amr_base", executable="joy_teleop_node", name="joy_teleop", output="screen",
+            parameters=[joy_cfg, {"stamped_output": True, "arm_button": -1, "arm_axis": 4, "teleop_arm_axis": 5}],
+            remappings=[("cmd_vel", "/teleop/cmd_vel")]))
+        nodes.append(Node(
+            package="amr_mpc", executable="wheel_pi_node", name="teleop_pi_node", output="screen",
+            parameters=[{"cmd_topic": "/teleop/cmd_vel", "armed_topic": "/teleop/armed",
+                         "output_topic": "/teleop_pi/cmd_raw", "status_topic": "/teleop_pi/status",
+                         "speed_source": "wheels", "cmd_timeout": 0.25, **_drive_args(g)}]))
+        nodes.append(LogInfo(msg="게임패드: RT = 자율 무장, LT = 수동 주행 (왼쪽 스틱 전후 · 오른쪽 스틱 옆 · LB/RB 회전), B = 정지.  "
+                                 "키보드 a = 자율, t = 수동, s/SPACE = 정지"))
     return nodes
 
 
@@ -808,6 +873,8 @@ def generate_launch_description():
                       "true = torque_plant.yaml friction.compensation_scale (0.9) 로 보상 — 상한 옮김·마찰 모델과는 같이 못 쓴다"),
         A("use_mpc", default_value="true", description="false 면 플랜트(+RViz)만 띄운다"),
         A("use_figure8", default_value="true", description="8자 기준궤적 노드. false 면 기준열을 밖에서 준다"),
+        A("joy", default_value="auto", choices=["auto", "true", "false"],
+          description="게임패드 RT = 자율 무장, LT = 수동 주행, B = 정지 (Xbox). auto = plant:=real 에서만 켬 (2026-11-28)"),
         A("armed", default_value="false", description="게이트 초기 상태. false 면 터미널에서 'a' 로 무장. plant:=real 에서는 true 금지"),
         # 모델·비교군. 비우면 config/torque_plant.yaml, torque_mpc.yaml 값
         A("payload_kg", default_value="0.0", description="적재 [kg]. 2차 발표 조건 0 / 5"),
@@ -817,11 +884,12 @@ def generate_launch_description():
                       "제어기는 M 에 m_w 를 늘 넣는다"),
         A("use_w", default_value="",
           description="제어기 w 항 (식-6) true/false. 비우면 torque_mpc.yaml model_terms.use_w (기본 true, 2026-11-20 — 11-16 지시서는 false)"),
-        A("controller", default_value="mpc", choices=["mpc", "pp", "adpp", "pure_pursuit", "ramp", "step"],
+        A("controller", default_value="mpc", choices=["mpc", "pp", "adpp", "pure_pursuit", "all", "ramp", "step"],
           description="mpc = torque_mpc_node (비교군 B·C), pp = 퓨어 퍼슛 + 바퀴별 PI (비교군 A, 룩어헤드 고정 0.30 m), "
                       "adpp = 어댑티브 PP (같은 PP 에 속도 비례 룩어헤드 clamp(0.5 s·|v_ref|, 0.15, 0.60) m, 2026-11-23), "
-                      "pure_pursuit = pp 의 예전 이름, "
+                      "pure_pursuit = pp 의 예전 이름, all = 셋 다 띄우고 controller_select_node 가 회차마다 하나만 무장 (2026-11-28, amrseq), "
                       "ramp = 바닥 토크 램프 시험 torque_ramp_node, step = 스텝 시험 torque_step_node (8자 기준 없음)"),
+        A("ctrl_start", default_value="", description="controller:=all 에서 처음 고를 제어기 mpc | pp | adpp (비우면 mpc). 실행 중에는 tools/seq.py · rqt"),
         A("ramp_dir", default_value="", description="ramp: fwd (직진) | back | left (왼쪽 90°) | right. 비우면 fwd"),
         A("ramp_tau_max", default_value="", description="ramp: 바퀴–바닥 토크 끝값 [N·m] (기본 1.0)"),
         A("ramp_rate", default_value="", description="ramp: 기울기 [N·m/s]. 비우면 ramp_distance·mu_hat 로 자동"),
@@ -880,13 +948,14 @@ def generate_launch_description():
                       "(비우면 torque_mpc.yaml model_terms.fric_rolling_Nm = 0, 2026-11-24. 잰 값 0.0027~0.0051)"),
         A("mpc_roller_rr", default_value="",
           description="MPC 롤러 구름 저항 [N, 롤러 하나당] — 옆·회전에만 걸리는 몸체 저항을 목표 입력·예측·외란 추정 잔차에 넣는다 "
-                      "(비우면 torque_mpc.yaml model_terms.roller_rr_N = 0 = 끔, 2026-11-25. 실차 0.88 → 옆 4.98 N · 회전 0.43 N·m)"),
+                      "(비우면 torque_mpc.yaml model_terms.roller_rr_N = 0.88 — 2026-11-26 사용자 결정 기본 켬. 0 = 끔. 옆 4.98 N · 회전 0.43 N·m)"),
         A("mpc_inertia_z", default_value="",
-          description="MPC 가 믿는 몸체 회전 관성 I_z [kg·m²] — 제어기만 (비우면 torque_plant.yaml 0.06). 실차 식별 I_eff 0.11~0.12 − 바퀴 몫 0.083 → 0.03"),
+          description="MPC 가 믿는 몸체 회전 관성 I_z [kg·m²] — 제어기만 (비우면 torque_mpc.yaml model_terms.inertia_z_kgm2 = 0.03, 2026-11-26 기본. "
+                      "예전 값은 0.06 = torque_plant.yaml). 실차 식별 I_eff 0.11~0.12 − 바퀴 몫 0.083"),
         A("sim_inertia_z", default_value="",
-          description="시뮬 플랜트 몸체 회전 관성 I_z [kg·m²] (비우면 torque_plant.yaml 0.06, 2026-11-25. 실차 식별 0.03)"),
+          description="시뮬 플랜트 몸체 회전 관성 I_z [kg·m²] (비우면 torque_plant.yaml sim_plant.inertia_z_kgm2 = 0.03, 2026-11-26 실차값. 예전 0.06)"),
         A("sim_roller_rr", default_value="",
-          description="시뮬 플랜트 롤러 구름 저항 [N, 롤러 하나당] (비우면 0, 2026-11-25. 실차 0.88)"),
+          description="시뮬 플랜트 롤러 구름 저항 [N, 롤러 하나당] (비우면 torque_plant.yaml sim_plant.roller_rr_N = 0.88, 2026-11-26 실차값. 0 = 없음)"),
         A("sim_rolling", default_value="",
           description="시뮬 플랜트의 구름 손실 [N·m, 네 바퀴 공통, 바퀴 회전 방향] — 구동계 마찰에 더한다, friction_scale 과 무관 (비우면 0, 2026-11-24)"),
         A("mpc_cap_friction_shift", default_value="", choices=["", "true", "false"],
@@ -903,6 +972,13 @@ def generate_launch_description():
         A("mpc_load_dynamic_cap", default_value="", description="하중 이동: friction 상한을 지평 스텝마다 N_i 에 맞춤 true/false (비우면 load_transfer.dynamic_cap)"),
         A("sim_com_height", default_value="", description="시뮬 플랜트 하중 이동 무게중심 높이 [m] (비우면 0 = 정지 하중, 2026-11-23). 제어기 mpc_com_height 와 따로"),
         A("mpc_target_projection", default_value="", description="U_s 를 토크 상한 상자에 사영 true/false (비우면 torque_mpc.yaml feedforward.target_projection)"),
+        A("slip_fb", default_value="",
+          description="슬립 되먹임 true/false — MPC 뒤에서 τ = τ_MPC − K_ω (ω − ω_nom), ω_nom = 추정기 몸체 속도가 시키는 무슬립 바퀴 속도, "
+                      "K_ω 4×4 (비우면 torque_mpc.yaml slip_feedback.enable = true, 2026-11-28 부터 기본 켬)"),
+        A("slip_fb_scale", default_value="", description="슬립 되먹임 K_ω 배율 0~5 (비우면 torque_mpc.yaml slip_feedback.gain_scale 1.0)"),
+        A("slip_fb_gain", default_value="", choices=["", "lqr", "ik"],
+          description="슬립 되먹임 K_ω 설계: lqr = 바퀴 미끄럼 모델 LQR (대각 0.0162) | ik = K_v R(δ0) T (예전 몸체 오차 되먹임과 같음) "
+                      "(비우면 torque_mpc.yaml slip_feedback.gain lqr, 2026-11-27 (3))"),
         A("slip_eta", default_value="",
           description="슬립 계수 η_s true/false — 바퀴별 상한 × 1/(1+exp((|λ̃|−λ_c)/s)) (비우면 torque_mpc.yaml slip_eta.enable = false). "
                       "회의 결정대로면 mu_hat_wheels:=off mu_hat:=1.0 과 같이 (2026-11-23)"),

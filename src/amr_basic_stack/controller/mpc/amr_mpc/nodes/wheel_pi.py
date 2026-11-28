@@ -59,6 +59,7 @@ class WheelPINode(Node):
             ("wheel_states_topic", "/wheel_states"),
             ("armed_topic", "/mpc/armed"),
             ("output_topic", "/wheel_pi/cmd_raw"),
+            ("status_topic", "/wheel_pi/status"),     # 2026-11-28: 패드 텔레옵 PI (teleop_pi_node) 가 비교군 A 의 것과 섞이지 않게
             ("kp", float(ya["kp"])),
             ("ki", float(ya["ki"])),
             ("tau_max_Nm", float(ya.get("tau_max_Nm", -1.0))),          # ≤ 0 이면 B 와 같게 (τ_lim − τ_fric,max)
@@ -99,7 +100,7 @@ class WheelPINode(Node):
         self.armed, self.armed_since, self.active = False, 0.0, False
 
         self.pub = self.create_publisher(WheelTorqueCommand, str(g("output_topic")), 10)
-        self.pub_status = self.create_publisher(Float64MultiArray, "/wheel_pi/status", 10)
+        self.pub_status = self.create_publisher(Float64MultiArray, str(g("status_topic")), 10)
         self.create_subscription(TwistStamped, str(g("cmd_topic")), self.on_cmd, 10)
         self.create_subscription(WheelStates, str(g("wheel_states_topic")), self.on_wheels, 10)
         if self.speed_source == "estimator":

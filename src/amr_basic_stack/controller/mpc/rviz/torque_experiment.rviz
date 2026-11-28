@@ -30,6 +30,31 @@ Visualization Manager:
         History Policy: Keep Last
       Value: true
     - Class: rviz_default_plugins/Path
+      Name: Next run preview (pitwall, while stopped)
+      Enabled: true
+      Color: 255; 0; 255
+      Alpha: 0.6
+      Line Style: Lines
+      Topic:
+        Value: /figure8/next_path
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Name: Pitwall status text
+      Enabled: true
+      Namespaces:
+        {}
+      Topic:
+        Value: /figure8/status_marker
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Path
       Name: MPC reference horizon
       Enabled: true
       Color: 255; 170; 0

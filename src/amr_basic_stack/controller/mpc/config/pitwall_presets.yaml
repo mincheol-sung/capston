@@ -1,0 +1,55 @@
+# pit 프리셋 (tools/pit.py, 2026-11-28 pitwall). amrall 스택을 켠 채로 `pit poly` · `pit circ` 로 다음 판 조건을 바꾼다.
+#   reference : 기준 노드 값. torque_track.yaml track 값에서 시작해 여기 적은 값으로 덮는다 → 같은 프리셋이면 늘 같은 기준
+#               (출발점 방식 origin_*·start_tolerance_*·lead_* 와 yaml 이 max 인 값은 지금 값 그대로 둔다)
+#   mpc       : MPC 값. 적은 것만 바꾼다 (실행 중 바꿀 수 있는 12 개만 — torque_mpc_node.cpp kLiveParams)
+#   requires  : launch 때 정해지는 값. 다르면 pit 이 경고만 한다 (실행 중 못 바꾼다 — 그 launch 로 다시 띄울 것)
+# ★ poly·circ 는 amr_aliases.sh 의 같은 이름 별칭과 같은 기준이다. 한쪽을 바꾸면 다른 쪽도 맞출 것.
+#   launch: `poly` (또는 `circ`) 로 한 번 띄운 뒤 `pit circ` · `pit poly` 로 갈아탄다. 뒤에 key=value 를 붙이면 그 값이 이긴다 (pit poly accel=1.2).
+
+poly:
+  description: 꺾은선 스트레스 판 — 가감속 1.5 · 최고 1.5 m/s · 꼭짓점 통과 (amr_aliases.sh poly)
+  requires: {controller: mpc, limit_mode: friction}
+  reference: {shape: polyline, accel: 1.5, square_v_max: 1.5, square_corner_mode: pass}
+
+circ:
+  description: 원 8 자 스트레스 판 — 반지름 0.75 m · 1.232 m/s (부하 예산 최고) · 가감속 1.5 · 3 바퀴 (amr_aliases.sh circ)
+  requires: {controller: mpc, limit_mode: friction}
+  reference: {shape: circles8, width: 3.0, speed: 1.232, accel: 1.5, laps: 3.0}
+
+# ── 2026-11-28 controller:=all + amrseq 용: 11-26 세 경로 조건 그대로 (analysis/torque_mpc_real/2026-11-28_c_sfb_q4/COMMANDS_KO.md)
+#   reference = 11-26 기준 회차 run_info/params 의 그 모양에서 쓰이는 값 전부 (ref_config.RELEVANT) — 덤프에서 그대로 옮김
+#   pp        = PP·ADPP 룩어헤드 여섯 값 (11-26 launch 인자 + torque_baseline_a.yaml). 경로마다 다르므로 늘 여섯 개 다 적는다
+#   fault     = 추종 오차 한계 (11-26 max_track_error)
+#   mpc       = 새 C (슬립 되먹임 lqr 1.0 + Q 위치 ×4, 2026-11-28 yaml 기본과 같음 — yaml 이 또 바뀌어도 조건이 남게)
+#   쓰는 법:  amrall use_mpc:=true controller:=all limit_mode:=friction bag:=… → 초록 배너 → pit s1 → amrseq
+s1:
+  description: 11-26 S1 circles8 — width 2.0 · 1.0 m/s · accel 1.0 · 교차 완화 0.6 · 1 바퀴 (기준 회차 172646 · 172737 · 172939)
+  requires: {controller: all, limit_mode: friction}
+  reference: {shape: circles8, width: 2.0, speed: 1.0, accel: 1.0, laps: 1.0, lap_speeds: [0.0], align_s: 1.5, crossing_blend_m: 0.6,
+              speed_mod_amp: 0.0, speed_mod_cycles: 2.0, speed_mod_phase_deg: 0.0, speed_mod_shape: sin, spin_rate: 1.0,
+              first_turn: left, yaw_mode: tangent, start_delay: 3.0, hold_s: 5.0}
+  pp: {lookahead_time: 0.5, lookahead_min: 0.30, lookahead_max: 0.30, adpp_lookahead_time: 0.5, adpp_lookahead_min: 0.15, adpp_lookahead_max: 0.60}
+  fault: {max_track_error: 0.5}
+  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.0}
+
+s2:
+  description: S2 zigzag — 직선 5 개 × 2 m · 30° · square · 꼭짓점 통과 0.3 m/s · 최고 = 부하 예산 · accel 1.15 (11-26 기준 회차 200634 는 9 개 × 1 m)
+  requires: {controller: all, limit_mode: friction}
+  # 2026-11-28 사용자 결정 "zigzag_length = 2, zigzag_n = 5 로 기본값 수정" (11-26 값: zigzag_n 9 · zigzag_length 1.0). 나머지는 11-26 그대로
+  reference: {shape: zigzag, zigzag_n: 5, zigzag_length: 2.0, zigzag_angle_deg: 30.0, zigzag_profile: square, zigzag_rot_s: 0.5,
+              zigzag_dwell_s: 0.1, zigzag_corner: pass, zigzag_corner_speed: 0.3, zigzag_turn_m: 0.5, zigzag_reverse: false,
+              speed: 0.0, accel: 1.15, spin_rate: 1.0, align_s: 1.5, yaw_mode: tangent, start_delay: 3.0, hold_s: 5.0}
+  # 11-26 zigzag 는 PP·ADPP 모두 pp_lookahead_min:=0.1 pp_lookahead_max:=0.2 → lookahead_time 이 둘 다 0.5 라 두 제어기 룩어헤드가 같았다
+  pp: {lookahead_time: 0.5, lookahead_min: 0.10, lookahead_max: 0.20, adpp_lookahead_time: 0.5, adpp_lookahead_min: 0.10, adpp_lookahead_max: 0.20}
+  fault: {max_track_error: 0.5}
+  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.0}
+
+s3:
+  description: 11-26 S3 polyline — R1,L1,L2,R1,R1,R2 · 최고 1.5 m/s · accel 1.5 · 꼭짓점 통과 (기준 회차 201944 · 202049 · 202150, = poly)
+  requires: {controller: all, limit_mode: friction}
+  reference: {shape: polyline, poly_path: "R1,L1,L2,R1,R1,R2", square_corner_speed: 0.1, square_v_max: 1.5, square_yaw_blend: 0.3,
+              square_corner_mode: pass, square_rot_s: 1.0, square_dwell_s: 0.1, accel: 1.5, align_s: 1.5, yaw_mode: tangent,
+              start_delay: 3.0, hold_s: 5.0}
+  pp: {lookahead_time: 0.5, lookahead_min: 0.30, lookahead_max: 0.30, adpp_lookahead_time: 0.5, adpp_lookahead_min: 0.15, adpp_lookahead_max: 0.60}
+  fault: {max_track_error: 1.5}
+  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.0}

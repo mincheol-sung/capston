@@ -32,6 +32,13 @@ from amr_mpc.core import node_main
 #       엇갈려 정지 신호 **뒤에** 토크 명령이 한 번 더 나가는 일을 막는다.
 #     · rclpy 의 SIGINT 처리기를 끈다 (SignalHandlerOptions.NO). 켜 두면 Ctrl+C 때 rclpy 가 먼저 닫혀
 #       shutdown() 의 마지막 정지 신호를 못 내고, 토크 모드에서는 마지막 토크 명령이 남는다 (실측).
+#   텔레옵 모드 (2026-11-28 사용자 요청, teleop_input_topic — 비우면 끔 = 예전 동작 그대로):
+#     게이트가 두 입력 중 하나만 중계한다.
+#       DISARMED ─ 'a' · /mpc/arm true (패드 RT) ───▶ AUTO    input_topic 중계,        /mpc/armed true
+#                ─ 't' · /teleop/arm true (패드 LT) ─▶ TELEOP  teleop_input_topic 중계, /teleop/armed true
+#     AUTO ↔ TELEOP 는 바로 넘어간다 (한쪽을 켜면 다른 쪽은 꺼진다). 넘어가는 순간 정지 신호를 한 번 내고, 새 쪽 입력은
+#     넘어간 뒤 받은 명령만 낸다 (무장 때와 같은 규칙). 's' · SPACE · /mpc/arm false (패드 B, fault_monitor) 는 둘 다 끈다.
+#     /mpc/armed 는 AUTO 일 때만 true — 기준 시간·MPC·fault_monitor 추종 검사·bag 분석의 "무장 구간" 은 그대로 AUTO 만 뜻한다.
 _COMMAND_TYPES = {
     'twist':  (Twist,              Twist),
     'wheels': (Float32MultiArray,  lambda: Float32MultiArray(data=[0.0] * 4)),
@@ -59,6 +66,10 @@ class KeyboardCommandGate(Node):
         # (MPC 100 Hz, 게이트 50 Hz 면 명령 절반 유실 + 0~20 ms). true 면 무장 중에는 받는 즉시 내보내고,
         # 타이머는 무장 해제·명령 끊김 때의 0 만 낸다. 무장·신선도·정지 논리는 같다.
         self.declare_parameter('forward_on_receive', False)
+        # 2026-11-28 텔레옵 모드 (머리주석). teleop_input_topic 을 비우면 끈다
+        self.declare_parameter('teleop_input_topic', '')
+        self.declare_parameter('teleop_arm_topic', '/teleop/arm')
+        self.declare_parameter('teleop_armed_topic', '/teleop/armed')
 
         input_topic = str(self.get_parameter('input_topic').value)
         output_topic = str(self.get_parameter('output_topic').value)
@@ -83,6 +94,12 @@ class KeyboardCommandGate(Node):
 
         self.latest_command = self._zero()
         self.latest_command_time = 0.0
+        teleop_input = str(self.get_parameter('teleop_input_topic').value)
+        self.teleop_enabled = bool(teleop_input)
+        self.teleop = False                       # TELEOP 모드. self.armed (AUTO) 와 동시에 True 가 되지 않는다
+        self.teleop_command = self._zero()
+        self.teleop_command_time = 0.0
+        self.teleop_state_publisher = None
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
         self.keyboard_thread = None
@@ -98,6 +115,12 @@ class KeyboardCommandGate(Node):
         )
         self.create_subscription(self.msg_type, input_topic, self._on_command, 10)
         self.create_subscription(Bool, arm_topic, self._on_arm_message, 10)
+        if self.teleop_enabled:
+            self.teleop_state_publisher = self.create_publisher(
+                Bool, str(self.get_parameter('teleop_armed_topic').value), state_qos)
+            self.create_subscription(self.msg_type, teleop_input, self._on_teleop_command, 10)
+            self.create_subscription(
+                Bool, str(self.get_parameter('teleop_arm_topic').value), self._on_teleop_arm_message, 10)
         self.timer = self.create_timer(
             1.0 / max(publish_frequency, 1.0),
             self._publish_gated_command,
@@ -115,11 +138,13 @@ class KeyboardCommandGate(Node):
         initial_state = 'ARMED' if self.armed else 'DISARMED'
         self.get_logger().warning(
             f'MPC command gate is {initial_state}. '
-            "Press 'a' to arm; press 's' or SPACE to stop."
+            "Press 'a' to arm" + (", 't' for teleop" if self.teleop_enabled else "")
+            + "; press 's' or SPACE to stop."
         )
         self.get_logger().info(
             f'Command gate [{command_type}]: {input_topic} -> {output_topic}, '
-            f'arm topic={arm_topic}, '
+            + (f'teleop {teleop_input} -> {output_topic}, ' if self.teleop_enabled else '')
+            + f'arm topic={arm_topic}, '
             f'{"forward on receive" if self.forward_on_receive else f"resample {publish_frequency:.0f} Hz"}.'
         )
 
@@ -137,38 +162,72 @@ class KeyboardCommandGate(Node):
             if self.forward_on_receive and self.armed:
                 self.command_publisher.publish(message)     # lock 안 — 정지 신호와 순서가 뒤바뀌지 않게
 
+    def _on_teleop_command(self, message):
+        with self.lock:
+            self.teleop_command = copy.deepcopy(message)
+            self.teleop_command_time = time.monotonic()
+            if self.forward_on_receive and self.teleop:
+                self.command_publisher.publish(message)
+
     def _on_arm_message(self, message):
         self._set_armed(bool(message.data), 'ROS arm topic')
 
+    def _on_teleop_arm_message(self, message):
+        self._set_teleop(bool(message.data), 'ROS teleop arm topic')
+
     def _set_armed(self, armed, source):
+        """AUTO 무장, 또는 전부 정지 — 정지는 TELEOP 도 끈다 ('s'·패드 B·fault_monitor 는 어느 모드든 세운다)."""
         with self.lock:
-            changed = self.armed != armed
+            before = (self.armed, self.teleop)
             self.armed = armed
+            self.teleop = False
             if armed:
                 # Require a command received after arming; never release a stale
                 # command that was buffered while the robot was disarmed.
                 self.latest_command_time = 0.0
-            else:
+            if not armed or before[1]:        # 정지, 또는 TELEOP → AUTO 로 넘어가는 순간 (텔레옵 명령을 끊는다)
                 self.command_publisher.publish(self._stop_message())
         self._publish_state()
-        if changed:
+        if before != (self.armed, self.teleop):
             state = 'ARMED' if armed else 'DISARMED'
             self.get_logger().warning(f'MPC command gate {state} by {source}.')
 
+    def _set_teleop(self, on, source):
+        """TELEOP 켜기 (AUTO 는 꺼진다) / 끄기. teleop_input_topic 이 비어 있으면 아무것도 안 한다."""
+        if not self.teleop_enabled:
+            return
+        with self.lock:
+            before = (self.armed, self.teleop)
+            if on and not self.teleop:
+                self.teleop_command_time = 0.0    # 무장 때와 같다 — 켜기 전에 받아 둔 묵은 명령은 내지 않는다
+            self.teleop = on
+            if on:
+                self.armed = False
+            if before != (self.armed, self.teleop):   # AUTO → TELEOP 이든 TELEOP → 끔 이든 지금 나가던 명령은 끊는다
+                self.command_publisher.publish(self._stop_message())
+        self._publish_state()
+        if before != (self.armed, self.teleop):
+            self.get_logger().warning(f"MPC command gate {'TELEOP' if on else 'DISARMED'} by {source}.")
+
     def _publish_state(self):
         self.state_publisher.publish(Bool(data=self.armed))
+        if self.teleop_state_publisher is not None:
+            self.teleop_state_publisher.publish(Bool(data=self.teleop))
 
     def _publish_gated_command(self):
         now = time.monotonic()
         with self.lock:
-            fresh = (
-                self.latest_command_time > 0.0
-                and now - self.latest_command_time <= self.command_timeout
-            )
-            if self.armed and fresh:
+            if self.armed:
+                command, received = self.latest_command, self.latest_command_time
+            elif self.teleop:
+                command, received = self.teleop_command, self.teleop_command_time
+            else:
+                command, received = None, 0.0
+            fresh = received > 0.0 and now - received <= self.command_timeout
+            if command is not None and fresh:
                 if self.forward_on_receive:
-                    return              # _on_command 가 이미 받은 즉시 냈다
-                command = copy.deepcopy(self.latest_command)
+                    return              # _on_command · _on_teleop_command 가 이미 받은 즉시 냈다
+                command = copy.deepcopy(command)
             else:
                 command = self._stop_message()
             self.command_publisher.publish(command)
@@ -197,6 +256,8 @@ class KeyboardCommandGate(Node):
                     continue
                 if key.lower() == 'a':
                     self._set_armed(True, "keyboard 'a'")
+                elif key.lower() == 't' and self.teleop_enabled:
+                    self._set_teleop(True, "keyboard 't'")
                 elif key.lower() == 's' or key == ' ':
                     self._set_armed(False, 'keyboard stop key')
         except (OSError, termios.error) as exc:
@@ -221,6 +282,7 @@ class KeyboardCommandGate(Node):
         else:
             with self.lock:
                 self.armed = False
+                self.teleop = False
         if self.keyboard_thread is not None:
             self.keyboard_thread.join(timeout=0.5)
 

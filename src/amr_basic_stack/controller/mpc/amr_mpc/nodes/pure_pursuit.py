@@ -18,23 +18,45 @@
 #   상태가 끊기면 이 노드가 깨어나지 않으니 역시 명령이 끊긴다 (같은 결과).
 #   기준열과 상태의 frame_id 가 다르면 명령을 끊는다 (torque_mpc_node 와 같은 검사, R7 리뷰 2026-11-13).
 #   safety·hold 문턱은 torque_mpc.yaml 을 그대로 읽는다 (A 와 B·C 의 정지 규칙이 갈라지지 않게 한 곳에서).
+#
+# controller:=all (2026-11-28, nodes/controller_select.py): variant_topic (/ctrl/active) 을 주면 룩어헤드 묶음을 그 값으로 고른다.
+#   pp   = lookahead_time·min·max (launch 가 torque_baseline_a.yaml pure_pursuit + pp_lookahead_* 로 채운다)
+#   adpp = adpp_lookahead_time·min·max (pure_pursuit_adaptive + pp_lookahead_*)
+#   mpc  = 이 노드는 무장 신호를 못 받아 쉰다 (묶음은 그대로).
+#   이 여섯 값은 정지 중에 바꿀 수 있다 (tools/pit.py 프리셋 s2 의 zigzag 0.1·0.2 m 처럼 경로마다 다른 값). 무장 중에는 거부.
 # ---------------------------------------------------------------
+import dataclasses
 import math
 
 import numpy as np
 import rclpy
 from geometry_msgs.msg import PointStamped, TwistStamped
 from nav_msgs.msg import Odometry
+from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
-from std_msgs.msg import Bool, Float64MultiArray
+from std_msgs.msg import Bool, Float64MultiArray, String
 
 from amr_interfaces.msg import PlanarReferenceArray
 from amr_mpc.baseline.pure_pursuit import PurePursuitConfig, pure_pursuit
 from amr_mpc.core import config, node_main
+from amr_mpc.core.ctrl_select import parse_active
 from amr_mpc.core.reference import HoldLatch, ReferenceHorizon, wrap
 from amr_mpc.torque.model import TorquePlant
+
+
+LOOKAHEAD = ("lookahead_time", "lookahead_min", "lookahead_max")
+
+
+def lookahead_sets(get):
+    """parameter 읽기 함수 → {"pp": {lookahead_*}, "adpp": {lookahead_*}}."""
+    return {"pp": {k: float(get(k)) for k in LOOKAHEAD}, "adpp": {k: float(get("adpp_" + k)) for k in LOOKAHEAD}}
+
+
+def check_lookahead(la):
+    if not (la["lookahead_time"] >= 0.0 and 0.0 < la["lookahead_min"] <= la["lookahead_max"]):
+        raise ValueError(f"룩어헤드 {la} — time ≥ 0, 0 < min ≤ max")
 
 
 def yaw_of(q):
@@ -44,7 +66,8 @@ def yaw_of(q):
 class PurePursuitNode(Node):
     def __init__(self):
         super().__init__("pure_pursuit_node")
-        ya = config.load("torque_baseline_a.yaml")["pure_pursuit"]
+        yb = config.load("torque_baseline_a.yaml")
+        ya, yad = yb["pure_pursuit"], yb.get("pure_pursuit_adaptive", {})
         ym = config.load("torque_mpc.yaml")
         d = PurePursuitConfig()
         self.declare_parameters("", [
@@ -60,6 +83,8 @@ class PurePursuitNode(Node):
             ("hold_exit_yaw_deg", float(ym["hold"]["exit_yaw_deg"])),
             ("hold_stopped_speed", float(ym["hold"]["stopped_speed"])),
             *[(k, float(ya.get(k, getattr(d, k)))) for k in PurePursuitConfig.__dataclass_fields__],
+            ("variant_topic", ""),         # 2026-11-28 controller:=all 머리주석. 비우면 위 lookahead_* 하나
+            *[("adpp_" + k, float(yad.get(k, ya.get(k, getattr(d, k))))) for k in LOOKAHEAD],
         ])
         g = lambda n: self.get_parameter(n).value
         self.cfg = PurePursuitConfig(**{k: float(g(k)) for k in PurePursuitConfig.__dataclass_fields__})
@@ -72,6 +97,14 @@ class PurePursuitNode(Node):
         self.ref, self.ref_rx, self.ref_frame = None, 0.0, "map"
         self.armed, self.armed_since, self.active = False, 0.0, False
 
+        self.sets = lookahead_sets(g)
+        for la in self.sets.values():
+            check_lookahead(la)
+        self.variant = None                        # variant_topic 을 안 쓰면 None (예전 그대로: lookahead_* 하나)
+        if str(g("variant_topic")):
+            latched_v = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+            self.create_subscription(String, str(g("variant_topic")), self.on_variant, latched_v)
+        self.add_on_set_parameters_callback(self.on_params)
         self.pub = self.create_publisher(TwistStamped, str(g("cmd_topic")), 10)
         self.pub_status = self.create_publisher(Float64MultiArray, "/pure_pursuit/status", 10)
         self.pub_la = self.create_publisher(PointStamped, "/pure_pursuit/lookahead", 1)
@@ -95,6 +128,48 @@ class PurePursuitNode(Node):
 
     def now_s(self):
         return self.get_clock().now().nanoseconds * 1e-9
+
+    def apply_lookahead(self):
+        la = self.sets[self.variant or "pp"]
+        self.cfg = dataclasses.replace(self.cfg, **la)
+        c = self.cfg
+        self.get_logger().info(f"룩어헤드 ({self.variant or 'pp'}): L_d = clamp({c.lookahead_time:g} s × |v_ref|, "
+                               f"{c.lookahead_min:g}, {c.lookahead_max:g}) m")
+
+    def on_variant(self, m):
+        try:
+            v = parse_active(m.data)
+        except ValueError as e:
+            self.get_logger().error(f"제어기 선택 무시: {e}")
+            return
+        if v in ("pp", "adpp") and v != self.variant:
+            self.variant = v
+            self.apply_lookahead()
+
+    def on_params(self, params):
+        """룩어헤드 여섯 값만 정지 중에. 나머지는 기동 때 읽은 값이라 바꿔도 안 쓰인다 → 거부."""
+        names = [p.name for p in params if p.name != "use_sim_time"]
+        allowed = set(LOOKAHEAD) | {"adpp_" + k for k in LOOKAHEAD}
+        bad = [n for n in names if n not in allowed]
+        if bad:
+            return SetParametersResult(successful=False, reason=f"{bad} 는 launch 때만 (실행 중: {sorted(allowed)})")
+        if not names:
+            return SetParametersResult(successful=True)
+        if self.armed:
+            return SetParametersResult(successful=False, reason="무장 중 — 정지한 뒤")
+        sets = {k: dict(v) for k, v in self.sets.items()}
+        for p in params:
+            if p.name in allowed:
+                fam, key = ("adpp", p.name[5:]) if p.name.startswith("adpp_") else ("pp", p.name)
+                sets[fam][key] = float(p.value)
+        try:
+            for la in sets.values():
+                check_lookahead(la)
+        except ValueError as e:
+            return SetParametersResult(successful=False, reason=str(e))
+        self.sets = sets
+        self.apply_lookahead()
+        return SetParametersResult(successful=True)
 
     def on_armed(self, m):
         if bool(m.data) != self.armed:

@@ -1,0 +1,639 @@
+[INFO] [launch]: All log files can be found below /home/smoc/.ros/log/2026-11-21-19-30-24-993070-smoc-NUC-184067
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch.user]: [real_all] ROS_DOMAIN_ID=81  peers=(없음, NUC 만)
+[INFO] [launch.user]: 
+────────────────────────────────────────────────────────────────────────────
+TODO(확인) — cartographer 의 오도메트리 prior 를 무엇으로 줄 것인가   (2026-09-03)
+
+  지금 /odom (휠 원본) 을 쓴다. 이 선택을 실측으로 검증한 적이 없다.
+
+  배경: 2026-09-03 에 ekf.yaml 이 휠의 절대 위치 x,y 를 융합하던 것을 고쳐
+        (속도만 받도록) /odometry/filtered 가 자기일관적이 됐다. 이제
+        ekf_carto_*.yaml 세 개가 쓰는 패턴과 같다.
+        같은 날 실측:  휠 yaw 는 실제 회전의 65 % 만 본다 (총회전 66° vs 자이로 114°).
+        /odom 의 pose 델타에는 그 축소된 회전이 실려 있다.
+
+  괜찮을 수도 있는 이유: lua 가 use_imu_data = true 이고 tracking_frame 이 IMU
+        프레임이라, cartographer 는 자세를 IMU 에서 직접 받는다. 오도메트리는
+        주로 병진 prior 다. "회전은 IMU, 병진은 휠" 은 cartographer 정석 설정이다.
+
+  판단 방법 (코드 수정 없이 A/B):
+        ros2 launch amr_perception_bringup cartographer.launch.py \
+             mode:=localization map:=<맵> odom_topic:=/odometry/filtered
+        같은 경로를 두 토픽으로 주행하고 비교:
+          · ros2 run amr_perception_bringup carto_debug --watch 2
+          · map -> odom 이 튀는 정도 (특히 제자리 회전·급선회 구간)
+          · 재측위 수렴 시간
+
+  끝나면: 더 나은 쪽을 default_value 로 박고 근거를 한 줄 남긴 뒤
+          **이 알림 블록과 위의 TODO(확인) 주석을 지워라.**
+          /odom 이 이기면 그것도 결론이다 — 지우고 이유를 적으면 된다.
+────────────────────────────────────────────────────────────────────────────
+
+[INFO] [launch.user]: CAN setup: can0 already UP; using existing interface (device/bitrate not reconfigured).
+[INFO] [launch.user]: plant:=real — 이 launch 는 모터(ak40_can_node), IMU 회전 노드, robot_state_publisher(로봇 모델 TF) 를 띄운다. 다른 터미널에서 먼저:
+  ① 센서: ros2 launch amr_bringup sensors.launch.py   (라이다·D455 IMU)
+  ② 측위: ros2 launch amr_perception_bringup cartographer.launch.py mode:=localization map:=<지도 이름> lua_basename:=localization_torque_2d.lua
+     (저장된 지도 pbstream 위에서, 외삽 끔 → /tracked_pose 스캔 시각 stamp)
+  ✗ 같이 띄우지 말 것: bringup.launch.py (RoboClaw 구동 노드), localization.launch.py (IMU 회전 노드가 하나 더 떠 IMU 가 두 배로 온다)
+  NUC 에서는 use_rviz:=false 권장 (화면 없음·CPU 를 MPC 와 나눠 쓴다)
+  실차 확인 순서: amr/notes_amr/real_robot_checklist.md
+[INFO] [bag_record-1]: process started with pid [184078]
+[INFO] [rplidar_node-2]: process started with pid [184079]
+[INFO] [rplidar_node-3]: process started with pid [184080]
+[INFO] [scan_sector_filter-4]: process started with pid [184081]
+[INFO] [scan_sector_filter-5]: process started with pid [184082]
+[INFO] [scan_merger-6]: process started with pid [184085]
+[INFO] [realsense2_camera_node-7]: process started with pid [184086]
+[INFO] [cartographer_node-8]: process started with pid [184087]
+[INFO] [cartographer_occupancy_grid_node-9]: process started with pid [184089]
+[INFO] [pose_to_odom_node-10]: process started with pid [184090]
+[INFO] [ekf_node-11]: process started with pid [184092]
+[INFO] [set_initial_pose_node-12]: process started with pid [184093]
+[INFO] [ak40_can_node-13]: process started with pid [184094]
+[INFO] [robot_state_publisher-14]: process started with pid [184103]
+[INFO] [imu_to_base_node-15]: process started with pid [184125]
+[INFO] [state_estimator_node-16]: process started with pid [184126]
+[INFO] [figure8_reference_node-17]: process started with pid [184129]
+[INFO] [torque_mpc_node-18]: process started with pid [184132]
+[INFO] [torque_output_node-19]: process started with pid [184133]
+[INFO] [fault_monitor_node-20]: process started with pid [184134]
+[INFO] [slip_logger_node-21]: process started with pid [184139]
+[INFO] [keyboard_command_gate-22]: process started with pid [184157]
+[INFO] [torque_viz_node-23]: process started with pid [184160]
+[rplidar_node-2] [INFO] [1795257025.189734436] [rplidar_front]: RPLidar running on ROS2 package rplidar_ros. RPLIDAR SDK Version:2.1.0
+[rplidar_node-3] [INFO] [1795257025.190043066] [rplidar_rear]: RPLidar running on ROS2 package rplidar_ros. RPLIDAR SDK Version:2.1.0
+[rplidar_node-2] [INFO] [1795257025.206654996] [rplidar_front]: RPLidar S/N: 99A3E18DC9E692D1BB9592F61B024A6B
+[rplidar_node-2] [INFO] [1795257025.206689879] [rplidar_front]: Firmware Ver: 1.02
+[rplidar_node-2] [INFO] [1795257025.206695107] [rplidar_front]: Hardware Rev: 18
+[rplidar_node-2] [INFO] [1795257025.208551365] [rplidar_front]: RPLidar health status : 0
+[rplidar_node-2] [INFO] [1795257025.208596510] [rplidar_front]: RPLidar health status : OK.
+[rplidar_node-2] [INFO] [1795257025.211725476] [rplidar_front]: Start
+[rplidar_node-3] [INFO] [1795257025.206675188] [rplidar_rear]: RPLidar S/N: B559E18DC9E692D1BB9592F637F84A6B
+[rplidar_node-3] [INFO] [1795257025.206698713] [rplidar_rear]: Firmware Ver: 1.02
+[rplidar_node-3] [INFO] [1795257025.206703792] [rplidar_rear]: Hardware Rev: 18
+[rplidar_node-3] [INFO] [1795257025.211633361] [rplidar_rear]: RPLidar health status : 0
+[rplidar_node-3] [INFO] [1795257025.211670182] [rplidar_rear]: RPLidar health status : OK.
+[rplidar_node-3] [INFO] [1795257025.213761110] [rplidar_rear]: Start
+[torque_mpc_node-18] [INFO] [1795257025.245946816] [torque_mpc_node]: 토크 MPC (C++/DAQP).  기준 /dra_mppi/reference_trajectory  상태 /state_estimator/odom → /torque_mpc/cmd_raw
+[torque_mpc_node-18]   Ts 10 ms  Np 50  Nc 5   m 4.56 kg  I_z 0.060  바퀴 등가 질량 m_w 2.225 kg (M 에 늘)  w 항 켬
+[torque_mpc_node-18]   상한 모드 friction: τ̄ 0.1230 N·m, Δτ̄ 0.0410 N·m/스텝  (모터 1.200, 마찰 τ_μ 0.0759 @ μ̂ 0.30)   외란 추정치 끔 (α 0.10)
+[torque_mpc_node-18] [INFO] [1795257025.246022201] [torque_mpc_node]:   바퀴별 μ̂ [0.486 0.495 0.513 0.469] (mg/4 기준, - = μ̂ 0.30 × 하중 몫)  하중 몫 FL 0.2388 FR 0.2392 RL 0.2608 RR 0.2612
+[torque_mpc_node-18]   → 마찰 τ_μ,i [0.1230 0.1253 0.1298 0.1187] N·m, 쓰는 τ̄ [0.1230 0.1253 0.1298 0.1187]
+[torque_mpc_node-18] [INFO] [1795257025.246032666] [torque_mpc_node]:   가중: W [5, 5, 2.5, 2, 2, 1]  r_Δ 100 /스텝 (= w_dudt 0.010000 (N·m/s)⁻² / Ts²)  r_U 10  q_null 0
+[torque_mpc_node-18] [INFO] [1795257025.246040789] [torque_mpc_node]:   속도 상태: 추정기 그대로
+[torque_mpc_node-18] [INFO] [1795257025.246043672] [torque_mpc_node]:   선형화 reference (1판: 지평의 기준 방향 θ_r 을 대입)
+[bag_record-1] [record_all] 녹화 → /home/smoc/capston/capston/bags/2026-11-21/193025  (모든 토픽, 영상·점군·카토 표시용 제외. 끝낼 때 Ctrl+C)
+[robot_state_publisher-14] [INFO] [1795257025.255432405] [robot_state_publisher]: Robot initialized
+[cartographer_node-8] [INFO] [1795257025.284662795] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/localization_torque_2d.lua' for 'localization_torque_2d.lua'.
+[cartographer_node-8] [INFO] [1795257025.284902332] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/localization_2d.lua' for 'localization_2d.lua'.
+[cartographer_node-8] [INFO] [1795257025.284933867] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/localization_2d.lua' for 'localization_2d.lua'.
+[cartographer_node-8] [INFO] [1795257025.289573722] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/mapping_2d.lua' for 'mapping_2d.lua'.
+[cartographer_node-8] [INFO] [1795257025.292434738] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/mapping_2d.lua' for 'mapping_2d.lua'.
+[cartographer_node-8] [INFO] [1795257025.292634270] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/map_builder.lua' for 'map_builder.lua'.
+[cartographer_node-8] [INFO] [1795257025.292662269] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/map_builder.lua' for 'map_builder.lua'.
+[cartographer_node-8] [INFO] [1795257025.292713582] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/pose_graph.lua' for 'pose_graph.lua'.
+[cartographer_node-8] [INFO] [1795257025.292734591] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/pose_graph.lua' for 'pose_graph.lua'.
+[cartographer_node-8] [INFO] [1795257025.292831826] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder.lua' for 'trajectory_builder.lua'.
+[cartographer_node-8] [INFO] [1795257025.292854235] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder.lua' for 'trajectory_builder.lua'.
+[cartographer_node-8] [INFO] [1795257025.292890732] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder_2d.lua' for 'trajectory_builder_2d.lua'.
+[cartographer_node-8] [INFO] [1795257025.292910220] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder_2d.lua' for 'trajectory_builder_2d.lua'.
+[cartographer_node-8] [INFO] [1795257025.293002774] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder_3d.lua' for 'trajectory_builder_3d.lua'.
+[cartographer_node-8] [INFO] [1795257025.293022953] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder_3d.lua' for 'trajectory_builder_3d.lua'.
+[torque_mpc_node-18] [WARN] [1795257025.296060240] [torque_mpc_node]: 상태 추정값 대기/끊김
+[cartographer_node-8] [INFO] [1795257025.316580715] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 map_builder_bridge.cpp:117] Loading saved state '/home/smoc/capston/capston/src/amr_basic_stack/planner/global_planner/maps/smoc_lab/smoc_lab.pbstream'...
+[rplidar_node-2] [INFO] [1795257025.407897643] [rplidar_front]: current scan mode: DenseBoost, sample rate: 32 Khz, max_distance: 30.0 m, scan frequency:10.0 Hz, 
+[rplidar_node-3] [INFO] [1795257025.408698679] [rplidar_rear]: current scan mode: DenseBoost, sample rate: 32 Khz, max_distance: 30.0 m, scan frequency:10.0 Hz, 
+[realsense2_camera_node-7] [INFO] [1795257025.411546289] [camera]: RealSense ROS v4.58.4
+[realsense2_camera_node-7] [INFO] [1795257025.411611810] [camera]: Built with LibRealSense v2.58.4
+[realsense2_camera_node-7] [INFO] [1795257025.411618966] [camera]: Running with LibRealSense v2.58.4
+[realsense2_camera_node-7] [INFO] [1795257025.451144723] [camera]: Device with serial number 215122251246 was found.
+[realsense2_camera_node-7] 
+[realsense2_camera_node-7] [INFO] [1795257025.451203857] [camera]: Device with physical ID /sys/devices/pci0000:00/0000:00:0d.0/usb2/2-1/2-1:1.0/video4linux/video0 was found.
+[realsense2_camera_node-7] [INFO] [1795257025.451214088] [camera]: Device with name RealSense D455 was found.
+[realsense2_camera_node-7] [INFO] [1795257025.451355999] [camera]: Device with port number 2-1 was found.
+[realsense2_camera_node-7] [INFO] [1795257025.451366478] [camera]: Device USB type: 3.2
+[realsense2_camera_node-7] [INFO] [1795257025.451376720] [camera]: Starting device RealSense D455 (Product ID: 0x0B5C)
+[realsense2_camera_node-7] [INFO] [1795257025.451424811] [camera]: getParameters...
+[realsense2_camera_node-7] [WARN] [1795257025.457960118] [camera]: For the 'unite_imu_method' param update to take effect, re-enable either gyro or accel stream.
+[realsense2_camera_node-7] [INFO] [1795257025.458010041] [camera]: JSON file is not provided
+[realsense2_camera_node-7] [INFO] [1795257025.458021078] [camera]: Device Name: RealSense D455
+[realsense2_camera_node-7] [INFO] [1795257025.458028136] [camera]: Device Serial No: 215122251246
+[realsense2_camera_node-7] [INFO] [1795257025.458034517] [camera]: Device physical port: /sys/devices/pci0000:00/0000:00:0d.0/usb2/2-1/2-1:1.0/video4linux/video0
+[realsense2_camera_node-7] [INFO] [1795257025.458041682] [camera]: Device FW version: 5.17.0.10
+[realsense2_camera_node-7] [INFO] [1795257025.458048173] [camera]: Device Product ID: 0x0B5C
+[realsense2_camera_node-7] [INFO] [1795257025.458053826] [camera]: Sync Mode: Off
+[realsense2_camera_node-7] [WARN] [1795257025.636730702] [camera]: re-enable the stream for the change to take effect.
+[realsense2_camera_node-7] [WARN] [1795257025.658829292] [camera]: re-enable the stream for the change to take effect.
+[realsense2_camera_node-7] [WARN] [1795257025.677561361] [camera]: re-enable the stream for the change to take effect.
+[realsense2_camera_node-7] [WARN] [1795257025.680101997] [camera]: re-enable the stream for the change to take effect.
+[realsense2_camera_node-7] [INFO] [1795257025.712845218] [camera]: Stopping Sensor: Depth Module
+[realsense2_camera_node-7] [INFO] [1795257025.712979490] [camera]: Stopping Sensor: RGB Camera
+[realsense2_camera_node-7] [INFO] [1795257025.713002333] [camera]: Stopping Sensor: Motion Module
+[ak40_can_node-13] [INFO] [1795257025.779292207] [ak40_can_node]: ak40_can_node: can0  모터 ID [1, 2, 3, 4] (FL FR RL RR)  부호 [-1, 1, -1, 1]
+[ak40_can_node-13]   MIT 범위 P ±12.5 V ±45.5 T ±5.0 (토크 한 칸 2.44 mN·m)  매뉴얼 확인, 실물 확인
+[ak40_can_node-13]   100 Hz, DAMPING kd 0.02, 토크 ±4.1 N·m, 명령 끊김 0.2 s → DAMPING, 응답 없음 0.05 s → error 255
+[ak40_can_node-13] [WARN] [1795257025.788022832] [ak40_can_node]: 응답 1/4 — 빠진 바퀴 [1, 2, 3]
+[ak40_can_node-13] [ERROR] [1795257025.788449986] [ak40_can_node]: FR 모터 에러 255 (응답 없음)
+[ak40_can_node-13] [ERROR] [1795257025.792005261] [ak40_can_node]: RL 모터 에러 255 (응답 없음)
+[ak40_can_node-13] [ERROR] [1795257025.792457329] [ak40_can_node]: RR 모터 에러 255 (응답 없음)
+[realsense2_camera_node-7] [INFO] [1795257025.795559684] [camera]: Starting Sensor: Depth Module
+[realsense2_camera_node-7] [INFO] [1795257025.816724636] [camera]: Open profile: stream_type: Depth(0), Format: Z16, Width: 640, Height: 480, FPS: 15
+[slip_logger_node-21] [INFO] [1795257025.890504721] [slip_logger_node]: slip_logger: 바퀴 /wheel_states + 차체 /state_estimator/odom → /slip_logger/slip (ω_ε 2.5 rad/s, 잡음 바닥 |λ| 0.1)
+[cartographer_node-8] [INFO] [1795257025.895043495] [cartographer logger]: I20261121 19:30:25.-2147483648 184087 map_builder_bridge.cpp:136] Added trajectory with ID '1'.
+[scan_merger-6] [INFO] [1795257025.912578979] [dual_scan_merger]: dual_scan_merger: ['/scan_front', '/scan_rear'] -> /scan (720 bins @ 0.50 deg)
+[scan_sector_filter-5] [INFO] [1795257025.920461608] [rear_cartographer_scan_filter]: LaserScan / timed PointCloud2 섹터 필터: 85.0° ~ -85.0° (기준 base_scan)
+[keyboard_command_gate-22] [WARN] [1795257025.934537639] [torque_command_gate]: MPC command gate is DISARMED. Press 'a' to arm; press 's' or SPACE to stop.
+[keyboard_command_gate-22] [WARN] [1795257025.936314392] [torque_command_gate]: Keyboard arming unavailable: cannot open /dev/tty ([Errno 6] No such device or address: '/dev/tty'). Use std_msgs/Bool on /mpc/arm instead.
+[keyboard_command_gate-22] [INFO] [1795257025.936868717] [torque_command_gate]: Command gate [torques]: /torque_output/cmd_raw -> /wheel_torque_cmd, arm topic=/mpc/arm, forward on receive.
+[realsense2_camera_node-7] [INFO] [1795257025.937649921] [camera]: Starting Sensor: RGB Camera
+[realsense2_camera_node-7] [INFO] [1795257025.941776649] [camera]: Open profile: stream_type: Color(0), Format: RGB8, Width: 640, Height: 480, FPS: 15
+[realsense2_camera_node-7]  21/11 19:30:25,943 WARNING [130150810355392] (ds-calib-parsers.cpp:36) IMU Calibration is not available, default intrinsic and extrinsic will be used.
+[figure8_reference_node-17] [INFO] [1795257025.944967889] [figure8_reference_node]: 정사각형 한 변 1.50 m × 4 변 (왼쪽으로), yaw tangent (꼭짓점 헤딩 완화 0.30 m), 꼭짓점 0.10 m/s, 가감속 1.50 m/s²
+[figure8_reference_node-17]   변별 시작→최고→끝: [0] 0.00→1.50→0.10 m/s 1.9 s  [1] 0.10→1.50→0.10 m/s 1.9 s  [2] 0.10→1.50→0.10 m/s 1.9 s  [3] 0.10→1.50→0.00 m/s 1.9 s
+[figure8_reference_node-17]   시간  대기 3.0 s + 주행 7.6 s + 정렬 1.5 s + 유지 5.0 s   부하 주행 97 %  정렬 20 % (예산 100 %, V_LIMIT 1.55 m/s)
+[realsense2_camera_node-7] [INFO] [1795257025.948070500] [camera]: Starting Sensor: Motion Module
+[realsense2_camera_node-7] [INFO] [1795257025.955374898] [camera]: Open profile: stream_type: Accel(0)Format: MOTION_XYZ32F, FPS: 400
+[realsense2_camera_node-7] [INFO] [1795257025.955413829] [camera]: Open profile: stream_type: Gyro(0)Format: MOTION_XYZ32F, FPS: 400
+[bag_record-1] stdin is not a terminal device. Keyboard handling disabled.[INFO] [1795257025.959408390] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[bag_record-1] [INFO] [1795257025.959410160] [rosbag2_recorder]: Event publisher thread: Started
+[bag_record-1] [INFO] [1795257025.965501902] [rosbag2_recorder]: Starting recording to '/home/smoc/capston/capston/bags/2026-11-21/193025'
+[bag_record-1] [INFO] [1795257025.970327663] [rosbag2_recorder]: Subscribed to topic '/rosout'
+[bag_record-1] [INFO] [1795257025.972617950] [rosbag2_recorder]: Subscribed to topic '/parameter_events'
+[bag_record-1] [INFO] [1795257025.974614195] [rosbag2_recorder]: Subscribed to topic '/events/write_split'
+[bag_record-1] [INFO] [1795257025.975311750] [rosbag2_recorder]: Listening for topics...
+[bag_record-1] [INFO] [1795257025.975352416] [rosbag2_recorder]: Recording...
+[bag_record-1] [INFO] [1795257025.975653605] [rosbag2_recorder]: Topics discovery started.
+[bag_record-1] [INFO] [1795257025.984796945] [rosbag2_recorder]: Subscribed to topic '/dra_mppi/reference_trajectory'
+[bag_record-1] [INFO] [1795257025.990889971] [rosbag2_recorder]: Subscribed to topic '/figure8/path'
+[imu_to_base_node-15] [INFO] [1795257025.995158348] [imu_to_base_node]: IMU 를 base_footprint 축으로 회전시켜 재발행
+[pose_to_odom_node-10] [INFO] [1795257025.995186013] [pose_to_odom_node]: camera_imu_optical_frame -> base_footprint 로 변환해 발행. cov(x,y,yaw)=(0.01, 0.01, 0.01)
+[bag_record-1] [INFO] [1795257025.997190332] [rosbag2_recorder]: Subscribed to topic '/scan'
+[realsense2_camera_node-7] [INFO] [1795257026.001383274] [camera]: RealSense Node Is Up!
+[bag_record-1] [INFO] [1795257026.005796058] [rosbag2_recorder]: Subscribed to topic '/camera/depth/camera_info'
+[bag_record-1] [INFO] [1795257026.010517051] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/status'
+[bag_record-1] [INFO] [1795257026.012118235] [rosbag2_recorder]: Subscribed to topic '/mpc/armed'
+[bag_record-1] [INFO] [1795257026.014515604] [rosbag2_recorder]: Subscribed to topic '/imu/base_link'
+[bag_record-1] [INFO] [1795257026.016322998] [rosbag2_recorder]: Subscribed to topic '/map_carto'
+[bag_record-1] [INFO] [1795257026.023003388] [rosbag2_recorder]: Subscribed to topic '/camera/gyro/metadata'
+[bag_record-1] [INFO] [1795257026.024622720] [rosbag2_recorder]: Subscribed to topic '/scan_front'
+[bag_record-1] [INFO] [1795257026.026010060] [rosbag2_recorder]: Subscribed to topic '/tracked_pose'
+[bag_record-1] [INFO] [1795257026.027026519] [rosbag2_recorder]: Subscribed to topic '/camera/imu'
+[bag_record-1] [INFO] [1795257026.029126796] [rosbag2_recorder]: Subscribed to topic '/camera/gyro/imu_info'
+[bag_record-1] [INFO] [1795257026.031251977] [rosbag2_recorder]: Subscribed to topic '/tf_static'
+[bag_record-1] [INFO] [1795257026.033184719] [rosbag2_recorder]: Subscribed to topic '/odometry/map'
+[bag_record-1] [INFO] [1795257026.034648934] [rosbag2_recorder]: Subscribed to topic '/camera/extrinsics/depth_to_color'
+[bag_record-1] [INFO] [1795257026.037565662] [rosbag2_recorder]: Subscribed to topic '/scan_matched_points2'
+[bag_record-1] [INFO] [1795257026.039120856] [rosbag2_recorder]: Subscribed to topic '/slip_logger/slip'
+[bag_record-1] [INFO] [1795257026.040297499] [rosbag2_recorder]: Subscribed to topic '/camera/extrinsics/depth_to_depth'
+[bag_record-1] [INFO] [1795257026.044199947] [rosbag2_recorder]: Subscribed to topic '/wheel_states'
+[bag_record-1] [INFO] [1795257026.044901298] [rosbag2_recorder]: Subscribed to topic '/scan_rear'
+[bag_record-1] [INFO] [1795257026.045596848] [rosbag2_recorder]: Subscribed to topic '/camera/color/camera_info'
+[bag_record-1] [INFO] [1795257026.051534615] [rosbag2_recorder]: Subscribed to topic '/submap_list'
+[bag_record-1] [INFO] [1795257026.052537656] [rosbag2_recorder]: Subscribed to topic '/tf'
+[bag_record-1] [INFO] [1795257026.058315526] [rosbag2_recorder]: Subscribed to topic '/scan_rear_carto'
+[bag_record-1] [INFO] [1795257026.060279044] [rosbag2_recorder]: Subscribed to topic '/camera/accel/imu_info'
+[bag_record-1] [INFO] [1795257026.063084743] [rosbag2_recorder]: Subscribed to topic '/robot_description'
+[bag_record-1] [INFO] [1795257026.067461106] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/cmd_raw'
+[bag_record-1] [INFO] [1795257026.070142726] [rosbag2_recorder]: Subscribed to topic '/wheel_torque_cmd'
+[bag_record-1] [INFO] [1795257026.072765912] [rosbag2_recorder]: Subscribed to topic '/camera/extrinsics/depth_to_gyro'
+[bag_record-1] [INFO] [1795257026.076252831] [rosbag2_recorder]: Subscribed to topic '/camera/accel/metadata'
+[bag_record-1] [INFO] [1795257026.079640501] [rosbag2_recorder]: Subscribed to topic '/ak40_can/status'
+[imu_to_base_node-15] [INFO] [1795257026.082595636] [imu_to_base_node]: camera_imu_optical_frame -> base_footprint 회전 확보
+[bag_record-1] [INFO] [1795257026.083097436] [rosbag2_recorder]: Subscribed to topic '/camera/color/metadata'
+[bag_record-1] [INFO] [1795257026.087840206] [rosbag2_recorder]: Subscribed to topic '/diagnostics'
+[bag_record-1] [INFO] [1795257026.090187492] [rosbag2_recorder]: Subscribed to topic '/camera/accel/sample'
+[bag_record-1] [INFO] [1795257026.092089673] [rosbag2_recorder]: Subscribed to topic '/camera/extrinsics/depth_to_accel'
+[bag_record-1] [INFO] [1795257026.096672090] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/reference_horizon'
+[bag_record-1] [INFO] [1795257026.099226991] [rosbag2_recorder]: Subscribed to topic '/tracked_pose/odom'
+[bag_record-1] [INFO] [1795257026.101914455] [rosbag2_recorder]: Subscribed to topic '/camera/depth/metadata'
+[bag_record-1] [INFO] [1795257026.104369797] [rosbag2_recorder]: Subscribed to topic '/camera/aligned_depth_to_color/camera_info'
+[bag_record-1] [INFO] [1795257026.109301101] [rosbag2_recorder]: Subscribed to topic '/camera/gyro/sample'
+[bag_record-1] [WARN] [1795257026.111615845] [ROSBAG2_TRANSPORT]: Hidden topics are not recorded. Enable them with --include-hidden-topics
+[bag_record-1] [INFO] [1795257026.116234601] [rosbag2_recorder]: Subscribed to topic '/torque_viz/trail'
+[bag_record-1] [INFO] [1795257026.127115976] [rosbag2_recorder]: Subscribed to topic '/mpc/arm'
+[bag_record-1] [INFO] [1795257026.131838437] [rosbag2_recorder]: Subscribed to topic '/fault_monitor/fault'
+[torque_viz_node-23] [INFO] [1795257026.136179109] [torque_viz_node]: torque_viz: /state_estimator/odom → TF map → base_footprint (30 Hz), /torque_viz/trail (무장할 때 비움)
+[set_initial_pose_node-12] [INFO] [1795257026.138037974] [set_initial_pose_node]: 설정 디렉터리: /home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config
+[set_initial_pose_node-12] [INFO] [1795257026.138482396] [set_initial_pose_node]: 설정 파일: localization_torque_2d.lua
+[bag_record-1] [INFO] [1795257026.139554947] [rosbag2_recorder]: Subscribed to topic '/torque_output/cmd_raw'
+[torque_output_node-19] [INFO] [1795257026.153645134] [torque_output_node]: torque_output: /torque_mpc/cmd_raw → /torque_output/cmd_raw   마찰 보�� coulomb [0.01566 0.01854 0.01395 0.01413] N·m, viscous [0.0009594 0.0010422 0.0010008 0.0010593] N·m·s/rad (실측 × 0.9)   정지 마찰 [0.072 0.072 0.072 0.072] N·m (실측 × 0.9), ω_st 0.5 rad/s, 방향 = /dra_mppi/reference_trajectory 의 ω_ref   안전 클램프 ±1.3 N·m
+[scan_sector_filter-4] [INFO] [1795257026.165807469] [front_cartographer_scan_filter]: LaserScan / timed PointCloud2 섹터 필터: -95.0° ~ 95.0° (기준 base_scan)
+[set_initial_pose_node-12] [INFO] [1795257026.176140657] [set_initial_pose_node]: cartographer 서비스 대기 중...
+[set_initial_pose_node-12] [INFO] [1795257026.176608845] [set_initial_pose_node]: cartographer 서비스 준비됨
+[set_initial_pose_node-12] [INFO] [1795257026.178129443] [set_initial_pose_node]: EKF 리셋 토픽: /ekf_carto/set_pose
+[set_initial_pose_node-12] [WARN] [1795257026.178425135] [set_initial_pose_node]: 
+[set_initial_pose_node-12] ==============================================================
+[set_initial_pose_node-12] [WARN] [1795257026.178695974] [set_initial_pose_node]: RViz 에서 '2D Pose Estimate' 로 로봇의 현재 위치를 찍으세요
+[set_initial_pose_node-12] [WARN] [1795257026.178951332] [set_initial_pose_node]: ==============================================================
+[set_initial_pose_node-12] 
+[bag_record-1] [INFO] [1795257026.183944269] [rosbag2_recorder]: Subscribed to topic '/ekf_carto/set_pose'
+[fault_monitor_node-20] [INFO] [1795257026.192086443] [fault_monitor_node]: fault_monitor: 무장 중 검사 — 포즈 튐 켬, 추종 오차 > 50 cm, 모터 에러, 센서 끊김 > 0.3 s → /mpc/arm false
+[state_estimator_node-16] [INFO] [1795257026.206017179] [state_estimator_node]: state_estimator: /imu/base_link + /tracked_pose [stamped] → /state_estimator/odom (100 Hz)
+[state_estimator_node-16]   IMU·포즈 기준점 (0.109, 0.017) m (base_footprint 기준)
+[state_estimator_node-16]   모드 kf (고정 게인 칼만)  K_p 0.711  K_v 4.16 1/s  K_b -1.13 1/s²   K_psi 0.440  K_bg -0.0339 1/s   튐 (> 15 cm·15°) 버림, 연속 5 번이면 따라감
+[state_estimator_node-16]   정지 상태에서 1.0 s 동안 바이어스를 잡는다 — 그동안 로봇을 움직이지 말 것
+[bag_record-1] [INFO] [1795257026.226000496] [rosbag2_recorder]: Subscribed to topic '/scan_front_carto'
+[bag_record-1] [INFO] [1795257026.239701459] [rosbag2_recorder]: Subscribed to topic '/state_estimator/status'
+[bag_record-1] [INFO] [1795257026.240257693] [rosbag2_recorder]: Subscribed to topic '/state_estimator/odom'
+[cartographer_node-8] [WARN] [1795257027.330825447] [cartographer logger]: W20261121 19:30:27.-2147483648 184087 ordered_multi_queue.cc:155] Queue waiting for data: (1, points2_1)
+[torque_mpc_node-18] [WARN] [1795257027.346058585] [torque_mpc_node]: 상태 추정값 대기/끊김
+[cartographer_node-8] [WARN] [1795257027.480634192] [cartographer logger]: W20261121 19:30:27.-2147483648 184087 ordered_multi_queue.cc:155] Queue waiting for data: (1, points2_1)
+[cartographer_node-8] [WARN] [1795257027.630641884] [cartographer logger]: W20261121 19:30:27.-2147483648 184087 ordered_multi_queue.cc:155] Queue waiting for data: (1, points2_1)
+[cartographer_node-8] [WARN] [1795257027.780605787] [cartographer logger]: W20261121 19:30:27.-2147483648 184087 ordered_multi_queue.cc:155] Queue waiting for data: (1, points2_1)
+[rplidar_node-3] [INFO] [1795257027.854603927] [rplidar_rear]: set lidar scan frequency to 10.0 Hz(600.0 Rpm) 
+[rplidar_node-2] [INFO] [1795257027.918184059] [rplidar_front]: set lidar scan frequency to 10.0 Hz(600.0 Rpm) 
+[cartographer_node-8] [WARN] [1795257027.930646492] [cartographer logger]: W20261121 19:30:27.-2147483648 184087 ordered_multi_queue.cc:155] Queue waiting for data: (1, points2_1)
+[cartographer_node-8] [INFO] [1795257028.047863228] [cartographer logger]: I20261121 19:30:28.-2147483648 184087 ordered_multi_queue.cc:172] All sensor data for trajectory 1 is available starting at '639308538280458475'.
+[scan_merger-6] [WARN] [1795257028.087479094] [dual_scan_merger]: 라이다 stamp 차이 0.064 s > 0.050 s — 오래된 /scan_rear 제외
+[cartographer_node-8] [INFO] [1795257028.094853391] [cartographer logger]: I20261121 19:30:28.-2147483648 184087 local_trajectory_builder_2d.cc:111] Range data collator filling buffer.
+[cartographer_node-8] [INFO] [1795257028.095005800] [cartographer logger]: I20261121 19:30:28.-2147483648 184087 local_trajectory_builder_2d.cc:135] Extrapolator is still initializing.
+[cartographer_node-8] [INFO] [1795257028.181724904] [cartographer logger]: I20261121 19:30:28.-2147483648 184087 local_trajectory_builder_2d.cc:135] Extrapolator is still initializing.
+[state_estimator_node-16] [ERROR] [1795257028.197717302] [state_estimator_node]: 2 s 동안 SLAM 포즈 0 개 (/tracked_pose) — Cartographer 측위가 떠 있는지 확인
+[cartographer_node-8] [INFO] [1795257028.305708587] [cartographer logger]: I20261121 19:30:28.-2147483648 184087 pose_graph_2d.cc:148] Inserted submap (1, 0).
+[state_estimator_node-16] [INFO] [1795257028.308975736] [state_estimator_node]: 준비 끝. 바이어스: 가속도 (-0.091, +0.086) m/s², 자이로 -0.0027 rad/s — 출력 시작
+[bag_record-1] [INFO] [1795257030.445096844] [rosbag2_recorder]: Subscribed to topic '/initialpose'
+[ak40_can_node-13] [WARN] [1795257030.517771736] [ak40_can_node]: 응답 3/4 — 빠진 바퀴 [3]
+[ekf_node-11] [ERROR] [1795257031.112684652] [ekf_carto]: Could not obtain transform from odom->base_footprint
+[scan_merger-6] [WARN] [1795257033.187352102] [dual_scan_merger]: 라이다 stamp 차이 0.082 s > 0.050 s — 오래된 /scan_rear 제외
+[ekf_node-11] [ERROR] [1795257036.132581452] [ekf_carto]: Could not obtain transform from odom->base_footprint
+[cartographer_node-8] [INFO] [1795257039.569494831] [cartographer logger]: I20261121 19:30:39.-2147483648 184281 pose_graph_2d.cc:538] Remaining work items in queue: 0
+[cartographer_node-8] [INFO] [1795257039.569660335] [cartographer logger]: I20261121 19:30:39.-2147483648 184281 constraint_builder_2d.cc:290] 6 computations resulted in 0 additional constraints.
+[cartographer_node-8] [INFO] [1795257039.569669459] [cartographer logger]: I20261121 19:30:39.-2147483648 184281 constraint_builder_2d.cc:292] Score histogram:
+[cartographer_node-8] Count: 0
+[INFO] [launch.user]: [real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것
+[INFO] [check_localization-24]: process started with pid [185207]
+[ak40_can_node-13] [WARN] [1795257040.357781322] [ak40_can_node]: 응답 2/4 — 빠진 바퀴 [2, 3]
+[bag_record-1] [WARN] [1795257040.626981632] [rosbag2_recorder]: New publisher discovered on topic '/initialpose', offering incompatible QoS. No messages will be sent to it. Last incompatible policy: RELIABILITY_QOS_POLICY
+[bag_record-1] [WARN] [1795257040.628927553] [rosbag2_recorder]: A new publisher for subscribed topic /initialpose was found offering RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT, but rosbag already subscribed requesting RMW_QOS_POLICY_RELIABILITY_RELIABLE. Messages from this new publisher will not be recorded.
+[check_localization-24] [WARN] [1795257040.640681738] [check_localization]: New subscription discovered on topic '/initialpose', requesting incompatible QoS. No messages will be sent to it. Last incompatible policy: RELIABILITY
+[cartographer_node-8] [INFO] [1795257040.964470159] [cartographer logger]: I20261121 19:30:40.-2147483648 184087 collated_trajectory_builder.cc:81] imu rate: 399.96 Hz 2.50e-03 s +/- 5.32e-07 s (pulsed at 99.61% real time)
+[cartographer_node-8] [INFO] [1795257040.964500568] [cartographer logger]: I20261121 19:30:40.-2147483648 184087 collated_trajectory_builder.cc:81] points2_1 rate: 9.99 Hz 1.00e-01 s +/- 4.48e-03 s (pulsed at 100.22% real time)
+[cartographer_node-8] [INFO] [1795257040.964512701] [cartographer logger]: I20261121 19:30:40.-2147483648 184087 collated_trajectory_builder.cc:81] points2_2 rate: 9.99 Hz 1.00e-01 s +/- 3.09e-03 s (pulsed at 100.30% real time)
+[ekf_node-11] [ERROR] [1795257041.132653227] [ekf_carto]: Could not obtain transform from odom->base_footprint
+[set_initial_pose_node-12] [INFO] [1795257045.429512359] [set_initial_pose_node]: 초기 위치 수신: (-0.591, 1.488)
+[set_initial_pose_node-12] [INFO] [1795257045.430151256] [set_initial_pose_node]: trajectory 1 종료...
+[cartographer_node-8] [INFO] [1795257045.431457088] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 node.cpp:569] Shutdown the subscriber of [points2_1]
+[cartographer_node-8] [INFO] [1795257045.432108336] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 node.cpp:569] Shutdown the subscriber of [points2_2]
+[cartographer_node-8] [INFO] [1795257045.433275931] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 node.cpp:569] Shutdown the subscriber of [imu]
+[cartographer_node-8] [INFO] [1795257045.433301428] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 map_builder_bridge.cpp:152] Finishing trajectory with ID '1'...
+[cartographer_node-8] [INFO] [1795257045.436371889] [cartographer logger]: I20261121 19:30:45.-2147483648 184281 pose_graph_2d.cc:538] Remaining work items in queue: 0
+[cartographer_node-8] [INFO] [1795257045.436408310] [cartographer logger]: I20261121 19:30:45.-2147483648 184281 constraint_builder_2d.cc:290] 3 computations resulted in 0 additional constraints.
+[cartographer_node-8] [INFO] [1795257045.436418513] [cartographer logger]: I20261121 19:30:45.-2147483648 184281 constraint_builder_2d.cc:292] Score histogram:
+[cartographer_node-8] Count: 0
+[set_initial_pose_node-12] [INFO] [1795257045.436992850] [set_initial_pose_node]: trajectory 종료 완료
+[set_initial_pose_node-12] [INFO] [1795257045.529761826] [set_initial_pose_node]: 초기 위치 수신: (-0.591, 1.488)
+[set_initial_pose_node-12] [INFO] [1795257045.530483869] [set_initial_pose_node]: trajectory 1 종료...
+[cartographer_node-8] [INFO] [1795257045.530648648] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 node.cpp:551] Trajectory 1 already pending to finish.
+[set_initial_pose_node-12] [INFO] [1795257045.531128137] [set_initial_pose_node]: trajectory 종료 완료
+[set_initial_pose_node-12] [INFO] [1795257045.629797204] [set_initial_pose_node]: 초기 위치 수신: (-0.591, 1.488)
+[set_initial_pose_node-12] [INFO] [1795257045.630508492] [set_initial_pose_node]: trajectory 1 종료...
+[cartographer_node-8] [INFO] [1795257045.630656881] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 node.cpp:551] Trajectory 1 already pending to finish.
+[set_initial_pose_node-12] [INFO] [1795257045.631077104] [set_initial_pose_node]: trajectory 종료 완료
+[state_estimator_node-16] [ERROR] [1795257045.865770398] [state_estimator_node]: SLAM 포즈가 0.50 s 동안 반영되지 않음 (한계 0.5 s) — IMU 적분만으로는 위치가 흘러가므로 출력을 멈춘다
+[set_initial_pose_node-12] [INFO] [1795257045.937544955] [set_initial_pose_node]: 초기 pose 로 새 trajectory 시작...
+[cartographer_node-8] [INFO] [1795257045.937761732] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/localization_torque_2d.lua' for 'localization_torque_2d.lua'.
+[cartographer_node-8] [INFO] [1795257045.937977281] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/localization_2d.lua' for 'localization_2d.lua'.
+[cartographer_node-8] [INFO] [1795257045.938007541] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/localization_2d.lua' for 'localization_2d.lua'.
+[cartographer_node-8] [INFO] [1795257045.938116347] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/mapping_2d.lua' for 'mapping_2d.lua'.
+[cartographer_node-8] [INFO] [1795257045.938137670] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/mapping_2d.lua' for 'mapping_2d.lua'.
+[cartographer_node-8] [INFO] [1795257045.938267637] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/map_builder.lua' for 'map_builder.lua'.
+[cartographer_node-8] [INFO] [1795257045.938288072] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/map_builder.lua' for 'map_builder.lua'.
+[cartographer_node-8] [INFO] [1795257045.938327945] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/pose_graph.lua' for 'pose_graph.lua'.
+[cartographer_node-8] [INFO] [1795257045.938346666] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/pose_graph.lua' for 'pose_graph.lua'.
+[cartographer_node-8] [INFO] [1795257045.938433669] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder.lua' for 'trajectory_builder.lua'.
+[cartographer_node-8] [INFO] [1795257045.938454133] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder.lua' for 'trajectory_builder.lua'.
+[cartographer_node-8] [INFO] [1795257045.938489155] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder_2d.lua' for 'trajectory_builder_2d.lua'.
+[cartographer_node-8] [INFO] [1795257045.938530851] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder_2d.lua' for 'trajectory_builder_2d.lua'.
+[cartographer_node-8] [INFO] [1795257045.938639758] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder_3d.lua' for 'trajectory_builder_3d.lua'.
+[cartographer_node-8] [INFO] [1795257045.938682190] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 configuration_file_resolver.cc:41] Found '/opt/ros/jazzy/share/cartographer/configuration_files/trajectory_builder_3d.lua' for 'trajectory_builder_3d.lua'.
+[cartographer_node-8] [INFO] [1795257045.939531836] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 map_builder_bridge.cpp:136] Added trajectory with ID '2'.
+[set_initial_pose_node-12] [INFO] [1795257045.941902423] [set_initial_pose_node]: 새 trajectory 시작됨. ID: 2
+[ekf_node-11] [INFO] [1795257045.942203973] [ekf_carto]: Received set_pose request with value
+[ekf_node-11] header:
+[ekf_node-11]   stamp:
+[ekf_node-11]     sec: 1795257045
+[ekf_node-11]     nanosec: 942013413
+[ekf_node-11]   frame_id: "map"
+[ekf_node-11] pose:
+[ekf_node-11]   pose:
+[ekf_node-11]     position:
+[ekf_node-11]       x: -0.591033
+[ekf_node-11]       y: 1.48762
+[ekf_node-11]       z: 0.00000
+[ekf_node-11]     orientation:
+[ekf_node-11]       x: 0.00000
+[ekf_node-11]       y: 0.00000
+[ekf_node-11]       z: -0.609368
+[ekf_node-11]       w: 0.792887
+[ekf_node-11]   covariance:
+[ekf_node-11]   - 0.250000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.250000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.00000
+[ekf_node-11]   - 0.0680000
+[ekf_node-11] 
+[set_initial_pose_node-12] [INFO] [1795257045.942595419] [set_initial_pose_node]: ekf_carto 를 초기 pose 로 리셋했습니다 (map -> odom TF 갱신).
+[cartographer_node-8] [INFO] [1795257045.976310729] [cartographer logger]: I20261121 19:30:45.-2147483648 184087 ordered_multi_queue.cc:172] All sensor data for trajectory 2 is available starting at '639308538459746460'.
+[cartographer_node-8] [INFO] [1795257046.057775543] [cartographer logger]: I20261121 19:30:46.-2147483648 184087 local_trajectory_builder_2d.cc:111] Range data collator filling buffer.
+[cartographer_node-8] [INFO] [1795257046.057902320] [cartographer logger]: I20261121 19:30:46.-2147483648 184087 local_trajectory_builder_2d.cc:135] Extrapolator is still initializing.
+[cartographer_node-8] [INFO] [1795257046.076482155] [cartographer logger]: I20261121 19:30:46.-2147483648 184087 local_trajectory_builder_2d.cc:135] Extrapolator is still initializing.
+[ekf_node-11] [ERROR] [1795257046.132655713] [ekf_carto]: Could not obtain transform from odom->base_footprint
+[cartographer_node-8] [INFO] [1795257046.179428784] [cartographer logger]: I20261121 19:30:46.-2147483648 184087 pose_graph_2d.cc:148] Inserted submap (2, 0).
+[state_estimator_node-16] [WARN] [1795257046.187417513] [state_estimator_node]: SLAM 포즈 튐: 잔차 160.1 cm, -75.4° — 버림 (누적 1)
+[torque_mpc_node-18] [WARN] [1795257046.196045122] [torque_mpc_node]: 상태 추정값 대기/끊김
+[state_estimator_node-16] [ERROR] [1795257046.582086290] [state_estimator_node]: SLAM 포즈가 계속 다른 곳을 가리킨다 — 그 포즈로 다시 초기화했다
+[torque_mpc_node-18] [WARN] [1795257046.583470910] [torque_mpc_node]: 상태 주기 722.6 ms ≠ Ts 10.0 ms — 모델 이산화와 어긋난다
+[cartographer_node-8] [INFO] [1795257047.889749250] [cartographer logger]: I20261121 19:30:47.-2147483648 184278 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 12) differs by translation 0.10 rotation 0.030 with score 63.3%.
+[ak40_can_node-13] [WARN] [1795257047.897702787] [ak40_can_node]: 응답 3/4 — 빠진 바퀴 [3]
+[cartographer_node-8] [INFO] [1795257047.904677019] [cartographer logger]: I20261121 19:30:47.-2147483648 184276 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 37) differs by translation 0.10 rotation 0.035 with score 63.2%.
+[cartographer_node-8] [INFO] [1795257047.907510796] [cartographer logger]: I20261121 19:30:47.-2147483648 184280 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 46) differs by translation 0.09 rotation 0.030 with score 64.3%.
+[cartographer_node-8] [INFO] [1795257047.908284251] [cartographer logger]: I20261121 19:30:47.-2147483648 184278 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 47) differs by translation 0.10 rotation 0.030 with score 63.1%.
+[cartographer_node-8] [INFO] [1795257047.924987222] [cartographer logger]: I20261121 19:30:47.-2147483648 184280 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 84) differs by translation 0.09 rotation 0.033 with score 62.1%.
+[cartographer_node-8] [INFO] [1795257047.925974725] [cartographer logger]: I20261121 19:30:47.-2147483648 184279 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 86) differs by translation 0.10 rotation 0.032 with score 62.9%.
+[cartographer_node-8] [INFO] [1795257047.926427650] [cartographer logger]: I20261121 19:30:47.-2147483648 184278 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 85) differs by translation 0.10 rotation 0.035 with score 64.0%.
+[cartographer_node-8] [INFO] [1795257047.927815287] [cartographer logger]: I20261121 19:30:47.-2147483648 184277 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 88) differs by translation 0.10 rotation 0.030 with score 64.1%.
+[cartographer_node-8] [INFO] [1795257047.928492766] [cartographer logger]: I20261121 19:30:47.-2147483648 184281 constraint_builder_2d.cc:275] Node (2, 3) with 209 points on submap (0, 87) differs by translation 0.10 rotation 0.030 with score 62.9%.
+[cartographer_node-8] [INFO] [1795257049.501283801] [cartographer logger]: I20261121 19:30:49.-2147483648 184279 constraint_builder_2d.cc:275] Node (2, 6) with 216 points on submap (0, 37) differs by translation 0.09 rotation 0.031 with score 63.0%.
+[cartographer_node-8] [INFO] [1795257049.507529977] [cartographer logger]: I20261121 19:30:49.-2147483648 184276 constraint_builder_2d.cc:275] Node (2, 6) with 216 points on submap (0, 47) differs by translation 0.09 rotation 0.030 with score 63.7%.
+[cartographer_node-8] [INFO] [1795257049.508596920] [cartographer logger]: I20261121 19:30:49.-2147483648 184281 constraint_builder_2d.cc:275] Node (2, 6) with 216 points on submap (0, 46) differs by translation 0.09 rotation 0.030 with score 63.3%.
+[cartographer_node-8] [INFO] [1795257049.527926006] [cartographer logger]: I20261121 19:30:49.-2147483648 184280 constraint_builder_2d.cc:275] Node (2, 6) with 216 points on submap (0, 86) differs by translation 0.09 rotation 0.032 with score 62.4%.
+[cartographer_node-8] [INFO] [1795257049.527952911] [cartographer logger]: I20261121 19:30:49.-2147483648 184281 constraint_builder_2d.cc:275] Node (2, 6) with 216 points on submap (0, 85) differs by translation 0.09 rotation 0.033 with score 63.9%.
+[cartographer_node-8] [INFO] [1795257049.530129432] [cartographer logger]: I20261121 19:30:49.-2147483648 184276 constraint_builder_2d.cc:275] Node (2, 6) with 216 points on submap (0, 87) differs by translation 0.09 rotation 0.029 with score 62.4%.
+[cartographer_node-8] [INFO] [1795257049.530216980] [cartographer logger]: I20261121 19:30:49.-2147483648 184277 constraint_builder_2d.cc:275] Node (2, 6) with 216 points on submap (0, 88) differs by translation 0.10 rotation 0.031 with score 63.3%.
+[ak40_can_node-13] [WARN] [1795257050.777608274] [ak40_can_node]: 응답 3/4 — 빠진 바퀴 [3]
+[check_localization-24] 지금 측위 (-0.001, -0.001) m, -0.1°: 라이다 점 1298 개, 지도 벽 겹침 ±5 cm 11.8 % (지도 안 97 %)
+[check_localization-24] → 안 맞음. 지도 전체에서 찾는 중 (1~2 분)...
+[check_localization-24] 찾은 위치 (-0.59, +1.49) m, -75.1°: 겹침 ±5 cm 82.7 %
+[check_localization-24] /initialpose 보냄. 5 s 뒤 다시 확인...
+[check_localization-24] 다시: (-0.586, +1.501) m, -75.6°, 겹침 ±5 cm 66.0 % → ★ 아직 안 맞음
+[ERROR] [check_localization-24]: process has died [pid 185207, exit code 4, cmd '/usr/bin/python3 /home/smoc/capston/capston/src/amr_basic_stack/controller/mpc/tools/check_localization.py --apply'].
+[INFO] [launch.user]: 
+[1;37;41m████████████████████████████████████████████████████████████████████████[0m
+[1;37;41m██  측위 맞추기 실패: /initialpose 를 넣었는데 아직 안 맞음 — 무장하지 말 것 (위 check_localization 출력 확인)[0m
+[1;37;41m████████████████████████████████████████████████████████████████████████[0m
+[ekf_node-11] [ERROR] [1795257051.152656845] [ekf_carto]: Could not obtain transform from odom->base_footprint
+[cartographer_node-8] [INFO] [1795257051.881909135] [cartographer logger]: I20261121 19:30:51.-2147483648 184276 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 1) differs by translation 0.09 rotation 0.031 with score 62.0%.
+[cartographer_node-8] [INFO] [1795257051.886512954] [cartographer logger]: I20261121 19:30:51.-2147483648 184278 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 12) differs by translation 0.10 rotation 0.031 with score 62.7%.
+[cartographer_node-8] [INFO] [1795257051.888122123] [cartographer logger]: I20261121 19:30:51.-2147483648 184279 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 15) differs by translation 0.09 rotation 0.032 with score 62.3%.
+[cartographer_node-8] [INFO] [1795257051.902798012] [cartographer logger]: I20261121 19:30:51.-2147483648 184280 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 37) differs by translation 0.09 rotation 0.032 with score 62.6%.
+[cartographer_node-8] [INFO] [1795257051.905829670] [cartographer logger]: I20261121 19:30:51.-2147483648 184276 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 46) differs by translation 0.09 rotation 0.030 with score 62.4%.
+[cartographer_node-8] [INFO] [1795257051.907905406] [cartographer logger]: I20261121 19:30:51.-2147483648 184280 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 47) differs by translation 0.09 rotation 0.028 with score 62.7%.
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[ekf_node-11] [INFO] [1795257051.911990983] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[cartographer_node-8] [INFO] [1795257051.912047731] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[INFO] [torque_viz_node-23]: sending signal 'SIGINT' to process[torque_viz_node-23]
+[INFO] [keyboard_command_gate-22]: sending signal 'SIGINT' to process[keyboard_command_gate-22]
+[INFO] [slip_logger_node-21]: sending signal 'SIGINT' to process[slip_logger_node-21]
+[INFO] [fault_monitor_node-20]: sending signal 'SIGINT' to process[fault_monitor_node-20]
+[INFO] [torque_output_node-19]: sending signal 'SIGINT' to process[torque_output_node-19]
+[INFO] [torque_mpc_node-18]: sending signal 'SIGINT' to process[torque_mpc_node-18]
+[INFO] [figure8_reference_node-17]: sending signal 'SIGINT' to process[figure8_reference_node-17]
+[INFO] [state_estimator_node-16]: sending signal 'SIGINT' to process[state_estimator_node-16]
+[INFO] [imu_to_base_node-15]: sending signal 'SIGINT' to process[imu_to_base_node-15]
+[INFO] [robot_state_publisher-14]: sending signal 'SIGINT' to process[robot_state_publisher-14]
+[INFO] [ak40_can_node-13]: sending signal 'SIGINT' to process[ak40_can_node-13]
+[INFO] [set_initial_pose_node-12]: sending signal 'SIGINT' to process[set_initial_pose_node-12]
+[INFO] [ekf_node-11]: sending signal 'SIGINT' to process[ekf_node-11]
+[INFO] [pose_to_odom_node-10]: sending signal 'SIGINT' to process[pose_to_odom_node-10]
+[INFO] [cartographer_occupancy_grid_node-9]: sending signal 'SIGINT' to process[cartographer_occupancy_grid_node-9]
+[INFO] [cartographer_node-8]: sending signal 'SIGINT' to process[cartographer_node-8]
+[INFO] [realsense2_camera_node-7]: sending signal 'SIGINT' to process[realsense2_camera_node-7]
+[INFO] [scan_merger-6]: sending signal 'SIGINT' to process[scan_merger-6]
+[ERROR] [cartographer_occupancy_grid_node-9]: process has died [pid 184089, exit code -2, cmd '/opt/ros/jazzy/lib/cartographer_ros/cartographer_occupancy_grid_node -resolution 0.05 -publish_period_sec 1.0 --ros-args -r __node:=cartographer_occupancy_grid_node --params-file /tmp/launch_params_7g1whu_c -r map:=/map_carto'].
+[ERROR] [ekf_node-11]: process has died [pid 184092, exit code -2, cmd '/opt/ros/jazzy/lib/robot_localization/ekf_node --ros-args -r __node:=ekf_carto --params-file /home/smoc/capston/capston/install/amr_perception_bringup/share/amr_perception_bringup/config/ekf_carto_localization.yaml --params-file /tmp/launch_params_4kqvkz4t -r odometry/filtered:=/odometry/map -r set_pose:=/ekf_carto/set_pose'].
+[INFO] [scan_sector_filter-5]: sending signal 'SIGINT' to process[scan_sector_filter-5]
+[INFO] [scan_sector_filter-4]: sending signal 'SIGINT' to process[scan_sector_filter-4]
+[INFO] [rplidar_node-3]: sending signal 'SIGINT' to process[rplidar_node-3]
+[INFO] [rplidar_node-2]: sending signal 'SIGINT' to process[rplidar_node-2]
+[INFO] [bag_record-1]: sending signal 'SIGINT' to process[bag_record-1]
+[realsense2_camera_node-7] [INFO] [1795257051.912600473] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[realsense2_camera_node-7] [INFO] [1795257051.913556402] [camera]: Stop Sensor: Depth Module
+[realsense2_camera_node-7] [INFO] [1795257051.913798811] [camera]: Close Sensor. 
+[cartographer_occupancy_grid_node-9] [INFO] [1795257051.912633669] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[robot_state_publisher-14] [INFO] [1795257051.913085339] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[cartographer_node-8] [INFO] [1795257051.914964246] [cartographer logger]: I20261121 19:30:51.-2147483648 184087 node.cpp:569] Shutdown the subscriber of [points2_1]
+[cartographer_node-8] [INFO] [1795257051.917706842] [cartographer logger]: I20261121 19:30:51.-2147483648 184279 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 61) differs by translation 0.10 rotation 0.032 with score 62.5%.
+[cartographer_node-8] [INFO] [1795257051.917785372] [cartographer logger]: I20261121 19:30:51.-2147483648 184087 node.cpp:569] Shutdown the subscriber of [points2_2]
+[cartographer_node-8] [INFO] [1795257051.920253345] [cartographer logger]: I20261121 19:30:51.-2147483648 184087 node.cpp:569] Shutdown the subscriber of [imu]
+[cartographer_node-8] [INFO] [1795257051.920277201] [cartographer logger]: I20261121 19:30:51.-2147483648 184087 map_builder_bridge.cpp:152] Finishing trajectory with ID '2'...
+[cartographer_node-8] [WARN] [1795257051.920862495] [cartographer logger]: W20261121 19:30:51.-2147483648 184087 node.cpp:773] Can't run final optimization if there are one or more active trajectories. Trying to finish trajectory with ID 2 now.
+[cartographer_node-8] [INFO] [1795257051.920881148] [cartographer logger]: I20261121 19:30:51.-2147483648 184087 node.cpp:551] Trajectory 2 already pending to finish.
+[cartographer_node-8] [INFO] [1795257051.920894234] [cartographer logger]: I20261121 19:30:51.-2147483648 184087 map_builder_bridge.cpp:161] Running final trajectory optimization...
+[bag_record-1] [INFO] [1795257051.916598987] [rosbag2_recorder]: Topics discovery stopped.
+[bag_record-1] [INFO] [1795257051.916728206] [rosbag2_recorder]: Pausing recording.
+[bag_record-1] [INFO] [1795257051.916760446] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[set_initial_pose_node-12] [INFO] [1795257051.919358804] [set_initial_pose_node]: set_initial_pose_node 종료
+[set_initial_pose_node-12] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[cartographer_node-8] [INFO] [1795257051.942772301] [cartographer logger]: I20261121 19:30:51.-2147483648 184281 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 85) differs by translation 0.09 rotation 0.035 with score 65.1%.
+[cartographer_node-8] [INFO] [1795257051.946994428] [cartographer logger]: I20261121 19:30:51.-2147483648 184276 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 87) differs by translation 0.09 rotation 0.030 with score 62.8%.
+[cartographer_node-8] [INFO] [1795257051.947053609] [cartographer logger]: I20261121 19:30:51.-2147483648 184276 pose_graph_2d.cc:538] Remaining work items in queue: 2
+[cartographer_node-8] [INFO] [1795257051.947531222] [cartographer logger]: I20261121 19:30:51.-2147483648 184281 constraint_builder_2d.cc:275] Node (2, 10) with 202 points on submap (0, 88) differs by translation 0.10 rotation 0.030 with score 64.2%.
+[robot_state_publisher-14] [INFO] [1795257051.949028530] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[bag_record-1] [INFO] [1795257051.949662133] [rosbag2_recorder]: Recording stopped
+[set_initial_pose_node-12] Traceback (most recent call last):
+[set_initial_pose_node-12]   File "/home/smoc/capston/capston/install/amr_perception_bringup/lib/amr_perception_bringup/set_initial_pose_node", line 33, in <module>
+[set_initial_pose_node-12]     sys.exit(load_entry_point('amr-perception-bringup', 'console_scripts', 'set_initial_pose_node')())
+[set_initial_pose_node-12]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[set_initial_pose_node-12]   File "/home/smoc/capston/capston/build/amr_perception_bringup/amr_perception_bringup/set_initial_pose_node.py", line 223, in main
+[set_initial_pose_node-12]     node.destroy_node()
+[set_initial_pose_node-12]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1962, in destroy_node
+[set_initial_pose_node-12]     self.destroy_service(self._services[0])
+[set_initial_pose_node-12]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1886, in destroy_service
+[cartographer_node-8] [INFO] [1795257051.955702254] [cartographer logger]: I20261121 19:30:51.-2147483648 184277 constraint_builder_2d.cc:290] 368 computations resulted in 26 additional constraints.
+[cartographer_node-8] [INFO] [1795257051.956071168] [cartographer logger]: I20261121 19:30:51.-2147483648 184277 constraint_builder_2d.cc:292] Score histogram:
+[cartographer_node-8] Count: 26  Min: 0.620303  Max: 0.651427  Mean: 0.631251
+[cartographer_node-8] [0.620303, 0.623415)	                  ##	Count: 3 (11.5385%)	Total: 3 (11.5385%)
+[cartographer_node-8] [0.623415, 0.626528)	                ####	Count: 5 (19.2308%)	Total: 8 (30.7692%)
+[cartographer_node-8] [0.626528, 0.629640)	                ####	Count: 5 (19.2308%)	Total: 13 (50%)
+[cartographer_node-8] [0.629640, 0.632752)	                  ##	Count: 3 (11.5385%)	Total: 16 (61.5385%)
+[cartographer_node-8] [0.632752, 0.635865)	                  ##	Count: 3 (11.5385%)	Total: 19 (73.0769%)
+[cartographer_node-8] [0.635865, 0.638977)	                  ##	Count: 2 (7.69231%)	Total: 21 (80.7692%)
+[cartographer_node-8] [0.638977, 0.642090)	                  ##	Count: 3 (11.5385%)	Total: 24 (92.3077%)
+[cartographer_node-8] [0.642090, 0.645202)	                   #	Count: 1 (3.84615%)	Total: 25 (96.1538%)
+[cartographer_node-8] [0.645202, 0.648314)	                    	Count: 0 (0%)	Total: 25 (96.1538%)
+[cartographer_node-8] [0.648314, 0.651427]	                   #	Count: 1 (3.84615%)	Total: 26 (100%)
+[set_initial_pose_node-12]     service.destroy()
+[set_initial_pose_node-12]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/service.py", line 123, in destroy
+[set_initial_pose_node-12]     self.__service.destroy_when_not_in_use()
+[set_initial_pose_node-12] KeyboardInterrupt
+[pose_to_odom_node-10] Traceback (most recent call last):
+[pose_to_odom_node-10]   File "/home/smoc/capston/capston/install/amr_perception_bringup/lib/amr_perception_bringup/pose_to_odom_node", line 33, in <module>
+[pose_to_odom_node-10]     sys.exit(load_entry_point('amr-perception-bringup', 'console_scripts', 'pose_to_odom_node')())
+[pose_to_odom_node-10]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pose_to_odom_node-10]   File "/home/smoc/capston/capston/build/amr_perception_bringup/amr_perception_bringup/pose_to_odom_node.py", line 138, in main
+[pose_to_odom_node-10]     node.destroy_node()
+[pose_to_odom_node-10]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1962, in destroy_node
+[pose_to_odom_node-10]     self.destroy_service(self._services[0])
+[pose_to_odom_node-10]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1886, in destroy_service
+[pose_to_odom_node-10]     service.destroy()
+[pose_to_odom_node-10]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/service.py", line 123, in destroy
+[pose_to_odom_node-10]     self.__service.destroy_when_not_in_use()
+[pose_to_odom_node-10] KeyboardInterrupt
+[cartographer_node-8] [INFO] [1795257051.964642963] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[cartographer_node-8] [INFO] [1795257051.966685268] [cartographer logger]: I20261121 19:30:51.-2147483648 184277 pose_graph_2d.cc:538] Remaining work items in queue: 1
+[cartographer_node-8] [INFO] [1795257051.966748080] [cartographer logger]: I20261121 19:30:51.-2147483648 184277 constraint_builder_2d.cc:290] 0 computations resulted in 0 additional constraints.
+[cartographer_node-8] [INFO] [1795257051.966902633] [cartographer logger]: I20261121 19:30:51.-2147483648 184277 constraint_builder_2d.cc:292] Score histogram:
+[cartographer_node-8] Count: 26  Min: 0.620303  Max: 0.651427  Mean: 0.631251
+[cartographer_node-8] [0.620303, 0.623415)	                  ##	Count: 3 (11.5385%)	Total: 3 (11.5385%)
+[cartographer_node-8] [0.623415, 0.626528)	                ####	Count: 5 (19.2308%)	Total: 8 (30.7692%)
+[cartographer_node-8] [0.626528, 0.629640)	                ####	Count: 5 (19.2308%)	Total: 13 (50%)
+[cartographer_node-8] [0.629640, 0.632752)	                  ##	Count: 3 (11.5385%)	Total: 16 (61.5385%)
+[cartographer_node-8] [0.632752, 0.635865)	                  ##	Count: 3 (11.5385%)	Total: 19 (73.0769%)
+[cartographer_node-8] [0.635865, 0.638977)	                  ##	Count: 2 (7.69231%)	Total: 21 (80.7692%)
+[cartographer_node-8] [0.638977, 0.642090)	                  ##	Count: 3 (11.5385%)	Total: 24 (92.3077%)
+[cartographer_node-8] [0.642090, 0.645202)	                   #	Count: 1 (3.84615%)	Total: 25 (96.1538%)
+[cartographer_node-8] [0.645202, 0.648314)	                    	Count: 0 (0%)	Total: 25 (96.1538%)
+[cartographer_node-8] [0.648314, 0.651427]	                   #	Count: 1 (3.84615%)	Total: 26 (100%)
+[realsense2_camera_node-7] [INFO] [1795257051.966605774] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[cartographer_node-8] [INFO] [1795257051.971769707] [cartographer logger]: I20261121 19:30:51.-2147483648 184281 constraint_builder_2d.cc:290] 0 computations resulted in 0 additional constraints.
+[cartographer_node-8] [INFO] [1795257051.971837887] [cartographer logger]: I20261121 19:30:51.-2147483648 184281 constraint_builder_2d.cc:292] Score histogram:
+[cartographer_node-8] Count: 26  Min: 0.620303  Max: 0.651427  Mean: 0.631251
+[cartographer_node-8] [0.620303, 0.623415)	                  ##	Count: 3 (11.5385%)	Total: 3 (11.5385%)
+[cartographer_node-8] [0.623415, 0.626528)	                ####	Count: 5 (19.2308%)	Total: 8 (30.7692%)
+[cartographer_node-8] [0.626528, 0.629640)	                ####	Count: 5 (19.2308%)	Total: 13 (50%)
+[cartographer_node-8] [0.629640, 0.632752)	                  ##	Count: 3 (11.5385%)	Total: 16 (61.5385%)
+[cartographer_node-8] [0.632752, 0.635865)	                  ##	Count: 3 (11.5385%)	Total: 19 (73.0769%)
+[cartographer_node-8] [0.635865, 0.638977)	                  ##	Count: 2 (7.69231%)	Total: 21 (80.7692%)
+[cartographer_node-8] [0.638977, 0.642090)	                  ##	Count: 3 (11.5385%)	Total: 24 (92.3077%)
+[cartographer_node-8] [0.642090, 0.645202)	                   #	Count: 1 (3.84615%)	Total: 25 (96.1538%)
+[cartographer_node-8] [0.645202, 0.648314)	                    	Count: 0 (0%)	Total: 25 (96.1538%)
+[cartographer_node-8] [0.648314, 0.651427]	                   #	Count: 1 (3.84615%)	Total: 26 (100%)
+[cartographer_node-8] [KOptimizing: Done.     
+[rplidar_node-2] [INFO] [1795257051.978919525] [rplidar_front]: Stop motor
+[cartographer_node-8] [INFO] [1795257051.994035674] [cartographer logger]: I20261121 19:30:51.-2147483648 184278 constraint_builder_2d.cc:290] 0 computations resulted in 0 additional constraints.
+[cartographer_node-8] [INFO] [1795257051.994072724] [cartographer logger]: I20261121 19:30:51.-2147483648 184278 constraint_builder_2d.cc:292] Score histogram:
+[cartographer_node-8] Count: 26  Min: 0.620303  Max: 0.651427  Mean: 0.631251
+[cartographer_node-8] [0.620303, 0.623415)	                  ##	Count: 3 (11.5385%)	Total: 3 (11.5385%)
+[cartographer_node-8] [0.623415, 0.626528)	                ####	Count: 5 (19.2308%)	Total: 8 (30.7692%)
+[cartographer_node-8] [0.626528, 0.629640)	                ####	Count: 5 (19.2308%)	Total: 13 (50%)
+[cartographer_node-8] [0.629640, 0.632752)	                  ##	Count: 3 (11.5385%)	Total: 16 (61.5385%)
+[cartographer_node-8] [0.632752, 0.635865)	                  ##	Count: 3 (11.5385%)	Total: 19 (73.0769%)
+[cartographer_node-8] [0.635865, 0.638977)	                  ##	Count: 2 (7.69231%)	Total: 21 (80.7692%)
+[cartographer_node-8] [0.638977, 0.642090)	                  ##	Count: 3 (11.5385%)	Total: 24 (92.3077%)
+[cartographer_node-8] [0.642090, 0.645202)	                   #	Count: 1 (3.84615%)	Total: 25 (96.1538%)
+[cartographer_node-8] [0.645202, 0.648314)	                    	Count: 0 (0%)	Total: 25 (96.1538%)
+[cartographer_node-8] [0.648314, 0.651427]	                   #	Count: 1 (3.84615%)	Total: 26 (100%)
+[cartographer_node-8] [KOptimizing: Done.     
+[bag_record-1] [INFO] [1795257052.001790864] [rosbag2_recorder]: Event publisher thread: Exited
+[slip_logger_node-21] [slip_logger] 2360행, 움직인 구간 0행 (차체 속도 > 0.05 m/s)
+[rplidar_node-3] [INFO] [1795257052.076651157] [rplidar_rear]: Stop motor
+[ak40_can_node-13] [ak40_can_node] DAMPING 뒤 모터 모드 해제
+[imu_to_base_node-15] Traceback (most recent call last):
+[imu_to_base_node-15]   File "/home/smoc/capston/capston/build/amr_perception_bringup/amr_perception_bringup/imu_to_base_node.py", line 195, in main
+[imu_to_base_node-15]     rclpy.spin(node)
+[imu_to_base_node-15]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[imu_to_base_node-15]     executor.spin_once()
+[imu_to_base_node-15]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[imu_to_base_node-15]     self._spin_once_impl(timeout_sec)
+[imu_to_base_node-15]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[imu_to_base_node-15]     raise handler.exception()
+[imu_to_base_node-15]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[imu_to_base_node-15]     result = coro.send(None)
+[imu_to_base_node-15]              ^^^^^^^^^^^^^^^
+[imu_to_base_node-15]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 584, in handler
+[imu_to_base_node-15]     call_coroutine = take_from_wait_list(entity)
+[imu_to_base_node-15]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[imu_to_base_node-15]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 470, in _take_subscription
+[imu_to_base_node-15]     msg_info = sub.handle.take_message(sub.msg_type, sub.raw)
+[imu_to_base_node-15]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[imu_to_base_node-15] RuntimeError: Unable to convert call argument '0' to Python object (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)
+[imu_to_base_node-15] 
+[imu_to_base_node-15] During handling of the above exception, another exception occurred:
+[imu_to_base_node-15] 
+[imu_to_base_node-15] Traceback (most recent call last):
+[imu_to_base_node-15]   File "/home/smoc/capston/capston/install/amr_perception_bringup/lib/amr_perception_bringup/imu_to_base_node", line 33, in <module>
+[imu_to_base_node-15]     sys.exit(load_entry_point('amr-perception-bringup', 'console_scripts', 'imu_to_base_node')())
+[imu_to_base_node-15]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[imu_to_base_node-15]   File "/home/smoc/capston/capston/build/amr_perception_bringup/amr_perception_bringup/imu_to_base_node.py", line 199, in main
+[imu_to_base_node-15]     node.destroy_node()
+[imu_to_base_node-15]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1968, in destroy_node
+[imu_to_base_node-15]     self.__node.destroy_when_not_in_use()
+[imu_to_base_node-15] KeyboardInterrupt
+[scan_sector_filter-4] Traceback (most recent call last):
+[scan_sector_filter-4]   File "/home/smoc/capston/capston/install/amr_laser_tools/lib/amr_laser_tools/scan_sector_filter", line 33, in <module>
+[scan_sector_filter-4]     sys.exit(load_entry_point('amr-laser-tools', 'console_scripts', 'scan_sector_filter')())
+[scan_sector_filter-4]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_sector_filter-4]   File "/home/smoc/capston/capston/build/amr_laser_tools/amr_laser_tools/scan_sector_filter.py", line 143, in main
+[scan_sector_filter-4]     node.destroy_node()
+[scan_sector_filter-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1968, in destroy_node
+[scan_sector_filter-4]     self.__node.destroy_when_not_in_use()
+[scan_sector_filter-4] KeyboardInterrupt
+[INFO] [robot_state_publisher-14]: process has finished cleanly [pid 184103]
+[scan_sector_filter-5] Traceback (most recent call last):
+[scan_sector_filter-5]   File "/home/smoc/capston/capston/install/amr_laser_tools/lib/amr_laser_tools/scan_sector_filter", line 33, in <module>
+[scan_sector_filter-5]     sys.exit(load_entry_point('amr-laser-tools', 'console_scripts', 'scan_sector_filter')())
+[scan_sector_filter-5]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_sector_filter-5]   File "/home/smoc/capston/capston/build/amr_laser_tools/amr_laser_tools/scan_sector_filter.py", line 143, in main
+[scan_sector_filter-5]     node.destroy_node()
+[scan_sector_filter-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1968, in destroy_node
+[scan_sector_filter-5]     self.__node.destroy_when_not_in_use()
+[scan_sector_filter-5] KeyboardInterrupt
+[scan_merger-6] Traceback (most recent call last):
+[scan_merger-6]   File "/home/smoc/capston/capston/install/amr_laser_tools/lib/amr_laser_tools/scan_merger", line 33, in <module>
+[scan_merger-6]     sys.exit(load_entry_point('amr-laser-tools', 'console_scripts', 'scan_merger')())
+[scan_merger-6]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_merger-6]   File "/home/smoc/capston/capston/build/amr_laser_tools/amr_laser_tools/scan_merger.py", line 267, in main
+[scan_merger-6]     node.destroy_node()
+[scan_merger-6]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1968, in destroy_node
+[scan_merger-6]     self.__node.destroy_when_not_in_use()
+[scan_merger-6] KeyboardInterrupt
+[ERROR] [imu_to_base_node-15]: process has died [pid 184125, exit code -2, cmd '/home/smoc/capston/capston/install/amr_perception_bringup/lib/amr_perception_bringup/imu_to_base_node --ros-args -r __node:=imu_to_base_node --params-file /tmp/launch_params_kmcc4a_c -r imu_in:=/camera/imu -r imu_out:=/imu/base_link'].
+[INFO] [cartographer_node-8]: process has finished cleanly [pid 184087]
+[ERROR] [scan_sector_filter-4]: process has died [pid 184081, exit code -2, cmd '/home/smoc/capston/capston/install/amr_laser_tools/lib/amr_laser_tools/scan_sector_filter --ros-args -r __node:=front_cartographer_scan_filter --params-file /home/smoc/capston/capston/install/amr_laser_tools/share/amr_laser_tools/config/scan_merge.yaml -r scan_in:=/scan_front -r scan_out:=/scan_front_carto -r points_in:=/points_front_timed -r points_out:=/points_front_carto'].
+[ERROR] [pose_to_odom_node-10]: process has died [pid 184090, exit code -2, cmd '/home/smoc/capston/capston/install/amr_perception_bringup/lib/amr_perception_bringup/pose_to_odom_node --ros-args -r __node:=pose_to_odom_node --params-file /tmp/launch_params_0wqi2hgq -r pose_in:=/tracked_pose -r odom_out:=/tracked_pose/odom'].
+[ERROR] [set_initial_pose_node-12]: process has died [pid 184093, exit code -2, cmd '/home/smoc/capston/capston/install/amr_perception_bringup/lib/amr_perception_bringup/set_initial_pose_node --ros-args -r __node:=set_initial_pose_node --params-file /tmp/launch_params_0remht6j'].
+[ERROR] [scan_sector_filter-5]: process has died [pid 184082, exit code -2, cmd '/home/smoc/capston/capston/install/amr_laser_tools/lib/amr_laser_tools/scan_sector_filter --ros-args -r __node:=rear_cartographer_scan_filter --params-file /home/smoc/capston/capston/install/amr_laser_tools/share/amr_laser_tools/config/scan_merge.yaml -r scan_in:=/scan_rear -r scan_out:=/scan_rear_carto -r points_in:=/points_rear_timed -r points_out:=/points_rear_carto'].
+[ERROR] [scan_merger-6]: process has died [pid 184085, exit code -2, cmd '/home/smoc/capston/capston/install/amr_laser_tools/lib/amr_laser_tools/scan_merger --ros-args -r __node:=dual_scan_merger --params-file /home/smoc/capston/capston/install/amr_laser_tools/share/amr_laser_tools/config/scan_merge.yaml'].
+[INFO] [fault_monitor_node-20]: process has finished cleanly [pid 184134]
+[INFO] [figure8_reference_node-17]: process has finished cleanly [pid 184129]
+[INFO] [slip_logger_node-21]: process has finished cleanly [pid 184139]
+[INFO] [torque_mpc_node-18]: process has finished cleanly [pid 184132]
+[INFO] [state_estimator_node-16]: process has finished cleanly [pid 184126]
+[INFO] [keyboard_command_gate-22]: process has finished cleanly [pid 184157]
+[INFO] [torque_output_node-19]: process has finished cleanly [pid 184133]
+[INFO] [torque_viz_node-23]: process has finished cleanly [pid 184160]
+[bag_record-1] [record_all] 끝: /home/smoc/capston/capston/bags/2026-11-21/193025 (61M), run_info/ 에 CAN·CPU·온도·로그
+[INFO] [bag_record-1]: process has finished cleanly [pid 184078]
+[INFO] [ak40_can_node-13]: process has finished cleanly [pid 184094]
+[realsense2_camera_node-7] [INFO] [1795257053.820202761] [camera]: Close Sensor - Done. 
+[realsense2_camera_node-7] [INFO] [1795257053.820214482] [camera]: Stop Sensor: RGB Camera
+[realsense2_camera_node-7] [INFO] [1795257053.820217066] [camera]: Close Sensor. 
+[realsense2_camera_node-7] [INFO] [1795257053.821134189] [camera]: Close Sensor - Done. 
+[realsense2_camera_node-7] [INFO] [1795257053.821139197] [camera]: Stop Sensor: Motion Module
+[realsense2_camera_node-7] [INFO] [1795257053.821275743] [camera]: Close Sensor. 
+[INFO] [rplidar_node-2]: process has finished cleanly [pid 184079]
+[INFO] [rplidar_node-3]: process has finished cleanly [pid 184080]
+[realsense2_camera_node-7] [INFO] [1795257054.155428755] [camera]: Close Sensor - Done. 
+[INFO] [realsense2_camera_node-7]: process has finished cleanly [pid 184086]

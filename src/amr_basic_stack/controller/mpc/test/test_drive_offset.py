@@ -54,4 +54,4 @@ def test_drive_angle_slip_and_clip():
 def test_drive_params_default_and_yaml():
     assert drive_params({}) == (0.0, 0.0, 2.0)
     yaw, coef, acm = drive_params(config.load("torque_plant.yaml"))
-    assert (yaw, coef) == (0.0, 0.0) and acm == 2.0          # 실차 A/B 전까지 기본 0 (보정 없음)
+    assert (yaw, coef) == (3.1, 0.8) and acm == 2.0          # 2026-11-26 사용자 결정 "B (3.1° · +0.8)" (실차 A/B 뒤 기본으로)

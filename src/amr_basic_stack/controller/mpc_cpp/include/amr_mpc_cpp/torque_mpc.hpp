@@ -480,4 +480,48 @@ private:
   Eigen::VectorXd e0_, g_, T_, lam_, lb_, ub_, Us_;
 };
 
+// 무제약 MPC 의 state feedback 이득 (2026-11-27, 슬립 되먹임 slip_feedback 용 — TorqueMPC 의 풀이에는 안 쓰인다).
+//   입력 제약이 하나도 활성이 아니면 receding horizon 첫 입력은 선형 법칙이다 (Wang 2009 1장 K_mpc 와 같은 구조):
+//     τ_0 = U_s − K_x (x − x_r) + K_τ (τ_prev − U_s)
+//     K_x = [H⁻¹ Φᵀ W̄ Λ]_{0:4, :},   K_τ = w_Δ [H⁻¹]_{0:4, 0:4},   H = Φᵀ W̄ Φ + H_const (TorqueMPC 와 같은 H)
+//   선형화 점은 가장 nominal 한 것: θ_r = 0 (지평 내내 일정), 바퀴 관성 m_w 포함, drive_yaw 는 force_map 그대로.
+//   W 의 x·y 무게가 같으면 K(θ) = K(0)·blkdiag(R(θ)ᵀ, R(θ)ᵀ) 라서 K_x 의 속도 열 (3~5) 은 몸체 좌표 속도 오차에 그대로 곱하면 된다.
+//   w 항·마찰·롤러 저항은 기준에서 계산하는 외부 입력이라 이득에 안 들어간다. linearization current_state 여도 이 값은 reference 모델 기준.
+struct UnconstrainedGain
+{
+  Eigen::Matrix<double, 4, 6> Kx;    // 열: [x, y, θ, ẋ, ẏ, θ̇],  행: 바퀴 [FL, FR, RL, RR]  [N·m / 단위 오차]
+  Eigen::Matrix4d Ktau;
+};
+UnconstrainedGain unconstrained_gain(const TorqueModel & md, const TorqueTuning & tu);
+
+// 바퀴 공간 슬립 되먹임 이득 K_ω (2026-11-27 (3), torque_mpc.yaml slip_feedback). MPC 풀이 뒤 바깥 회로:
+//   Δτ = −K_ω e_ω,   e_ω = ω − ω_nom,   ω_nom = J v_e,   J = T⁻¹ R(δ0)ᵀ = force_map()ᵀ   (4×3, 무슬립 바퀴 속도)
+//   v_e = 추정기 몸체 속도. R(δ0)·T·J = I 라서 R(δ0)·T e_ω = R(δ0)·T ω − v_e (예전 몸체 오차 e) 이다.
+//   e_ω 는 바퀴마다의 미끄럼 [rad/s] — 4 개가 다 독립이다 (몸체 오차 3 개로는 앞·뒤 쌍 n = [1, 1, −1, −1] 방향이 안 보인다).
+//
+//   Ik  : K_ω = K_v R(δ0) T,  K_v = unconstrained_gain 의 속도 열. 예전 (2026-11-27 (2)) 몸체 오차 되먹임과 Δτ 가 똑같다.
+//         rank 3 — n 방향 미끄럼에는 0 을 낸다. 실차 δ0 3.1° 에서 대각 0.0043, 이웃 바퀴 ∓0.0023 [N·m/(rad/s)].
+//   Lqr : 바퀴 미끄럼 모델 (single-corner model 을 네 바퀴로, Savaresi & Tanelli 2010) 의 이산 LQR.
+//           J_w ω̇ = τ − τ_g,   M_b v̇ = Jᵀ τ_g,   τ_g = C e_ω (바닥이 바퀴에 거는 토크, 미끄럼에 비례)
+//           → ė_ω = J_w⁻¹ Δτ − (J_w⁻¹ I + J M_b⁻¹ Jᵀ) C e_ω,   M_b = diag(m, m, I_z) (바퀴 회전 관성은 J_w 쪽)
+//         ZOH (Ts) 로 이산화해 Σ q_slip ‖r e_ω‖² + r_dtau ‖Δτ‖² 를 최소화하는 DARE 해 K_ω = (R + BᵀPB)⁻¹ BᵀPA.
+//         C_i = mu_slope · N_i · r² / (√2 · grip_speed)  (실측 μ–λ 첫 기울기 1.26, analysis/torque_mpc_real/2026-11-23_slip_lpf 5 절).
+//         grip_speed ≤ 0 이면 C = 0 — 바닥 힘이 포화된 "미끄러지는 중" 모델: 바퀴끼리 안 엮여 K_ω 가 대각
+//           (스칼라 적분기 LQR, q_slip 2 · r_dtau 10 에서 0.0162 N·m/(rad/s), 닫힌 고리 시정수 50 ms).
+//         grip_speed > 0 이면 붙어 구르는 모델 — 몸체를 거쳐 엮인 4×4 (1 m/s 에서 대각 0.0047, 이웃 ±0.0013).
+//   scale 은 결과에 곱한다 (0 ~ 5).
+enum class SlipFbGain { Lqr, Ik };
+SlipFbGain parse_slip_fb_gain(const std::string & s);
+struct SlipFbDesign
+{
+  SlipFbGain mode = SlipFbGain::Lqr;
+  double q_slip = 2.0;       // [(m/s)⁻²] 미끄럼 속도 r e_ω 무게 — MPC 속도 무게 q_ẋ 와 같은 값에서 시작
+  double r_dtau = 10.0;      // [(N·m)⁻²] Δτ 무게 — MPC 입력 편차 무게 r_U 와 같은 값에서 시작
+  double grip_speed = 0.0;   // [m/s] 0 = 미끄러지는 중 모델 (대각), > 0 = 이 속도에서 붙어 구르는 모델
+  double mu_slope = 1.26;    // 실측 μ–λ 첫 기울기 (u / λ)
+  double scale = 1.0;
+};
+Eigen::Matrix<double, 4, 3> wheel_nominal_map(const TorqueModel & md);    // J = T⁻¹ R(δ0)ᵀ
+Eigen::Matrix4d slip_feedback_gain(const TorqueModel & md, const TorqueTuning & tu, const SlipFbDesign & d);
+
 }  // namespace amr_mpc_cpp

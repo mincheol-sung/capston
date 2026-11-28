@@ -1,0 +1,44 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1795851750.272316910] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1795851750.272322157] [rosbag2_recorder]: Event publisher thread: Started
+[INFO] [1795851750.279927555] [rosbag2_recorder]: Starting recording to '/home/smoc/capston/capston/analysis/torque_mpc_sim/2026-11-28_pitwall/run1/bag'
+[INFO] [1795851750.288369218] [rosbag2_recorder]: Subscribed to topic '/wheel_torque_cmd'
+[INFO] [1795851750.289243977] [rosbag2_recorder]: Subscribed to topic '/torque_output/cmd_raw'
+[INFO] [1795851750.290170719] [rosbag2_recorder]: Subscribed to topic '/mpc/armed'
+[INFO] [1795851750.291582575] [rosbag2_recorder]: Subscribed to topic '/imu/base_link'
+[INFO] [1795851750.292526337] [rosbag2_recorder]: Subscribed to topic '/figure8/status'
+[INFO] [1795851750.293691992] [rosbag2_recorder]: Subscribed to topic '/sim/ground_truth'
+[INFO] [1795851750.294218263] [rosbag2_recorder]: Subscribed to topic '/figure8/run_config'
+[INFO] [1795851750.295006996] [rosbag2_recorder]: Subscribed to topic '/tracked_pose'
+[INFO] [1795851750.295688349] [rosbag2_recorder]: Subscribed to topic '/figure8/path'
+[INFO] [1795851750.296269413] [rosbag2_recorder]: Subscribed to topic '/events/write_split'
+[INFO] [1795851750.297214397] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/load'
+[INFO] [1795851750.297727461] [rosbag2_recorder]: Subscribed to topic '/fault_monitor/fault'
+[INFO] [1795851750.298388709] [rosbag2_recorder]: Subscribed to topic '/mpc/arm'
+[INFO] [1795851750.299321916] [rosbag2_recorder]: Subscribed to topic '/figure8/next_path'
+[INFO] [1795851750.300530921] [rosbag2_recorder]: Subscribed to topic '/dra_mppi/reference_trajectory'
+[INFO] [1795851750.301983819] [rosbag2_recorder]: Subscribed to topic '/rosout'
+[INFO] [1795851750.302816340] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/config'
+[INFO] [1795851750.303628088] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/slip_fb'
+[INFO] [1795851750.304255355] [rosbag2_recorder]: Subscribed to topic '/scan_matched_points2'
+[INFO] [1795851750.304809677] [rosbag2_recorder]: Subscribed to topic '/wheel_states'
+[INFO] [1795851750.305177779] [rosbag2_recorder]: Subscribed to topic '/slip_logger/slip'
+[INFO] [1795851750.305584473] [rosbag2_recorder]: Subscribed to topic '/state_estimator/odom'
+[INFO] [1795851750.305963285] [rosbag2_recorder]: Subscribed to topic '/state_estimator/status'
+[INFO] [1795851750.306889034] [rosbag2_recorder]: Subscribed to topic '/tf'
+[INFO] [1795851750.308107065] [rosbag2_recorder]: Subscribed to topic '/figure8/status_marker'
+[INFO] [1795851750.308536866] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/adapt'
+[INFO] [1795851750.308956480] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/cap'
+[INFO] [1795851750.309367158] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/cmd_raw'
+[INFO] [1795851750.309763509] [rosbag2_recorder]: Subscribed to topic '/figure8/progress'
+[INFO] [1795851750.310315569] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/reference_horizon'
+[INFO] [1795851750.310722864] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/slip'
+[INFO] [1795851750.311750843] [rosbag2_recorder]: Subscribed to topic '/parameter_events'
+[INFO] [1795851750.312070552] [rosbag2_recorder]: Subscribed to topic '/torque_mpc/status'
+[INFO] [1795851750.312219754] [rosbag2_recorder]: Listening for topics...
+[INFO] [1795851750.312245658] [rosbag2_recorder]: Recording...
+[INFO] [1795851750.312257100] [rosbag2_recorder]: Topics discovery started.
+[INFO] [1795852003.341640699] [rosbag2_recorder]: Topics discovery stopped.
+[INFO] [1795852003.341827978] [rosbag2_recorder]: Pausing recording.
+[INFO] [1795852003.343206864] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1795852003.355114628] [rosbag2_recorder]: Recording stopped
+[INFO] [1795852003.361923319] [rosbag2_recorder]: Event publisher thread: Exited

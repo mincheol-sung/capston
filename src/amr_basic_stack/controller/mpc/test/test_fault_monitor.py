@@ -40,3 +40,25 @@ def test_state_timeout_can_be_disabled():
     st = ok_state(10.0); st["state_rx"] = None; st["motor_error"] = [0, 255, 0, 0]
     out = check_faults(10.0, True, cfg, st)
     assert len(out) == 1 and out[0].startswith("motor_error"), out
+
+
+def test_teleop_mode_checks_motor_and_wheels_only(monkeypatch):
+    """2026-11-28: 패드 텔레옵 중 (/teleop/armed) 에는 모터 에러·바퀴 끊김만 — 추종 오차·포즈 튐·추정기 끊김은 안 본다."""
+    from unittest.mock import Mock
+    import rclpy
+    from amr_mpc.nodes.fault_monitor import FaultMonitorNode
+    rclpy.init(args=['--ros-args', '-p', 'teleop_armed_topic:=/teleop/armed'])
+    try:
+        n = FaultMonitorNode()
+        n.pub_arm, n.pub_fault = Mock(), Mock()
+        now = n.now()
+        n.teleop = True
+        n.st = dict(jump_count=9, jump_count_at_arm=0, track_error=5.0, motor_error=[0] * 4, wheel_rx=now, state_rx=None)
+        n.on_tick()
+        assert not n.pub_arm.publish.called
+        n.st["motor_error"] = [0, 255, 0, 0]
+        n.on_tick()
+        assert n.pub_arm.publish.call_args.args[0].data is False and n.teleop is False
+        n.destroy_node()
+    finally:
+        rclpy.shutdown()

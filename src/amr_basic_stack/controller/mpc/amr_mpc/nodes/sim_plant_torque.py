@@ -74,7 +74,7 @@ class SimPlantTorqueNode(Node):
             ("x0", 0.0), ("y0", 0.0), ("yaw0", 0.0),
             # 아래는 비우면 torque_plant.yaml 값. 적재 조건 바꿀 때 launch 인자로 덮어쓴다.
             ("payload_kg", -1.0),
-            ("inertia_z", -1.0),         # [kg·m²] 몸체 회전 관성 덮어쓰기 (2026-11-25). < 0 = torque_plant.yaml (0.06). 실차 식별 0.03
+            ("inertia_z", -1.0),         # [kg·m²] 몸체 회전 관성. < 0 = torque_plant.yaml sim_plant.inertia_z_kgm2 (2026-11-26 기본 0.03), 그 키가 없으면 body (0.06)
             ("use_wheel_inertia", base.use_wheel_inertia),
             ("wheel_load_share", [float(v) for v in base.wheel_load_share]),   # 바퀴별 수직력 몫 (슬립 모델 N_i, 2026-11-19)
             # 센서 흉내
@@ -101,7 +101,7 @@ class SimPlantTorqueNode(Node):
             ("friction_scale", 1.0),     # 구동계 마찰 = torque_plant.yaml friction × 이 값. 0 이면 마찰 없음
             ("friction_smooth", 0.05),   # [rad/s] 쿨롱 마찰을 잇는 바퀴 속도 (작을수록 진짜 쿨롱에 가깝고 적분이 잘아진다)
             ("rolling_Nm", 0.0),         # [N·m] 바닥 구름 손실 (네 바퀴 공통, 바퀴 회전 방향 — 2026-11-24). friction_scale 과 무관, 0 = 없음
-            ("roller_rr_N", 0.0),        # [N] 롤러 하나당 구름 저항 (model.py RollerResistance, 2026-11-25). 0 = 없음. 실차 0.88
+            ("roller_rr_N", -1.0),       # [N] 롤러 하나당 구름 저항 (model.py RollerResistance). < 0 = torque_plant.yaml sim_plant.roller_rr_N (2026-11-26 기본 0.88), 0 = 없음
             ("roller_s0_mps", 0.02),     # [m/s] 롤러 상대 속도 매끈하게 하는 폭
             ("can_interface", ""),       # 비우면 ROS 토픽 모드. vcan0 등을 주면 가짜 AK40 모터 모드 (머리주석)
             # 가짜 모터 응답 지연 [s]. 0 = 바로 답함. 실차 slcan(USB 직렬)은 네 모터 응답이 몇 ms 늦을 수 있다
@@ -114,8 +114,11 @@ class SimPlantTorqueNode(Node):
                     "wheel_load_share": [float(v) for v in g("wheel_load_share")]}
         if float(g("payload_kg")) >= 0.0:
             override["mass"] = float(config.section("body", "torque_plant.yaml")["mass_kg"]) + float(g("payload_kg"))
-        if float(g("inertia_z")) > 0.0:
-            override["inertia_z"] = float(g("inertia_z"))
+        simy = config.load("torque_plant.yaml").get("sim_plant") or {}       # 2026-11-26 시뮬 전용 실차값 (없으면 예전 그대로)
+        iz = float(g("inertia_z")) if float(g("inertia_z")) > 0.0 else float(simy.get("inertia_z_kgm2", -1.0))
+        if iz > 0.0:
+            override["inertia_z"] = iz
+        rr = float(g("roller_rr_N")) if float(g("roller_rr_N")) >= 0.0 else float(simy.get("roller_rr_N", 0.0))
         self.p = TorquePlant.from_yaml(**override)
 
         self.X = np.array([g("x0"), g("y0"), g("yaw0")], float)
@@ -132,8 +135,7 @@ class SimPlantTorqueNode(Node):
             raise SystemExit("[sim_plant_torque] wheel_efficiency 는 슬립 없는 판(surface_mu ≤ 0)에만")
         if self.eff is not None and float(g("surface_mu")) > 0:
             raise SystemExit("[sim_plant_torque] floor_efficiency 는 슬립 없는 판(surface_mu ≤ 0)에만 — 둘 중 하나만")
-        self.roller = (RollerResistance(self.p, float(g("roller_rr_N")), float(g("roller_s0_mps")))
-                       if float(g("roller_rr_N")) > 0.0 else None)
+        self.roller = RollerResistance(self.p, rr, float(g("roller_s0_mps"))) if rr > 0.0 else None
         self.slip = (SlipPlant(self.p, float(g("surface_mu")), float(g("slip_v_eps")), fric=self.fric, com_height=float(g("com_height")),
                                roller=self.roller)
                      if float(g("surface_mu")) > 0 else None)

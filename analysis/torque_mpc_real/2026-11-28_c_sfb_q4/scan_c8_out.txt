@@ -1,0 +1,37 @@
+같은 원 판 98 개. 기준 params = /home/smoc/capston/capston/bags/2026-11-28/183517_seq_sfbq4
+| 제어기 | blend | 지금 기본값과 다른 MPC 파라미터 | 판 | 위치 RMS cm | 진행 cm | 미끄럼 속도 cm/s | 큰 슬립 % | 날짜·판 |
+|---|---|---|---|---|---|---|---|---|
+| ADPP | 0 | - | 2/2 | 8.7 (8.4~9.0) | 7.0 (6.8~7.2) | 21.6 (20.7~22.5) | 9.1 (5.8~12.3) | 11-27 173512, 11-28 170436 |
+| ADPP | 0.6 | - | 12/12 | 9.1 (8.3~9.9) | 7.2 (6.1~8.0) | 20.5 (18.7~22.6) | 7.6 (1.7~17.8) | 11-25 145912, 11-26 172939, 11-26 173553, 11-26 173649, 11-26 185636, 11-26 185736, 11-26 185834, 11-28 183517#3 … |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_gain=∅ slip_fb_grip_speed=∅ slip_fb_mu_slope=∅ slip_fb_q_slip=∅ slip_fb_r_dtau=∅ slip_fb_scale=0.5 | 1/1 | 2.8 | -0.3 | 50.8 | 62.8 | 11-27 162547 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_scale=1.3 | 1/1 | 3.7 | 2.1 | 19.8 | 0.0 | 11-27 175559 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_gain=ik slip_fb_scale=0.25 | 1/1 | 3.9 | -0.6 | 54.0 | 51.1 | 11-27 165331 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_scale=1.4 | 1/1 | 4.4 | 2.2 | 21.3 | 6.8 | 11-27 175853 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_scale=1.5 | 2/2 | 4.5 (4.4~4.6) | 2.7 (2.6~2.8) | 21.6 (20.9~22.3) | 4.0 (1.6~6.5) | 11-27 173707, 11-27 175358 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_enable=false slip_fb_gain=∅ slip_fb_grip_speed=∅ slip_fb_mu_slope=∅ slip_fb_q_slip=∅ slip_fb_r_dtau=∅ | 1/1 | 5.0 | -0.0 | 72.8 | 71.2 | 11-27 162411 |
+| MPC | 0.6 | W=20,20,10,2,2,1 slip_fb_enable=∅ slip_fb_gain=∅ slip_fb_grip_speed=∅ slip_fb_mu_slope=∅ slip_fb_q_slip=∅ slip_fb_r_dtau=∅ slip_fb_scale=∅ | 6/6 | 5.1 (4.2~5.9) | 0.6 (-0.3~1.7) | 48.1 (42.8~51.2) | 53.8 (48.2~61.0) | 11-26 184758, 11-26 184937, 11-26 185209, 11-26 185937, 11-26 190248, 11-26 190352 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_enable=false | 1/1 | 5.5 | 1.4 | 57.7 | 60.0 | 11-27 165139 |
+| MPC | 0.6 | W=20,20,10,2,2,1 drive_slip_coef_deg=0 drive_yaw_offset_deg=0 inertia_z=0.06 roller_rr=∅ roller_s0=∅ slip_fb_enable=∅ slip_fb_gain=∅ slip_fb_grip_speed=∅ slip_fb_mu_slope=∅ slip_fb_q_slip=∅ slip_fb_r_dtau=∅ slip_fb_scale=∅ | 1/1 | 5.5 | 2.7 | 50.9 | 63.7 | 11-25 145538 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_scale=1.7 | 1/1 | 5.8 | 3.3 | 21.0 | 9.3 | 11-27 175505 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_gain=ik slip_fb_scale=0.25 | 1/1 | 6.0 | 1.6 | 52.0 | 62.6 | 11-27 164956 |
+| MPC | 0.6 | W=20,20,10,2,2,1 drive_slip_coef_deg=0 drive_yaw_offset_deg=0 inertia_z=0.06 roller_rr=0 slip_fb_enable=∅ slip_fb_gain=∅ slip_fb_grip_speed=∅ slip_fb_mu_slope=∅ slip_fb_q_slip=∅ slip_fb_r_dtau=∅ slip_fb_scale=∅ | 3/3 | 6.0 (5.6~6.3) | 2.7 (2.4~2.9) | 51.8 (51.1~52.5) | 56.8 (53.6~60.6) | 11-26 172337, 11-26 172500, 11-26 172646 |
+| MPC | 0.6 | mu_hat=0.41 | 3/3 | 7.4 (6.6~8.8) | 4.5 (4.2~4.8) | 23.5 (22.9~23.8) | 12.0 (8.1~14.6) | 11-28 192447#1, 11-28 192447#3, 11-28 192447#5 |
+| MPC | 0.6 | W=20,20,10,2,2,1 drive_slip_coef_deg=0 drive_yaw_offset_deg=0 inertia_z=0.06 roller_rr=∅ roller_s0=∅ slip_fb_enable=∅ slip_fb_gain=∅ slip_fb_grip_speed=∅ slip_fb_mu_slope=∅ slip_fb_q_slip=∅ slip_fb_r_dtau=∅ slip_fb_scale=∅ velocity_source=wheels | 1/1 | 7.4 | 5.2 | 46.9 | 51.5 | 11-25 145703 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_scale=0.25 | 1/1 | 7.8 | 2.5 | 39.9 | 45.7 | 11-27 164829 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_scale=2.5 | 1/1 | 8.0 | 4.9 | 17.4 | 18.5 | 11-27 175248 |
+| MPC | 0 | 지금 기본값 | 3/3 | 9.8 (9.0~10.5) | 7.1 (6.6~7.5) | 19.0 (18.1~19.9) | 10.9 (5.8~14.2) | 11-28 170146, 11-28 171215, 11-28 175813 |
+| MPC | 0 | W=20,20,10,2,2,1 | 4/4 | 10.0 (8.9~11.1) | 6.9 (6.3~7.6) | 19.1 (18.6~19.5) | 14.1 (7.3~17.9) | 11-27 165723, 11-27 192519, 11-27 193234, 11-27 193851 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_scale=1.2 | 3/3 | 11.7 (11.5~12.0) | 7.6 (7.3~7.9) | 17.4 (16.8~18.5) | 14.1 (10.5~16.1) | 11-27 192850, 11-27 193517, 11-27 194044 |
+| MPC | 0.6 | 지금 기본값 | 8/8 | 12.0 (9.9~15.3) | 7.7 (6.5~9.6) | 19.0 (17.5~20.2) | 9.3 (3.6~14.1) | 11-28 183517#1, 11-28 183517#4, 11-28 183517#7, 11-28 183517#10, 11-28 183517#13, 11-28 192447#2, 11-28 192447#4, 11-28 192447#6 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_scale=1.3 | 4/4 | 12.2 (10.6~15.0) | 8.3 (7.1~10.2) | 17.5 (15.7~20.0) | 12.3 (9.7~15.2) | 11-27 192946, 11-27 193611, 11-27 194141, 11-27 194243 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_scale=1.4 | 3/3 | 12.7 (11.6~13.6) | 8.4 (7.8~9.1) | 15.4 (15.2~15.5) | 13.0 (10.9~16.3) | 11-27 193040, 11-27 193702, 11-27 194336 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_scale=1.5 | 4/4 | 13.2 (12.0~15.4) | 8.6 (8.1~9.2) | 15.0 (14.4~16.0) | 14.0 (8.5~21.6) | 11-27 192404, 11-27 193135, 11-27 193756, 11-27 194433 |
+| MPC | 0.2 | Nc=5 Np=50 W=5,5,2.5,2,2,1 acc_window_shift=∅ cap_friction_scale=∅ cap_friction_shift=∅ cap_friction_smooth=∅ cap_on=∅ disturbance_acc_max=∅ disturbance_accel_only=false disturbance_alpha=0.1 disturbance_enable=false disturbance_frame=∅ disturbance_freeze_on_saturation=∅ disturbance_kalman_q=∅ disturbance_kalman_r_pos=∅ disturbance_kalman_r_vel=∅ disturbance_observer=∅ disturbance_yaw_acc_max=∅ drive_slip_ac_max=∅ drive_slip_coef_deg=∅ drive_yaw_offset_deg=∅ ff_normal_P0=∅ ff_normal_estimate=∅ ff_normal_max=∅ ff_normal_min=∅ ff_normal_q=∅ ff_normal_scale=∅ ff_normal_x_min=∅ fric_rolling=∅ inertia_z=0.06 load_com_height=∅ load_dynamic_cap=∅ load_min_frac=∅ load_weighted_alloc=∅ mu_hat=0.3 mu_hat_wheels=0.432,0.285,0.456,0.35 r_u=0.1 roller_rr=∅ roller_s0=∅ slip_eta_alloc=∅ slip_eta_alloc_floor=∅ slip_eta_enable=∅ slip_eta_fc=∅ slip_eta_lambda_c=∅ slip_eta_omega_eps=∅ slip_eta_s=∅ slip_fb_enable=∅ slip_fb_gain=∅ slip_fb_grip_speed=∅ slip_fb_mu_slope=∅ slip_fb_q_slip=∅ slip_fb_r_dtau=∅ slip_fb_scale=∅ target_projection=∅ use_fric_model=∅ w_dudt=0.001 | 1/1 | 13.5 | 6.3 | 47.3 | 45.4 | 11-19 175907 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_scale=2 | 2/2 | 14.3 (11.8~16.7) | 9.7 (7.9~11.4) | 13.7 (13.3~14.1) | 16.1 (15.8~16.4) | 11-27 171400, 11-27 171546 |
+| MPC | 0 | W=20,20,10,2,2,1 slip_fb_scale=1.1 | 4/4 | 15.9 (10.0~32.3) | 8.7 (6.9~13.1) | 18.9 (17.1~22.6) | 11.3 (7.9~20.2) | 11-27 192626, 11-27 193327, 11-27 193425, 11-27 193948 |
+| MPC | 0.6 | W=20,20,10,2,2,1 slip_fb_scale=2 | 1/1 | 18.0 | 12.9 | 14.2 | 23.2 | 11-27 171825 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_scale=5 | 1/1 | 43.0 | 20.0 | 39.8 | 68.9 | 11-27 175124 |
+| MPC | 0 | W=20,20,10,2,2,1 limit_mode=motor_only slip_fb_gain=∅ slip_fb_grip_speed=∅ slip_fb_mu_slope=∅ slip_fb_q_slip=∅ slip_fb_r_dtau=∅ | 1/1 | 55.0 | 5.4 | 154.3 | 75.2 | 11-27 162239 |
+| MPC | 0 | params 없음 | 1/1 | 67.2 | 0.1 | 0.9 | nan | 11-27 174801 |
+| PP | 0.6 | - | 15/15 | 6.7 (5.6~9.3) | 5.1 (3.4~7.4) | 23.5 (20.5~32.4) | 10.9 (4.9~21.9) | 11-25 145812, 11-26 172846, 11-26 173350, 11-26 173446, 11-26 185321, 11-26 185437, 11-26 185532, 11-27 172717 … |
+| PP | 0 | - | 3/3 | 6.7 (6.0~7.8) | 5.3 (4.6~6.3) | 23.6 (22.1~26.7) | 12.1 (9.3~16.4) | 11-27 165935, 11-27 173001, 11-28 170339 |

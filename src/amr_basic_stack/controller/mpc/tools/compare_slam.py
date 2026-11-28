@@ -18,6 +18,7 @@ analyze_run.py 는 /torque_mpc/status(추정기 기준)를 읽어 퓨어 퍼슛 
 
   source /opt/ros/jazzy/setup.bash && source install/setup.bash
   /usr/bin/python3 tools/compare_slam.py <bag 폴더> [<bag 폴더> ...] [--csv 표.csv]
+  --runs : bag 하나에 판이 여럿이면 (2026-11-28 pitwall, tools/bag_runs.py) 판마다 한 줄. 안 주면 예전처럼 bag 의 모든 무장 구간을 한 판으로
 """
 import argparse
 import csv
@@ -127,8 +128,9 @@ def load(bag):
     return D
 
 
-def analyse(bag, off, r_w, k):
-    D = load(bag)
+def analyse(bag, off, r_w, k, window=None, D=None):
+    """window = (t0, t1) bag 수신 시각 [s] — 그 판의 무장 구간만 (--runs). D 를 주면 bag 을 다시 읽지 않는다."""
+    D = D if D is not None else load(bag)
     if not D["ref"] or not D["pose"] or not any(v for _, v in D["armed"]):
         raise RuntimeError(f"기준 {len(D['ref'])}·포즈 {len(D['pose'])}·무장 {sum(v for _, v in D['armed'])} — 추종 판이 아니다")
     rt = np.array([a for a, _ in D["ref"]])
@@ -147,6 +149,8 @@ def analyse(bag, off, r_w, k):
     t, x, y, th, xr, yr, thr, vx, vy, om = a.T
     et, ec, en, ey, sp = path_errors(x, y, th, xr, yr, thr, vx, vy, om)
     mv = armed_mask(t, D["armed"]) & (sp > 0.02)
+    if window is not None:
+        mv &= (t >= window[0]) & (t <= window[1])
     if not mv.any():
         raise RuntimeError("무장 중 주행 구간이 없다")
     win, ncross = crossing_mask(t, om, mv)
@@ -192,6 +196,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("bags", nargs="+")
     ap.add_argument("--csv", default="", help="표를 CSV 로도 (발표용)")
+    ap.add_argument("--runs", action="store_true", help="bag 안의 판마다 한 줄 (tools/bag_runs.py, 2026-11-28 pitwall)")
     a = ap.parse_args()
     plant = yaml.safe_load(open(os.path.join(CFG, "torque_plant.yaml")))
     est = yaml.safe_load(open(os.path.join(CFG, "torque_estimator.yaml")))["estimator"]
@@ -205,17 +210,27 @@ def main():
     for bag in a.bags:
         bag = bag.rstrip("/")
         name = os.path.relpath(bag, os.path.join(bag, "..", ".."))
-        try:
-            d = analyse(bag, off, r_w, k)
-        except Exception as ex:
-            print(f"{name} | {run_label(bag)} | 건너뜀: {ex}")
-            continue
-        cells = []
-        for c in COLS:
-            v = d.get(c[0], float("nan"))
-            cells.append(c[2].format(v * (c[3] if len(c) > 3 else 1)) if v == v else "—")
-        print(" | ".join([name, run_label(bag)] + cells))
-        table.append([name, run_label(bag)] + cells)
+        jobs = [(name, run_label(bag), None)]
+        D = None
+        if a.runs:
+            from bag_runs import runs
+            rs = runs(bag)
+            if rs and rs[0]["ref"] is not None:
+                D = load(bag)
+                jobs = [(f"{name}#{r['run']}", f"{run_label(bag)} | {r['ref']['summary'].split(' | ')[0]}", (r["t0"], r["t1"]))
+                        for r in rs]
+        for jname, label, win in jobs:
+            try:
+                d = analyse(bag, off, r_w, k, window=win, D=D)
+            except Exception as ex:
+                print(f"{jname} | {label} | 건너뜀: {ex}")
+                continue
+            cells = []
+            for c in COLS:
+                v = d.get(c[0], float("nan"))
+                cells.append(c[2].format(v * (c[3] if len(c) > 3 else 1)) if v == v else "—")
+            print(" | ".join([jname, label] + cells))
+            table.append([jname, label] + cells)
     if a.csv and table:
         with open(a.csv, "w", newline="") as f:
             w = csv.writer(f)

@@ -9,6 +9,7 @@ import re
 import os
 
 import pytest
+import yaml
 from launch import LaunchContext
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 
@@ -862,11 +863,19 @@ def test_real_all_passes_max_ff_ratio():
 # ── 2026-11-23 구동계 방향 보정 launch 인자 (torque_plant.yaml drive) ──
 @pytest.mark.parametrize("controller, exe", [("mpc", "torque_mpc_node"), ("pure_pursuit", "wheel_pi_node"),
                                              ("pp", "wheel_pi_node"), ("adpp", "wheel_pi_node")])
-def test_drive_args_default_not_passed(launch_mod, controller, exe):
-    """인자를 안 주면 어느 노드에도 drive_* 를 넘기지 않는다 (노드가 torque_plant.yaml drive 기본 0 을 읽는다)."""
-    _, _, out = build(launch_mod, controller=controller)
+def test_drive_args_default_not_passed(launch_mod, monkeypatch, controller, exe):
+    """실차: 인자를 안 주면 어느 노드에도 drive_* 를 넘기지 않는다 (노드가 torque_plant.yaml drive — 2026-11-26 부터 3.1° · +0.8 — 를 읽는다).
+    시뮬: 플랜트에 이 물리가 없어 비운 인자를 0 으로 넘긴다 (2026-11-26). 직접 준 값은 시뮬에서도 그대로."""
+    monkeypatch.setattr(os.path, "exists", lambda p: True)
+    _, _, out = build(launch_mod, plant="real", use_mpc="true", controller=controller)
     assert not any(k.startswith("drive_") for k in _node_params(out, exe))
     assert not any(k.startswith("drive_") for k in _torque_output_params(out))
+    _, _, out = build(launch_mod, controller=controller)                                 # 기본 plant:=sim
+    p = _node_params(out, exe)
+    assert p["drive_yaw_offset_deg"] == 0.0 and p["drive_slip_coef_deg"] == 0.0
+    assert _torque_output_params(out)["drive_yaw_offset_deg"] == 0.0
+    _, _, out = build(launch_mod, controller=controller, drive_yaw_deg="3.1")
+    assert _node_params(out, exe)["drive_yaw_offset_deg"] == 3.1 and _node_params(out, exe)["drive_slip_coef_deg"] == 0.0
 
 
 @pytest.mark.parametrize("controller, exe", [("mpc", "torque_mpc_node"), ("pure_pursuit", "wheel_pi_node"),
@@ -1190,7 +1199,7 @@ def test_roller_and_inertia_args_2026_11_25(launch_mod, monkeypatch):
     _, _, out = build(launch_mod)
     p = _node_params(out, "torque_mpc_node")
     assert "roller_rr" not in p and "inertia_z" not in p
-    assert _node_params(out, "sim_plant_torque_node")["roller_rr_N"] == 0.0 and _node_params(out, "sim_plant_torque_node")["inertia_z"] == -1.0
+    assert _node_params(out, "sim_plant_torque_node")["roller_rr_N"] == -1.0 and _node_params(out, "sim_plant_torque_node")["inertia_z"] == -1.0   # 노드가 yaml sim_plant 를 쓴다
     spec = importlib.util.spec_from_file_location("real_all_roller", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
@@ -1198,4 +1207,140 @@ def test_roller_and_inertia_args_2026_11_25(launch_mod, monkeypatch):
     import yaml
     with open(os.path.join(HERE, "..", "config", "torque_mpc.yaml")) as f:
         y = yaml.safe_load(f)
-    assert y["model_terms"]["roller_rr_N"] == 0.0 and y["model_terms"]["roller_s0_mps"] == 0.02
+    # 2026-11-26 사용자 결정 "기본으로 켜기": 롤러 0.88 N · MPC 회전 관성 0.03 (torque_plant.yaml 0.06 은 그대로 — 시뮬 플랜트·도구용)
+    assert y["model_terms"]["roller_rr_N"] == 0.88 and y["model_terms"]["roller_s0_mps"] == 0.02 and y["model_terms"]["inertia_z_kgm2"] == 0.03
+    with open(os.path.join(HERE, "..", "config", "torque_plant.yaml")) as f:
+        yp = yaml.safe_load(f)
+    assert yp["body"]["inertia_z_kgm2"] == 0.06
+    assert yp["sim_plant"] == {"roller_rr_N": 0.88, "inertia_z_kgm2": 0.03}     # 2026-11-26 사용자 결정 "시뮬 맞추고" — 시뮬 플랜트 전용
+
+
+# ── 게임패드 RT 자율 · LT 수동 (2026-11-28) ─────────────────────────────────────────────
+def _by_name(out, name):
+    """노드 이름이 name 인 노드의 dict 파라미터 {이름: 값} (yaml 경로 문자열은 건너뛴다)."""
+    def txt(x):
+        return x if isinstance(x, str) else "".join(getattr(s, "text", str(s)) for s in x)
+    n = [n for n in out if txt(getattr(n, "_Node__node_name", None) or "") == name][0]
+    val = lambda v: yaml.safe_load(txt(v)) if isinstance(v, tuple) and all(hasattr(s, "text") for s in v) else v   # 글자 값은 yaml 로 감싸 있다
+    return {txt(k): val(v) for d in n._Node__parameters if isinstance(d, dict) for k, v in d.items()}
+
+
+JOY = ["joy_node", "joy_teleop_node"]
+
+
+def _real(launch_mod, monkeypatch, **args):
+    real_share = launch_mod.get_package_share_directory
+    monkeypatch.setattr(launch_mod, "get_package_share_directory",
+                        lambda p: "/nonexistent/amr_description" if p == "amr_description" else real_share(p))
+    return build(launch_mod, plant="real", auto_setup_can="false", **args)
+
+
+def test_joy_on_by_default_on_real(launch_mod, monkeypatch):
+    """실차 기본 (joy auto): 패드 노드 + 텔레옵 PI 가 뜨고, 게이트가 /teleop_pi/cmd_raw 를 두 번째 입력으로, fault_monitor 가 /teleop/armed 를 본다."""
+    exes, _, out = _real(launch_mod, monkeypatch)
+    assert all(e in exes for e in JOY)
+    pi = _by_name(out, "teleop_pi_node")
+    assert pi["cmd_topic"] == "/teleop/cmd_vel" and pi["armed_topic"] == "/teleop/armed"
+    assert pi["output_topic"] == "/teleop_pi/cmd_raw" and pi["status_topic"] == "/teleop_pi/status"
+    assert _by_name(out, "torque_command_gate")["teleop_input_topic"] == "/teleop_pi/cmd_raw"
+    assert _by_name(out, "fault_monitor_node")["teleop_armed_topic"] == "/teleop/armed"
+    jt = _by_name(out, "joy_teleop")
+    assert (jt["arm_axis"], jt["teleop_arm_axis"], jt["arm_button"]) == (4, 5, -1)   # RT 4 · LT 5 (joy_teleop_xbox.yaml 실측), Menu 끔
+
+
+def test_joy_off(launch_mod, monkeypatch):
+    exes, _, out = _real(launch_mod, monkeypatch, joy="false")
+    assert not any(e in exes for e in JOY)
+    assert "teleop_input_topic" not in _by_name(out, "torque_command_gate")
+    assert "teleop_armed_topic" not in _by_name(out, "fault_monitor_node")
+
+
+def test_joy_sim_off_by_default_and_switchable(launch_mod):
+    exes, _, _ = build(launch_mod)
+    assert not any(e in exes for e in JOY)
+    exes, _, out = build(launch_mod, joy="true")
+    assert all(e in exes for e in JOY)
+    assert _by_name(out, "torque_command_gate")["teleop_input_topic"] == "/teleop_pi/cmd_raw"
+
+
+def test_joy_with_pp_keeps_two_pi_nodes_apart(launch_mod, monkeypatch):
+    """비교군 A 의 wheel_pi_node 와 텔레옵 PI 가 이름·토픽이 겹치지 않는다."""
+    _, _, out = _real(launch_mod, monkeypatch, controller="pp")
+    a, t = _by_name(out, "wheel_pi_node"), _by_name(out, "teleop_pi_node")
+    assert a.get("armed_topic") == "/mpc/armed" and t["armed_topic"] == "/teleop/armed"
+    assert "status_topic" not in a and t["status_topic"] != "/wheel_pi/status"
+
+
+def test_real_all_passes_joy():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "joy" in m._PASS
+
+
+# ── 2026-11-28 controller:=all (controller_select_node + amrseq) ──
+def _txt(v):
+    """글자 파라미터는 YAML 로 적힌 Substitution 튜플 → 값."""
+    return yaml.safe_load("".join(getattr(s, "text", str(s)) for s in v)) if isinstance(v, (tuple, list)) else v
+
+
+def _plain(p, drop=()):
+    return {k: _txt(v) for k, v in p.items() if k not in drop}
+
+
+def test_all_launches_three_controllers_and_select(launch_mod):
+    exes, _, out = build(launch_mod, controller="all")
+    for exe in ("torque_mpc_node", "pure_pursuit_node", "wheel_pi_node", "controller_select_node"):
+        assert exes.count(exe) == 1, exe
+    assert _plain(_node_params(out, "torque_mpc_node"))["armed_topic"] == "/ctrl/mpc/armed"
+    for exe in ("pure_pursuit_node", "wheel_pi_node"):
+        assert _plain(_node_params(out, exe))["armed_topic"] == "/ctrl/pp/armed"
+    assert _plain(_node_params(out, "pure_pursuit_node"))["variant_topic"] == "/ctrl/active"
+    assert _plain(_torque_output_params(out))["select_topic"] == "/ctrl/active"
+    assert _plain(_node_params(out, "fault_monitor_node"))["select_topic"] == "/ctrl/active"
+    assert _plain(_node_params(out, "controller_select_node"))["active"] == "mpc"
+
+
+@pytest.mark.parametrize("ctrl, exe", [("mpc", "torque_mpc_node"), ("pp", "pure_pursuit_node"), ("pp", "wheel_pi_node")])
+def test_all_controller_params_match_single_mode(launch_mod, ctrl, exe):
+    """all 에서 각 제어기 노드 파라미터는 단독 launch 와 같다 — 무장 토픽·룩어헤드 선택 배선만 다르다 (같은 조건 비교)."""
+    _, _, one = build(launch_mod, controller=ctrl)
+    _, _, every = build(launch_mod, controller="all")
+    drop = ("armed_topic", "variant_topic", "adpp_lookahead_time", "adpp_lookahead_min", "adpp_lookahead_max")
+    assert _plain(_node_params(one, exe), drop) == _plain(_node_params(every, exe), drop)
+
+
+def test_all_adpp_set_matches_adpp_mode(launch_mod):
+    """all 의 adpp_lookahead_* = controller:=adpp 의 lookahead_* (yaml pure_pursuit_adaptive), pp 묶음 = controller:=pp."""
+    _, _, every = build(launch_mod, controller="all")
+    _, _, ad = build(launch_mod, controller="adpp")
+    _, _, fx = build(launch_mod, controller="pp")
+    p_all, p_ad, p_fx = (_node_params(o, "pure_pursuit_node") for o in (every, ad, fx))
+    for k in LOOKAHEAD:
+        assert p_all["adpp_" + k] == pytest.approx(p_ad[k])
+        assert p_all.get(k, None) == p_fx.get(k, None)
+
+
+def test_all_lookahead_override_goes_to_both_sets(launch_mod):
+    """pp_lookahead_min·max (11-26 zigzag 0.1·0.2) 는 단독 모드처럼 pp·adpp 둘 다에."""
+    _, _, out = build(launch_mod, controller="all", pp_lookahead_min="0.1", pp_lookahead_max="0.2")
+    p = _node_params(out, "pure_pursuit_node")
+    assert p["lookahead_min"] == pytest.approx(0.1) and p["adpp_lookahead_min"] == pytest.approx(0.1)
+    assert p["lookahead_max"] == pytest.approx(0.2) and p["adpp_lookahead_max"] == pytest.approx(0.2)
+
+
+def test_single_modes_have_no_select(launch_mod):
+    """controller:=mpc·pp·adpp 는 예전 그대로 — 선택 노드 없음, torque_output·fault_monitor 에 select_topic 안 넘김."""
+    for ctrl in ("mpc", "pp", "adpp"):
+        exes, _, out = build(launch_mod, controller=ctrl)
+        assert "controller_select_node" not in exes
+        assert "select_topic" not in _plain(_torque_output_params(out))
+        assert "select_topic" not in _plain(_node_params(out, "fault_monitor_node"))
+        assert _plain(_node_params(out, "pure_pursuit_node" if ctrl != "mpc" else "torque_mpc_node")).get("armed_topic") == "/mpc/armed"
+
+
+def test_real_all_passes_ctrl_start():
+    spec = importlib.util.spec_from_file_location("real_all_launch", os.path.join(HERE, "..", "launch", "real_all.launch.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert "ctrl_start" in m._PASS and "controller" in m._PASS

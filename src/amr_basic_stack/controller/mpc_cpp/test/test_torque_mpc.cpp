@@ -2082,3 +2082,114 @@ TEST(RollerResistance, RR4_ObserverDoesNotDoubleCount)
   EXPECT_LT(err_on, 1e-3);
   EXPECT_GT(err_off, 5.0 * err_on);
 }
+
+// 2026-11-27 슬립 되먹임 이득: unconstrained_gain 의 K_x 가 실제 풀이 (constrained = false) 의 기울기와 같다.
+//   정지 기준 (θ_r = 0) 에서 x 를 ε 만큼 흔든 첫 입력 τ = −K_x x  (finite difference, 해가 x 에 선형이라 ε 무관)
+//   K_τ 는 직접 τ_prev 를 넣을 수 없어 K_x 로만 본다. 지금 기본 튜닝 (Np 75, Nc 40, W [20 20 10 2 2 1], r_Δ 100, r_U 10, δ0 3.1°)
+//   에서 Python 배치 계산 값 K_x(0, 3) = 0.1031, K_x(0, 4) = −0.0925, K_x(0, 5) = −0.0450 (scratch kgain.py, 같은 날) 과도 맞춘다.
+TEST(TorqueMPC, UnconstrainedGainMatchesSolver)
+{
+  TorqueModel md;
+  md.wheel_radius = 0.04; md.wheel_base = 0.1724; md.robot_width = 0.2140; md.mass = 4.56;
+  md.inertia_z = 0.03; md.J_w = 8.9e-4; md.use_w = true; md.drive_yaw = 3.1 * M_PI / 180.0;
+  TorqueTuning tu;
+  tu.Ts = 0.01; tu.Np = 75; tu.Nc = 40;
+  tu.W << 20, 20, 10, 2, 2, 1;
+  tu.w_delta = 100.0; tu.r_u = 10.0; tu.q_null = 0.0;
+  tu.constrained = false;
+  const auto K = unconstrained_gain(md, tu);
+  const double eps = 1e-3;
+  for (int i = 0; i < 6; ++i) {
+    TorqueMPC mpc(md, tu);
+    TVec6 x = TVec6::Zero();
+    x(i) = eps;
+    const TVec4 tau = mpc.step(x, hold_ref(TVec3::Zero(), tu.Np + 1));
+    EXPECT_LT((tau / eps + K.Kx.col(i)).cwiseAbs().maxCoeff(), 1e-8) << "열 " << i;
+  }
+  EXPECT_NEAR(K.Kx(0, 3), 0.1031, 1e-4);
+  EXPECT_NEAR(K.Kx(0, 4), -0.0925, 1e-4);
+  EXPECT_NEAR(K.Kx(0, 5), -0.0450, 1e-4);
+  EXPECT_NEAR(K.Ktau(0, 0), 0.6739, 1e-4);
+  // 몸체 wrench F·K_v 는 대각 (x·y 무게가 같고 방향 보정은 F 와 K 에 같이 들어간다)
+  const Eigen::Matrix3d FK = md.force_map() * K.Kx.rightCols<3>();
+  EXPECT_LT((FK - Eigen::Matrix3d(FK.diagonal().asDiagonal())).cwiseAbs().maxCoeff(), 1e-9);
+}
+
+// 2026-11-27 (3) 바퀴 공간 슬립 되먹임 K_ω. 실차 값 (δ0 3.1°, I_z 0.03, J_w 8.9e-4, 지금 MPC 튜닝)
+static void slip_fb_model(TorqueModel & md, TorqueTuning & tu)
+{
+  md.wheel_radius = 0.04; md.wheel_base = 0.1724; md.robot_width = 0.2140; md.mass = 4.56;
+  md.inertia_z = 0.03; md.J_w = 8.9e-4; md.use_w = true; md.drive_yaw = 3.1 * M_PI / 180.0;
+  tu.Ts = 0.01; tu.Np = 75; tu.Nc = 40;
+  tu.W << 20, 20, 10, 2, 2, 1;
+  tu.w_delta = 100.0; tu.r_u = 10.0; tu.q_null = 0.0;
+}
+
+// ik: −K_ω (ω − J v_e) 가 예전 몸체 오차 되먹임 −K_v (R(δ0)Tω − v_e) 와 같고, 앞·뒤 쌍 n 방향에 0 (rank 3)
+TEST(TorqueMPC, SlipFbIkEqualsBodyForm)
+{
+  TorqueModel md;
+  TorqueTuning tu;
+  slip_fb_model(md, tu);
+  SlipFbDesign sd;
+  sd.mode = SlipFbGain::Ik;
+  const Eigen::Matrix4d Kw = slip_feedback_gain(md, tu, sd);
+  const Eigen::Matrix<double, 4, 3> Kv = unconstrained_gain(md, tu).Kx.rightCols<3>();
+  const Eigen::Matrix<double, 4, 3> J = wheel_nominal_map(md);
+  // R(δ0)·T·J = I (ω_nom 을 다시 몸체로 바꾸면 v_e 그대로)
+  for (int i = 0; i < 3; ++i) {
+    TVec3 v = TVec3::Zero();
+    v(i) = 1.0;
+    EXPECT_LT((md.correct_wheel_velocity(md.wheel_body_velocity(J * v), 0.0) - v).cwiseAbs().maxCoeff(), 1e-12);
+  }
+  std::srand(7);
+  for (int k = 0; k < 20; ++k) {
+    const TVec4 om = 20.0 * TVec4::Random();
+    const TVec3 ve(TVec3::Random());
+    const TVec4 d_new = -Kw * (om - J * ve);
+    const TVec4 d_old = -Kv * (md.correct_wheel_velocity(md.wheel_body_velocity(om), 0.0) - ve);
+    EXPECT_LT((d_new - d_old).cwiseAbs().maxCoeff(), 1e-12) << "표본 " << k;
+  }
+  EXPECT_LT((Kw * TVec4(1.0, 1.0, -1.0, -1.0)).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_NEAR(Kw(0, 0), 0.0043, 1e-4);
+  EXPECT_NEAR(Kw(0, 1), -0.0023, 1e-4);
+}
+
+// lqr, grip_speed 0 (미끄러지는 중, C = 0): 바퀴끼리 안 엮인 적분기 e+ = e + (Ts/J_w) Δτ 의 스칼라 LQR 과 같은 대각
+TEST(TorqueMPC, SlipFbLqrSlidingIsScalarLqr)
+{
+  TorqueModel md;
+  TorqueTuning tu;
+  slip_fb_model(md, tu);
+  SlipFbDesign sd;     // 기본 lqr, q_slip 2, r_dtau 10, grip 0
+  const Eigen::Matrix4d Kw = slip_feedback_gain(md, tu, sd);
+  const double b = tu.Ts / md.J_w, q = sd.q_slip * md.wheel_radius * md.wheel_radius, rho = sd.r_dtau;
+  const double P = (q * b * b + std::sqrt(q * q * b * b * b * b + 4.0 * b * b * q * rho)) / (2.0 * b * b);
+  const double k = b * P / (rho + b * b * P);
+  EXPECT_LT((Kw - k * Eigen::Matrix4d::Identity()).cwiseAbs().maxCoeff(), 1e-10);
+  EXPECT_NEAR(k, 0.0162, 1e-4);
+  EXPECT_NEAR(1.0 - b * k, 0.8182, 1e-4);                    // 닫힌 고리 극 → 시정수 50 ms
+  sd.scale = 0.25;
+  EXPECT_LT((slip_feedback_gain(md, tu, sd) - 0.25 * Kw).cwiseAbs().maxCoeff(), 1e-15);
+  EXPECT_THROW(parse_slip_fb_gain("kv"), std::invalid_argument);
+  sd.scale = 6.0;
+  EXPECT_THROW(slip_feedback_gain(md, tu, sd), std::invalid_argument);
+}
+
+// lqr, grip_speed 1 m/s: 몸체를 거쳐 엮인 4×4. 같은 날 Python (scipy expm·solve_discrete_are, 네 바퀴 같은 하중) 과 맞춘다
+TEST(TorqueMPC, SlipFbLqrGripCoupled)
+{
+  TorqueModel md;
+  TorqueTuning tu;
+  slip_fb_model(md, tu);
+  md.wheel_load_share = TVec4::Constant(0.25);
+  SlipFbDesign sd;
+  sd.grip_speed = 1.0;
+  const Eigen::Matrix4d Kw = slip_feedback_gain(md, tu, sd);
+  EXPECT_NEAR(Kw(0, 0), 0.0047, 1e-4);
+  EXPECT_NEAR(Kw(0, 1), 0.0013, 1e-4);
+  EXPECT_NEAR(Kw(0, 2), -0.0013, 1e-4);
+  EXPECT_NEAR(Kw(0, 3), 0.0003, 1e-4);
+  sd.grip_speed = 0.0;
+  EXPECT_LT(Kw(0, 0), slip_feedback_gain(md, tu, sd)(0, 0));   // 붙어 구르면 미끄럼이 스스로 줄어 이득이 작다
+}

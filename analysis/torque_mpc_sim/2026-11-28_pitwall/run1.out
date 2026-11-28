@@ -1,0 +1,71 @@
+[16:42:15] launch
+[16:42:32] pit show (기동 직후)
+기준: 판 없음 (다음 'a' 가 새 판) | 다음 판 #0
+  다음 판: circles8 width=2 speed=0.5 accel=0.8 laps=1 align_s=1.5 crossing_blend_m=0 yaw=tangent | 기준 13.2 s | 부하 45 %
+MPC: W [80, 80, 10, 2, 2, 1] w_dudt 0.01 r_u 10 q_null 0 mu_hat 0.33 slip_fb 켬 ×1 slip_eta 끔 외란 켬 α 0.01 roller 0.88 I_z 0.03
+  launch 때 값: limit_mode friction, Ts 0.01, Np 75, Nc 40, cap_on ground, velocity_source estimator
+[16:42:33] 거부 시험: circles8 speed 1.5 (부하 예산 넘음)
+✗ 거부 기준: speed=1.5
+    이유: 기준 부하 2.080 > 예산 1.550 (100 % of 1.55). speed 를 1.118 m/s 이하로 낮추거나 height 를 줄여라 (최대곡률 2.00 1/m 이 ω=κv 를 키운다).
+
+기준: 판 없음 (다음 'a' 가 새 판) | 다음 판 #0
+  다음 판: circles8 width=2 speed=0.5 accel=0.8 laps=1 align_s=1.5 crossing_blend_m=0 yaw=tangent | 기준 13.2 s | 부하 45 %
+  마지막 거부: speed=1.5: 기준 부하 2.080 > 예산 1.550 (100 % of 1.55). speed 를 1.118 m/s 이하로 낮추거나 height 를 줄여라 (최대곡률 2.00 1/m 이 ω=κv 를 키운다).
+MPC: W [80, 80, 10, 2, 2, 1] w_dudt 0.01 r_u 10 q_null 0 mu_hat 0.33 slip_fb 켬 ×1 slip_eta 끔 외란 켬 α 0.01 roller 0.88 I_z 0.03
+  launch 때 값: limit_mode friction, Ts 0.01, Np 75, Nc 40, cap_on ground, velocity_source estimator
+[16:42:34] 거부 시험: MPC 실행 중 못 바꾸는 값 Np
+pit: 실행 중 바꿀 수 없는 이름 ['Np']
+  기준: shape, width, height, lap_speeds, speed, accel, laps, yaw_mode, spin_rate, align_s, speed_mod_amp, speed_mod_cycles, speed_mod_phase_deg, speed_mod_shape, crossing_blend_m, start_delay, hold_s, resume_ramp_s, resync_window_s, origin_mode, origin_x, origin_y, origin_yaw_deg, start_tolerance_xy, start_tolerance_yaw_deg, lead_speed, lead_yaw_rate, seg_distance, seg_dir_deg, seg_angle_deg, seg_yaw_rate, seg_yaw_accel, seg_out_and_back, seg_pause_s, square_side, square_corner_speed, square_v_max, square_yaw_blend, square_corner_mode, square_rot_s, square_dwell_s, poly_path, zigzag_n, zigzag_length, zigzag_angle_deg, zigzag_profile, zigzag_rot_s, zigzag_dwell_s, zigzag_corner, zigzag_corner_speed, zigzag_turn_m, zigzag_reverse
+  MPC: W, w_dudt, r_u, q_null, mu_hat, slip_fb_enable, slip_fb_scale, slip_eta_enable, disturbance_enable, disturbance_alpha, roller_rr, inertia_z
+  (그 밖의 값은 launch 인자로 — 다시 띄울 것)
+[16:42:36] arm true
+[16:42:42] 주행 중 변경: 기준 accel 0.6 (다음 판부터), MPC W·slip_fb_scale (다음 정지 때)
+✓ 기준: accel=0.6
+✓ MPC: W=[40, 40, 10, 2, 2, 1], slip_fb_scale=0.5
+
+기준: 판 #1 주행 중 | 다음 판 #2
+  다음 판: circles8 width=2 speed=0.5 accel=0.6 laps=1 align_s=1.5 crossing_blend_m=0 yaw=tangent | 기준 13.4 s | 부하 45 %
+  받아 둔 변경 (지금 판에는 안 들어감): accel 0.8→0.6
+MPC: W [80, 80, 10, 2, 2, 1] w_dudt 0.01 r_u 10 q_null 0 mu_hat 0.33 slip_fb 켬 ×1 slip_eta 끔 외란 켬 α 0.01 roller 0.88 I_z 0.03
+  launch 때 값: limit_mode friction, Ts 0.01, Np 75, Nc 40, cap_on ground, velocity_source estimator
+  받아 둔 값 (다음 정지 때 적용): W [80, 80, 10, 2, 2, 1]→[40, 40, 10, 2, 2, 1], slip_fb_scale 1→0.5
+[16:43:43] state 기다림 시간 초과 (finished, 마지막 )
+[16:43:44] arm false
+[16:43:46] pit show (판 1 끝, 정지 뒤)
+기준: 판 없음 (다음 'a' 가 새 판) | 다음 판 #1
+  다음 판: circles8 width=2 speed=0.5 accel=0.6 laps=1 align_s=1.5 crossing_blend_m=0 yaw=tangent | 기준 13.4 s | 부하 45 %
+MPC: W [40, 40, 10, 2, 2, 1] w_dudt 0.01 r_u 10 q_null 0 mu_hat 0.33 slip_fb 켬 ×0.5 slip_eta 끔 외란 켬 α 0.01 roller 0.88 I_z 0.03
+  launch 때 값: limit_mode friction, Ts 0.01, Np 75, Nc 40, cap_on ground, velocity_source estimator
+[16:43:47] 프리셋 poly (정지 중 → 바로 다음 판)
+프리셋 poly: 꺾은선 스트레스 판 — 가감속 1.5 · 최고 1.5 m/s · 꼭짓점 통과 (amr_aliases.sh poly)
+✓ 기준: 41 개 값
+
+기준: 판 없음 (다음 'a' 가 새 판) | 다음 판 #1
+  다음 판: polyline poly_path=R1,L1,L2,R1,R1,R2 square_corner_speed=0.1 square_v_max=1 square_yaw_blend=0.3 square_corner_mode=pass square_rot_s=1 square_dwell_s=0.1 accel=1 align_s=1.5 yaw=tangent | 기준 15.7 s | 부하 65 %
+MPC: W [40, 40, 10, 2, 2, 1] w_dudt 0.01 r_u 10 q_null 0 mu_hat 0.33 slip_fb 켬 ×0.5 slip_eta 끔 외란 켬 α 0.01 roller 0.88 I_z 0.03
+  launch 때 값: limit_mode friction, Ts 0.01, Np 75, Nc 40, cap_on ground, velocity_source estimator
+[16:43:48] arm true
+[16:43:57] arm false
+[16:43:57] 판 2 도중 멈춤 → accel 0.8 로 바꿈 (멈춘 판 버림)
+✓ 기준: accel=0.8
+
+기준: 판 없음 (다음 'a' 가 새 판) | 다음 판 #2
+  다음 판: polyline poly_path=R1,L1,L2,R1,R1,R2 square_corner_speed=0.1 square_v_max=1 square_yaw_blend=0.3 square_corner_mode=pass square_rot_s=1 square_dwell_s=0.1 accel=0.8 align_s=1.5 yaw=tangent | 기준 17.0 s | 부하 65 %
+MPC: W [40, 40, 10, 2, 2, 1] w_dudt 0.01 r_u 10 q_null 0 mu_hat 0.33 slip_fb 켬 ×0.5 slip_eta 끔 외란 켬 α 0.01 roller 0.88 I_z 0.03
+  launch 때 값: limit_mode friction, Ts 0.01, Np 75, Nc 40, cap_on ground, velocity_source estimator
+[16:44:00] arm true
+[16:45:01] state 기다림 시간 초과 (finished, 마지막 )
+[16:45:02] arm false
+[16:45:04] pit show (끝)
+기준: 판 없음 (다음 'a' 가 새 판) | 다음 판 #3
+  다음 판: polyline poly_path=R1,L1,L2,R1,R1,R2 square_corner_speed=0.1 square_v_max=1 square_yaw_blend=0.3 square_corner_mode=pass square_rot_s=1 square_dwell_s=0.1 accel=0.8 align_s=1.5 yaw=tangent | 기준 17.0 s | 부하 65 %
+MPC: W [40, 40, 10, 2, 2, 1] w_dudt 0.01 r_u 10 q_null 0 mu_hat 0.33 slip_fb 켬 ×0.5 slip_eta 끔 외란 켬 α 0.01 roller 0.88 I_z 0.03
+  launch 때 값: limit_mode friction, Ts 0.01, Np 75, Nc 40, cap_on ground, velocity_source estimator
+[16:45:20] arm true
+[16:46:24] state 기다림 시간 초과 (finished, 마지막 )
+[16:46:25] arm false
+[16:46:27] pit show (끝)
+기준: /figure8/status 없음 (기준 노드가 안 떠 있거나 pitwall 전 판)
+MPC: /torque_mpc/config 없음 (controller:=mpc 가 아니거나 pitwall 전 빌드)
+./sim_pitwall.sh: line 65: kill: (-286861) - No such process
+[16:46:45] sim_plant_torque 남은 프로세스: 0

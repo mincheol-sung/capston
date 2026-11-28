@@ -1,0 +1,2 @@
+[figure8_reference_node-3] [INFO] [1795754374.010999047] [figure8_reference_node]: 주행 끝: 실제 27.20 s (기준 27.19 s, +0.01 s) — trajectory tracking (시계대로, 무장 배속 램프 몫만 길어짐)
+[figure8_reference_node-3] [INFO] [1795754379.010998425] [figure8_reference_node]: 8자 완주 + 유지 5.0 s 끝 — 발행 중단. MPC 가 곧 타임아웃으로 정지한다.

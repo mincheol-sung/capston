@@ -53,14 +53,15 @@ import rclpy
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
 
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import Imu
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, String
 
 from amr_interfaces.msg import PlanarReferenceArray, WheelStates, WheelTorqueCommand
 from amr_mpc.torque.slip_guard import SlipGuard
 from amr_mpc.torque.model import TorquePlant, drive_params, drive_Tinv, wheel_coefficients
 from amr_mpc.core import config, node_main
+from amr_mpc.core.ctrl_select import TopicSelect, parse_active
 
 
 def friction_torque(omega, coulomb, viscous, smooth, omega_ref=None, static=0.0, stribeck=0.5):
@@ -153,6 +154,10 @@ class TorqueOutputNode(Node):
             # 2026-11-23 구동계 앞방향 보정 δ0 (torque_plant.yaml drive, 기본 0) — 기준 바퀴속도 (정지 마찰 방향) 와 슬립 가드 T⁻¹ 에.
             #   선회 미끄럼 몫은 여기서 안 쓴다 (슬립 가드가 잡을 대상이 아니고, 정지 마찰 방향에는 영향이 작다)
             ("drive_yaw_offset_deg", drive_params(plant_yaml)[0]),
+            # 2026-11-28 controller:=all (nodes/controller_select.py): select_topic 을 주면 input_topic 대신 select_inputs 의 토픽을
+            #   다 받고 /ctrl/active 가 고른 제어기의 것만 낸다 (고르지 않은 MPC 가 내는 DAMPING 을 막는다). 비우면 예전 그대로
+            ("select_topic", ""),
+            ("select_inputs", ["mpc=/torque_mpc/cmd_raw", "pp=/wheel_pi/cmd_raw", "adpp=/wheel_pi/cmd_raw"]),
         ])
         g = lambda n: self.get_parameter(n).value
         scale = float(g("compensation_scale"))
@@ -188,7 +193,16 @@ class TorqueOutputNode(Node):
         self.create_subscription(WheelStates, str(g("wheel_states_topic")), self.on_wheel, 10)
         if self.has_static:
             self.create_subscription(PlanarReferenceArray, ref_topic, self.on_reference, 10)
-        self.create_subscription(WheelTorqueCommand, str(g("input_topic")), self.on_cmd, 10)
+        self.sel = None
+        if str(g("select_topic")):
+            self.sel = TopicSelect(list(g("select_inputs")))
+            for topic in self.sel.topics():
+                self.create_subscription(WheelTorqueCommand, topic, lambda m, t=topic: self.on_cmd(m) if self.sel.passes(t) else None, 10)
+            latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+            self.create_subscription(String, str(g("select_topic")), self.on_select, latched)
+            self.get_logger().info(f"제어기 선택 모드: {g('select_topic')} 가 고른 제어기만 — {self.sel.map}")
+        else:
+            self.create_subscription(WheelTorqueCommand, str(g("input_topic")), self.on_cmd, 10)
         static_txt = (f"{self.static} N·m (실측 × {scale}), ω_st {self.stribeck} rad/s, 방향 = {ref_topic} 의 ω_ref"
                       if self.has_static else "끔")
         self.get_logger().info(
@@ -231,6 +245,18 @@ class TorqueOutputNode(Node):
         m = Float64MultiArray()
         m.data = [now, *self.guard.sigma.tolist(), *gains.tolist(), float(self.guard.flagged)]
         self.pub_guard.publish(m)
+
+    def on_select(self, msg):
+        try:
+            topic = self.sel.select(parse_active(msg.data))
+        except ValueError as e:
+            self.sel.active = None                      # 모르는 값이면 아무것도 안 낸다 (게이트가 command_timeout 뒤 DAMPING)
+            self.get_logger().error(f"제어기 선택 무시 — 명령을 끊는다: {e}")
+            return
+        if self.guard is not None:                      # 다른 제어기로 넘어간다 — 슬립 가드 이득은 1 에서
+            self.guard.reset()
+            self.tau_net = np.zeros(4)
+        self.get_logger().info(f"제어기 {self.sel.active}: {topic} 만 낸다")
 
     def on_reference(self, msg):
         rows = np.array([[r.vx, r.vy, r.yaw_rate] for r in msg.references], float).reshape(-1, 3)

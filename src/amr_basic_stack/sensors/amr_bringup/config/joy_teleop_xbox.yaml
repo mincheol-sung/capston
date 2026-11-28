@@ -60,6 +60,8 @@ joy_teleop:
 
     # 게이트 무장/해제 (AK40 teleop.launch.py 에서만 의미 있다 — /mpc/arm 을 듣는 게이트가 있을 때)
     #   Menu(☰) 를 누르면 무장, B 를 누르면 즉시 해제(DAMPING). B 를 누르고 있는 동안 명령도 0.
+    #   MPC 스택 (amr_mpc torque_experiment.launch.py joy:=, 2026-11-28) 은 launch 에서 arm_button −1 (Menu 끔), arm_axis 4 (RT = 자율 무장),
+    #   teleop_arm_axis 5 (LT = 수동 주행, /teleop/arm) 로 덮어쓴다. B 는 거기서도 둘 다 정지.
     arm_button: 11
     disarm_button: 1
     arm_topic: /mpc/arm

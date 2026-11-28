@@ -115,9 +115,15 @@ class Figure8:
     def __init__(self, width=1.4, height=0.8, speed=0.25, accel=0.4,
                  laps=1.0, yaw_mode="tangent", align_s=1.5, samples=8000, lap_speeds=None, curve="gerono",
                  crossing_blend=0.0, spin_rate=1.0, speed_mod_amp=0.0, speed_mod_cycles=2.0, speed_mod_phase_deg=0.0,
-                 speed_mod_shape="sin"):
+                 speed_mod_shape="sin", first_turn="left"):
         if curve not in ("gerono", "circles"):
             raise ValueError(f"curve 는 gerono | circles (받은 값 {curve!r})")
+        # 2026-11-28 첫 회전 방향. left = 지금까지 그대로 (출발 헤딩 기준 왼쪽 잎·왼쪽 원부터), right = 출발 헤딩 축에 대해
+        #   거울로 뒤집은 경로 (at()·path_xy() 에서 로컬 y·헤딩·요레이트 부호를 바꾼다 → 몸체 vy 도 부호가 바뀌고 vx·부하는 그대로)
+        first_turn = str(first_turn).strip().lower()
+        if first_turn not in ("left", "right"):
+            raise ValueError(f"first_turn 은 left | right (받은 값 {first_turn!r})")
+        self.first_turn, self.mirror = first_turn, first_turn == "right"
         self.curve = curve
         if curve == "circles":
             height = 0.5 * float(width)               # 원 지름 = width/2 (경계상자 앞뒤 길이)
@@ -372,6 +378,9 @@ class Figure8:
             yl, wl = a, -w
         else:                                                             # 4) 기동 포즈 유지
             yl = wl = 0.0
+        if self.mirror:                                    # first_turn right: 로컬 x 축에 대해 거울 (y → −y, 각 → −각)
+            p = np.array([p[0], -p[1]])
+            th, yl, wl = -th, -yl, -wl
 
         cy, sy = math.cos(yl), math.sin(yl)                # 로컬프레임 속도 → 몸체프레임 (−yl 회전)
         vx, vy = v * math.cos(th), v * math.sin(th)
@@ -404,6 +413,8 @@ class Figure8:
         out = []
         for s in np.linspace(0.0, 2.0 * math.pi, n):
             p = self._point(s)
+            if self.mirror:                                # first_turn right (at() 과 같은 거울)
+                p = np.array([p[0], -p[1]])
             out.append((x0 + c0 * p[0] - s0 * p[1], y0 + s0 * p[0] + c0 * p[1]))
         return out
 

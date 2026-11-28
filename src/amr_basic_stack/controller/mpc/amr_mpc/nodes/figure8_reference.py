@@ -49,29 +49,49 @@
 #   기준 부하 |vx|+|vy|+K_GEOM·|ω| 가 load_budget·V_LIMIT 를 넘으면 뜨지 않고 거부한다
 #   (fake_reference_node 와 같은 규칙).  남는 35 % 가 MPC 의 보정 여유다.
 #
+# 실시간 변경·여러 판 (2026-11-28 pitwall, amr/notes_amr/pitwall_design.md — 사용자 결정 "다음 판부터")
+#   core/ref_config.py LIVE 의 parameter 는 실행 중에 바꿀 수 있다 (rqt_reconfigure · tools/pit.py). 나머지는 read_only.
+#   바꾸면 그 값으로 경로를 만들어 부하 검사까지 해 보고, 걸리면 set 을 거부한다 → 노드 값은 늘 "통과한 다음 판".
+#   진행 중인 판의 경로는 바꾸지 않는다:
+#     무장 중 (주행·완주 뒤 hold)  받아 두기만 → 그 판이 끝나고 정지('s') 할 때 다음 판으로
+#     판 도중 정지 중              멈춘 판을 버린다 → 다음 'a' 가 새 판 (무장한 자리 = 출발점)
+#     판 없음 (기동 뒤·끝난 뒤 정지)  바로 다음 판으로
+#   완주·중단 뒤 정지 → 다음 'a' 가 새 판 (예전에는 launch 를 다시 켜야 했다). 서비스 ~/new_run (std_srvs/Trigger, 정지 중만):
+#   바꾼 값 없이 멈춘 판을 버리고 새 판. 이 노드는 무장하지 않는다.
+#   /figure8/next_path   (Path, latched)   다음 판 경로 미리 보기 — origin robot 이면 지금 로봇 자리 기준, 정지 중 1 Hz
+#   /figure8/status      (String JSON, latched)  상태·다음 판 값·받아 둔 변경·마지막 거부 이유 — 바뀔 때마다 (bag 에 남는다)
+#   /figure8/run_config  (String JSON, latched)  새 판이 출발할 때 그 판에서 쓴 값 전체 (판 번호·출발 포즈) — tools/bag_runs.py 가 판을 나눈다
+#   /figure8/status_marker (visualization_msgs/Marker)  RViz 글자 — 다음 판 요약·거부 이유
+#
 # 예)  ros2 run amr_mpc figure8_reference_node --ros-args -p width:=1.4 -p height:=1.0 -p speed:=0.25
 # ---------------------------------------------------------------
+import json
 import math
+import os
 import numpy as np
 import rclpy
 import rclpy.duration
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+import rclpy.parameter
+from ament_index_python.packages import get_package_share_directory
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_parameter_events
 from rclpy.signals import SignalHandlerOptions
+from rcl_interfaces.msg import FloatingPointRange, IntegerRange, ParameterDescriptor, ParameterEvent, SetParametersResult
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry, Path
-from std_msgs.msg import Bool, Float64MultiArray
+from std_msgs.msg import Bool, Float64MultiArray, String
+from std_srvs.srv import Trigger
+from visualization_msgs.msg import Marker
 from amr_interfaces.msg import PlanarReference, PlanarReferenceArray
 
 from amr_mpc.core import node_main
 from amr_mpc.core import path_follow
+from amr_mpc.core import ref_config
+from amr_mpc.core import presets as presets_mod
 from amr_mpc.body import mpc as mpc_mod
 from amr_mpc.core.figure8 import Figure8, lead_in, lead_in_duration, ramp_elapsed, ramp_rate
-from amr_mpc.core.segment import Segment
-from amr_mpc.core.square import Square
-from amr_mpc.core.polyline import Polyline
-from amr_mpc.core.zigzag import Zigzag
 K_GEOM = mpc_mod.K_GEOM
+LATCHED = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
 
 
 def yaw_of(q):
@@ -81,6 +101,16 @@ def yaw_of(q):
 class Figure8ReferenceNode(Node):
     def __init__(self):
         super().__init__("figure8_reference_node")
+        # (맨 앞에 선언 → rqt_reconfigure 목록 맨 위) rqt_reconfigure 에서 쓰는 체크박스·칸 (unicorn sector_tuner 의 save_params 와 같은 방식 — 노드가 하고 도로 끈다/비운다)
+        self.config_dir = os.path.join(get_package_share_directory("amr_mpc"), "config")
+        try:
+            names = ", ".join(presets_mod.load_presets(self.config_dir))
+        except OSError:
+            names = "(pitwall_presets.yaml 없음)"
+        self.declare_parameter("new_run", False, ParameterDescriptor(
+            description="켜면 멈춘 판을 버리고 다음 'a' 를 새 판으로 (정지 중만, pit new 와 같다). 노드가 도로 끈다"))
+        self.declare_parameter("preset", "", ParameterDescriptor(
+            description=f"프리셋 이름을 쓰면 그 기준 값으로 ({names} — config/pitwall_presets.yaml). 다음 판부터. 노드가 도로 비운다"))
         self.declare_parameters("", [
             # 8자 모양 — 경계상자가 정확히 width × height 이고 기동 포즈가 그 중심이다.
             # 방 2.0 m, 로봇 외접반경 0.18 m 이면 1.4 폭에서 좌우 여유 0.12 m.
@@ -100,6 +130,7 @@ class Figure8ReferenceNode(Node):
             ("speed_mod_cycles", 2.0),                # 랩당 변조 주기 수 n (circles8 는 2 면 원 하나에 한 주기)
             ("speed_mod_phase_deg", 0.0),             # 변조 위상 φ [deg] (2026-11-22). −90 = 출발·교차점에서 가장 느리게 (n 짝수)
             ("speed_mod_shape", "sin"),               # sin | square (2026-11-22, 두 속도 계단 + accel 가감속)
+            ("first_turn", "left"),                   # figure8·circles8 첫 회전 left | right (2026-11-28, right = 거울 — 오른쪽 원부터)
             ("crossing_blend_m", 0.0),                # circles8 + tangent 교차점 헤딩 완화 길이 [m] (core/figure8.py, 0 = 끔)
             ("start_delay", 3.0),                     # 첫 odom 뒤 이만큼 기동 포즈를 유지하다 출발 (실차에서 손 뺄 시간)
             ("abort_error", 1.6),                     # 로봇이 기준에서 이만큼 벌어지면 발행 중단 → MPC 타임아웃 정지.
@@ -154,122 +185,336 @@ class Figure8ReferenceNode(Node):
         ])
         g = lambda n: self.get_parameter(n).value
         self.dt, self.T, self.frame = float(g("dt")), int(g("horizon_steps")), str(g("frame_id"))
-        self.hold, self.delay = float(g("hold_s")), max(0.0, float(g("start_delay")))
         self.abort = float(g("abort_error"))
 
         mpc_mod.set_wheel_limit(g("max_wheel_rad_per_sec"))
-        V_LIMIT, budget = mpc_mod.V_LIMIT, float(g("load_budget"))
-        self.shape = str(g("shape")).strip().lower()
-        try:
-            if self.shape in ("line", "rotate"):
-                self.path = Segment(shape=self.shape, distance=g("seg_distance"), dir_deg=g("seg_dir_deg"),
-                                    speed=g("speed"), accel=g("accel"), angle_deg=g("seg_angle_deg"),
-                                    yaw_rate=g("seg_yaw_rate"), yaw_accel=g("seg_yaw_accel"),
-                                    out_and_back=bool(g("seg_out_and_back")), pause_s=g("seg_pause_s"))
-            elif self.shape == "square":
-                vmax = float(g("square_v_max"))
-                self.path = Square(side=g("square_side"), corner_speed=g("square_corner_speed"), accel=g("accel"),
-                                   v_max=vmax if vmax > 0.0 else budget * V_LIMIT, laps=g("laps"),
-                                   yaw_mode=str(g("yaw_mode")), yaw_blend=g("square_yaw_blend"), align_s=g("align_s"),
-                                   corner_mode=str(g("square_corner_mode")).strip().lower(), rot_s=g("square_rot_s"),
-                                   dwell_s=g("square_dwell_s"))
-            elif self.shape == "polyline":                # 2026-11-25 꺾은선 (core/polyline.py) — square_* 값을 같이 쓴다
-                vmax = float(g("square_v_max"))
-                self.path = Polyline(path=str(g("poly_path")), corner_speed=g("square_corner_speed"), accel=g("accel"),
-                                     v_max=vmax if vmax > 0.0 else budget * V_LIMIT, yaw_mode=str(g("yaw_mode")),
-                                     yaw_blend=g("square_yaw_blend"), align_s=g("align_s"),
-                                     corner_mode=str(g("square_corner_mode")).strip().lower(), rot_s=g("square_rot_s"),
-                                     dwell_s=g("square_dwell_s"))
-            elif self.shape == "zigzag":
-                vmax = float(g("speed"))                    # 지그재그에서 speed = 직선 최고 속도 상한 (launch: max → 0)
-                self.path = Zigzag(n=g("zigzag_n"), length=g("zigzag_length"), angle_deg=g("zigzag_angle_deg"), accel=g("accel"),
-                                   v_max=vmax if vmax > 0.0 else budget * V_LIMIT,
-                                   profile=str(g("zigzag_profile")).strip().lower(), rot_s=g("zigzag_rot_s"),
-                                   dwell_s=g("zigzag_dwell_s"), yaw_mode=str(g("yaw_mode")),
-                                   spin_rate=float(g("spin_rate")), align_s=float(g("align_s")), reverse=bool(g("zigzag_reverse")),
-                                   corner_mode=str(g("zigzag_corner")).strip().lower(), corner_speed=float(g("zigzag_corner_speed")),
-                                   turn_m=float(g("zigzag_turn_m")))
-            elif self.shape not in ("figure8", "circles8"):
-                raise ValueError(f"shape={self.shape!r} — figure8 | circles8 | line | rotate | square | zigzag | polyline")
-            else:
-                self.path = Figure8(width=g("width"), height=g("height"), speed=g("speed"),
-                                    accel=g("accel"), laps=g("laps"), yaw_mode=str(g("yaw_mode")),
-                                    align_s=g("align_s"),
-                                    lap_speeds=[v for v in g("lap_speeds") if v > 0.0] or None,
-                                    curve="circles" if self.shape == "circles8" else "gerono",
-                                    crossing_blend=float(g("crossing_blend_m")), spin_rate=float(g("spin_rate")),
-                                    speed_mod_amp=float(g("speed_mod_amp")), speed_mod_cycles=float(g("speed_mod_cycles")),
-                                    speed_mod_phase_deg=float(g("speed_mod_phase_deg")),
-                                    speed_mod_shape=str(g("speed_mod_shape")))
-        except ValueError as e:
-            raise SystemExit(f"[figure8] 파라미터 오류: {e}")
-
-        run, spin = self.path.peak_load(K_GEOM)
-        cap = budget * V_LIMIT
-        if run > cap and self.shape == "zigzag":
-            raise SystemExit(
-                f"[figure8] 지그재그 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "
-                f"speed:= (직선 최고 속도 상한) 를 낮추거나 zigzag_rot_s 를 늘려라.")
-        if run > cap and self.shape in ("square", "polyline"):
-            raise SystemExit(
-                f"[figure8] 정사각형 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "
-                f"square_v_max 를 낮추거나 (tangent 면) square_yaw_blend 를 늘려라 — 꼭짓점 헤딩 회전이 부하에 더해진다.")
-        if run > cap:                                 # 주행 부하는 speed 에 선형
-            raise SystemExit(
-                f"[figure8] 기준 부하 {run:.3f} > 예산 {cap:.3f} ({budget*100:.0f} % of {V_LIMIT:.2f}). "
-                f"speed 를 {float(g('speed')) * cap / run:.3f} m/s 이하로 낮추거나 height 를 줄여라 "
-                f"(최대곡률 {self.path.max_curvature():.2f} 1/m 이 ω=κv 를 키운다).")
-        if spin > cap:                                # 정렬 회전 부하는 align_s 에 반비례
-            raise SystemExit(f"[figure8] 정렬 회전 부하 {spin:.3f} > 예산 {cap:.3f}. "
-                             f"align_s 를 {float(g('align_s')) * spin / cap:.2f} s 이상으로 늘려라.")
-
-        self.origin = None; self.t0 = None; self.finished = False; self.pose = None
-        self.wait_for_arm = bool(g("wait_for_arm"))
-        self.armed = not self.wait_for_arm            # 기다리지 않으면 처음부터 흐른다 (기존 동작)
-        self.t_run = 0.0                              # 무장된 동안 누적된 기준 시간 [s]
-        self.t_last_tick = None
-        self.rate = 0.0 if self.wait_for_arm else 1.0  # 기준 시간 배속 (기다리지 않으면 늘 1)
-        rr = float(g("resume_ramp_s"))
-        v_top = self.path.V_peak if isinstance(self.path, Figure8) else self.path.V   # Figure8: sin 변조 최고 속도 (2026-11-20). Square 에는 없고 Segment 의 V_peak() 는 메서드
-        self.ramp_s = (v_top / self.path.A) if rr < 0.0 else rr
-        self.resync_window = max(0.0, float(g("resync_window_s")))
+        self.V_LIMIT, self.budget = mpc_mod.V_LIMIT, float(g("load_budget"))
         self.pf_lead = float(g("path_follow_lead_s"))
         self.pf = self.pf_lead >= 0.0
+        try:                                          # 모양·부하 검사는 core/ref_config.py (실행 중 변경과 같은 함수)
+            cfg = self.live_cfg()
+            path, run, spin = ref_config.build(cfg, self.V_LIMIT, self.budget, K_GEOM, self.pf)
+        except ValueError as e:
+            raise SystemExit(f"[figure8] {e}")
+
+        self.pose = None
+        self.pose_full = None
+        self.wait_for_arm = bool(g("wait_for_arm"))
+        self.armed = not self.wait_for_arm            # 기다리지 않으면 처음부터 흐른다 (기존 동작)
+        self.run_idx = 0                              # 출발한 판 수 (2026-11-28 pitwall)
+        self.last_reject = ""                         # 마지막으로 거부한 변경과 이유
+        self.next = (cfg, path, run, spin)            # 다음 판 (받아 둔 값). 진행 중인 판은 self.cfg·self.path
+        self.adopt(cfg, path, run, spin)
+        self.reset_run()
+        self.pub_prog = self.create_publisher(Float64MultiArray, "/figure8/progress", 10)
+        if self.wait_for_arm:
+            self.create_subscription(Bool, str(g("armed_topic")), self.cb_armed, LATCHED)
+        self.pub = self.create_publisher(PlanarReferenceArray, str(g("reference_topic")), 5)
+        self.pub_path = self.create_publisher(
+            Path, "/figure8/path", QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        self.pub_next = self.create_publisher(Path, "/figure8/next_path", LATCHED)
+        self.pub_status = self.create_publisher(String, "/figure8/status", LATCHED)
+        self.pub_runcfg = self.create_publisher(String, "/figure8/run_config", LATCHED)
+        self.pub_marker = self.create_publisher(Marker, "/figure8/status_marker", LATCHED)
+        self.create_subscription(Odometry, str(g("odom_topic")), self.cb_odom, 10)
+        self.create_timer(1.0 / float(g("rate_hz")), self.on_tick)
+        self.create_timer(1.0, self.publish_preview)  # 정지 중 다음 판 미리 보기 (로봇을 옮기면 따라간다)
+        self.create_service(Trigger, "~/new_run", self.srv_new_run)
+        self.pub_pevent = self.create_publisher(ParameterEvent, "/parameter_events", qos_profile_parameter_events)
+        self.set_ui_descriptors()
+        self.add_on_set_parameters_callback(self.on_params)
+        if self.fixed:                                # 지도 고정: 기동 전부터 경로를 보여 준다
+            self.publish_path(self.track_origin)
+        self.log_path()
+        self.publish_status()
+        self.publish_preview()
+
+    # ---------- 판 설정 (2026-11-28 pitwall) ----------
+    def set_ui_descriptors(self):
+        """rqt_reconfigure 표시: LIVE 는 설명 + 슬라이더 범위 (ref_config.UI_RANGES), 그 밖은 read_only (회색)."""
+        live_txt = "다음 판부터 (무장 중 바꾸면 받아 두기만, 멈춘 판에서 바꾸면 그 판 버림). 부하 예산을 넘으면 거부"
+        for name in list(self._parameters):
+            if name in ("use_sim_time", "new_run", "preset") or self.describe_parameter(name).read_only:
+                continue
+            p = self.get_parameter(name)
+            if name not in ref_config.LIVE:
+                d = ParameterDescriptor(type=p.type_.value, read_only=True,
+                                        description="launch 때만 (실행 중 변경 불가, core/ref_config.py LIVE)")
+            else:
+                note = ref_config.UI_NOTES.get(name)
+                d = ParameterDescriptor(type=p.type_.value, description=live_txt + (f". {note}" if note else ""))
+                r = ref_config.UI_RANGES.get(name)
+                if r is not None and r[0] <= p.value <= r[1]:
+                    if p.type_ == rclpy.parameter.Parameter.Type.INTEGER:
+                        d.integer_range = [IntegerRange(from_value=int(r[0]), to_value=int(r[1]), step=1)]
+                    else:
+                        d.floating_point_range = [FloatingPointRange(from_value=float(r[0]), to_value=float(r[1]), step=0.0)]
+            try:
+                self.set_descriptor(name, d)
+            except Exception as e:                # 범위 밖 값 등 — 범위 없이 둔다
+                self.get_logger().warning(f"[pitwall] {name} 표시 설정 못 함: {e}")
+
+    def revert_in_rqt(self, params):
+        """거부한 값: rqt_reconfigure 는 set 결과를 안 보고 화면에 새 값을 남긴다 → 지금 값을 parameter event 로 다시 알려 되돌린다."""
+        ev = ParameterEvent()
+        ev.stamp = self.get_clock().now().to_msg()
+        ev.node = self.get_fully_qualified_name()
+        ev.changed_parameters = [self.get_parameter(p.name).to_parameter_msg() for p in params if self.has_parameter(p.name)]
+        self.pub_pevent.publish(ev)
+
+    def reject(self, params, what, reason):
+        self.last_reject = f"{what}: {reason}"
+        self.get_logger().warning(f"[pitwall] 거부 — {self.last_reject}")
+        self.publish_status()
+        self.revert_in_rqt(params)
+        return SetParametersResult(successful=False, reason=reason)
+
+    def defer(self, fn):
+        """parameter callback 안에서는 parameter 를 못 바꾼다 → 0.05 s 뒤 한 번 (타이머는 멈춰 둔다)."""
+        box = []
+
+        def once():
+            box[0].cancel()
+            fn()
+        box.append(self.create_timer(0.05, once))
+
+    def on_ui_param(self, p):
+        """rqt 의 new_run (체크박스) · preset (칸)."""
+        if p.name == "new_run":
+            if not p.value:
+                return SetParametersResult(successful=True)
+            if self.armed:
+                return self.reject([p], "new_run", "무장 중 — 's' 로 정지한 뒤")
+
+            def go():
+                ok, msg = self.new_run()
+                self.set_parameters([rclpy.parameter.Parameter("new_run", value=False)])
+            self.defer(go)
+            return SetParametersResult(successful=True)
+        name = str(p.value).strip()
+        if not name:
+            return SetParametersResult(successful=True)
+        try:
+            vals = presets_mod.reference_values(self.config_dir, name)
+        except (KeyError, OSError):
+            try:
+                have = ", ".join(presets_mod.load_presets(self.config_dir))
+            except OSError:
+                have = "(pitwall_presets.yaml 없음)"
+            return self.reject([p], f"preset={name}", f"없는 프리셋 — 있는 것: {have}")
+        params = []
+        for k, v in vals.items():
+            typ = self.get_parameter(k).type_
+            v = float(v) if typ == rclpy.parameter.Parameter.Type.DOUBLE else (
+                int(v) if typ == rclpy.parameter.Parameter.Type.INTEGER else (
+                    [float(x) for x in v] if typ == rclpy.parameter.Parameter.Type.DOUBLE_ARRAY else (
+                        bool(v) if typ == rclpy.parameter.Parameter.Type.BOOL else str(v))))
+            params.append(rclpy.parameter.Parameter(k, typ, v))
+        cand = dict(self.next[0], **{q.name: q.value for q in params})
+        try:
+            ref_config.build(cand, self.V_LIMIT, self.budget, K_GEOM, self.pf)
+        except Exception as e:
+            return self.reject([p], f"preset={name}", str(e))
+
+        def go():
+            r = self.set_parameters_atomically(params)
+            if not r.successful:
+                self.get_logger().error(f"[pitwall] 프리셋 {name} 적용 실패: {r.reason}")
+            else:
+                self.get_logger().info(f"[pitwall] 프리셋 {name} 적용 (rqt)")
+            self.set_parameters([rclpy.parameter.Parameter("preset", value="")])
+        self.defer(go)
+        return SetParametersResult(successful=True)
+
+    def live_cfg(self):
+        """LIVE parameter 의 지금 값 dict (배열은 list)."""
+        out = {}
+        for k in ref_config.LIVE:
+            v = self.get_parameter(k).value
+            out[k] = list(v) if isinstance(v, (list, tuple)) or hasattr(v, "tolist") else v
+        return out
+
+    def adopt(self, cfg, path, run, spin):
+        """경로와 판 단위 값 (출발점 방식·대기·유지·재무장 창) 을 진행 판으로. 판 시작 전에만 부른다."""
+        self.cfg, self.path, self.load = dict(cfg), path, (run, spin)
+        self.shape = str(cfg["shape"]).strip().lower()
+        self.hold = float(cfg["hold_s"])
+        self.min_delay = max(0.0, float(cfg["start_delay"]))
+        self.delay = self.min_delay                   # fixed 출발이면 set_origin 이 진입 시간으로 늘린다
+        rr = float(cfg["resume_ramp_s"])
+        v_top = self.path.V_peak if isinstance(self.path, Figure8) else self.path.V   # Figure8: sin 변조 최고 속도 (2026-11-20). Square 에는 없고 Segment 의 V_peak() 는 메서드
+        self.ramp_s = (v_top / self.path.A) if rr < 0.0 else rr
+        self.resync_window = max(0.0, float(cfg["resync_window_s"]))
         T_al, T_pa = getattr(self.path, "T_align", None), getattr(self.path, "T_path", None)
         self.drive = (float(T_al), float(T_al + T_pa)) if T_al is not None and T_pa is not None else None
         if getattr(self.path, "drive_window", None) is not None:   # Zigzag: 정렬 회전이 끝에만 있어 주행 구간 = (0, T_path) (2026-11-24 (9))
             self.drive = tuple(float(x) for x in self.path.drive_window)
-        if self.pf and (self.drive is None or self.shape not in ("figure8", "circles8", "square", "zigzag")):
-            raise SystemExit(f"[figure8] path_follow_lead_s 는 shape figure8 | circles8 | square | zigzag 만 (받은 {self.shape})")
+        self.fixed = str(cfg["origin_mode"]).strip().lower() == "fixed"
+        self.track_origin = self.cfg_origin(cfg)
+        self.tol_xy, self.tol_yaw = float(cfg["start_tolerance_xy"]), math.radians(float(cfg["start_tolerance_yaw_deg"]))
+        self.lead_speed, self.lead_yaw_rate = float(cfg["lead_speed"]), float(cfg["lead_yaw_rate"])
+
+    @staticmethod
+    def cfg_origin(cfg):
+        return np.array([float(cfg["origin_x"]), float(cfg["origin_y"]), math.radians(float(cfg["origin_yaw_deg"]))])
+
+    def reset_run(self):
+        """진행 판을 지운다 → 다음 무장이 새 판 (set_origin). 무장 중에는 부르지 않는다 (cb_odom 이 바로 출발시킨다)."""
+        self.origin = None; self.t0 = None; self.finished = False
+        self.end = ""                                 # 2026-11-28 finished 의 까닭: done (완주 + hold) | abort (abort_error 이탈)
+        self.t_run = 0.0                              # 무장된 동안 누적된 기준 시간 [s]
+        self.t_last_tick = None
+        self.rate = 0.0 if self.wait_for_arm else 1.0  # 기준 시간 배속 (기다리지 않으면 늘 1)
         self.t_clock = 0.0                            # 묶지 않았을 때의 기준 시각 (+delay 포함, t_run 과 같은 축)
         self.t_proj = None                            # 직전 정사영 시각
         self.pf_flag = 0
         self.drive_wall = [None, None]                # 주행 구간 시작·끝 벽시계 [s]
-        self.pub_prog = self.create_publisher(Float64MultiArray, "/figure8/progress", 10)
-        self.pose_full = None
-        mode = str(g("origin_mode")).strip().lower()
-        if mode not in ("robot", "fixed"):
-            raise SystemExit(f"[figure8] origin_mode={mode!r} — robot | fixed")
-        self.fixed = mode == "fixed"
-        self.track_origin = np.array([float(g("origin_x")), float(g("origin_y")), math.radians(float(g("origin_yaw_deg")))])
-        self.tol_xy, self.tol_yaw = float(g("start_tolerance_xy")), math.radians(float(g("start_tolerance_yaw_deg")))
-        self.lead_speed, self.lead_yaw_rate = float(g("lead_speed")), float(g("lead_yaw_rate"))
-        self.min_delay = self.delay
+        self.delay = self.min_delay
         self.lead_from = None                         # 진입 구간 시작 포즈 (fixed 출발 때)
         self.refused = False                          # fixed: 출발점에서 멀어 거부한 상태 (다음 무장 때 다시 검사)
-        if self.wait_for_arm:
-            arm_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
-            self.create_subscription(Bool, str(g("armed_topic")), self.cb_armed, arm_qos)
-        self.pub = self.create_publisher(PlanarReferenceArray, str(g("reference_topic")), 5)
-        self.pub_path = self.create_publisher(
-            Path, "/figure8/path", QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
-        self.create_subscription(Odometry, str(g("odom_topic")), self.cb_odom, 10)
-        self.create_timer(1.0 / float(g("rate_hz")), self.on_tick)
-        if self.fixed:                                # 지도 고정: 기동 전부터 경로를 보여 준다
-            self.publish_path(self.track_origin)
 
+    def state(self):
+        if self.origin is None:
+            return "idle"
+        if self.finished:
+            return "finished"
+        return "running" if self.armed else "paused"
+
+    def pending(self):
+        """받아 둔 다음 판 값이 진행 판과 다른가 → {이름: [지금, 다음]}."""
+        cur, nxt = self.cfg, self.next[0]
+        return {k: [cur[k], nxt[k]] for k in ref_config.LIVE if cur[k] != nxt[k]}
+
+    def adopt_next(self):
+        if self.pending():
+            self.adopt(*self.next)
+            self.log_path()
+
+    def on_params(self, params):
+        """parameter set 검사 (rqt_reconfigure · pit). 다음 판 경로를 만들어 부하 검사까지 해 보고 걸리면 거부."""
+        ui = [p for p in params if p.name in ("new_run", "preset")]
+        if ui:
+            if len(params) > 1:
+                return self.reject(params, "new_run·preset", "다른 값과 같이 바꾸지 않는다 — 따로 보낼 것")
+            return self.on_ui_param(ui[0])
+        cand = dict(self.next[0])
+        names = ", ".join(f"{p.name}={p.value}" for p in params)
+        for p in params:
+            if p.name not in ref_config.LIVE:     # read_only 는 rclpy 가 먼저 막는다. 여기는 use_sim_time 등
+                if p.name == "use_sim_time":
+                    continue
+                return self.reject(params, names, f"{p.name} 는 launch 때만")
+            v = p.value
+            cand[p.name] = list(v) if isinstance(v, (list, tuple)) or hasattr(v, "tolist") else v
+        try:
+            path, run, spin = ref_config.build(cand, self.V_LIMIT, self.budget, K_GEOM, self.pf)
+        except Exception as e:                    # ValueError (검사) 와 경로 클래스의 그 밖 오류 모두 거부
+            return self.reject(params, names, str(e))
+        self.next = (cand, path, run, spin)
+        self.last_reject = ""
+        st = self.state()
+        when = "다음 판부터 (지금 판이 끝나고 's' 하면)"
+        if not self.armed and st in ("idle", "paused"):   # 정지 중: 바로 다음 판으로 (멈춘 판은 버린다)
+            if st == "paused":
+                when = f"멈춘 판 #{self.run_idx} 버림 → 다음 'a' 가 새 판"
+                self.reset_run()
+            else:
+                when = "다음 'a' 부터"
+            self.adopt(*self.next)
+        self.get_logger().info(f"[pitwall] 받음 {names} — {when}\n  다음 판: {ref_config.summary(cand, path, run, self.V_LIMIT)}")
+        self.publish_status()
+        self.publish_preview()
+        return SetParametersResult(successful=True)
+
+    def srv_new_run(self, req, res):
+        """~/new_run (pit new): 정지 중이면 진행 판을 버리고 다음 'a' 를 새 판으로 (받아 둔 값 적용)."""
+        res.success, res.message = self.new_run()
+        return res
+
+    def new_run(self):
+        """(성공, 문장). rqt 의 new_run 체크박스도 이것을 부른다."""
+        if self.armed:                            # 무장 중에 판을 지우면 cb_odom 이 바로 새 판을 출발시킨다
+            return False, ("무장 중 — 's' 로 정지한 뒤" if self.wait_for_arm else
+                           "wait_for_arm 이 꺼진 노드 (늘 무장) 에서는 쓸 수 없다")
+        st = self.state()
+        self.reset_run()
+        self.adopt_next()
+        msg = (f"{'판 #%d 버림 — ' % self.run_idx if st in ('paused', 'running', 'finished') else ''}"
+               f"다음 'a' 가 새 판 #{self.run_idx + 1}: {ref_config.summary(self.cfg, self.path, self.load[0], self.V_LIMIT)}")
+        self.get_logger().info(f"[pitwall] new_run — {msg}")
+        self.publish_status()
+        self.publish_preview()
+        return True, msg
+
+    def publish_status(self):
+        cfg, path, run, spin = self.next
+        nxt = ref_config.summary(cfg, path, run, self.V_LIMIT)
+        st = {"t": self.get_clock().now().nanoseconds * 1e-9, "state": self.state(), "armed": self.armed,
+              "run": self.run_idx, "next_run": self.run_idx + 1,
+              "pending": self.pending(), "next_summary": nxt, "next": ref_config.relevant(cfg),
+              "next_load_pct": round(run / self.V_LIMIT * 100.0, 1), "last_reject": self.last_reject,
+              "end": self.end if self.finished else "", "T_total": round(float(self.path.T_total), 3), "hold_s": self.hold}
+        self.pub_status.publish(String(data=json.dumps(st, ensure_ascii=False)))
+        word = {"idle": "대기", "running": f"판 #{self.run_idx} 주행", "paused": f"판 #{self.run_idx} 멈춤",
+                "finished": f"판 #{self.run_idx} 끝 ('s' 뒤 'a' = 새 판)"}[st["state"]]
+        text = f"{word} | 다음 판 #{st['next_run']}{' (바뀐 값 있음)' if st['pending'] else ''}\n{nxt}"
+        if self.last_reject:
+            text += f"\n거부: {self.last_reject[:120]}"
+        o = self.preview_origin()
+        m = Marker()
+        m.header.frame_id = self.frame
+        m.header.stamp = self.get_clock().now().to_msg()
+        m.ns, m.id, m.type, m.action = "pitwall", 0, Marker.TEXT_VIEW_FACING, Marker.ADD
+        if o is not None:
+            m.pose.position.x, m.pose.position.y = float(o[0]), float(o[1])
+        m.pose.position.z = 0.8
+        m.pose.orientation.w = 1.0
+        m.scale.z = 0.12
+        m.color.r, m.color.g, m.color.b, m.color.a = (1.0, 0.4, 0.3, 1.0) if self.last_reject else (1.0, 1.0, 1.0, 1.0)
+        m.text = text
+        self.pub_marker.publish(m)
+
+    def preview_origin(self):
+        """다음 판 출발점: fixed 면 다음 판 설정의 교차점, robot 이면 지금 로봇 포즈 (없으면 None)."""
+        cfg = self.next[0]
+        if str(cfg["origin_mode"]).strip().lower() == "fixed":
+            return self.cfg_origin(cfg)
+        return None if self.pose_full is None else self.pose_full
+
+    def publish_preview(self):
+        """/figure8/next_path — 정지 중 (또는 판 없음) 에만 내 RViz 에서 다음 판 경로가 벽과 겹치는지 본다."""
+        if self.armed and self.state() != "idle":
+            return
+        o = self.preview_origin()
+        if o is None:
+            return
+        msg = Path(); msg.header.frame_id = self.frame
+        msg.header.stamp = self.get_clock().now().to_msg()
+        for x, y in self.next[1].path_xy(origin=o):
+            ps = PoseStamped(); ps.header = msg.header
+            ps.pose.position.x, ps.pose.position.y = float(x), float(y)
+            ps.pose.orientation.w = 1.0
+            msg.poses.append(ps)
+        self.pub_next.publish(msg)
+
+    def publish_run_config(self):
+        """새 판 출발 — 그 판에서 쓴 값 전체를 bag 에 (tools/bag_runs.py)."""
+        run, spin = self.load
+        rc = {"run": self.run_idx, "t": self.get_clock().now().nanoseconds * 1e-9,
+              "origin": [float(x) for x in self.origin], "origin_mode": "fixed" if self.fixed else "robot",
+              "shape": self.shape, "summary": ref_config.summary(self.cfg, self.path, run, self.V_LIMIT),
+              "relevant": ref_config.relevant(self.cfg), "cfg": self.cfg,
+              "load_pct": round(run / self.V_LIMIT * 100.0, 1), "spin_load_pct": round(spin / self.V_LIMIT * 100.0, 1),
+              "T_total": float(self.path.T_total), "delay": self.delay,
+              "launch_only": {"dt": self.dt, "horizon_steps": self.T, "load_budget": self.budget, "V_LIMIT": self.V_LIMIT,
+                              "abort_error": self.abort, "path_follow_lead_s": self.pf_lead}}
+        self.pub_runcfg.publish(String(data=json.dumps(rc, ensure_ascii=False)))
+        self.get_logger().info(f"[pitwall] 판 #{self.run_idx} 출발 — {rc['summary']}")
+
+    def log_path(self):
         p = self.path
+        run, spin = self.load
+        V_LIMIT, budget = self.V_LIMIT, self.budget
         if self.shape == "zigzag":
             legs = "  ".join(f"[{k}] {('전진' if d > 0 else '후진') + ' ' if p.tangent else ''}{h:+.0f}° 최고 {vp:.2f} m/s {T:.2f} s"
                              for k, d, h, vp, _, T in p.leg_summary()[:4])
@@ -360,6 +605,7 @@ class Figure8ReferenceNode(Node):
             self.get_logger().info(f"기동 포즈(8자 교차점) x {self.origin[0]:.3f}  y {self.origin[1]:.3f}  "
                                    f"yaw {math.degrees(self.origin[2]):.1f}°  — {self.delay:.1f} s 뒤 출발")
             self.publish_path()
+            self.run_started()
             return
         # 지도 고정: 출발점과의 거리 검사 → 진입 구간
         o, p = self.track_origin, self.pose_full
@@ -381,6 +627,13 @@ class Figure8ReferenceNode(Node):
             f"출발: 출발점에서 {d*100:.1f} cm, {math.degrees(a):.1f}° — 진입 {self.delay:.1f} s 뒤 8자 시작 "
             f"(교차점 x {o[0]:.3f}  y {o[1]:.3f}  {math.degrees(o[2]):.1f}°)")
         self.publish_path(o)
+        self.run_started()
+
+    def run_started(self):
+        """새 판 출발 (2026-11-28 pitwall): 판 번호를 올리고 그 판의 값 전체를 /figure8/run_config 에."""
+        self.run_idx += 1
+        self.publish_run_config()
+        self.publish_status()
 
     def ref_at(self, t):
         """기준 시각 t 의 (Xr, ur). t < 0 은 진입 구간(fixed) 또는 기동 포즈 유지."""
@@ -403,6 +656,14 @@ class Figure8ReferenceNode(Node):
                 moved = self.resync()
             self.get_logger().info(
                 f"{'무장 — 기준 시간 재개' if armed else '정지 — 기준 시간 멈춤'} (t = {self.t_run - self.delay:.2f} s){moved}")
+        elif not armed:                               # 2026-11-28 pitwall: 판이 끝났거나 (출발 거부로) 없는 채 정지 → 다음 'a' 가 새 판
+            if self.finished:
+                self.reset_run()
+            self.adopt_next()
+            self.get_logger().info(f"정지 — 다음 'a' 가 새 판 #{self.run_idx + 1}: "
+                                   f"{ref_config.summary(self.cfg, self.path, self.load[0], self.V_LIMIT)}")
+        self.publish_status()
+        self.publish_preview()
 
     def resync(self):
         """재무장: 멈춘 시각 ±resync_window 안에서 로봇 위치에 가장 가까운 경로 시각으로 옮긴다."""
@@ -462,18 +723,20 @@ class Figure8ReferenceNode(Node):
             self.publish_hold(now, Xr)
             return
         if 0.0 <= self.hold and t > self.path.T_total + self.hold:
-            self.finished = True
+            self.finished, self.end = True, "done"
             self.get_logger().info(f"8자 완주 + 유지 {self.hold:.1f} s 끝 — 발행 중단. "
-                                   f"MPC 가 곧 타임아웃으로 정지한다.")
+                                   f"MPC 가 곧 타임아웃으로 정지한다. 다음 판: 's' 뒤 'a' (판 #{self.run_idx} 끝)")
+            self.publish_status()
             return
         if self.abort > 0.0 and self.pose is not None:      # 발산 비상정지 — MPC 가 못 잡으면 여기서 끊는다
             err = float(np.hypot(*(self.pose - self.ref_at(t)[0][:2])))
             if err > self.abort:
-                self.finished = True
+                self.finished, self.end = True, "abort"
                 self.get_logger().error(
                     f"중단: 기준에서 {err*100:.1f} cm 벗어남 (한계 {self.abort*100:.1f} cm). 발행을 끊는다 — MPC 가 곧 정지한다.\n"
                     f"  체크: odom_topic 이 /odom 인가 (EKF 를 끼면 모델에 없는 지연이 붙는다),"
-                    f" mpc/status 의 부하·QP 반복, speed 를 낮췄는가")
+                    f" mpc/status 의 부하·QP 반복, speed 를 낮췄는가. 다음 판: 's' 뒤 'a' (판 #{self.run_idx} 중단)")
+                self.publish_status()
                 return
 
         msg = PlanarReferenceArray()

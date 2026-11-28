@@ -1,0 +1,28 @@
+[16:57:49] launch
+[16:58:04] launch 전용 값 (read_only) — ros2 param set dt
+Setting parameter failed: Trying to set a read-only parameter: dt.
+[16:58:06] MPC 범위 밖 — disturbance_alpha=0
+✗ 거부 MPC: disturbance_alpha=0.0
+    이유: disturbance_alpha = 0 — 범위 (0, 1]
+
+[16:58:06] MPC launch 전용 — ros2 param set Np
+Setting parameter failed: Np 는 launch 때만 (실행 중 바꿀 수 있는 값: W, w_dudt, r_u, q_null, mu_hat, slip_fb_enable, slip_fb_scale, slip_eta_enable, disturbance_enable, disturbance_alpha, roller_rr, inertia_z)
+[16:58:07] RViz 토픽: next_path 점 수, status_marker 글자
+  next_path 점 수 128
+texture_resource: ''
+texture:
+text: '대기 | 다음 판 #1
+[16:58:11] arm true
+[16:58:15] 무장 중 pit new (거부돼야)
+✗ 무장 중 — 's' 로 정지한 뒤
+[16:58:17] arm false
+[16:58:18] 멈춤 중 pit new (판 버림)
+✓ 판 #1 버림 — 다음 'a' 가 새 판 #2: circles8 width=2 speed=0.5 accel=0.8 laps=1 align_s=1.5 crossing_blend_m=0 yaw=tangent | 기준 13.2 s | 부하 45 %
+기준: 판 없음 (다음 'a' 가 새 판) | 다음 판 #2
+  다음 판: circles8 width=2 speed=0.5 accel=0.8 laps=1 align_s=1.5 crossing_blend_m=0 yaw=tangent | 기준 13.2 s | 부하 45 %
+[16:58:20] arm true
+[16:58:26] arm false
+[16:58:26] pit show (판 2 멈춤)
+기준: 판 #2 멈춤 | 다음 판 #3
+  다음 판: circles8 width=2 speed=0.5 accel=0.8 laps=1 align_s=1.5 crossing_blend_m=0 yaw=tangent | 기준 13.2 s | 부하 45 %
+[16:58:38] sim_plant_torque 남은 프로세스: 0

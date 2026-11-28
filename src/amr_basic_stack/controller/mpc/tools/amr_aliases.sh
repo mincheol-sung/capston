@@ -22,6 +22,15 @@
 #   amrbuild [패키지...]     빌드 (기본 amr_mpc amr_mpc_cpp). 설치본이 소스 링크라 yaml·launch·Python 은 고치면 바로 반영 — C++ 만 다시 빌드
 #   amrcmp  bag... [--csv f] A(퓨어 퍼슛)·MPC 판을 같은 잣대로: SLAM(IMU 점 → 중심) 기준 오차·요·토크·슬립 표   tools/compare_slam.py
 #   amrlag  bag...           자이로·가속도계·추정기·SLAM 이 바퀴 엔코더보다 몇 ms 늦나 (D455 imu_accel_fps 등 비교)   tools/sensor_lag.py
+#   poly    [인자...]        amrall MPC friction 꺾은선 스트레스 판 (가감속 1.5·최고 1.5 m/s·꼭짓점 통과, 녹화 켬). 뒤 인자가 이긴다 (예: poly accel:=1.0 bag:=pl10)
+#   circ    [인자...]        amrall MPC friction 원 8 자 스트레스 판 (반지름 0.75 m·1.232 m/s = 부하 예산 최고·가감속 1.5·3 바퀴, 녹화 켬). 예: circ speed:=1.0 first_turn:=right (오른쪽 원부터)
+#   (패드)                   amrall·amrmpc·poly·circ 의 MPC 판 = Xbox 패드도: RT 자율 무장 · LT 수동 주행 (왼 스틱 전후·오른 스틱 옆·LB/RB 회전) · B 정지. 키보드 a·t·s 도 그대로. 끄기 joy:=false
+#   pit     [명령...]        (2026-11-28 pitwall) 스택을 켠 채 다음 판 조건 바꾸기 — pit (상태) · pit circ · pit poly accel=1.2 · pit set W=[40,40,10,2,2,1] · pit new.  tools/pit.py -h
+#                            기준 값은 다음 판부터, MPC 값은 정지 중 바로 (무장 중이면 다음 정지 때). 판이 끝나면 's' 뒤 'a' = 새 판 (launch 다시 안 켬)
+#   amrpit                   rqt_reconfigure (랩 PC 등 화면 있는 곳). 기준 노드·MPC 노드 값을 GUI 로. RViz 에 다음 판 경로·상태 글자 (torque_real.rviz)
+#   amrruns bag... [--changes]  bag 하나에 든 여러 판을 나눠 판마다 조건·MPC 값·앞 판과 다른 값 (tools/bag_runs.py). amrcmp 에 --runs 면 판마다 한 줄
+#   amrall3 [인자...]        (2026-11-28) amrall + 세 제어기 다 (controller:=all, MPC friction, 녹화 켬) — 회차마다 controller_select 가 하나만 무장
+#   amrseq  [--n N ...]      (2026-11-28) amrall3 스택에서 mpc → pp → adpp 를 사람 없이 N 바퀴 (기본 5, zigzag 는 복귀 180° 회전). 순서: 배너 → pit s1|s2|s3 → amrseq. tools/seq.py -h
 #   amrhelp                  이 표
 #   예) amrmpc shape:=line seg_distance:=0.4 seg_dir_deg:=45 speed:=0.10 limit_mode:=friction mu_hat:=0.55
 #       amrmove --dirs fwd,back --amps 0.1 --time 0.5
@@ -32,6 +41,8 @@
 # 컴퓨터마다 다른 값 (source 전에 export 하면 바뀐다)
 #   AMR_WS       작업공간          NUC 기본 /home/smoc/capston/capston
 #   AMR_INSTALL  설치 폴더 이름    NUC 기본 install, 랩 PC 는 install_pc (stack_changelog: PC 는 build_pc/install_pc 로 따로 빌드)
+#   AMR_DISCOVERY  찾는 범위        비우면 LOCALHOST (지금까지처럼). SUBNET 이면 같은 공유기의 같은 ROS_DOMAIN_ID 컴퓨터가 IP 없이 서로 보인다
+#                                  (rqt_reconfigure·RViz 를 랩 PC 에서 — pitwall_usage.md). NUC 방화벽이 그 PC 를 허용해야 한다
 #   AMR_PEERS    상대 컴퓨터 IP    비우면 NUC 혼자 (지금까지 실험처럼 ROS_STATIC_PEERS 를 지운다).
 #                                  랩 PC 의 RViz 로 볼 때: NUC 에는 랩 PC IP, 랩 PC 에는 NUC IP (192.168.0.132).
 #                                  ※ 꺼진 컴퓨터 IP 를 넣어 두면 노드 생성이 느려진 적이 있다 (~/.bashrc 주석: 18 s) — 쓸 때만 넣는다.
@@ -48,7 +59,8 @@ _amr_env() {
   source "$AMR_WS/$AMR_INSTALL/setup.bash" || return 1
   export ROS_DOMAIN_ID="$AMR_DOMAIN"
   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-  export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+  # 2026-11-28 AMR_DISCOVERY=SUBNET 이면 같은 공유기·같은 도메인 컴퓨터가 IP 없이 서로 찾는다 (unicorn 스택·Jazzy 기본과 같음, pitwall_usage.md)
+  export ROS_AUTOMATIC_DISCOVERY_RANGE="${AMR_DISCOVERY:-LOCALHOST}"
   # NUC ~/.bashrc 와 같은 CycloneDDS 설정 (참가자 번호 auto — 상대 컴퓨터가 정해진 포트로 찾을 수 있게). 이미 있으면 그대로
   : "${CYCLONEDDS_URI:=<CycloneDDS><Domain id=\"any\"><Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>120</MaxAutoParticipantIndex></Discovery></Domain></CycloneDDS>}"
   export CYCLONEDDS_URI
@@ -57,7 +69,7 @@ _amr_env() {
   else
     unset ROS_STATIC_PEERS
   fi
-  echo "[amr] ROS_DOMAIN_ID=$ROS_DOMAIN_ID  peers=${ROS_STATIC_PEERS:-(없음, 이 컴퓨터만)}"
+  echo "[amr] ROS_DOMAIN_ID=$ROS_DOMAIN_ID  discovery=$ROS_AUTOMATIC_DISCOVERY_RANGE  peers=${ROS_STATIC_PEERS:-(없음)}"
 }
 
 amrcan()    ( cd "$AMR_MPC_DIR" && sudo -v && bash tools/setup_can.sh )
@@ -74,6 +86,11 @@ amrviz()    ( _amr_env && exec ros2 launch amr_mpc torque_viz.launch.py "$@" )
 amrall()    ( _amr_env && sudo -v && exec ros2 launch amr_mpc real_all.launch.py "$@" )   # 2026-11-16 터미널 하나로
 amrramp()   ( _amr_env && sudo -v && exec ros2 launch amr_mpc torque_ramp.launch.py "$@" )   # 2026-11-17 바닥 토크 램프
 amrstep()   ( _amr_env && sudo -v && exec ros2 launch amr_mpc torque_step.launch.py "$@" )   # 2026-11-17 바닥 토크 스텝
+# 2026-11-28 사용자 요청: 꺾은선 스트레스 판. W·슬립 되먹임은 torque_mpc.yaml 기본 (W ×4, slip_fb 켬). 같은 인자를 뒤에 다시 주면 뒤 값이 쓰인다.
+poly()      { amrall use_mpc:=true controller:=mpc limit_mode:=friction shape:=polyline accel:=1.5 square_v_max:=1.5 square_corner_mode:=pass bag:=true "$@"; }
+# 2026-11-28 사용자 요청: 원 8 자 스트레스 판 (판 155544 와 같은 조건). width 3.0 → 반지름 0.75 m. speed 1.232 = 기준 부하 v (1 + K_GEOM/R) ≤ V_LIMIT 1.550 의 최고
+#   (1.5 를 주면 figure8_reference_node 가 기동 검사에서 종료한다). W·슬립 되먹임은 torque_mpc.yaml 기본 (W ×4, slip_fb 켬).
+circ()      { amrall use_mpc:=true controller:=mpc limit_mode:=friction shape:=circles8 width:=3.0 speed:=1.232 accel:=1.5 laps:=3 bag:=true "$@"; }
 amrrec() (   # 이름 생략 가능 — 폴더는 record_all.sh 가 bags/<날짜>/<시분초>[_이름] 로 정한다
   _amr_env && exec bash "$AMR_MPC_DIR/tools/record_all.sh" "${1:-}" "amrrec $*"
 )
@@ -88,4 +105,10 @@ amrbuild() (
 )
 amrcmp()   ( _amr_env && exec /usr/bin/python3 "$AMR_MPC_DIR/tools/compare_slam.py" "$@" )   # 2026-11-19 A·MPC 비교 (발표)
 amrlag()   ( _amr_env && exec /usr/bin/python3 "$AMR_MPC_DIR/tools/sensor_lag.py" "$@" )     # 2026-11-19 센서 지연
-amrhelp() { sed -n '6,30p' "$AMR_MPC_DIR/tools/amr_aliases.sh" | sed 's/^# \{0,1\}//'; }
+# 2026-11-28 pitwall (amr/notes_amr/pitwall_usage.md): 실행 중 다음 판 조건 바꾸기 · GUI · bag 판 나누기
+pit()      ( _amr_env >/dev/null && exec /usr/bin/python3 "$AMR_MPC_DIR/tools/pit.py" "$@" )
+amrpit()   ( _amr_env && exec ros2 run rqt_reconfigure rqt_reconfigure "$@" )
+amrruns()  ( _amr_env >/dev/null && exec /usr/bin/python3 "$AMR_MPC_DIR/tools/bag_runs.py" "$@" )
+amrall3()  { amrall use_mpc:=true controller:=all limit_mode:=friction bag:=true "$@"; }   # 2026-11-28 세 제어기 (뒤 인자가 이긴다)
+amrseq()   ( _amr_env >/dev/null && exec /usr/bin/python3 "$AMR_MPC_DIR/tools/seq.py" "$@" )   # 2026-11-28 사람 없이 여러 회차
+amrhelp() { sed -n '6,39p' "$AMR_MPC_DIR/tools/amr_aliases.sh" | sed 's/^# \{0,1\}//'; }

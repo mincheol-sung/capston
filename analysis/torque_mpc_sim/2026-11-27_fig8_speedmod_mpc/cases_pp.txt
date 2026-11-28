@@ -1,0 +1,9 @@
+# 같은 후보, 비교군 A (pp 룩어헤드 고정 · adpp 속도 비례). limit_mode 는 공통 인자에서 빼고 s2 명령과 같게
+pp_cur_v060_a100_r1|controller:=pp speed:=0.60 accel:=1.00
+pp_max_v054_a085_r1|controller:=pp speed:=0.54 accel:=0.85
+pp_m90_v051_a075_r1|controller:=pp speed:=0.51 accel:=0.75
+pp_m80_v048_a070_r1|controller:=pp speed:=0.48 accel:=0.70
+adpp_cur_v060_a100_r1|controller:=adpp speed:=0.60 accel:=1.00
+adpp_max_v054_a085_r1|controller:=adpp speed:=0.54 accel:=0.85
+adpp_m90_v051_a075_r1|controller:=adpp speed:=0.51 accel:=0.75
+adpp_m80_v048_a070_r1|controller:=adpp speed:=0.48 accel:=0.70

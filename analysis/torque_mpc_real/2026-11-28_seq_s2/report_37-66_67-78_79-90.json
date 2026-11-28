@@ -1,0 +1,2255 @@
+{
+ "37-66": {
+  "rows": [
+   {
+    "run": 37,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 1,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 1,
+     "dir": "fwd",
+     "data_i": 1
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.36194133758545,
+    "pos": 3.348203741459617,
+    "pos_max": 6.3589487231688056,
+    "cross": 2.3900474462938988,
+    "along": 0.43912371069474493,
+    "along_r": 2.3448116126435816,
+    "along_max": 5.711241191128359,
+    "head": 0.7819162208339063,
+    "slam": 3.038584667686245,
+    "slam_max": 6.244391623868101,
+    "m50": 16.49196366177498,
+    "m25": 42.76729559748428,
+    "p50": [
+     8.385744234800839,
+     1.8867924528301887,
+     3.6338225017470296,
+     4.332634521313766
+    ],
+    "spin": 45.33898305084746,
+    "big_corner": 100.0,
+    "vcorner": 0.30673099415780763,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.3055499301329128,
+    "vref_max": 1.2964366374810306,
+    "faults": []
+   },
+   {
+    "run": 39,
+    "ctrl": "pp",
+    "seq": {
+     "i": 3,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 1,
+     "dir": "rev",
+     "data_i": 2
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.351936340332031,
+    "pos": 3.609064697933989,
+    "pos_max": 6.890822363228096,
+    "cross": 2.0743060655886207,
+    "along": 0.9750715421926579,
+    "along_r": 2.95340521096168,
+    "along_max": 6.4080271477594595,
+    "head": 5.328935038902963,
+    "slam": 2.9851615921031867,
+    "slam_max": 5.753422820612628,
+    "m50": 21.769662921348313,
+    "m25": 53.30056179775281,
+    "p50": [
+     6.601123595505618,
+     5.969101123595506,
+     5.969101123595506,
+     7.162921348314606
+    ],
+    "spin": 29.677419354838708,
+    "big_corner": 100.0,
+    "vcorner": 0.2924213884072468,
+    "vcorner_ref": 0.2999999999999999,
+    "n_corner": 15,
+    "vmax": 1.3631075658479468,
+    "vref_max": 1.2954488362907928,
+    "faults": []
+   },
+   {
+    "run": 41,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 5,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 1,
+     "dir": "fwd",
+     "data_i": 3
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.3620765209198,
+    "pos": 2.9898408970714936,
+    "pos_max": 6.38543843134073,
+    "cross": 1.4501234301103978,
+    "along": 0.7250943033873022,
+    "along_r": 2.6146301128928595,
+    "along_max": 5.840040814508197,
+    "head": 4.756495985477344,
+    "slam": 2.6831360715856527,
+    "slam_max": 5.348488098860506,
+    "m50": 15.147265077138849,
+    "m25": 41.30434782608695,
+    "p50": [
+     7.854137447405329,
+     1.262272089761571,
+     6.38148667601683,
+     2.8751753155680224
+    ],
+    "spin": 38.88888888888889,
+    "big_corner": 100.0,
+    "vcorner": 0.2838994209558168,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.341102063594269,
+    "vref_max": 1.296456536058828,
+    "faults": []
+   },
+   {
+    "run": 43,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 1,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 1,
+     "dir": "fwd",
+     "data_i": 1
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.352007865905762,
+    "pos": 2.5366429774697297,
+    "pos_max": 6.8491052766779585,
+    "cross": 1.7742269264962407,
+    "along": 0.6017986641315244,
+    "along_r": 1.8129193055517387,
+    "along_max": 5.928141278815464,
+    "head": 0.6377857319543143,
+    "slam": 2.260367851654502,
+    "slam_max": 4.414555176656474,
+    "m50": 10.746685275645499,
+    "m25": 38.869504535938596,
+    "p50": [
+     0.6280530355896721,
+     3.628750872295883,
+     4.6057222609909285,
+     3.14026517794836
+    ],
+    "spin": 24.675324675324674,
+    "big_corner": 100.0,
+    "vcorner": 0.293211477744736,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.290485091432824,
+    "vref_max": 1.2961206103692229,
+    "faults": []
+   },
+   {
+    "run": 45,
+    "ctrl": "pp",
+    "seq": {
+     "i": 3,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 1,
+     "dir": "rev",
+     "data_i": 2
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.361949682235718,
+    "pos": 3.4611074192937323,
+    "pos_max": 7.444422086583715,
+    "cross": 1.731750291606839,
+    "along": 1.506324342828948,
+    "along_r": 2.996715784890144,
+    "along_max": 7.34867008482705,
+    "head": 4.297233263363136,
+    "slam": 3.1600125266673746,
+    "slam_max": 6.882478822809686,
+    "m50": 10.581639803784162,
+    "m25": 45.409950946040645,
+    "p50": [
+     5.466012613875263,
+     0.2803083391730904,
+     1.4716187806587244,
+     3.363700070077085
+    ],
+    "spin": 50.331125827814574,
+    "big_corner": 100.0,
+    "vcorner": 0.27792052707027837,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.3669192415734377,
+    "vref_max": 1.295838223577061,
+    "faults": []
+   },
+   {
+    "run": 47,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 5,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 1,
+     "dir": "fwd",
+     "data_i": 3
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.361993074417114,
+    "pos": 2.9604864511104467,
+    "pos_max": 7.153960254768686,
+    "cross": 1.431987638928913,
+    "along": 0.9502257766293762,
+    "along_r": 2.5911177953082962,
+    "along_max": 7.125534109872723,
+    "head": 5.115406117140305,
+    "slam": 2.845290273498001,
+    "slam_max": 7.190938012955245,
+    "m50": 7.358093903293623,
+    "m25": 33.35669236159776,
+    "p50": [
+     3.78416257883672,
+     0.7708479327259986,
+     2.172389628591451,
+     1.051156271899089
+    ],
+    "spin": 31.428571428571427,
+    "big_corner": 100.0,
+    "vcorner": 0.2848377123620334,
+    "vcorner_ref": 0.2999999999999999,
+    "n_corner": 15,
+    "vmax": 1.4169243896606625,
+    "vref_max": 1.2961674515285808,
+    "faults": []
+   },
+   {
+    "run": 49,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 7,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 2,
+     "dir": "rev",
+     "data_i": 4
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.351936340332031,
+    "pos": 1.68798140051635,
+    "pos_max": 3.5418941469741463,
+    "cross": 1.0553752300676738,
+    "along": 0.4970065718523696,
+    "along_r": 1.3173702335519593,
+    "along_max": 3.4663786058477095,
+    "head": 0.7391409652711696,
+    "slam": 1.50269654279658,
+    "slam_max": 3.296006313750377,
+    "m50": 2.857142857142857,
+    "m25": 25.505226480836235,
+    "p50": [
+     1.6027874564459932,
+     0.0,
+     0.0,
+     1.254355400696864
+    ],
+    "spin": 39.02439024390244,
+    "big_corner": 100.0,
+    "vcorner": 0.28742678983726355,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.2900263496650632,
+    "vref_max": 1.2954186228954205,
+    "faults": []
+   },
+   {
+    "run": 51,
+    "ctrl": "pp",
+    "seq": {
+     "i": 9,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 2,
+     "dir": "fwd",
+     "data_i": 5
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.36197805404663,
+    "pos": 2.9937702672828506,
+    "pos_max": 6.830227568176787,
+    "cross": 1.3221241809225923,
+    "along": 1.0956276384429036,
+    "along_r": 2.6860096916218668,
+    "along_max": 6.828676983902521,
+    "head": 4.333845231446372,
+    "slam": 2.8327808119202507,
+    "slam_max": 6.642949966518537,
+    "m50": 5.610098176718092,
+    "m25": 35.34361851332398,
+    "p50": [
+     0.9116409537166901,
+     1.6129032258064515,
+     2.1739130434782608,
+     0.9116409537166901
+    ],
+    "spin": 16.25,
+    "big_corner": 100.0,
+    "vcorner": 0.2859892395860043,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.3700627643827579,
+    "vref_max": 1.2968274384104719,
+    "faults": []
+   },
+   {
+    "run": 53,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 11,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 2,
+     "dir": "rev",
+     "data_i": 6
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.351993560791016,
+    "pos": 3.444102411744902,
+    "pos_max": 7.026175106458668,
+    "cross": 1.6726528879198999,
+    "along": 1.494683220279624,
+    "along_r": 3.010660017192288,
+    "along_max": 7.014397505039412,
+    "head": 7.623210745827996,
+    "slam": 3.133845929568975,
+    "slam_max": 6.406550880069532,
+    "m50": 10.721793973370708,
+    "m25": 41.6958654519972,
+    "p50": [
+     7.848633496846531,
+     0.7007708479327259,
+     2.102312543798178,
+     0.4905395935529082
+    ],
+    "spin": 61.43790849673203,
+    "big_corner": 98.69281045751634,
+    "vcorner": 0.27674569817782907,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.390433625191912,
+    "vref_max": 1.2953743721596183,
+    "faults": []
+   },
+   {
+    "run": 55,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 13,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 3,
+     "dir": "fwd",
+     "data_i": 7
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.361949682235718,
+    "pos": 2.814222224231666,
+    "pos_max": 4.846173712392911,
+    "cross": 2.0594737203992173,
+    "along": 0.10443945319602707,
+    "along_r": 1.9179193732647974,
+    "along_max": 3.6948584634695907,
+    "head": 0.8409367488012062,
+    "slam": 2.500439391852927,
+    "slam_max": 4.276267080553523,
+    "m50": 15.223463687150836,
+    "m25": 42.8072625698324,
+    "p50": [
+     2.4441340782122905,
+     4.608938547486034,
+     6.91340782122905,
+     2.7234636871508378
+    ],
+    "spin": 36.23853211009174,
+    "big_corner": 100.0,
+    "vcorner": 0.2888798246989798,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.2558730330623888,
+    "vref_max": 1.2961932483179632,
+    "faults": []
+   },
+   {
+    "run": 57,
+    "ctrl": "pp",
+    "seq": {
+     "i": 15,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 3,
+     "dir": "rev",
+     "data_i": 8
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.351968050003052,
+    "pos": 4.013032382344863,
+    "pos_max": 10.356600524696493,
+    "cross": 2.269897838423108,
+    "along": 1.3382095920470354,
+    "along_r": 3.30937950450996,
+    "along_max": 8.668798420773514,
+    "head": 6.339457911459767,
+    "slam": 3.419053904255423,
+    "slam_max": 7.4418227973839635,
+    "m50": 16.058906030855542,
+    "m25": 53.2258064516129,
+    "p50": [
+     7.293127629733521,
+     2.805049088359046,
+     4.488078541374474,
+     3.3660589060308554
+    ],
+    "spin": 54.14847161572053,
+    "big_corner": 100.0,
+    "vcorner": 0.28970133308577695,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.3768626760738214,
+    "vref_max": 1.295551714091273,
+    "faults": []
+   },
+   {
+    "run": 59,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 17,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 3,
+     "dir": "fwd",
+     "data_i": 9
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.361929416656494,
+    "pos": 3.5701892252709024,
+    "pos_max": 8.192938144125586,
+    "cross": 1.815801894444435,
+    "along": 1.0082579535865932,
+    "along_r": 3.073941213551822,
+    "along_max": 8.157033820444317,
+    "head": 6.568097871785531,
+    "slam": 3.1683669037493782,
+    "slam_max": 6.9389697501934755,
+    "m50": 18.271257905832748,
+    "m25": 50.10541110330288,
+    "p50": [
+     5.621925509486999,
+     4.848910751932537,
+     5.551651440618412,
+     3.4434293745607873
+    ],
+    "spin": 30.76923076923077,
+    "big_corner": 99.23076923076923,
+    "vcorner": 0.30588588968339414,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.424317733112179,
+    "vref_max": 1.29612092479934,
+    "faults": []
+   },
+   {
+    "run": 61,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 19,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 4,
+     "dir": "rev",
+     "data_i": 10
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.35191559791565,
+    "pos": 2.5909951655421604,
+    "pos_max": 4.9861553050240826,
+    "cross": 1.7179039279607708,
+    "along": 0.6742231556103315,
+    "along_r": 1.9396035786107948,
+    "along_max": 4.738687999868498,
+    "head": 0.6669501284256439,
+    "slam": 2.229995783401646,
+    "slam_max": 4.316645684220869,
+    "m50": 10.48951048951049,
+    "m25": 39.72027972027972,
+    "p50": [
+     2.5874125874125875,
+     1.6783216783216783,
+     3.2167832167832167,
+     3.006993006993007
+    ],
+    "spin": 38.666666666666664,
+    "big_corner": 100.0,
+    "vcorner": 0.30382304395804594,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.2807000721460082,
+    "vref_max": 1.2960372087218046,
+    "faults": []
+   },
+   {
+    "run": 63,
+    "ctrl": "pp",
+    "seq": {
+     "i": 21,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 4,
+     "dir": "fwd",
+     "data_i": 11
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.36189889907837,
+    "pos": 3.6689320405340258,
+    "pos_max": 8.213123801243356,
+    "cross": 1.8603698582719126,
+    "along": 0.9555040324374927,
+    "along_r": 3.1622913067095055,
+    "along_max": 8.146131652075765,
+    "head": 5.493276280353277,
+    "slam": 3.216230746593734,
+    "slam_max": 7.788308556587029,
+    "m50": 16.502808988764045,
+    "m25": 47.19101123595505,
+    "p50": [
+     6.03932584269663,
+     5.337078651685393,
+     3.8623595505617976,
+     6.952247191011236
+    ],
+    "spin": 27.659574468085108,
+    "big_corner": 100.0,
+    "vcorner": 0.28638659645071984,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.4020698242435456,
+    "vref_max": 1.2959769616590369,
+    "faults": []
+   },
+   {
+    "run": 65,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 23,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 4,
+     "dir": "rev",
+     "data_i": 12
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.15 align_s=1.5 yaw=tangent | 기준 14.5 s | 부하 85 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.15,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 14.358686447143555,
+    "pos": 3.8347110442444468,
+    "pos_max": 8.112775166345362,
+    "cross": 1.9662496078657283,
+    "along": 1.4624583079752027,
+    "along_r": 3.2922441088744017,
+    "along_max": 7.808100540893081,
+    "head": 7.629163705306474,
+    "slam": 3.396548956701274,
+    "slam_max": 7.014040794861522,
+    "m50": 23.70266479663394,
+    "m25": 49.859747545582046,
+    "p50": [
+     8.76577840112202,
+     6.241234221598877,
+     6.100981767180926,
+     5.259467040673211
+    ],
+    "spin": 42.30769230769231,
+    "big_corner": 97.92899408284023,
+    "vcorner": 0.2659853600987646,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.3825396387252133,
+    "vref_max": 1.2967194742533557,
+    "faults": []
+   }
+  ],
+  "returns": 0,
+  "summary": {
+   "pos": {
+    "mpc": [
+     3.348203741459617,
+     2.5366429774697297,
+     1.68798140051635,
+     2.814222224231666,
+     2.5909951655421604
+    ],
+    "pp": [
+     3.609064697933989,
+     3.4611074192937323,
+     2.9937702672828506,
+     4.013032382344863,
+     3.6689320405340258
+    ],
+    "adpp": [
+     2.9898408970714936,
+     2.9604864511104467,
+     3.444102411744902,
+     3.5701892252709024,
+     3.8347110442444468
+    ]
+   },
+   "pos_max": {
+    "mpc": [
+     6.3589487231688056,
+     6.8491052766779585,
+     3.5418941469741463,
+     4.846173712392911,
+     4.9861553050240826
+    ],
+    "pp": [
+     6.890822363228096,
+     7.444422086583715,
+     6.830227568176787,
+     10.356600524696493,
+     8.213123801243356
+    ],
+    "adpp": [
+     6.38543843134073,
+     7.153960254768686,
+     7.026175106458668,
+     8.192938144125586,
+     8.112775166345362
+    ]
+   },
+   "slam": {
+    "mpc": [
+     3.038584667686245,
+     2.260367851654502,
+     1.50269654279658,
+     2.500439391852927,
+     2.229995783401646
+    ],
+    "pp": [
+     2.9851615921031867,
+     3.1600125266673746,
+     2.8327808119202507,
+     3.419053904255423,
+     3.216230746593734
+    ],
+    "adpp": [
+     2.6831360715856527,
+     2.845290273498001,
+     3.133845929568975,
+     3.1683669037493782,
+     3.396548956701274
+    ]
+   },
+   "cross": {
+    "mpc": [
+     2.3900474462938988,
+     1.7742269264962407,
+     1.0553752300676738,
+     2.0594737203992173,
+     1.7179039279607708
+    ],
+    "pp": [
+     2.0743060655886207,
+     1.731750291606839,
+     1.3221241809225923,
+     2.269897838423108,
+     1.8603698582719126
+    ],
+    "adpp": [
+     1.4501234301103978,
+     1.431987638928913,
+     1.6726528879198999,
+     1.815801894444435,
+     1.9662496078657283
+    ]
+   },
+   "along": {
+    "mpc": [
+     0.43912371069474493,
+     0.6017986641315244,
+     0.4970065718523696,
+     0.10443945319602707,
+     0.6742231556103315
+    ],
+    "pp": [
+     0.9750715421926579,
+     1.506324342828948,
+     1.0956276384429036,
+     1.3382095920470354,
+     0.9555040324374927
+    ],
+    "adpp": [
+     0.7250943033873022,
+     0.9502257766293762,
+     1.494683220279624,
+     1.0082579535865932,
+     1.4624583079752027
+    ]
+   },
+   "along_max": {
+    "mpc": [
+     5.711241191128359,
+     5.928141278815464,
+     3.4663786058477095,
+     3.6948584634695907,
+     4.738687999868498
+    ],
+    "pp": [
+     6.4080271477594595,
+     7.34867008482705,
+     6.828676983902521,
+     8.668798420773514,
+     8.146131652075765
+    ],
+    "adpp": [
+     5.840040814508197,
+     7.125534109872723,
+     7.014397505039412,
+     8.157033820444317,
+     7.808100540893081
+    ]
+   },
+   "head": {
+    "mpc": [
+     0.7819162208339063,
+     0.6377857319543143,
+     0.7391409652711696,
+     0.8409367488012062,
+     0.6669501284256439
+    ],
+    "pp": [
+     5.328935038902963,
+     4.297233263363136,
+     4.333845231446372,
+     6.339457911459767,
+     5.493276280353277
+    ],
+    "adpp": [
+     4.756495985477344,
+     5.115406117140305,
+     7.623210745827996,
+     6.568097871785531,
+     7.629163705306474
+    ]
+   },
+   "m50": {
+    "mpc": [
+     16.49196366177498,
+     10.746685275645499,
+     2.857142857142857,
+     15.223463687150836,
+     10.48951048951049
+    ],
+    "pp": [
+     21.769662921348313,
+     10.581639803784162,
+     5.610098176718092,
+     16.058906030855542,
+     16.502808988764045
+    ],
+    "adpp": [
+     15.147265077138849,
+     7.358093903293623,
+     10.721793973370708,
+     18.271257905832748,
+     23.70266479663394
+    ]
+   },
+   "m25": {
+    "mpc": [
+     42.76729559748428,
+     38.869504535938596,
+     25.505226480836235,
+     42.8072625698324,
+     39.72027972027972
+    ],
+    "pp": [
+     53.30056179775281,
+     45.409950946040645,
+     35.34361851332398,
+     53.2258064516129,
+     47.19101123595505
+    ],
+    "adpp": [
+     41.30434782608695,
+     33.35669236159776,
+     41.6958654519972,
+     50.10541110330288,
+     49.859747545582046
+    ]
+   },
+   "spin": {
+    "mpc": [
+     45.33898305084746,
+     24.675324675324674,
+     39.02439024390244,
+     36.23853211009174,
+     38.666666666666664
+    ],
+    "pp": [
+     29.677419354838708,
+     50.331125827814574,
+     16.25,
+     54.14847161572053,
+     27.659574468085108
+    ],
+    "adpp": [
+     38.88888888888889,
+     31.428571428571427,
+     61.43790849673203,
+     30.76923076923077,
+     42.30769230769231
+    ]
+   },
+   "vcorner": {
+    "mpc": [
+     0.30673099415780763,
+     0.293211477744736,
+     0.28742678983726355,
+     0.2888798246989798,
+     0.30382304395804594
+    ],
+    "pp": [
+     0.2924213884072468,
+     0.27792052707027837,
+     0.2859892395860043,
+     0.28970133308577695,
+     0.28638659645071984
+    ],
+    "adpp": [
+     0.2838994209558168,
+     0.2848377123620334,
+     0.27674569817782907,
+     0.30588588968339414,
+     0.2659853600987646
+    ]
+   },
+   "vmax": {
+    "mpc": [
+     1.3055499301329128,
+     1.290485091432824,
+     1.2900263496650632,
+     1.2558730330623888,
+     1.2807000721460082
+    ],
+    "pp": [
+     1.3631075658479468,
+     1.3669192415734377,
+     1.3700627643827579,
+     1.3768626760738214,
+     1.4020698242435456
+    ],
+    "adpp": [
+     1.341102063594269,
+     1.4169243896606625,
+     1.390433625191912,
+     1.424317733112179,
+     1.3825396387252133
+    ]
+   }
+  }
+ },
+ "67-78": {
+  "rows": [
+   {
+    "run": 67,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 1,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 1,
+     "dir": "fwd",
+     "data_i": 1
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.3 align_s=1.5 yaw=tangent | 기준 14.1 s | 부하 90 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.3,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.96917176246643,
+    "pos": 3.7979653213599724,
+    "pos_max": 6.667179201845798,
+    "cross": 2.693289111779967,
+    "along": 0.24194316969374874,
+    "along_r": 2.6778226869269064,
+    "along_max": 5.629443485791899,
+    "head": 0.9801989188800975,
+    "slam": 3.388814816507161,
+    "slam_max": 6.666345554136307,
+    "m50": 20.114531138153186,
+    "m25": 47.172512526843235,
+    "p50": [
+     2.2906227630637077,
+     6.513958482462419,
+     6.8718682891911245,
+     7.015032211882606
+    ],
+    "spin": 31.672597864768683,
+    "big_corner": 100.0,
+    "vcorner": 0.3020277601149125,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.3671056492143048,
+    "vref_max": 1.3780738318597592,
+    "faults": []
+   },
+   {
+    "run": 69,
+    "ctrl": "pp",
+    "seq": {
+     "i": 3,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 1,
+     "dir": "rev",
+     "data_i": 2
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.3 align_s=1.5 yaw=tangent | 기준 14.1 s | 부하 90 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.3,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.969335317611694,
+    "pos": 4.488443519839738,
+    "pos_max": 9.476876352803147,
+    "cross": 2.5362790620870292,
+    "along": 1.3462985394895757,
+    "along_r": 3.7031626685861734,
+    "along_max": 8.920145808776002,
+    "head": 8.655771555610952,
+    "slam": 3.9426849180708294,
+    "slam_max": 8.24854477843166,
+    "m50": 16.618705035971225,
+    "m25": 52.80575539568345,
+    "p50": [
+     6.474820143884892,
+     5.611510791366906,
+     2.446043165467626,
+     4.676258992805756
+    ],
+    "spin": 59.74025974025974,
+    "big_corner": 88.74458874458875,
+    "vcorner": 0.28219617940628705,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.4418787802586288,
+    "vref_max": 1.3795344561835223,
+    "faults": []
+   },
+   {
+    "run": 71,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 5,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 1,
+     "dir": "fwd",
+     "data_i": 3
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.3 align_s=1.5 yaw=tangent | 기준 14.1 s | 부하 90 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.3,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.969491243362427,
+    "pos": 4.255358763430293,
+    "pos_max": 10.291057348913954,
+    "cross": 2.2451218666440362,
+    "along": 1.0676469533802426,
+    "along_r": 3.6149005531853557,
+    "along_max": 10.041889500993587,
+    "head": 7.7446372790681215,
+    "slam": 3.664995135607785,
+    "slam_max": 9.176452526039881,
+    "m50": 24.90974729241877,
+    "m25": 59.855595667870034,
+    "p50": [
+     5.631768953068592,
+     8.158844765342959,
+     7.79783393501805,
+     7.148014440433213
+    ],
+    "spin": 39.42028985507247,
+    "big_corner": 88.1159420289855,
+    "vcorner": 0.28017522090520436,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.467271705698659,
+    "vref_max": 1.3805132495269912,
+    "faults": []
+   },
+   {
+    "run": 73,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 7,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 2,
+     "dir": "rev",
+     "data_i": 4
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.3 align_s=1.5 yaw=tangent | 기준 14.1 s | 부하 90 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.3,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.969613552093506,
+    "pos": 3.046119797428325,
+    "pos_max": 6.474863761716421,
+    "cross": 1.975412355306982,
+    "along": 1.0364062870064497,
+    "along_r": 2.3187479049662354,
+    "along_max": 6.021016152657794,
+    "head": 0.9034947127022912,
+    "slam": 2.740355958876012,
+    "slam_max": 5.889556288155076,
+    "m50": 10.632183908045976,
+    "m25": 37.85919540229885,
+    "p50": [
+     3.089080459770115,
+     3.3764367816091956,
+     1.4367816091954022,
+     3.2327586206896552
+    ],
+    "spin": 60.13513513513513,
+    "big_corner": 100.0,
+    "vcorner": 0.2763673778957111,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.3822043782565818,
+    "vref_max": 1.3795605391248926,
+    "faults": []
+   },
+   {
+    "run": 75,
+    "ctrl": "pp",
+    "seq": {
+     "i": 9,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 2,
+     "dir": "fwd",
+     "data_i": 5
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.3 align_s=1.5 yaw=tangent | 기준 14.1 s | 부하 90 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.3,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.969756126403809,
+    "pos": 3.6373119150773867,
+    "pos_max": 7.7757759118284016,
+    "cross": 1.661632042324928,
+    "along": 1.085053279260661,
+    "along_r": 3.235586024738488,
+    "along_max": 7.708195323480152,
+    "head": 4.9117177414429465,
+    "slam": 3.2977523714702106,
+    "slam_max": 7.442327708762061,
+    "m50": 9.14985590778098,
+    "m25": 40.778097982708935,
+    "p50": [
+     2.521613832853026,
+     3.5302593659942363,
+     2.9538904899135447,
+     2.521613832853026
+    ],
+    "spin": 44.09448818897638,
+    "big_corner": 100.0,
+    "vcorner": 0.29460123012797057,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.4594443416575829,
+    "vref_max": 1.37817353457411,
+    "faults": []
+   },
+   {
+    "run": 77,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 11,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 2,
+     "dir": "rev",
+     "data_i": 6
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.3 align_s=1.5 yaw=tangent | 기준 14.1 s | 부하 90 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.3,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.979862213134766,
+    "pos": 3.582829870633565,
+    "pos_max": 11.577197942796595,
+    "cross": 1.5296181946794116,
+    "along": 1.407594213209672,
+    "along_r": 3.239897847218308,
+    "along_max": 10.798355975424704,
+    "head": 4.584176873217556,
+    "slam": 3.3043057749737823,
+    "slam_max": 7.9029364491253435,
+    "m50": 10.639827462257369,
+    "m25": 39.89935298346513,
+    "p50": [
+     4.24155283968368,
+     4.313443565780014,
+     1.1502516175413373,
+     1.2221423436376708
+    ],
+    "spin": 58.78378378378378,
+    "big_corner": 91.21621621621621,
+    "vcorner": 0.2685008398643573,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.4260838344712405,
+    "vref_max": 1.3773633371146967,
+    "faults": []
+   }
+  ],
+  "returns": 0,
+  "summary": {
+   "pos": {
+    "mpc": [
+     3.7979653213599724,
+     3.046119797428325
+    ],
+    "pp": [
+     4.488443519839738,
+     3.6373119150773867
+    ],
+    "adpp": [
+     4.255358763430293,
+     3.582829870633565
+    ]
+   },
+   "pos_max": {
+    "mpc": [
+     6.667179201845798,
+     6.474863761716421
+    ],
+    "pp": [
+     9.476876352803147,
+     7.7757759118284016
+    ],
+    "adpp": [
+     10.291057348913954,
+     11.577197942796595
+    ]
+   },
+   "slam": {
+    "mpc": [
+     3.388814816507161,
+     2.740355958876012
+    ],
+    "pp": [
+     3.9426849180708294,
+     3.2977523714702106
+    ],
+    "adpp": [
+     3.664995135607785,
+     3.3043057749737823
+    ]
+   },
+   "cross": {
+    "mpc": [
+     2.693289111779967,
+     1.975412355306982
+    ],
+    "pp": [
+     2.5362790620870292,
+     1.661632042324928
+    ],
+    "adpp": [
+     2.2451218666440362,
+     1.5296181946794116
+    ]
+   },
+   "along": {
+    "mpc": [
+     0.24194316969374874,
+     1.0364062870064497
+    ],
+    "pp": [
+     1.3462985394895757,
+     1.085053279260661
+    ],
+    "adpp": [
+     1.0676469533802426,
+     1.407594213209672
+    ]
+   },
+   "along_max": {
+    "mpc": [
+     5.629443485791899,
+     6.021016152657794
+    ],
+    "pp": [
+     8.920145808776002,
+     7.708195323480152
+    ],
+    "adpp": [
+     10.041889500993587,
+     10.798355975424704
+    ]
+   },
+   "head": {
+    "mpc": [
+     0.9801989188800975,
+     0.9034947127022912
+    ],
+    "pp": [
+     8.655771555610952,
+     4.9117177414429465
+    ],
+    "adpp": [
+     7.7446372790681215,
+     4.584176873217556
+    ]
+   },
+   "m50": {
+    "mpc": [
+     20.114531138153186,
+     10.632183908045976
+    ],
+    "pp": [
+     16.618705035971225,
+     9.14985590778098
+    ],
+    "adpp": [
+     24.90974729241877,
+     10.639827462257369
+    ]
+   },
+   "m25": {
+    "mpc": [
+     47.172512526843235,
+     37.85919540229885
+    ],
+    "pp": [
+     52.80575539568345,
+     40.778097982708935
+    ],
+    "adpp": [
+     59.855595667870034,
+     39.89935298346513
+    ]
+   },
+   "spin": {
+    "mpc": [
+     31.672597864768683,
+     60.13513513513513
+    ],
+    "pp": [
+     59.74025974025974,
+     44.09448818897638
+    ],
+    "adpp": [
+     39.42028985507247,
+     58.78378378378378
+    ]
+   },
+   "vcorner": {
+    "mpc": [
+     0.3020277601149125,
+     0.2763673778957111
+    ],
+    "pp": [
+     0.28219617940628705,
+     0.29460123012797057
+    ],
+    "adpp": [
+     0.28017522090520436,
+     0.2685008398643573
+    ]
+   },
+   "vmax": {
+    "mpc": [
+     1.3671056492143048,
+     1.3822043782565818
+    ],
+    "pp": [
+     1.4418787802586288,
+     1.4594443416575829
+    ],
+    "adpp": [
+     1.467271705698659,
+     1.4260838344712405
+    ]
+   }
+  }
+ },
+ "79-90": {
+  "rows": [
+   {
+    "run": 79,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 1,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 1,
+     "dir": "fwd",
+     "data_i": 1
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.5 align_s=1.5 yaw=tangent | 기준 13.6 s | 부하 97 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.5,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.54006814956665,
+    "pos": 3.432300571785416,
+    "pos_max": 9.388732643768002,
+    "cross": 2.249014577072906,
+    "along": 1.1501504109870726,
+    "along_r": 2.5928016983934716,
+    "along_max": 8.587593062749507,
+    "head": 0.9223545877140473,
+    "slam": 3.152173319486287,
+    "slam_max": 7.608280055582631,
+    "m50": 9.527326440177253,
+    "m25": 37.370753323485964,
+    "p50": [
+     0.0,
+     5.317577548005908,
+     2.658788774002954,
+     3.61890694239291
+    ],
+    "spin": 32.55813953488372,
+    "big_corner": 100.0,
+    "vcorner": 0.292143823101399,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.4425829766458058,
+    "vref_max": 1.4956383723720155,
+    "faults": []
+   },
+   {
+    "run": 81,
+    "ctrl": "pp",
+    "seq": {
+     "i": 3,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 1,
+     "dir": "rev",
+     "data_i": 2
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.5 align_s=1.5 yaw=tangent | 기준 13.6 s | 부하 97 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.5,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.540138721466064,
+    "pos": 3.997732238089794,
+    "pos_max": 7.988102183663415,
+    "cross": 1.813024733875159,
+    "along": 1.5093550601345038,
+    "along_r": 3.5629768960546664,
+    "along_max": 7.853595968055664,
+    "head": 6.77987594473693,
+    "slam": 3.724637658079032,
+    "slam_max": 7.981538491836808,
+    "m50": 11.210096510764663,
+    "m25": 46.32516703786192,
+    "p50": [
+     3.4892353377876764,
+     4.7512991833704525,
+     2.1529324424647367,
+     1.2620638455827766
+    ],
+    "spin": 35.76158940397351,
+    "big_corner": 95.36423841059603,
+    "vcorner": 0.2719723675857405,
+    "vcorner_ref": 0.2999999999999999,
+    "n_corner": 15,
+    "vmax": 1.5797961185112241,
+    "vref_max": 1.4959088905603555,
+    "faults": []
+   },
+   {
+    "run": 83,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 5,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 1,
+     "dir": "fwd",
+     "data_i": 3
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.5 align_s=1.5 yaw=tangent | 기준 13.6 s | 부하 97 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.5,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.540207147598267,
+    "pos": 3.855702418698582,
+    "pos_max": 10.42456334494046,
+    "cross": 1.635390022072916,
+    "along": 0.7429107193184955,
+    "along_r": 3.4916959514342656,
+    "along_max": 10.424494299927067,
+    "head": 6.54902096925508,
+    "slam": 3.609077233480171,
+    "slam_max": 8.889122770731538,
+    "m50": 17.9182156133829,
+    "m25": 47.88104089219331,
+    "p50": [
+     7.434944237918216,
+     6.022304832713755,
+     5.278810408921933,
+     3.197026022304833
+    ],
+    "spin": 21.991701244813278,
+    "big_corner": 100.0,
+    "vcorner": 0.2813908504514443,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.5822982153203011,
+    "vref_max": 1.4966901465903604,
+    "faults": []
+   },
+   {
+    "run": 85,
+    "ctrl": "mpc",
+    "seq": {
+     "i": 7,
+     "kind": "data",
+     "ctrl": "mpc",
+     "round": 2,
+     "dir": "rev",
+     "data_i": 4
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.5 align_s=1.5 yaw=tangent | 기준 13.6 s | 부하 97 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.5,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.54029893875122,
+    "pos": 3.704508837321876,
+    "pos_max": 8.886269171199823,
+    "cross": 2.1520091238129377,
+    "along": 1.5016277994536025,
+    "along_r": 3.0153345513925562,
+    "along_max": 8.515965703689645,
+    "head": 1.0148009521450252,
+    "slam": 3.360901410089962,
+    "slam_max": 8.293692619599192,
+    "m50": 13.535502958579881,
+    "m25": 39.94082840236686,
+    "p50": [
+     5.2514792899408285,
+     2.0710059171597637,
+     2.8846153846153846,
+     3.5502958579881656
+    ],
+    "spin": 51.36612021857923,
+    "big_corner": 100.0,
+    "vcorner": 0.29461209960951584,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.4134682629435886,
+    "vref_max": 1.4975473505505403,
+    "faults": []
+   },
+   {
+    "run": 87,
+    "ctrl": "pp",
+    "seq": {
+     "i": 9,
+     "kind": "data",
+     "ctrl": "pp",
+     "round": 2,
+     "dir": "fwd",
+     "data_i": 5
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.5 align_s=1.5 yaw=tangent | 기준 13.6 s | 부하 97 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.5,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.530380249023438,
+    "pos": 4.018374812423837,
+    "pos_max": 9.74628631265673,
+    "cross": 1.9452368393425319,
+    "along": 0.609282804165624,
+    "along_r": 3.5161612266770406,
+    "along_max": 9.70945509785765,
+    "head": 8.659838252980036,
+    "slam": 3.727140764323845,
+    "slam_max": 9.881825393894369,
+    "m50": 20.386904761904763,
+    "m25": 55.43154761904761,
+    "p50": [
+     6.25,
+     5.580357142857143,
+     6.101190476190476,
+     3.4970238095238098
+    ],
+    "spin": 22.62773722627737,
+    "big_corner": 95.98540145985402,
+    "vcorner": 0.2784381346642355,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.554739974765134,
+    "vref_max": 1.4988484974693956,
+    "faults": []
+   },
+   {
+    "run": 89,
+    "ctrl": "adpp",
+    "seq": {
+     "i": 11,
+     "kind": "data",
+     "ctrl": "adpp",
+     "round": 2,
+     "dir": "rev",
+     "data_i": 6
+    },
+    "end": "완주·중단 (finished)",
+    "shape": "zigzag",
+    "summary": "zigzag zigzag_n=5 zigzag_length=2 zigzag_angle_deg=30 zigzag_profile=square zigzag_rot_s=0.5 zigzag_dwell_s=0.1 zigzag_corner=pass zigzag_corner_speed=0.3 zigzag_turn_m=0.5 zigzag_reverse=False speed=0 accel=1.5 align_s=1.5 yaw=tangent | 기준 13.6 s | 부하 97 %",
+    "relevant": {
+     "zigzag_n": 5,
+     "zigzag_length": 2.0,
+     "zigzag_angle_deg": 30.0,
+     "zigzag_profile": "square",
+     "zigzag_rot_s": 0.5,
+     "zigzag_dwell_s": 0.1,
+     "zigzag_corner": "pass",
+     "zigzag_corner_speed": 0.3,
+     "zigzag_turn_m": 0.5,
+     "zigzag_reverse": false,
+     "speed": 0.0,
+     "accel": 1.5,
+     "spin_rate": 1.0,
+     "align_s": 1.5,
+     "yaw_mode": "tangent",
+     "start_delay": 3.0,
+     "hold_s": 5.0
+    },
+    "dur": 13.530407190322876,
+    "pos": 4.40845572265221,
+    "pos_max": 9.825135113726498,
+    "cross": 2.129114170616903,
+    "along": 1.2458222051971355,
+    "along_r": 3.8602272869694234,
+    "along_max": 9.372245794403481,
+    "head": 9.461686762588918,
+    "slam": 3.9475182732553895,
+    "slam_max": 8.576090075835573,
+    "m50": 15.092936802973977,
+    "m25": 50.63197026022305,
+    "p50": [
+     4.237918215613383,
+     7.063197026022305,
+     1.7843866171003717,
+     4.981412639405204
+    ],
+    "spin": 31.03448275862069,
+    "big_corner": 90.64039408866995,
+    "vcorner": 0.262455563659602,
+    "vcorner_ref": 0.29999999999999993,
+    "n_corner": 16,
+    "vmax": 1.5206925234883757,
+    "vref_max": 1.499087874087028,
+    "faults": []
+   }
+  ],
+  "returns": 0,
+  "summary": {
+   "pos": {
+    "mpc": [
+     3.432300571785416,
+     3.704508837321876
+    ],
+    "pp": [
+     3.997732238089794,
+     4.018374812423837
+    ],
+    "adpp": [
+     3.855702418698582,
+     4.40845572265221
+    ]
+   },
+   "pos_max": {
+    "mpc": [
+     9.388732643768002,
+     8.886269171199823
+    ],
+    "pp": [
+     7.988102183663415,
+     9.74628631265673
+    ],
+    "adpp": [
+     10.42456334494046,
+     9.825135113726498
+    ]
+   },
+   "slam": {
+    "mpc": [
+     3.152173319486287,
+     3.360901410089962
+    ],
+    "pp": [
+     3.724637658079032,
+     3.727140764323845
+    ],
+    "adpp": [
+     3.609077233480171,
+     3.9475182732553895
+    ]
+   },
+   "cross": {
+    "mpc": [
+     2.249014577072906,
+     2.1520091238129377
+    ],
+    "pp": [
+     1.813024733875159,
+     1.9452368393425319
+    ],
+    "adpp": [
+     1.635390022072916,
+     2.129114170616903
+    ]
+   },
+   "along": {
+    "mpc": [
+     1.1501504109870726,
+     1.5016277994536025
+    ],
+    "pp": [
+     1.5093550601345038,
+     0.609282804165624
+    ],
+    "adpp": [
+     0.7429107193184955,
+     1.2458222051971355
+    ]
+   },
+   "along_max": {
+    "mpc": [
+     8.587593062749507,
+     8.515965703689645
+    ],
+    "pp": [
+     7.853595968055664,
+     9.70945509785765
+    ],
+    "adpp": [
+     10.424494299927067,
+     9.372245794403481
+    ]
+   },
+   "head": {
+    "mpc": [
+     0.9223545877140473,
+     1.0148009521450252
+    ],
+    "pp": [
+     6.77987594473693,
+     8.659838252980036
+    ],
+    "adpp": [
+     6.54902096925508,
+     9.461686762588918
+    ]
+   },
+   "m50": {
+    "mpc": [
+     9.527326440177253,
+     13.535502958579881
+    ],
+    "pp": [
+     11.210096510764663,
+     20.386904761904763
+    ],
+    "adpp": [
+     17.9182156133829,
+     15.092936802973977
+    ]
+   },
+   "m25": {
+    "mpc": [
+     37.370753323485964,
+     39.94082840236686
+    ],
+    "pp": [
+     46.32516703786192,
+     55.43154761904761
+    ],
+    "adpp": [
+     47.88104089219331,
+     50.63197026022305
+    ]
+   },
+   "spin": {
+    "mpc": [
+     32.55813953488372,
+     51.36612021857923
+    ],
+    "pp": [
+     35.76158940397351,
+     22.62773722627737
+    ],
+    "adpp": [
+     21.991701244813278,
+     31.03448275862069
+    ]
+   },
+   "vcorner": {
+    "mpc": [
+     0.292143823101399,
+     0.29461209960951584
+    ],
+    "pp": [
+     0.2719723675857405,
+     0.2784381346642355
+    ],
+    "adpp": [
+     0.2813908504514443,
+     0.262455563659602
+    ]
+   },
+   "vmax": {
+    "mpc": [
+     1.4425829766458058,
+     1.4134682629435886
+    ],
+    "pp": [
+     1.5797961185112241,
+     1.554739974765134
+    ],
+    "adpp": [
+     1.5822982153203011,
+     1.5206925234883757
+    ]
+   }
+  }
+ }
+}

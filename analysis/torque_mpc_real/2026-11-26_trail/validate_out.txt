@@ -1,0 +1,12 @@
+## 191922_s2pl_mpc_r1
+estimator              횡흔들림 RMS 1.17 max 4.18 cm | 횡가속 1~5Hz RMS 1.57 (IMU 0.88) | SLAM 과 거리 RMS 2.28 max 6.74 cm | 속도 밖 스텝 max 46.0 mm
+SLAM→base_footprint    횡흔들림 RMS 0.85 max 2.86 cm | 횡가속 1~5Hz RMS 0.93 (IMU 0.88) | SLAM 과 거리 RMS 0.00 max 0.00 cm | 속도 밖 스텝 max 24.8 mm
+smooth τ=0.5 bias=True 횡흔들림 RMS 0.50 max 2.15 cm | 횡가속 1~5Hz RMS 0.28 (IMU 0.88) | SLAM 과 거리 RMS 2.89 max 6.96 cm | 속도 밖 스텝 max  1.5 mm
+## 191432_s2zz_mpc_r2
+estimator              횡흔들림 RMS 0.70 max 2.14 cm | 횡가속 1~5Hz RMS 0.54 (IMU 0.35) | SLAM 과 거리 RMS 0.91 max 3.33 cm | 속도 밖 스텝 max 16.0 mm
+SLAM→base_footprint    횡흔들림 RMS 0.65 max 1.65 cm | 횡가속 1~5Hz RMS 0.30 (IMU 0.35) | SLAM 과 거리 RMS 0.00 max 0.00 cm | 속도 밖 스텝 max 14.5 mm
+smooth τ=0.5 bias=True 횡흔들림 RMS 0.56 max 0.98 cm | 횡가속 1~5Hz RMS 0.11 (IMU 0.35) | SLAM 과 거리 RMS 1.14 max 4.39 cm | 속도 밖 스텝 max  0.6 mm
+## 190718_s2zz_pp_r1
+estimator              횡흔들림 RMS 0.63 max 1.76 cm | 횡가속 1~5Hz RMS 0.50 (IMU 0.29) | SLAM 과 거리 RMS 1.08 max 2.84 cm | 속도 밖 스텝 max 17.7 mm
+SLAM→base_footprint    횡흔들림 RMS 0.55 max 1.27 cm | 횡가속 1~5Hz RMS 0.29 (IMU 0.29) | SLAM 과 거리 RMS 0.00 max 0.00 cm | 속도 밖 스텝 max 17.7 mm
+smooth τ=0.5 bias=True 횡흔들림 RMS 0.51 max 0.88 cm | 횡가속 1~5Hz RMS 0.09 (IMU 0.29) | SLAM 과 거리 RMS 0.91 max 2.12 cm | 속도 밖 스텝 max  0.4 mm

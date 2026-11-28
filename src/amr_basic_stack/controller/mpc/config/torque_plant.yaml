@@ -130,9 +130,13 @@ surface:
 #             slip_coef:  torque_mpc_node 엔코더 몸체 속도 (측정 쪽만 — 미끄럼이라 힘 사상은 안 돌린다), wheel_pi 바퀴 목표
 #    안 쓰는 곳: 시뮬 플랜트 (물리), slip_logger λ (지표 정의 그대로), 토크 램프·스텝 시험
 #    한 번만 바꿀 때: launch drive_yaw_deg:=2.4 drive_slip_coef:=-2.5
+#    2026-11-26 사용자 결정 "B (3.1° · +0.8)" — 기본값으로 켬. 꺾은선 통과 12 판 엔코더 vs SLAM 이동 방향 다시 맞춤 (직선 +3.1°, 선회 계수 +0.8 ± 0.2,
+#      11-23 원운동 값 2.4 · −2.5 와 다름 — 꼭짓점 통과 영역) 뒤 실차 A/B 3 판씩: 경로까지 RMS 3.4 (11-23 값) → 2.6 cm, 최대 9.6 → 6.7 cm (안 겹침),
+#      슬립 그대로 (analysis/torque_mpc_real/2026-11-26_drive_ab/RESULTS_KO.md). 제어기 셋 (MPC·PP·어댑티브 PP 의 wheel_pi)·torque_output 이 같이 읽는다.
+#    ★ 시뮬 플랜트에는 이 물리가 없어서 plant:=sim 판은 launch 가 제어기에 0 을 넘긴다 (예전 시뮬 그대로). 보정 없는 실차 판: drive_yaw_deg:=0 drive_slip_coef:=0
 drive:
-  yaw_offset_deg: 0.0
-  slip_coef_deg_per_mps2: 0.0
+  yaw_offset_deg: 3.1
+  slip_coef_deg_per_mps2: 0.8
   slip_ac_max_mps2: 2.0
 
 # ── 모델 스위치 — 2026-11-16 부터 시뮬 플랜트(Python TorquePlant·sim_plant_torque) 물리만 정한다.
@@ -145,3 +149,12 @@ model:
                              #   바퀴 반영 관성 항 w = M_eff⁻¹[μ ω_z S Ẋ_xy; 0] 을 넣는다 (1판 식-3~6).
                              #   false 면 10/29 방향 정리의 "휠 관성 무시" 모델: M = diag(m, m, I_z), w = 0.
   gravity: 9.81
+
+# ── 시뮬 플랜트 전용 (2026-11-26 사용자 결정 "시뮬 맞추고") — sim_plant_torque.py 만 읽는다. MPC·기준 생성기·시험 도구는 안 읽는다.
+#   실차 식별값으로 시뮬을 실차에 맞춘다: 롤러 하나당 구름 저항 (옆 4.99 N → 0.88 N), 몸체 회전 관성 (I_eff 0.11~0.12 − 바퀴 몫 0.083 → 0.03)
+#   (analysis/torque_mpc_real/2026-11-25_rot · _lat). 이 값을 넣은 시뮬이 실차 MPC 회전 속도 비 (0.954 ↔ 실차 0.958) 를 재현했다
+#   (analysis/torque_mpc_sim/2026-11-25_roller). 예전 시뮬 플랜트: launch sim_roller_rr:=0 sim_inertia_z:=0.06
+#   위 body.inertia_z_kgm2 (0.06) 는 다른 도구가 같이 쓰므로 그대로 둔다.
+sim_plant:
+  roller_rr_N: 0.88
+  inertia_z_kgm2: 0.03

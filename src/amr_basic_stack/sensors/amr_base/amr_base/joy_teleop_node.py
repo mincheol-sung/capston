@@ -26,6 +26,14 @@ AK40 토크 스택에서 쓸 때 (2026-11-23, amr_mpc teleop.launch.py)
   arm_button / disarm_button (기본 -1 = 끔) -> 누르는 순간 한 번 arm_topic(/mpc/arm) 에
     Bool true / false. 둘이 같이 눌리면 disarm 이 이긴다. disarm 을 누르면 지금 명령도 0 으로.
   기본값은 전부 예전 동작과 같다 (RoboClaw bringup 은 그대로).
+
+MPC 스택에서 자율·수동 같이 쓸 때 (2026-11-28, amr_mpc torque_experiment.launch.py joy:=)
+  arm_axis (기본 -1 = 끔)        트리거 축을 당기는 순간 한 번 arm_topic 에 true (AUTO 무장). Xbox RT = 축 4
+  teleop_arm_axis (기본 -1 = 끔) 트리거 축을 당기는 순간 한 번 teleop_arm_topic(/teleop/arm) 에 true (TELEOP). Xbox LT = 축 5
+  trigger_threshold (−0.5)       축 값 ≤ 이 값이면 "당김". Xbox 트리거는 놓으면 +1, 끝까지 −1 → −0.5 = 75 % 당김.
+                                 아직 안 만진 트리거를 0 으로 내는 드라이버가 있어도 0 은 당김이 아니다.
+  우선순위: disarm 버튼 > teleop 트리거 > arm 트리거·버튼. teleop 트리거를 당기고 있는 동안 arm 은 안 먹는다.
+  첫 /joy 메시지는 기준만 잡는다 — 기동할 때 이미 당겨져 있던 트리거로 무장하지 않게.
 """
 
 import rclpy
@@ -64,6 +72,10 @@ class JoyTeleop(Node):
         self.declare_parameter("arm_button", -1)
         self.declare_parameter("disarm_button", -1)
         self.declare_parameter("arm_topic", "/mpc/arm")
+        self.declare_parameter("arm_axis", -1)                  # 2026-11-28 머리주석
+        self.declare_parameter("teleop_arm_axis", -1)
+        self.declare_parameter("teleop_arm_topic", "/teleop/arm")
+        self.declare_parameter("trigger_threshold", -0.5)
 
         self._max_v = float(self.get_parameter("max_linear_vel").value)
         self._max_w = float(self.get_parameter("max_angular_vel").value)
@@ -88,16 +100,22 @@ class JoyTeleop(Node):
         self._frame_id = str(self.get_parameter("frame_id").value)
         self._btn_arm = int(self.get_parameter("arm_button").value)
         self._btn_disarm = int(self.get_parameter("disarm_button").value)
+        self._axis_arm = int(self.get_parameter("arm_axis").value)
+        self._axis_teleop = int(self.get_parameter("teleop_arm_axis").value)
+        self._trigger_threshold = float(self.get_parameter("trigger_threshold").value)
 
         self._cmd = Twist()
         self._last_joy_time = None
         self._was_active = False        # 직전 주기에 0 이 아닌 명령을 냈나
         self._prev_arm = self._prev_disarm = False   # 버튼 누르는 순간(상승 에지)만 보내려고
+        self._prev_rt = self._prev_lt = None         # 트리거 — None 은 첫 /joy 전 (첫 메시지는 기준만 잡는다)
 
         self._pub = self.create_publisher(TwistStamped if self._stamped else Twist, "cmd_vel", 10)
-        self._arm_pub = None
-        if self._btn_arm >= 0 or self._btn_disarm >= 0:
+        self._arm_pub = self._teleop_pub = None
+        if self._btn_arm >= 0 or self._btn_disarm >= 0 or self._axis_arm >= 0:
             self._arm_pub = self.create_publisher(Bool, str(self.get_parameter("arm_topic").value), 10)
+        if self._axis_teleop >= 0:
+            self._teleop_pub = self.create_publisher(Bool, str(self.get_parameter("teleop_arm_topic").value), 10)
         self.create_subscription(Joy, "joy", self._joy_cb, 10)
         self.create_timer(0.05, self._publish)
 
@@ -105,7 +123,8 @@ class JoyTeleop(Node):
         self.get_logger().info(
             f"Joy teleop: vx <- axis {self._axis_x}, vy <- axis {self._axis_y}, wz <- axis {self._axis_w} "
             f"(axis -1 = off), rotate ccw/cw <- button {self._btn_ccw}/{self._btn_cw}, "
-            f"arm/disarm <- button {self._btn_arm}/{self._btn_disarm}; "
+            f"arm/disarm <- button {self._btn_arm}/{self._btn_disarm}, "
+            f"arm/teleop <- trigger axis {self._axis_arm}/{self._axis_teleop} (<= {self._trigger_threshold:g}); "
             f"limit vx {self._max_v * self._scale_x:.2f} vy {self._max_v * self._scale_y:.2f} m/s, "
             f"wz {self._max_w * self._scale_w:.2f} rad/s; "
             f"{'TwistStamped' if self._stamped else 'Twist'} on {self._pub.topic_name}"
@@ -128,17 +147,28 @@ class JoyTeleop(Node):
     def _clamp(value: float, limit: float) -> float:
         return max(-limit, min(limit, value))
 
+    def _trigger(self, msg: Joy, index: int) -> bool:
+        return 0 <= index < len(msg.axes) and float(msg.axes[index]) <= self._trigger_threshold
+
     def _arm_buttons(self, msg: Joy) -> bool:
-        """arm/disarm 버튼의 상승 에지에서 arm_topic 에 한 번 보낸다. disarm 이 눌려 있으면 True."""
+        """arm/disarm 버튼·트리거의 상승 에지에서 한 번 보낸다 (우선순위는 머리주석). disarm 이 눌려 있으면 True."""
         arm, disarm = self._pressed(msg, self._btn_arm), self._pressed(msg, self._btn_disarm)
-        if self._arm_pub is not None:
-            if disarm and not self._prev_disarm:
+        rt, lt = self._trigger(msg, self._axis_arm), self._trigger(msg, self._axis_teleop)
+        if self._prev_rt is None:                 # 첫 /joy: 이미 당겨져 있던 트리거는 당긴 것으로 치지 않는다
+            self._prev_rt, self._prev_lt = rt, lt
+        rt_edge, lt_edge = rt and not self._prev_rt, lt and not self._prev_lt
+        if disarm:
+            if not self._prev_disarm and self._arm_pub is not None:
                 self._arm_pub.publish(Bool(data=False))
                 self.get_logger().warn(f"button {self._btn_disarm}: DISARM")
-            elif arm and not self._prev_arm and not disarm:
-                self._arm_pub.publish(Bool(data=True))
-                self.get_logger().info(f"button {self._btn_arm}: ARM")
+        elif lt_edge and self._teleop_pub is not None:
+            self._teleop_pub.publish(Bool(data=True))
+            self.get_logger().info(f"trigger axis {self._axis_teleop}: TELEOP")
+        elif ((arm and not self._prev_arm) or rt_edge) and not lt and self._arm_pub is not None:
+            self._arm_pub.publish(Bool(data=True))
+            self.get_logger().info(f"{'trigger axis %d' % self._axis_arm if rt_edge else 'button %d' % self._btn_arm}: ARM")
         self._prev_arm, self._prev_disarm = arm, disarm
+        self._prev_rt, self._prev_lt = rt, lt
         return disarm
 
     def _joy_cb(self, msg: Joy):

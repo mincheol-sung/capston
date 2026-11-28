@@ -108,6 +108,31 @@ Visualization Manager:
         History Policy: Keep Last
       Value: true
     - Class: rviz_default_plugins/Path
+      Name: Next run preview (pitwall, while stopped)
+      Enabled: true
+      Color: 255; 0; 255
+      Alpha: 0.6
+      Line Style: Lines
+      Topic:
+        Value: /figure8/next_path
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Name: Pitwall status text
+      Enabled: true
+      Namespaces:
+        {}
+      Topic:
+        Value: /figure8/status_marker
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Path
       Name: MPC reference horizon (0.5 s)
       Enabled: true
       Color: 255; 170; 0
@@ -122,9 +147,37 @@ Visualization Manager:
         History Policy: Keep Last
       Value: true
     - Class: rviz_default_plugins/Path
-      Name: Trail (estimator, since arm)
+      Name: Trail (SLAM /tracked_pose at base_footprint, since arm)
       Enabled: true
       Color: 40; 230; 80
+      Alpha: 1
+      Line Style: Billboards
+      Line Width: 0.015
+      Topic:
+        Value: /torque_viz/trail_slam
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: Trail (smooth: wheels+gyro, SLAM tau 0.5 s, since arm)
+      Enabled: true
+      Color: 230; 60; 200
+      Alpha: 1
+      Line Style: Billboards
+      Line Width: 0.015
+      Topic:
+        Value: /torque_viz/trail_smooth
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+      Value: true
+    - Class: rviz_default_plugins/Path
+      Name: Trail (estimator, since arm)
+      Enabled: false
+      Color: 120; 120; 120
       Alpha: 1
       Line Style: Billboards
       Line Width: 0.015
@@ -134,7 +187,7 @@ Visualization Manager:
         Reliability Policy: Reliable
         Durability Policy: Volatile
         History Policy: Keep Last
-      Value: true
+      Value: false
     - Class: rviz_default_plugins/Pose
       Name: SLAM pose (/tracked_pose, IMU point)
       Enabled: false

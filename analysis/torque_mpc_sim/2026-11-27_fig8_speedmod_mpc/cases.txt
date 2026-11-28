@@ -1,0 +1,9 @@
+# 2026-11-27 가감속 8자 (circles8 width 2.0, ε 0.5, n 2, φ −90°, laps 2, crossing_blend 0.6) MPC 만. speed·accel 후보 = fig8_limits (C 앞먹임 비율 상한별)
+cur_v060_a100_r1|speed:=0.60 accel:=1.00
+max_v054_a085_r1|speed:=0.54 accel:=0.85
+m90_v051_a075_r1|speed:=0.51 accel:=0.75
+m80_v048_a070_r1|speed:=0.48 accel:=0.70
+cur_v060_a100_r2|speed:=0.60 accel:=1.00
+max_v054_a085_r2|speed:=0.54 accel:=0.85
+m90_v051_a075_r2|speed:=0.51 accel:=0.75
+m80_v048_a070_r2|speed:=0.48 accel:=0.70

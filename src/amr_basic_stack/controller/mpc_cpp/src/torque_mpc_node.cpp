@@ -9,6 +9,10 @@
 //      ↓ ReferenceHorizon 보간 (Ts 격자, Np+1 점) → TorqueMPC (DAQP)
 //   cmd_topic         WheelTorqueCommand     MPC 순토크 τ* → torque_output → 게이트 → /wheel_torque_cmd
 //   /torque_mpc/status, /torque_mpc/reference_horizon
+//   슬립 되먹임 (2026-11-27, torque_mpc.yaml slip_feedback, 2026-11-28 부터 기본 켬): MPC 풀이 뒤 바깥에서 τ = τ_MPC − K_ω (ω − ω_nom)
+//     (3) 바퀴 공간: ω_nom = T⁻¹R(δ0)ᵀ x_e (추정기 몸체 속도가 시키는 무슬립 바퀴 속도), K_ω 4×4 = slip_feedback_gain (hpp 주석)
+//       gain lqr (기본) = 바퀴 미끄럼 모델 DARE, gain ik = K_v R(δ0) T (예전 (2) 몸체 오차 되먹임 −K_v (R(δ0)Tω − x_e) 와 같은 Δτ)
+//     MPC 안 (τ_prev, d̂, 제약) 은 τ_MPC 만 안다. 낸 명령은 ± 모터 한계로만 자른다 (friction 상한은 Δτ 에 안 건다). → /torque_mpc/slip_fb
 //
 // 실행 방식: 타이머가 아니라 **상태 메시지가 올 때마다** 한 번 푼다 (추정기 100 Hz = 제어 100 Hz).
 //   추정값의 나이가 틱마다 달라지지 않고, 명령의 header.stamp 가 그 추정값의 시각 그대로라
@@ -29,6 +33,12 @@
 //   토크 0 은 관성 주행이라 정지가 아니다. 그때 MPC 를 reset() 한다 (명령 이력이 끊기면 d̂ 가 뜻을 잃는다, 1판 09절).
 // 좌표계: 기준열 header.frame_id 와 상태 header.frame_id 가 둘 다 있고 다르면 풀지 않는다 (R5 리뷰 2026-11-13).
 //   예: 기준은 odom, 상태는 map 이면 둘 사이 오프셋만큼 로봇을 끌고 간다.
+// 실행 중 변경 (2026-11-28 pitwall, amr/notes_amr/pitwall_design.md — 사용자 결정): kLiveParams 12 개만 받는다 (rqt_reconfigure · tools/pit.py).
+//   받기 전에 그 값으로 TorqueMPC·슬립 되먹임 이득을 시험 생성 — 생성자 검사에 걸리면 거부. 나머지 parameter 는 거부 (launch 때만:
+//   Ts·Np·Nc = 추정기 100 Hz·계산 시간, limit_mode·cap_on·linearization = 비교군, safety·hold·topic).
+//   정지 중이면 바로 TorqueMPC 를 새로 만든다 (무장할 때마다 reset() 하므로 기동과 같다 — η̂ 만 시작값으로).
+//   무장 중이면 받아 두고 다음 정지 때 만든다. /torque_mpc/config (String JSON, latched): 기동·변경·적용·거부·무장 때마다 쓰는 값 전체
+//   → bag 하나로 판마다 MPC 값을 안다 (tools/bag_runs.py).
 // ---------------------------------------------------------------
 #include "amr_mpc_cpp/reference.hpp"
 #include "amr_mpc_cpp/torque_mpc.hpp"
@@ -45,6 +55,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <rcl_interfaces/msg/parameter_event.hpp>
 #include <yaml-cpp/yaml.h>
 
 #include <algorithm>
@@ -70,6 +82,9 @@ using amr_mpc_cpp::TorqueTuning;
 using amr_mpc_cpp::TVec3;
 using amr_mpc_cpp::TVec4;
 using amr_mpc_cpp::TVec6;
+using amr_mpc_cpp::SlipFbDesign;          // 2026-11-27 (3) 바퀴 공간 슬립 되먹임
+using amr_mpc_cpp::SlipFbGain;
+using amr_mpc_cpp::parse_slip_fb_gain;
 
 namespace
 {
@@ -108,7 +123,9 @@ public:
     md.robot_width = yp["geometry"]["robot_width_m"].as<double>();
     const double payload = declare_parameter<double>("payload_kg", yp["body"]["payload_kg"].as<double>());
     md.mass = yp["body"]["mass_kg"].as<double>() + payload;
-    md.inertia_z = declare_parameter<double>("inertia_z", yp["body"]["inertia_z_kgm2"].as<double>());
+    // 2026-11-26 MPC 전용 회전 관성: torque_mpc.yaml model_terms.inertia_z_kgm2 (> 0) 가 있으면 그 값, 없으면 torque_plant.yaml (0.06)
+    const double iz_mpc = ym["model_terms"] && ym["model_terms"]["inertia_z_kgm2"] ? ym["model_terms"]["inertia_z_kgm2"].as<double>(-1.0) : -1.0;
+    md.inertia_z = declare_parameter<double>("inertia_z", iz_mpc > 0.0 ? iz_mpc : yp["body"]["inertia_z_kgm2"].as<double>());
     md.J_w = yp["wheel"]["inertia_J_w_kgm2"].as<double>();          // m_w = 4J_w/r² 는 M 에 늘 들어간다 (지시서 2026-11-16)
     // w 항 스위치 (식-6, 지시서 1절 use_w). 제어기 설정이라 torque_mpc.yaml model_terms 에 둔다 — torque_plant.yaml 의
     // model.use_wheel_inertia 는 이제 시뮬 플랜트 물리만 정한다
@@ -295,6 +312,24 @@ public:
     }
     slip_.emplace(sp);
     mpc_ = std::make_unique<TorqueMPC>(md, tu);
+    {   // 2026-11-27 슬립 되먹임 (torque_mpc.yaml slip_feedback): MPC 풀이 뒤 바깥에서 τ = τ_MPC − K_ω (ω − J v_e)
+      //   (3) 부터 바퀴 공간 4×4 이득 (slip_feedback_gain, hpp 주석). gain ik 면 예전 (2) 몸체 오차 되먹임과 같은 Δτ
+      const YAML::Node yf = ym["slip_feedback"];
+      sfb_on_ = declare_parameter<bool>("slip_fb_enable", yf ? yf["enable"].as<bool>(false) : false);
+      SlipFbDesign sd;
+      sd.scale = declare_parameter<double>("slip_fb_scale", yf ? yf["gain_scale"].as<double>(1.0) : 1.0);
+      sfb_gain_name_ = declare_parameter<std::string>("slip_fb_gain", yf && yf["gain"] ? yf["gain"].as<std::string>() : "lqr");
+      sd.mode = parse_slip_fb_gain(sfb_gain_name_);
+      sd.q_slip = declare_parameter<double>("slip_fb_q_slip", yf && yf["q_slip"] ? yf["q_slip"].as<double>() : sd.q_slip);
+      sd.r_dtau = declare_parameter<double>("slip_fb_r_dtau", yf && yf["r_dtau"] ? yf["r_dtau"].as<double>() : sd.r_dtau);
+      sd.grip_speed = declare_parameter<double>("slip_fb_grip_speed", yf && yf["grip_speed_mps"] ? yf["grip_speed_mps"].as<double>() : sd.grip_speed);
+      sd.mu_slope = declare_parameter<double>("slip_fb_mu_slope", yf && yf["mu_slope"] ? yf["mu_slope"].as<double>() : sd.mu_slope);
+      sfb_design_ = sd;
+      Kv_ = sd.scale * unconstrained_gain(md, tu).Kx.rightCols<3>();     // 몸체 오차 기록·비교용 (ik 의 K_ω = K_v R(δ0) T)
+      Kw_ = slip_feedback_gain(md, tu, sd);
+      Jw_ = wheel_nominal_map(md);
+      tau_cmd_max_ = md.tau_motor_limit();
+    }
 
     const auto ref_topic = declare_parameter<std::string>("reference_topic", "/dra_mppi/reference_trajectory");
     const auto state_topic = declare_parameter<std::string>("state_topic", "/state_estimator/odom");
@@ -335,6 +370,7 @@ public:
     pub_load_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/load", 10);
     pub_slip_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/slip", 10);
     pub_cap_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/cap", 10);
+    pub_sfb_ = create_publisher<std_msgs::msg::Float64MultiArray>("/torque_mpc/slip_fb", 10);   // 2026-11-27 슬립 되먹임
     sub_state_ = create_subscription<nav_msgs::msg::Odometry>(
       state_topic, 20, [this](nav_msgs::msg::Odometry::ConstSharedPtr m) {on_state(*m);});
     sub_ref_ = create_subscription<amr_interfaces::msg::PlanarReferenceArray>(
@@ -353,6 +389,13 @@ public:
             armed_ = m->data;
             armed_since_ = now_s();
             RCLCPP_INFO(get_logger(), "%s", armed_ ? "게이트 무장 — 추종 가능" : "게이트 정지 — DAMPING, MPC 리셋");
+            if (!armed_ && pending_) {          // 2026-11-28 pitwall: 무장 중 받아 둔 값 적용
+              apply_live(*pending_);
+              RCLCPP_INFO(get_logger(), "[pitwall] 무장 중 받아 둔 MPC 값 적용 — TorqueMPC 새로 만듦");
+              publish_config("applied");
+            } else if (armed_) {
+              publish_config("arm");            // 판마다 그 판에서 쓰는 값을 bag 에
+            }
           }
         });
     }
@@ -485,6 +528,35 @@ public:
       get_logger(), "  선형화 %s (%s)", linearization_.c_str(),
       tu.linearization == amr_mpc_cpp::TorqueLinearization::CurrentState ?
       "매 주기 현재 추정 상태 x̂(k), τ(k−1) 에서 야코비안" : "1판: 지평의 기준 방향 θ_r 을 대입");
+    RCLCPP_INFO(
+      get_logger(), "  슬립 되먹임 %s: τ = τ_MPC − K_ω (ω − ω_nom), ω_nom = T⁻¹R(δ0)ᵀ·(추정기 몸체 [v_x, v_y, ω_z]) (무슬립 바퀴 속도), "
+      "|τ| ≤ %.2f N·m → /torque_mpc/slip_fb", sfb_on_ ? "켬" : "끔 (계산·기록만)", tau_cmd_max_);
+    if (sfb_design_.mode == SlipFbGain::Ik) {
+      RCLCPP_INFO(get_logger(), "    K_ω: ik = K_v·R(δ0)·T (예전 몸체 오차 되먹임과 같은 Δτ, rank 3), 배율 %.2f", sfb_design_.scale);
+    } else {
+      char model[96];
+      if (sfb_design_.grip_speed > 0.0) {
+        std::snprintf(model, sizeof(model), "붙어 구름 %.2f m/s · μ–λ 기울기 %.2f", sfb_design_.grip_speed, sfb_design_.mu_slope);
+      } else {
+        std::snprintf(model, sizeof(model), "미끄러지는 중 (C = 0, 대각)");
+      }
+      RCLCPP_INFO(
+        get_logger(), "    K_ω: lqr — 바퀴 미끄럼 모델 DARE, q_slip %.3g (m/s)⁻², r_dtau %.3g (N·m)⁻², %s, 배율 %.2f",
+        sfb_design_.q_slip, sfb_design_.r_dtau, model, sfb_design_.scale);
+    }
+    for (int i = 0; i < 4; ++i) {
+      static const char * nm[4] = {"FL", "FR", "RL", "RR"};
+      RCLCPP_INFO(get_logger(), "    K_ω %s [%+.4f %+.4f %+.4f %+.4f]  (N·m per rad/s, 열 FL FR RL RR)", nm[i],
+        Kw_(i, 0), Kw_(i, 1), Kw_(i, 2), Kw_(i, 3));
+    }
+    // 2026-11-28 pitwall: 실행 중 변경 (머리주석). 기동 값을 기준으로 둔다
+    live_ = LiveCfg{md, tu, sfb_design_, slip_on_, sfb_on_, w_dudt};
+    w_delta_direct_ = w_step >= 0.0;
+    pub_config_ = create_publisher<std_msgs::msg::String>("/torque_mpc/config", rclcpp::QoS(1).reliable().transient_local());
+    pub_pevent_ = create_publisher<rcl_interfaces::msg::ParameterEvent>("/parameter_events", rclcpp::ParameterEventsQoS());
+    param_cb_ = add_on_set_parameters_callback(
+      [this](const std::vector<rclcpp::Parameter> & ps) {return on_params(ps);});
+    publish_config("startup");
   }
 
   void finish()
@@ -498,7 +570,11 @@ public:
     f << "t,x,y,th,xd,yd,thd,xr,yr,thr,ex,ey,eth,tau_fl,tau_fr,tau_rl,tau_rr,tau_bar,active,qp_iters,fallback,"
       "step_ms,ref_age,d_x,d_y,d_th,d_xd,d_yd,d_thd,eta_fl,eta_fr,eta_rl,eta_rr,"     // eta_*: 상한에 곱한 η_s (끄면 1)
       "fs_fl,fs_fr,fs_rl,fs_rr,"                                                       // fs_*: 마찰 상한 옮긴 양 f (스텝 0, 끄면 0) 2026-11-24
-      "ff_fl,ff_fr,ff_rl,ff_rr\n";                                                     // ff_*: 마찰 모델이 U_s 에 더한 τ_b (스텝 0, 끄면 0)
+      "ff_fl,ff_fr,ff_rl,ff_rr,"                                                       // ff_*: 마찰 모델이 U_s 에 더한 τ_b (스텝 0, 끄면 0)
+      // 2026-11-27 슬립 되먹임: tau_* 는 낸 명령 (켜면 τ_MPC + Δτ 를 자른 값), tau_mpc_* 는 MPC 해, sfb_e* = x̂_w − x_e (몸체, 기록용),
+      //   dtau_* = −K_ω e_ω (꺼져 있어도 계산값), sfb_fresh = 바퀴 값이 wheel_timeout 안, sfb_ew_* = e_ω = ω − ω_nom [rad/s] ((3) 부터 맨 뒤)
+      "sfb_on,sfb_fresh,sfb_evx,sfb_evy,sfb_ewz,dtau_fl,dtau_fr,dtau_rl,dtau_rr,tau_mpc_fl,tau_mpc_fr,tau_mpc_rl,tau_mpc_rr,"
+      "sfb_ew_fl,sfb_ew_fr,sfb_ew_rl,sfb_ew_rr\n";
     double se = 0.0, emax = 0.0, step_sum = 0.0, step_max = 0.0;
     for (const auto & r : rows_) {
       for (size_t i = 0; i < r.size(); ++i) {f << (i ? "," : "") << r[i];}
@@ -517,6 +593,181 @@ public:
 
 private:
   double now_s() {return get_clock()->now().seconds();}
+
+  // ---------- 2026-11-28 pitwall: 실행 중 변경 (머리주석) ----------
+  struct LiveCfg
+  {
+    TorqueModel md;
+    TorqueTuning tu;
+    SlipFbDesign sd;
+    bool slip_on = false, sfb_on = false;
+    double w_dudt = -1.0;          // [(N·m/s)⁻²]. launch 로 w_delta (스텝 단위) 를 줬으면 −1 (w_dudt 는 안 쓰인다)
+  };
+  static constexpr const char * kLiveParams =
+    "W, w_dudt, r_u, q_null, mu_hat, slip_fb_enable, slip_fb_scale, slip_eta_enable, disturbance_enable, "
+    "disturbance_alpha, roller_rr, inertia_z";
+
+  static double in_range(const rclcpp::Parameter & p, double lo, double hi, bool lo_open = false)
+  {
+    const double v = p.as_double();
+    if (!std::isfinite(v) || (lo_open ? !(v > lo) : !(v >= lo)) || !(v <= hi)) {
+      char b[160];
+      std::snprintf(b, sizeof(b), "%s = %g — 범위 %s%g, %g]", p.get_name().c_str(), v, lo_open ? "(" : "[", lo, hi);
+      throw std::invalid_argument(b);
+    }
+    return v;
+  }
+
+  rcl_interfaces::msg::SetParametersResult on_params(const std::vector<rclcpp::Parameter> & ps)
+  {
+    rcl_interfaces::msg::SetParametersResult r;
+    r.successful = false;
+    LiveCfg c = pending_ ? *pending_ : live_;
+    std::string names;
+    bool mu_changed = false;
+    try {
+      for (const auto & p : ps) {
+        const std::string & n = p.get_name();
+        names += (names.empty() ? "" : ", ") + n + "=" + p.value_to_string();
+        if (n == "W") {
+          const auto W = p.as_double_array();
+          if (W.size() != 6) {throw std::invalid_argument("W 는 6 개 [x, y, θ, ẋ, ẏ, θ̇]");}
+          for (int i = 0; i < 6; ++i) {
+            if (!(W[i] >= 0.0 && W[i] <= 1e5)) {throw std::invalid_argument("W 값은 0 ~ 1e5");}
+            c.tu.W(i) = W[i];
+          }
+        } else if (n == "w_dudt") {
+          if (w_delta_direct_) {throw std::invalid_argument("launch 로 w_delta (스텝 단위) 를 줘서 w_dudt 는 안 쓰인다");}
+          c.w_dudt = in_range(p, 0.0, 10.0);
+          c.tu.w_delta = c.w_dudt / (c.tu.Ts * c.tu.Ts);
+        } else if (n == "r_u") {
+          c.tu.r_u = in_range(p, 0.0, 1e4);
+        } else if (n == "q_null") {
+          c.tu.q_null = in_range(p, 0.0, 1e3);
+        } else if (n == "mu_hat") {
+          c.md.mu_hat = in_range(p, 0.0, 1.5, true);
+          mu_changed = true;
+        } else if (n == "slip_fb_enable") {
+          c.sfb_on = p.as_bool();
+        } else if (n == "slip_fb_scale") {
+          c.sd.scale = in_range(p, 0.0, 5.0);
+        } else if (n == "slip_eta_enable") {
+          c.slip_on = p.as_bool();
+        } else if (n == "disturbance_enable") {
+          c.tu.dist_enable = p.as_bool();
+        } else if (n == "disturbance_alpha") {
+          c.tu.dist_alpha = in_range(p, 0.0, 1.0, true);
+        } else if (n == "roller_rr") {
+          c.tu.roller_rr = in_range(p, 0.0, 2.0);
+        } else if (n == "inertia_z") {
+          c.md.inertia_z = in_range(p, 0.0, 0.5, true);
+        } else if (n == "use_sim_time") {
+          continue;
+        } else {
+          throw std::invalid_argument(n + " 는 launch 때만 (실행 중 바꿀 수 있는 값: " + kLiveParams + ")");
+        }
+      }
+      TorqueMPC trial(c.md, c.tu);             // 생성자 검사 (w_delta + r_u > 0, α 범위, 롤러 범위 …)
+      (void)unconstrained_gain(c.md, c.tu);
+      (void)slip_feedback_gain(c.md, c.tu, c.sd);
+    } catch (const std::exception & e) {
+      r.reason = e.what();
+      last_reject_ = names + ": " + e.what();
+      RCLCPP_WARN(get_logger(), "[pitwall] 거부 — %s", last_reject_.c_str());
+      publish_config("reject");
+      // rqt_reconfigure 는 set 결과를 안 보고 화면에 새 값을 남긴다 → 지금 값을 parameter event 로 다시 알려 되돌린다
+      rcl_interfaces::msg::ParameterEvent ev;
+      ev.stamp = now();
+      ev.node = get_fully_qualified_name();
+      for (const auto & p : ps) {
+        if (has_parameter(p.get_name())) {ev.changed_parameters.push_back(get_parameter(p.get_name()).to_parameter_msg());}
+      }
+      pub_pevent_->publish(ev);
+      return r;
+    }
+    r.successful = true;
+    last_reject_.clear();
+    if (mu_changed && (c.md.mu_hat_wheels.array() > 0.0).all()) {
+      RCLCPP_WARN(get_logger(), "[pitwall] mu_hat 를 바꿨지만 바퀴별 μ̂ (mu_hat_wheels) 가 모두 있어 상한에는 안 쓰인다");
+    }
+    if (mu_changed && limit_mode_ != "friction") {
+      RCLCPP_WARN(get_logger(), "[pitwall] mu_hat 은 limit_mode friction 에서만 상한에 쓰인다 (지금 %s)", limit_mode_.c_str());
+    }
+    if (armed_) {
+      pending_ = c;
+      RCLCPP_INFO(get_logger(), "[pitwall] 받음 %s — 무장 중이라 다음 정지 ('s') 때 적용", names.c_str());
+      publish_config("pending");
+    } else {
+      apply_live(c);
+      RCLCPP_INFO(get_logger(), "[pitwall] 받음 %s — 바로 적용 (TorqueMPC 새로 만듦)", names.c_str());
+      publish_config("applied");
+    }
+    return r;
+  }
+
+  // 정지 중에만 부른다 (on_state 와 같은 executor 스레드라 풀이 도중에 바뀌지 않는다)
+  void apply_live(const LiveCfg & c)
+  {
+    mpc_ = std::make_unique<TorqueMPC>(c.md, c.tu);
+    slip_on_ = c.slip_on;
+    sfb_on_ = c.sfb_on;
+    sfb_design_ = c.sd;
+    Kv_ = c.sd.scale * unconstrained_gain(c.md, c.tu).Kx.rightCols<3>();
+    Kw_ = slip_feedback_gain(c.md, c.tu, c.sd);
+    Jw_ = wheel_nominal_map(c.md);
+    tau_cmd_max_ = c.md.tau_motor_limit();
+    live_ = c;
+    pending_.reset();
+    active_ = false;
+  }
+
+  static std::string json_str(const std::string & s)
+  {
+    std::string o = "\"";
+    for (char ch : s) {
+      if (ch == '"' || ch == '\\') {o += '\\'; o += ch;} else if (ch == '\n') {o += "\\n";} else {o += ch;}
+    }
+    return o + "\"";
+  }
+
+  static std::string live_json(const LiveCfg & c)
+  {
+    char b[768];
+    const auto & W = c.tu.W;
+    std::snprintf(
+      b, sizeof(b),
+      "{\"W\": [%.10g, %.10g, %.10g, %.10g, %.10g, %.10g], \"w_dudt\": %.10g, \"w_delta_step\": %.10g, \"r_u\": %.10g, "
+      "\"q_null\": %.10g, \"mu_hat\": %.10g, \"slip_fb_enable\": %s, \"slip_fb_scale\": %.10g, \"slip_eta_enable\": %s, "
+      "\"disturbance_enable\": %s, \"disturbance_alpha\": %.10g, \"roller_rr\": %.10g, \"inertia_z\": %.10g}",
+      W(0), W(1), W(2), W(3), W(4), W(5), c.w_dudt, c.tu.w_delta, c.tu.r_u, c.tu.q_null, c.md.mu_hat,
+      c.sfb_on ? "true" : "false", c.sd.scale, c.slip_on ? "true" : "false", c.tu.dist_enable ? "true" : "false",
+      c.tu.dist_alpha, c.tu.roller_rr, c.md.inertia_z);
+    return b;
+  }
+
+  // /torque_mpc/config: event = startup | applied | pending | reject | arm
+  void publish_config(const char * event)
+  {
+    if (!pub_config_) {return;}
+    const auto & t = live_.tu;
+    char fixed[512];
+    std::snprintf(
+      fixed, sizeof(fixed),
+      "{\"limit_mode\": \"%s\", \"cap_on\": \"%s\", \"linearization\": \"%s\", \"velocity_source\": \"%s\", \"Ts\": %g, "
+      "\"Np\": %d, \"Nc\": %d, \"use_w\": %s, \"mass\": %.6g, \"use_fric_model\": %s, \"cap_friction_shift\": %s, "
+      "\"slip_fb_gain\": \"%s\", \"disturbance_observer\": \"%s\", \"disturbance_frame\": \"%s\"}",
+      limit_mode_.c_str(), cap_on_.c_str(), linearization_.c_str(), velocity_source_.c_str(), t.Ts, t.Np, t.Nc,
+      live_.md.use_w ? "true" : "false", live_.md.mass, t.use_fric_model ? "true" : "false",
+      t.cap_friction_shift ? "true" : "false", sfb_gain_name_.c_str(), t.dist_kalman ? "kalman" : "lpf",
+      t.dist_body_frame ? "body" : "world");
+    char head[160];
+    std::snprintf(head, sizeof(head), "{\"t\": %.6f, \"event\": \"%s\", \"armed\": %s, ", now_s(), event, armed_ ? "true" : "false");
+    std_msgs::msg::String m;
+    m.data = std::string(head) + "\"live\": " + live_json(live_) + ", \"pending\": " +
+      (pending_ ? live_json(*pending_) : std::string("null")) + ", \"last_reject\": " + json_str(last_reject_) +
+      ", \"launch_only\": " + fixed + "}";
+    pub_config_->publish(m);
+  }
 
   void publish_torque(const TVec4 & tau, const builtin_interfaces::msg::Time & stamp)
   {
@@ -567,10 +818,10 @@ private:
   {
     const TVec4 om(m.velocity[0], m.velocity[1], m.velocity[2], m.velocity[3]);
     const double now = now_s();
-    if (velocity_source_ == "wheels") {
-      wheel_v_ = mpc_->model().wheel_body_velocity(om);
-      wheel_rx_ = now;
-    }
+    // 2026-11-27: velocity_source 와 무관하게 늘 계산 — 슬립 되먹임 x̂_w 에도 쓴다 (on_state 의 wheels 분기는 그대로 velocity_source 로 고른다)
+    wheel_v_ = mpc_->model().wheel_body_velocity(om);
+    wheel_om_ = om;                          // 2026-11-27 (3) 바퀴 공간 슬립 되먹임 e_ω
+    wheel_rx_ = now;
     if (est_rx_ <= 0.0) {return;}
     const double st = rclcpp::Time(m.header.stamp).seconds();
     const double t = st > 0.0 ? st : now;
@@ -712,9 +963,36 @@ private:
           slip_rx_ > 0.0 ? (now - slip_rx_) * 1e3 : -1.0);
       }
     }
-    const TVec4 tau = mpc_->step(x, hz, &acc_ref_, dt_state);
+    const TVec4 tau_mpc = mpc_->step(x, hz, &acc_ref_, dt_state);
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_c).count();
+    // 2026-11-27 슬립 되먹임 — MPC 풀이 뒤 바깥 회로. MPC 안 (τ_prev, d̂, 제약) 은 τ_MPC 만 안다.
+    //   (3) 바퀴 공간: ω_nom = J x_e (J = T⁻¹R(δ0)ᵀ, 추정기 몸체 속도가 시키는 무슬립 바퀴 속도),  e_ω = ω − ω_nom,  Δτ = −K_ω e_ω
+    //   (바퀴가 무슬립 속도보다 빨리 돌면 그 바퀴 토크를 줄이고, 끌리면 늘린다). 선회 미끄럼 보정 (slip_coef) 은 안 넣는다 — 그게 잡으려는 슬립이라
+    //   기록용 몸체 오차 e = R(δ0)·T ω − x_e = R(δ0)·T e_ω 도 그대로 남긴다.
+    //   바퀴 값이 wheel_timeout 보다 묵으면 Δτ = 0. 꺼져 있으면 Δτ 를 계산·기록만 하고 더하지 않는다
+    sfb_fresh_ = wheel_rx_ > 0.0 && now - wheel_rx_ <= wheel_timeout_;
+    sfb_e_.setZero();
+    sfb_ew_.setZero();
+    sfb_dtau_.setZero();
+    if (sfb_fresh_) {
+      sfb_e_ = mpc_->model().correct_wheel_velocity(wheel_v_, 0.0) - est_vb_;    // wz 0 → a_c 0 → R(δ0) 만
+      sfb_ew_ = wheel_om_ - Jw_ * est_vb_;
+      sfb_dtau_ = -Kw_ * sfb_ew_;
+    } else if (sfb_on_) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "슬립 되먹임: 바퀴 상태 %.0f ms 묵음 — 이 주기는 Δτ 0",
+        wheel_rx_ > 0.0 ? (now - wheel_rx_) * 1e3 : -1.0);
+    }
+    const TVec4 tau = sfb_on_ ?
+      TVec4((tau_mpc + sfb_dtau_).cwiseMax(-tau_cmd_max_).cwiseMin(tau_cmd_max_)) : tau_mpc;
     publish_torque(tau, m.header.stamp);
+    {   // /torque_mpc/slip_fb = [t, 켬 0/1, 바퀴 값 fresh 0/1, e = x̂_w − x_e ×3 (몸체 v_x, v_y, ω_z), Δτ ×4, τ_MPC ×4, 낸 τ ×4,
+        //                       e_ω = ω − ω_nom ×4 [rad/s] ((3) 에서 맨 뒤에 덧붙임 — 앞 열 위치는 그대로)]
+      std_msgs::msg::Float64MultiArray sf;
+      sf.data = {now, sfb_on_ ? 1.0 : 0.0, sfb_fresh_ ? 1.0 : 0.0, sfb_e_(0), sfb_e_(1), sfb_e_(2),
+        sfb_dtau_(0), sfb_dtau_(1), sfb_dtau_(2), sfb_dtau_(3), tau_mpc(0), tau_mpc(1), tau_mpc(2), tau_mpc(3),
+        tau(0), tau(1), tau(2), tau(3), sfb_ew_(0), sfb_ew_(1), sfb_ew_(2), sfb_ew_(3)};
+      pub_sfb_->publish(sf);
+    }
 
     const auto & stt = mpc_->stats();
     if (stt.fallback) {
@@ -731,7 +1009,10 @@ private:
           tau(0), tau(1), tau(2), tau(3), mpc_->tau_bar().maxCoeff(), static_cast<double>(stt.active),
           static_cast<double>(stt.iters), static_cast<double>(stt.fallback), ms, ref_age,
           d(0), d(1), d(2), d(3), d(4), d(5), es(0), es(1), es(2), es(3), fs(0), fs(1), fs(2), fs(3),
-          ff(0), ff(1), ff(2), ff(3)});
+          ff(0), ff(1), ff(2), ff(3),
+          sfb_on_ ? 1.0 : 0.0, sfb_fresh_ ? 1.0 : 0.0, sfb_e_(0), sfb_e_(1), sfb_e_(2),
+          sfb_dtau_(0), sfb_dtau_(1), sfb_dtau_(2), sfb_dtau_(3), tau_mpc(0), tau_mpc(1), tau_mpc(2), tau_mpc(3),
+          sfb_ew_(0), sfb_ew_(1), sfb_ew_(2), sfb_ew_(3)});
     }
     if (debug_) {
       TVec4 us = TVec4::Zero();                         // 이번 주기 목표 입력 U_s,0 (식-14, 지평 첫 스텝)
@@ -822,6 +1103,19 @@ private:
   double est_rx_ = 0.0, slip_rx_ = 0.0, slip_t_ = 0.0;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_slip_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_cap_;   // 2026-11-24 마찰 상한 옮김 기록
+  // 2026-11-27 슬립 되먹임 τ = τ_MPC − K_ω (ω − J x_e)   ((3) 바퀴 공간 4×4)
+  bool sfb_on_ = false, sfb_fresh_ = false;
+  Eigen::Matrix<double, 4, 3> Kv_ = Eigen::Matrix<double, 4, 3>::Zero();
+  Eigen::Matrix4d Kw_ = Eigen::Matrix4d::Zero();
+  Eigen::Matrix<double, 4, 3> Jw_ = Eigen::Matrix<double, 4, 3>::Zero();   // T⁻¹ R(δ0)ᵀ
+  SlipFbDesign sfb_design_;
+  std::string sfb_gain_name_ = "lqr";
+  double tau_cmd_max_ = 1.2;
+  TVec3 sfb_e_ = TVec3::Zero();
+  TVec4 sfb_ew_ = TVec4::Zero();
+  TVec4 wheel_om_ = TVec4::Zero();       // 최근 /wheel_states 바퀴 속도 [rad/s]
+  TVec4 sfb_dtau_ = TVec4::Zero();
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_sfb_;
   double last_state_rx_ = 0.0, last_state_stamp_ = 0.0, ref_rx_ = 0.0, armed_since_ = 0.0;
   double state_timeout_ = 0.3, ref_timeout_ = 0.5, hold_stopped_speed_ = 0.04;
   double acc_dt_ = 0.2;
@@ -839,6 +1133,14 @@ private:
   rclcpp::Subscription<amr_interfaces::msg::PlanarReferenceArray>::SharedPtr sub_ref_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_armed_;
   rclcpp::TimerBase::SharedPtr watchdog_;
+  // 2026-11-28 pitwall 실행 중 변경
+  LiveCfg live_;
+  std::optional<LiveCfg> pending_;
+  bool w_delta_direct_ = false;
+  std::string last_reject_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_config_;
+  rclcpp::Publisher<rcl_interfaces::msg::ParameterEvent>::SharedPtr pub_pevent_;   // 거부한 값 rqt 에서 되돌리기
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_;
 };
 
 int main(int argc, char ** argv)

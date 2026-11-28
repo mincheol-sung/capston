@@ -50,6 +50,7 @@ setup(
             # 비교군 A (퓨어 퍼슛 + 바퀴별 PI, 6단계)
             'pure_pursuit_node = amr_mpc.nodes.pure_pursuit:main',
             'wheel_pi_node = amr_mpc.nodes.wheel_pi:main',
+            'controller_select_node = amr_mpc.nodes.controller_select:main',   # controller:=all 회차마다 제어기 고르기 (2026-11-28)
             # 실차 모터 (7단계)
             'ak40_can_node = amr_mpc.nodes.ak40_can:main',
         ],

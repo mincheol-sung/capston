@@ -1,0 +1,9 @@
+rqt 가 찾은 노드: ['/fault_monitor_node', '/figure8_reference_node', '/rqt_snapshot', '/sim_plant_torque_node', '/slip_logger_node', '/state_estimator_node', '/torque_command_gate', '/torque_mpc_node', '/torque_output_node']
+figure8 편집 칸: 68  read_only 아닌 칸: 55
+speed 범위: [(0.0, 2.0)]
+speed 1.5 입력 (부하 초과): 입력 직후 칸 0.5 → 2 s 뒤 칸 0.5 (원래 0.5)
+accel 0.6 입력: 칸 0.6, 노드 값 0.6
+preset circ 입력: preset 칸 '', shape circles8, width 3.0, speed 1.232, laps 3.0
+slip_fb_scale 9 입력 (범위 0~5 밖): 칸 1.0
+slip_fb_scale 0.5 입력: 칸 0.5, 노드 값 0.5
+sim_plant_torque 남은 프로세스: 0

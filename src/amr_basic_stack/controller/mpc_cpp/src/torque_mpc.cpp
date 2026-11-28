@@ -875,4 +875,125 @@ void SlipEta::reset()
   eta_.setOnes();
 }
 
+// ── 무제약 이득 (2026-11-27, 머리 선언 주석) ─────────────────────
+UnconstrainedGain unconstrained_gain(const TorqueModel & md, const TorqueTuning & tu)
+{
+  const int Np = tu.Np, Nc = tu.Nc, nU = 4 * Nc;
+  const double Ts = tu.Ts;
+  TMat6 A = TMat6::Identity();
+  A.topRightCorner<3, 3>() = Ts * Eigen::Matrix3d::Identity();
+  const TMat34 G0 = md.G(0.0);
+  TMat64 B;
+  B << 0.5 * Ts * Ts * G0, Ts * G0;
+  // x_{j+1} = A^{j+1} x0 + Σ A^{j-i} B τ_min(i, Nc-1)  (Nc 뒤는 마지막 τ 유지 — TorqueMPC 와 같은 move blocking)
+  Eigen::MatrixXd Phi = Eigen::MatrixXd::Zero(6 * Np, nU), Lam(6 * Np, 6);
+  Eigen::MatrixXd P = Eigen::MatrixXd::Zero(6, nU);
+  TMat6 Ap = TMat6::Identity();
+  for (int j = 0; j < Np; ++j) {
+    const int c = std::min(j, Nc - 1);
+    P = A * P;
+    P.middleCols<4>(4 * c) += B;
+    Ap = A * Ap;
+    Phi.middleRows<6>(6 * j) = P;
+    Lam.middleRows<6>(6 * j) = Ap;
+  }
+  Eigen::MatrixXd WPhi(6 * Np, nU), WLam(6 * Np, 6);
+  for (int j = 0; j < Np; ++j) {
+    WPhi.middleRows<6>(6 * j) = tu.W.asDiagonal() * Phi.middleRows<6>(6 * j);
+    WLam.middleRows<6>(6 * j) = tu.W.asDiagonal() * Lam.middleRows<6>(6 * j);
+  }
+  // H_const: TorqueMPC 생성자와 같은 식 (w_Δ DᵀD + r_U I + q_null n nᵀ)
+  Eigen::MatrixXd H = Phi.transpose() * WPhi;
+  const TVec4 n(0.5, 0.5, -0.5, -0.5);
+  for (int j = 0; j < Nc; ++j) {
+    const double diag = (j == Nc - 1) ? 1.0 : 2.0;
+    H.block<4, 4>(4 * j, 4 * j) += (tu.w_delta * diag + tu.r_u) * Eigen::Matrix4d::Identity() + tu.q_null * n * n.transpose();
+    if (j + 1 < Nc) {
+      H.block<4, 4>(4 * j, 4 * (j + 1)) -= tu.w_delta * Eigen::Matrix4d::Identity();
+      H.block<4, 4>(4 * (j + 1), 4 * j) -= tu.w_delta * Eigen::Matrix4d::Identity();
+    }
+  }
+  const Eigen::LDLT<Eigen::MatrixXd> ldlt(H);
+  UnconstrainedGain out;
+  out.Kx = ldlt.solve(Phi.transpose() * WLam).topRows<4>();
+  out.Ktau = tu.w_delta * ldlt.solve(Eigen::MatrixXd::Identity(nU, nU)).topLeftCorner<4, 4>();
+  return out;
+}
+
+// ── 바퀴 공간 슬립 되먹임 이득 (2026-11-27 (3), hpp 의 slip_feedback_gain 주석) ──────────────
+
+SlipFbGain parse_slip_fb_gain(const std::string & s)
+{
+  if (s == "lqr") {return SlipFbGain::Lqr;}
+  if (s == "ik") {return SlipFbGain::Ik;}
+  throw std::invalid_argument("slip_feedback.gain=" + s + " — lqr | ik 중 하나여야 한다");
+}
+
+Eigen::Matrix<double, 4, 3> wheel_nominal_map(const TorqueModel & md)
+{
+  // force_map = R(δ0)(T⁻¹)ᵀ (xy 행만 돌림) 이라 그 전치가 T⁻¹ R(δ0)ᵀ — kinematic–static duality
+  return md.force_map().transpose();
+}
+
+Eigen::Matrix4d slip_feedback_gain(const TorqueModel & md, const TorqueTuning & tu, const SlipFbDesign & d)
+{
+  if (!(d.scale >= 0.0 && d.scale <= 5.0)) {throw std::invalid_argument("slip_fb_scale 는 0 ~ 5");}
+  if (d.mode == SlipFbGain::Ik) {
+    // K_ω = K_v · R(δ0) T. R(δ0) T 의 열은 단위 바퀴 속도를 예전 x̂_w 계산 (correct_wheel_velocity(T ω, 0)) 에 넣은 값 — 예전 식과 같은 함수를 쓴다
+    const Eigen::Matrix<double, 4, 3> Kv = unconstrained_gain(md, tu).Kx.rightCols<3>();
+    TMat34 W;
+    for (int i = 0; i < 4; ++i) {
+      TVec4 e = TVec4::Zero();
+      e(i) = 1.0;
+      W.col(i) = md.correct_wheel_velocity(md.wheel_body_velocity(e), 0.0);
+    }
+    return d.scale * Kv * W;
+  }
+  if (!(d.q_slip > 0.0 && d.r_dtau > 0.0)) {throw std::invalid_argument("slip_feedback q_slip·r_dtau 는 0 보다 커야 한다");}
+  if (!(md.J_w > 0.0 && md.mass > 0.0 && md.inertia_z > 0.0)) {throw std::invalid_argument("슬립 되먹임 LQR: J_w·mass·inertia_z 가 0 보다 커야 한다");}
+  const double r = md.wheel_radius, Ts = tu.Ts;
+  const Eigen::Matrix<double, 4, 3> J = wheel_nominal_map(md);
+  const Eigen::Matrix4d Gw = J * Eigen::Vector3d(1.0 / md.mass, 1.0 / md.mass, 1.0 / md.inertia_z).asDiagonal() * J.transpose();
+  TVec4 C = TVec4::Zero();
+  if (d.grip_speed > 0.0) {
+    for (int i = 0; i < 4; ++i) {
+      C(i) = d.mu_slope * md.wheel_load_share(i) * md.mass * md.gravity * r * r / (std::sqrt(2.0) * d.grip_speed);
+    }
+  }
+  const Eigen::Matrix4d I4 = Eigen::Matrix4d::Identity();
+  const Eigen::Matrix4d A = -(I4 / md.J_w + Gw) * C.asDiagonal();
+  const Eigen::Matrix4d B = I4 / md.J_w;
+  // ZOH: exp([[A, B], [0, 0]] Ts) = [[A_d, B_d], [0, I]] — discretize_zoh 와 같은 스케일링·제곱 + 테일러 18항
+  using Mat8 = Eigen::Matrix<double, 8, 8>;
+  Mat8 M = Mat8::Zero();
+  M.topLeftCorner<4, 4>() = A * Ts;
+  M.topRightCorner<4, 4>() = B * Ts;
+  const double norm = M.cwiseAbs().colwise().sum().maxCoeff();
+  int squarings = 0;
+  if (norm > 0.5) {squarings = std::max(0, static_cast<int>(std::ceil(std::log2(norm / 0.5))));}
+  const Mat8 X = M / std::pow(2.0, squarings);
+  Mat8 E = Mat8::Identity(), term = Mat8::Identity();
+  for (int i = 1; i <= 18; ++i) {
+    term = term * X / static_cast<double>(i);
+    E += term;
+  }
+  for (int i = 0; i < squarings; ++i) {E = (E * E).eval();}
+  const Eigen::Matrix4d Ad = E.topLeftCorner<4, 4>(), Bd = E.topRightCorner<4, 4>();
+  // DARE 반복: P ← Q + A_dᵀ P (A_d − B_d K),  K = (R + B_dᵀ P B_d)⁻¹ B_dᵀ P A_d
+  const Eigen::Matrix4d Q = d.q_slip * r * r * I4, R = d.r_dtau * I4;
+  Eigen::Matrix4d P = Q, K = Eigen::Matrix4d::Zero();
+  for (int it = 0; it < 100000; ++it) {
+    K = (R + Bd.transpose() * P * Bd).ldlt().solve(Bd.transpose() * P * Ad);
+    Eigen::Matrix4d Pn = Q + Ad.transpose() * P * (Ad - Bd * K);
+    Pn = 0.5 * (Pn + Pn.transpose()).eval();
+    const double dp = (Pn - P).cwiseAbs().maxCoeff();
+    P = Pn;
+    if (dp <= 1e-15 * std::max(1.0, P.cwiseAbs().maxCoeff())) {
+      K = (R + Bd.transpose() * P * Bd).ldlt().solve(Bd.transpose() * P * Ad);
+      return d.scale * K;
+    }
+  }
+  throw std::runtime_error("슬립 되먹임 LQR: DARE 가 100000 번 안에 수렴하지 않았다");
+}
+
 }  // namespace amr_mpc_cpp

@@ -1,0 +1,12 @@
+mpc_sqmax_v079_a030_r1|controller:=mpc limit_mode:=friction speed_mod_shape:=square speed:=0.79 accel:=0.30
+mpc_sqmax_v079_a030_r2|controller:=mpc limit_mode:=friction speed_mod_shape:=square speed:=0.79 accel:=0.30
+pp_sqmax_v079_a030_r1|controller:=pp speed_mod_shape:=square speed:=0.79 accel:=0.30
+adpp_sqmax_v079_a030_r1|controller:=adpp speed_mod_shape:=square speed:=0.79 accel:=0.30
+mpc_sq_v054_a085_r1|controller:=mpc limit_mode:=friction speed_mod_shape:=square speed:=0.54 accel:=0.85
+mpc_sq_v054_a085_r2|controller:=mpc limit_mode:=friction speed_mod_shape:=square speed:=0.54 accel:=0.85
+pp_sq_v054_a085_r1|controller:=pp speed_mod_shape:=square speed:=0.54 accel:=0.85
+adpp_sq_v054_a085_r1|controller:=adpp speed_mod_shape:=square speed:=0.54 accel:=0.85
+mpc_sq_v054_a150_r1|controller:=mpc limit_mode:=friction speed_mod_shape:=square speed:=0.54 accel:=1.50
+mpc_sq_v054_a150_r2|controller:=mpc limit_mode:=friction speed_mod_shape:=square speed:=0.54 accel:=1.50
+pp_sq_v054_a150_r1|controller:=pp speed_mod_shape:=square speed:=0.54 accel:=1.50
+adpp_sq_v054_a150_r1|controller:=adpp speed_mod_shape:=square speed:=0.54 accel:=1.50

@@ -146,3 +146,88 @@ def test_shutdown_sends_damping_last(teardown):
     out = g.command_publisher.publish.call_args_list[-1].args[0]
     assert out.mode == out.MODE_DAMPING
     g.destroy_node()
+
+
+# ── 텔레옵 모드 (2026-11-28): AUTO ↔ TELEOP 중 하나만 중계 ───────────────────────────────
+def make_mode_gate():
+    rclpy.init(args=['--ros-args', '-p', 'command_type:=torques', '-p', 'keyboard_enabled:=false',
+                     '-p', 'forward_on_receive:=true', '-p', 'teleop_input_topic:=/teleop_pi/cmd_raw'])
+    g = KeyboardCommandGate()
+    g.timer.cancel()
+    g.command_publisher = Mock()
+    g.state_publisher = Mock()
+    g.teleop_state_publisher = Mock()
+    return g
+
+
+def modes(g):
+    """마지막으로 낸 (/mpc/armed, /teleop/armed)."""
+    return (g.state_publisher.publish.call_args.args[0].data, g.teleop_state_publisher.publish.call_args.args[0].data)
+
+
+def last(g):
+    m = g.command_publisher.publish.call_args_list[-1].args[0]
+    return 'DAMPING' if m.mode == m.MODE_DAMPING else m.torque[0]
+
+
+def test_teleop_relays_only_teleop_input(teardown):
+    g = make_mode_gate()
+    g._on_teleop_command(torque_cmd(0.03))        # 켜기 전에 받은 텔레옵 명령
+    g._set_teleop(True, 'test')
+    assert modes(g) == (False, True) and last(g) == 'DAMPING'
+    g._publish_gated_command()
+    assert last(g) == 'DAMPING'                   # 켜기 전 묵은 명령은 내지 않는다
+    n = len(g.command_publisher.publish.call_args_list)
+    g._on_command(torque_cmd(0.5))                # MPC 경로는 TELEOP 에서 막힌다
+    assert len(g.command_publisher.publish.call_args_list) == n
+    g._on_teleop_command(torque_cmd(0.04))
+    assert last(g) == pytest.approx(0.04)
+    g.destroy_node()
+
+
+def test_auto_to_teleop_and_back(teardown):
+    g = make_mode_gate()
+    g._set_armed(True, 'RT')
+    g._on_command(torque_cmd(0.5))
+    assert modes(g) == (True, False) and last(g) == pytest.approx(0.5)
+    g._set_teleop(True, 'LT')                     # AUTO → TELEOP: 바로 DAMPING, /mpc/armed false (기준 시간 멈춤)
+    assert modes(g) == (False, True) and last(g) == 'DAMPING'
+    g._on_teleop_command(torque_cmd(0.04))
+    assert last(g) == pytest.approx(0.04)
+    g._set_armed(True, 'RT')                      # TELEOP → AUTO: 텔레옵 명령을 끊고, 무장 뒤 새 MPC 명령만
+    assert modes(g) == (True, False) and last(g) == 'DAMPING'
+    g._on_teleop_command(torque_cmd(0.04))
+    assert last(g) == 'DAMPING'
+    g._on_command(torque_cmd(0.6))
+    assert last(g) == pytest.approx(0.6)
+    g.destroy_node()
+
+
+def test_stop_kills_teleop_too(teardown):
+    """'s' · 패드 B · fault_monitor 는 모두 /mpc/arm false — TELEOP 도 꺼야 한다."""
+    g = make_mode_gate()
+    g._set_teleop(True, 'LT')
+    g._on_teleop_command(torque_cmd(0.04))
+    g._set_armed(False, 'B')
+    assert modes(g) == (False, False) and last(g) == 'DAMPING'
+    g._on_teleop_command(torque_cmd(0.04))
+    assert last(g) == 'DAMPING'
+    g.destroy_node()
+
+
+def test_teleop_timeout_sends_damping(teardown):
+    g = make_mode_gate()
+    g._set_teleop(True, 'LT')
+    g._on_teleop_command(torque_cmd(0.04))
+    g.teleop_command_time -= 1.0
+    g._publish_gated_command()
+    assert last(g) == 'DAMPING'
+    g.destroy_node()
+
+
+def test_teleop_off_when_topic_empty(teardown):
+    g = make_torque_gate(armed=False)
+    assert g.teleop_state_publisher is None
+    g._set_teleop(True, 'LT')                     # 텔레옵 입력이 없는 게이트 (teleop.launch.py 등) 는 무시
+    assert g.teleop is False and g.armed is False
+    g.destroy_node()

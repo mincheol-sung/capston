@@ -14,6 +14,8 @@
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>   <!-- state_estimator_node, 시뮬 센서 -->
   <depend>tf2_ros</depend>   <!-- sim_plant_torque_node 의 map → base_footprint TF -->
+  <exec_depend>std_srvs</exec_depend>   <!-- figure8_reference ~/new_run (2026-11-28 pitwall) -->
+  <exec_depend>visualization_msgs</exec_depend>   <!-- figure8_reference /figure8/status_marker -->
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-yaml</exec_depend>   <!-- config/plant.yaml 적재 (params.py) -->
 

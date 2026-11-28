@@ -6,6 +6,7 @@
   ② amr_perception_bringup/cartographer.launch.py      mode:=localization map:=<map> lua_basename:=<lua>
   ③ amr_mpc/torque_experiment.launch.py plant:=real    ak40_can_node(CAN 자동 준비) · IMU 회전 · robot_state_publisher · 추정기
                                                        use_mpc:=true 면 기준·MPC·게이트도 — 이 터미널에서 a = 무장, s/스페이스 = 정지
+                                                       게임패드 (2026-11-28, joy:=false 로 끔): RT = 자율 무장, LT = 수동 주행, B = 정지
   ④ amr_mpc/torque_viz.launch.py rviz:=false           map → base_footprint TF, 지나간 경로 (RViz 는 랩 PC 에서)
   (origin_mode 기본 robot — 무장한 자리가 출발점)
   ⑤ (auto_localize) localize_delay 초 뒤 tools/check_localization.py --apply 한 번 — "맞음" 이 로그에 나와야 한다
@@ -40,7 +41,7 @@ from launch.substitutions import LaunchConfiguration
 
 # torque_experiment.launch.py 로 그대로 넘기는 인자 (비우면 넘기지 않는다 → 그쪽 기본값·YAML)
 _PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_hat", "mu_hat_wheels", "wheel_load_share", "disturbance", "stiction_comp", "friction_comp", "use_w",
-         "origin_mode", "shape", "crossing_blend_m", "load_budget", "spin_rate", "speed_mod_amp", "speed_mod_cycles", "speed_mod_phase_deg", "speed_mod_shape", "lap_speeds",
+         "origin_mode", "shape", "crossing_blend_m", "load_budget", "spin_rate", "speed_mod_amp", "speed_mod_cycles", "speed_mod_phase_deg", "speed_mod_shape", "first_turn", "lap_speeds",
          "width", "height", "yaw_mode", "align_s",
          "seg_distance", "seg_dir_deg", "seg_angle_deg", "seg_yaw_rate", "seg_out_and_back", "seg_pause_s", "speed",
          "square_side", "square_corner_speed", "square_v_max", "square_yaw_blend", "square_corner_mode", "square_rot_s", "square_dwell_s", "poly_path",
@@ -48,9 +49,11 @@ _PASS = ["use_mpc", "controller", "wheel_odom", "log_prefix", "limit_mode", "mu_
          "zigzag_corner", "zigzag_corner_speed", "zigzag_turn_m",
          "accel", "max_ff_ratio", "laps", "hold_s", "max_track_error",
          "ramp_dir", "ramp_tau_max", "ramp_rate", "ramp_distance", "ramp_stop_distance", "ramp_inertia_ff", "ramp_log_dir",
-         "mpc_roller_rr", "mpc_inertia_z", "step_dir", "step_tau", "step_distance", "step_angle_deg", "step_max_time", "step_inertia_ff", "step_log_dir", "mpc_W", "mpc_com_height", "mpc_load_weighted_alloc", "mpc_load_dynamic_cap", "mpc_w_delta", "mpc_w_dudt", "mpc_r_u", "mpc_Nc", "mpc_Np", "mpc_q_null", "mpc_dist_alpha", "mpc_dist_accel_only", "mpc_dist_frame", "mpc_dist_freeze", "mpc_dist_acc_max", "mpc_dist_yaw_acc_max", "mpc_dist_observer", "mpc_target_projection", "mpc_cap_on", "mpc_cap_friction_shift", "use_fric_model", "mpc_fric_rolling", "slip_eta", "slip_eta_lambda_c", "slip_eta_s", "mpc_ff_normal_scale", "mpc_ff_normal_estimate", "mpc_ff_normal_q", "velocity_source", "est_pose_period", "pp_speed_source", "pp_kp", "pp_ki",
+         "mpc_roller_rr", "mpc_inertia_z", "step_dir", "step_tau", "step_distance", "step_angle_deg", "step_max_time", "step_inertia_ff", "step_log_dir", "mpc_W", "mpc_com_height", "mpc_load_weighted_alloc", "mpc_load_dynamic_cap", "mpc_w_delta", "mpc_w_dudt", "mpc_r_u", "mpc_Nc", "mpc_Np", "mpc_q_null", "mpc_dist_alpha", "mpc_dist_accel_only", "mpc_dist_frame", "mpc_dist_freeze", "mpc_dist_acc_max", "mpc_dist_yaw_acc_max", "mpc_dist_observer", "mpc_target_projection", "mpc_cap_on", "mpc_cap_friction_shift", "use_fric_model", "mpc_fric_rolling", "slip_eta", "slip_eta_lambda_c", "slip_eta_s", "slip_fb", "slip_fb_scale", "slip_fb_gain", "mpc_ff_normal_scale", "mpc_ff_normal_estimate", "mpc_ff_normal_q", "velocity_source", "est_pose_period", "pp_speed_source", "pp_kp", "pp_ki",
          "pp_lookahead_min", "pp_lookahead_max", "est_mode", "trip_on_pose_jump", "slip_guard", "est_gains", "est_noise",
-         "drive_yaw_deg", "drive_slip_coef", "max_com_height", "path_follow_lead"]                      # 2026-11-23 구동계 방향 보정 (torque_plant.yaml drive)
+         "drive_yaw_deg", "drive_slip_coef", "max_com_height", "path_follow_lead",   # 2026-11-23 구동계 방향 보정 (torque_plant.yaml drive)
+         "joy",                 # 2026-11-28 게임패드 RT 자율 · LT 수동 (plant real 기본 켬)
+         "ctrl_start"]          # 2026-11-28 controller:=all 처음 고를 제어기 (amrseq)
 
 
 # sensors.launch.py 로 넘기는 인자 (이름 바꿔서). 비우면 넘기지 않는다
@@ -157,7 +160,7 @@ def _nodes(context):
         if os.path.isfile(tool):
             check = ExecuteProcess(cmd=["/usr/bin/python3", tool, "--apply"], output="screen", name="check_localization")
             out.append(TimerAction(period=float(g("localize_delay")), actions=[
-                LogInfo(msg="[real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a 누르지 말 것"),
+                LogInfo(msg="[real_all] 측위 맞추기 (check_localization.py --apply) — 끝나면 큰 배너가 나온다. 그 전에 a · RT · LT 누르지 말 것"),
                 check]))
             # 2026-11-20: 끝났다는 줄이 Cartographer 로그에 묻혀 그 전에 무장했다가 측위 보정(1.6 m 튐)에 fault_monitor 가 섰다
             #   → 종료 코드 (check_localization.py: 0 맞음, 1 측위 결과 없음, 2 찾았지만 안 넣음, 3 지도 어디에도 안 맞음, 4 넣었는데 아직 안 맞음,
@@ -176,7 +179,7 @@ def _localize_banner(event, context):
            4: "/initialpose 를 넣었는데 아직 안 맞음",
            5: "/initialpose 뒤 새 trajectory 가 안 생김 — 측위 맞추기가 안 먹었다"}.get(code, f"종료 코드 {code}")
     if code == 0:
-        line, color = "측위 맞추기 끝: 맞음 — 이제 'a' 로 무장해도 된다", "\033[1;30;42m"
+        line, color = "측위 맞추기 끝: 맞음 — 이제 'a' · 패드 RT 로 무장 (LT 수동 주행) 해도 된다", "\033[1;30;42m"
     else:
         line, color = f"측위 맞추기 실패: {why} — 무장하지 말 것 (위 check_localization 출력 확인)", "\033[1;37;41m"
     bar = "█" * 72
