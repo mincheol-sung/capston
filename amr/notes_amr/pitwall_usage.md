@@ -154,7 +154,7 @@ amrall3 bag:=seq_s1        # = amrall use_mpc:=true controller:=all limit_mode:=
 2. 다른 터미널에서 경로 조건 → 순서:
 ```bash
 pit s1                     # 11-26 S1 circles8 (기준·PP 룩어헤드·fault 한계·MPC 값). s2 = zigzag, s3 = polyline
-amrseq                     # mpc → pp → adpp × 5 (세 경로 모두, zigzag 는 회차마다 180° 복귀 회전). --n 6 = zigzag fwd·rev 같은 수. --dry 로 할 일만
+amrseq                     # mpc → pp → adpp × 6 (세 경로 모두, zigzag 는 회차마다 180° 복귀 회전 — fwd·rev 3:3). --n 5 로 줄일 수 있다. --dry 로 할 일만
 ```
 3. 끝나면 다음 경로: `pit s2` → `amrseq` (launch 를 다시 켜지 않는다. bag 하나에 다 들어간다).
 4. 분석: `amrruns bags/…_seq_s1` — 판마다 `제어기 mpc|pp|adpp`, `amrseq 다리 i data|return 회차 r fwd|rev`. 스크립트는 `r["controller"]`·`r["seq"]` (복귀 다리 `kind == "return"` 는 뺀다).

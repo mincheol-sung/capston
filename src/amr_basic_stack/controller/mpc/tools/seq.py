@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """seq — controller:=all 스택에서 제어기를 번갈아 사람 없이 여러 회차를 돈다 (2026-11-28 사용자 결정).
 
-  amrseq                          지금 기준 (rqt · pit s1|s2|s3 로 맞춘 다음 판) 으로 mpc → pp → adpp 를 N 바퀴 (기본 5 — 2026-11-28 사용자 결정, 세 경로 모두)
+  amrseq                          지금 기준 (rqt · pit s1|s2|s3 로 맞춘 다음 판) 으로 mpc → pp → adpp 를 N 바퀴 (기본 6 — 2026-11-28 사용자 결정, 세 경로 모두)
   amrseq --n 6                    제어기마다 6 회차
   amrseq --order mpc,adpp         고를 제어기·순서
   amrseq --dry                    할 일만 출력 (무장 안 함)
@@ -89,10 +89,9 @@ def end_offset_of(cfg, v_limit, budget, k_geom):
 
 
 def default_n(shape):
-    """제어기마다 회차 수. 2026-11-28 사용자 결정 "s1, s2, s3 모두 5 바퀴를 기본값" → 모양과 무관하게 5.
-    (그 전: 세 경로 6 → 그 전: zigzag 6 · 그 밖 5.) zigzag 5 면 data 15 라 fwd·rev 가 제어기마다 3:2 또는 2:3, 끝은 B (A 반대편).
-    짝수로 맞추려면 --n 6."""
-    return 5
+    """제어기마다 회차 수. 2026-11-28 사용자 결정 "기본값 6 으로" → 모양과 무관하게 6 (zigzag fwd·rev 3:3, 끝나면 A).
+    (그 전: 세 경로 5 → 6 → zigzag 6 · 그 밖 5.) 5 바퀴는 --n 5."""
+    return 6
 
 
 class Abort(Exception):
@@ -320,7 +319,7 @@ def run(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
-    ap.add_argument("--n", type=int, default=0, help="제어기마다 회차 수 (0 = 기본 5)")
+    ap.add_argument("--n", type=int, default=0, help="제어기마다 회차 수 (0 = 기본 6)")
     ap.add_argument("--order", default=",".join(ORDER), help="제어기 순서 (기본 mpc,pp,adpp)")
     ap.add_argument("--return-ctrl", default="mpc", help="zigzag 복귀 회전을 할 제어기 (기본 mpc)")
     ap.add_argument("--settle", type=float, default=2.0, help="무장 전 로봇이 서 있어야 하는 시간 [s]")

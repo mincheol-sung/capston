@@ -61,6 +61,11 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-28 (10) — `amrseq` 기본 회차 수: 세 경로 모두 5 → 6
+- 왜: 사용자 (2026-11-28) "기본값 6 으로 바꿔줘" — μ̂ 0.60 · 배율 1.2 튜닝 뒤 세 경로 다시 돌기 전. zigzag 는 제어기마다 fwd·rev 3:3, 순서 끝에 A 로 돌아온다.
+- 바꾼 파일: `mpc/tools/seq.py` `default_n` (늘 6), 도움말·`amr_aliases.sh` 표·`pitwall_usage.md`, `test_seq_plan.py`. `--n 5` 로 예전처럼.
+- 확인: test_seq_plan 통과.
+
 ### 2026-11-28 (9) — MPC 기본값: μ̂ 0.33 → 0.60 (MPC 전용 키), 슬립 되먹임 배율 1.0 → 1.2
 - 왜: 사용자 (2026-11-28 밤) "바꿔줘". 원 · zigzag · polyline 세 경로에서 μ̂ × 되먹임 배율을 실차로 비교했다 (`analysis/torque_mpc_real/2026-11-28_c_sfb_q4/RESULTS_KO.md` 13 절).
   (0.60, 1.2) 가 세 경로 모두 위치 RMS 에서 PP·ADPP 를 이기고 (원 3.4 · zigzag 2.2 · polyline 2.7 cm), PP·ADPP 에 p < 0.05 로 지는 지표가 없다.

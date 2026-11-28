@@ -1,0 +1,375 @@
+<title>메카넘 AMR 상태공간 모델</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* 레이아웃: 한 줄 신호 사슬 (블록선도) → 식 블록마다 [수식 | 물리적 의미] 두 칸, 폰에서는 한 칸 */
+:root {
+  --bg: #f6f8fa; --panel: #ffffff; --ink: #18212b; --ink2: #4d5a68; --line: #d5dde6;
+  --accent: #1f6feb; --accent-soft: #e5efff; --warm: #b35c00; --warm-soft: #fff1e0;
+  --sans: "IBM Plex Sans KR", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141a; --panel: #161d25; --ink: #e6edf3; --ink2: #9aa8b6; --line: #2a3543;
+  --accent: #5ea3ff; --accent-soft: #162a44; --warm: #f0a54a; --warm-soft: #2e2213; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f141a; --panel: #161d25; --ink: #e6edf3; --ink2: #9aa8b6; --line: #2a3543;
+  --accent: #5ea3ff; --accent-soft: #162a44; --warm: #f0a54a; --warm-soft: #2e2213; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 40px 64px; display: grid; gap: 40px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
+h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 20px; font-weight: 600; }
+h3 { font-size: 15px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--ink2); font-size: 15.5px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+header { display: grid; gap: 10px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 20px; font-family: var(--mono); font-size: 12.5px; color: var(--ink2); }
+.facts b { color: var(--ink); font-weight: 500; }
+section { display: grid; gap: 16px; }
+.sec-head { display: grid; gap: 6px; }
+.chain { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
+.node { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; flex: 1 1 120px;
+  display: grid; gap: 2px; align-content: start; }
+.node .sym { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+.node .nm { font-weight: 600; font-size: 13.5px; }
+.node .ds { font-size: 12.5px; color: var(--ink2); line-height: 1.45; }
+.node.io { background: var(--accent-soft); border-color: transparent; }
+.arrow { align-self: center; color: var(--ink2); font-family: var(--mono); font-size: 14px; }
+.block { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.block + .block { margin-top: 0; }
+.math { padding: 18px 18px 12px; min-width: 0; overflow-x: auto; display: grid; gap: 8px; align-content: start; }
+.math .eq { min-height: 40px; }
+.mean { padding: 18px; border-left: 1px solid var(--line); display: grid; gap: 8px; align-content: start; min-width: 0; font-size: 14px; }
+.mean ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.mean li::marker { color: var(--ink2); }
+.tag { font-family: var(--mono); font-size: 11.5px; color: var(--ink2); }
+.copy { justify-self: start; font-family: var(--mono); font-size: 11.5px; color: var(--accent); background: transparent;
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+.copy:hover { border-color: var(--accent); }
+.copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.note { background: var(--warm-soft); color: var(--ink); border-radius: 6px; padding: 10px 14px; font-size: 13.5px; }
+.note b { color: var(--warm); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--ink2); font-size: 12.5px; }
+td.num, th.num { text-align: right; }
+footer { color: var(--ink2); font-size: 12.5px; display: grid; gap: 4px; }
+footer code, p code, li code { font-family: var(--mono); font-size: 12.5px; }
+mjx-container { color: var(--ink); }
+@media (max-width: 760px) {
+  .block { grid-template-columns: minmax(0, 1fr); }
+  .mean { border-left: 0; border-top: 1px solid var(--line); }
+  .arrow { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Torque-input MPC · prediction model</div>
+    <h1>메카넘 AMR 상태공간 모델</h1>
+    <p class="lede">바퀴 네 개의 토크가 로봇의 위치를 어떻게 바꾸는지를, MPC 가 예측에 쓰는 행렬 그대로 정리했습니다. 숫자는 2026-11-28 기본값(<code>torque_plant.yaml</code> · <code>torque_mpc.yaml</code>)입니다.</p>
+    <div class="facts">
+      <span>상태 <b>6</b> (위치 3 + 속도 3)</span><span>입력 <b>4</b> (바퀴 토크)</span><span>자유도 <b>3</b> (x · y · θ)</span>
+      <span>T<sub>s</sub> <b>0.01 s</b></span><span>N<sub>p</sub> <b>75</b> (0.75 s)</span><span>μ̂ <b>0.60</b> · 되먹임 배율 <b>1.2</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head"><h2>신호 사슬</h2><p class="lede">입력 행렬 B<sub>c</sub> 는 물리 단계 네 개의 곱입니다. 왼쪽에서 오른쪽으로 곱해 나가면 토크가 가속도가 됩니다.</p></div>
+    <div class="chain" role="img" aria-label="바퀴 토크에서 위치까지의 블록선도">
+      <div class="node io"><span class="sym">τ ∈ ℝ⁴</span><span class="nm">바퀴 토크</span><span class="ds">FL · FR · RL · RR [N·m]</span></div>
+      <span class="arrow">→</span>
+      <div class="node"><span class="sym">F (3×4)</span><span class="nm">힘 사상</span><span class="ds">바퀴 토크 → 몸체 힘·모멘트. 1/r, 롤러 45° 부호</span></div>
+      <span class="arrow">→</span>
+      <div class="node"><span class="sym">R(θ)</span><span class="nm">좌표 회전</span><span class="ds">몸체 좌표 → 지도 좌표</span></div>
+      <span class="arrow">→</span>
+      <div class="node"><span class="sym">M⁻¹</span><span class="nm">유효 질량</span><span class="ds">몸체 + 바퀴 회전 관성</span></div>
+      <span class="arrow">→</span>
+      <div class="node"><span class="sym">∫ ∫</span><span class="nm">이중 적분</span><span class="ds">가속도 → 속도 → 위치 (A<sub>c</sub>)</span></div>
+      <span class="arrow">→</span>
+      <div class="node io"><span class="sym">x ∈ ℝ⁶</span><span class="nm">상태</span><span class="ds">[x, y, θ, ẋ, ẏ, θ̇] (지도 좌표)</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>1. 운동 방정식과 상태공간</h2></div>
+    <div class="block">
+      <div class="math"><span class="tag">Newton–Euler (manipulator form)</span><div class="eq" data-eq="newton"></div><button class="copy" data-copy="newton" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>q = [x, y, θ]: 지도에서의 위치와 헤딩. 몸체 x 앞, y 왼쪽, θ 반시계 +.</li>
+          <li>좌변은 유효 질량 × 가속도, 우변 첫 항은 바퀴 토크가 만든 힘입니다.</li>
+          <li><b>h</b> 는 속도에 따라 붙는 항입니다(아래 5 절): 바퀴 관성의 회전 결합, 구동계 마찰, 롤러 구름 저항, 외란.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <div class="math"><span class="tag">continuous-time state space</span><div class="eq" data-eq="ss"></div><button class="copy" data-copy="ss" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>A<sub>c</sub> 의 윗줄 I<sub>3</sub>: 위치의 미분이 속도(운동학). 아랫줄이 0: 속도는 힘으로만 바뀝니다.</li>
+          <li>A<sub>c</sub> 는 3 자유도 <b>이중 적분기</b>이고, A<sub>c</sub>² = 0 (nilpotent) 입니다.</li>
+          <li>헤딩 θ 는 B<sub>c</sub> 안의 R(θ) 로만 들어갑니다. MPC 는 θ 자리에 기준 헤딩 θ<sub>r</sub> 를 넣어 지평 스텝마다 다른 B 를 씁니다(LTV).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>2. 입력 행렬의 세 인수</h2><p class="lede">r = 0.04 m, k = l<sub>x</sub> + l<sub>y</sub> = (0.1724 + 0.2140)/2 = 0.1932 m.</p></div>
+    <div class="block">
+      <div class="math"><span class="tag">force map (mecanum configuration matrix)</span><div class="eq" data-eq="F"></div><button class="copy" data-copy="F" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>행마다</h3>
+        <ul>
+          <li><b>1행 앞 힘</b>: 네 바퀴 모두 +. 같은 토크면 앞으로 갑니다.</li>
+          <li><b>2행 옆 힘</b>: FR·RL +, FL·RR −. 롤러가 45° 라 대각선 짝끼리 같은 부호입니다.</li>
+          <li><b>3행 요 모멘트</b>: 오른쪽(FR·RR) +, 왼쪽 −. 팔 길이 k.</li>
+          <li><b>영공간</b> n = [1, 1, −1, −1]: Fn = 0. 앞·뒤 바퀴가 서로 미는 성분은 몸체를 움직이지 않습니다(입력 4 > 자유도 3).</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <div class="math"><span class="tag">rotation body → map</span><div class="eq" data-eq="R"></div><button class="copy" data-copy="R" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>몸체 좌표에서 만든 힘 [F<sub>x</sub>, F<sub>y</sub>] 를 지도 좌표로 돌립니다. 모멘트는 그대로.</li>
+          <li>모델에서 유일한 헤딩 의존 부분입니다.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <div class="math"><span class="tag">effective mass (reflected wheel inertia)</span><div class="eq" data-eq="M"></div><button class="copy" data-copy="M" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>μ = 4J<sub>w</sub>/r² = 4 × 8.9·10⁻⁴ / 0.04² = <span class="num">2.225 kg</span>: 바퀴 네 개의 회전 관성을 몸체 질량으로 옮긴 값.</li>
+          <li>병진: 몸체 4.56 kg 에 2.225 kg 이 더해져 <span class="num">6.785 kg</span>. 유효 질량의 33 % 가 바퀴입니다.</li>
+          <li>회전: I<sub>z</sub> 0.03 에 μk² 0.083 이 더해져 <span class="num">0.113 kg·m²</span>. 요 관성의 73 % 가 바퀴입니다.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <div class="math"><span class="tag">input gain at θ = 0</span><div class="eq" data-eq="G"></div><button class="copy" data-copy="G" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>숫자로 읽기</h3>
+        <ul>
+          <li>한 바퀴에 1 N·m 를 주면 앞으로 <span class="num">3.68 m/s²</span>, 요 <span class="num">42.7 rad/s²</span>.</li>
+          <li>네 바퀴에 같은 0.1 N·m 를 주면 앞 가속 4 × 0.368 = <span class="num">1.47 m/s²</span>.</li>
+          <li>검산: 코드의 Python 모델 <code>TorquePlant.G(0)</code> 과 손 계산 차이 0.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note"><b>구동 방향 보정</b> MPC 는 F 의 앞·옆 두 행을 δ = 3.1° 돌려 씁니다(구동계 쪽 앞방향 어긋남 보정, 선회 계수 0.8). 위 숫자는 δ = 0 입니다.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>3. 이산화 (MPC 가 실제로 쓰는 식)</h2></div>
+    <div class="block">
+      <div class="math"><span class="tag">ZOH discretization, LTV along reference</span><div class="eq" data-eq="disc"></div><button class="copy" data-copy="disc" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>A<sub>c</sub>² = 0 이라 e<sup>A<sub>c</sub>T<sub>s</sub></sup> = I + A<sub>c</sub>T<sub>s</sub> 가 근사가 아니라 정확합니다. B 도 [T<sub>s</sub>²/2·G ; T<sub>s</sub>·G] 가 정확합니다(증강 행렬 지수와 차이 0).</li>
+          <li>한 스텝에 토크 1 N·m 가 바꾸는 양: 속도 T<sub>s</sub>·3.68 = <span class="num">0.037 m/s</span>, 위치 <span class="num">0.18 mm</span>.</li>
+          <li>지평 75 스텝마다 기준 헤딩 θ<sub>r,k</sub> 로 G 를 다시 계산합니다.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>4. 바퀴 속도: 같은 행렬의 전치</h2></div>
+    <div class="block">
+      <div class="math"><span class="tag">duality (Jacobian transpose / virtual work)</span><div class="eq" data-eq="dual"></div><button class="copy" data-copy="dual" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>미끄러지지 않으면 바퀴 각속도는 몸체 속도 u 에 Fᵀ 를 곱한 값입니다(메카넘 inverse kinematics).</li>
+          <li>힘 사상의 전치가 속도 사상입니다. 가상 일 τ·ω = (Fτ)·u 에서 나옵니다. 코드의 T⁻¹ 과 Fᵀ 차이 0.</li>
+          <li>슬립 되먹임은 실제 ω 와 이 무슬립 ω<sub>nom</sub> 의 차이를 씁니다(7 절).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>5. 속도 의존 항 h(q̇) — 켜져 있는 것</h2></div>
+    <div class="block">
+      <div class="math"><span class="tag">terms in the prediction</span><div class="eq" data-eq="h"></div><button class="copy" data-copy="h" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>항마다</h3>
+        <ul>
+          <li><b>바퀴 관성 회전 결합</b> μθ̇Sṗ: 바퀴 관성은 몸체 좌표에서만 작용해, 선회로 속도 방향이 돌 때 생깁니다. 1 m/s · 2 rad/s 면 옆 <span class="num">0.66 m/s²</span>. (manipulator form 의 C(q, q̇)q̇ 자리, 코드 이름 w 항)</li>
+          <li><b>구동계 마찰</b> τ<sub>b</sub>: 쿨롱 + 점성, 바퀴 속도 함수(벤치 측정값).</li>
+          <li><b>롤러 구름 저항</b> Q<sub>rr</sub>: 롤러마다 0.88 N. 옆걸음·회전에서만 생기고 직진에서는 0.</li>
+          <li><b>외란 추정</b> d̂: offset-free MPC 의 입력 외란(몸체 좌표, 시정수 1 s).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>6. 제약과 비용</h2></div>
+    <div class="block">
+      <div class="math"><span class="tag">constraints</span><div class="eq" data-eq="con"></div><button class="copy" data-copy="con" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li><b>모터</b>: 바퀴 토크 1.2 N·m.</li>
+          <li><b>바닥 마찰</b>: 바닥에 실제로 넘어가는 토크 P(τ − f) 를 묶습니다. P 는 모터 토크 중 바퀴 자신을 가속하는 몫을 뺀 바닥 몫입니다(앞 방향 0.672). f 는 구동계 마찰.</li>
+          <li>τ̄<sub>i</sub> = (r/√2)·μ̂·N<sub>i</sub>·c<sub>s</sub>, μ̂ 0.60 · c<sub>s</sub> 0.8 → <span class="num">[0.145 0.145 0.158 0.159] N·m</span> (FL FR RL RR, 뒤가 무거움).</li>
+          <li><b>변화율</b>: 한 스텝 Δτ̄ = τ̄/3.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <div class="math"><span class="tag">cost</span><div class="eq" data-eq="cost"></div><button class="copy" data-copy="cost" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>W = diag[80, 80, 10, 2, 2, 1]: 위치 오차를 가장 무겁게.</li>
+          <li>r<sub>Δ</sub> = 100/스텝: 토크 변화율 벌점(떨림 억제).</li>
+          <li>r<sub>U</sub> = 10: 목표 입력 U<sub>s</sub> 에서 벗어난 토크 벌점. U<sub>s</sub> 는 모델이 맞을 때 기준을 따라가는 데 드는 최소 노름 토크로, 영공간 성분이 0 입니다.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>7. MPC 바깥 슬립 되먹임</h2></div>
+    <div class="block">
+      <div class="math"><span class="tag">wheel-space slip feedback (LQR gain)</span><div class="eq" data-eq="sfb"></div><button class="copy" data-copy="sfb" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>바퀴가 무슬립 속도보다 빨리 돌면(헛돎) 그 바퀴 토크를 줄이고, 느리면(끌림) 늘립니다.</li>
+          <li>K<sub>ω</sub> = 배율 1.2 × LQR 대각 0.0162 = <span class="num">0.0194 N·m/(rad/s)</span>, 바퀴끼리 엮이지 않는 대각.</li>
+          <li>예: 림이 0.2 m/s(5 rad/s) 더 빠르면 그 바퀴에서 <span class="num">0.097 N·m</span> 를 뺍니다.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>8. 다 펼친 식</h2><p class="lede">c<sub>θ</sub> = cos θ, s<sub>θ</sub> = sin θ. 위 행렬을 원소까지 곱해 풀었습니다. 코드의 Python 모델 G(θ) 와 θ = 0, 0.7, −2.1 에서 차이 10⁻¹⁵ 이하입니다.</p></div>
+    <div class="block">
+      <div class="math"><span class="tag">A_c (6×6), B_c(θ) (6×4)</span><div class="eq" data-eq="Bfull"></div><button class="copy" data-copy="Bfull" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>a = 1/(r(m+μ)) = <span class="num">3.685</span>, b = k/(r(I<sub>z</sub>+μk²)) = <span class="num">42.72</span> (단위: 가속도 per N·m).</li>
+          <li>c<sub>θ</sub> ± s<sub>θ</sub> = √2 cos(θ ∓ 45°) 라서 각 바퀴 토크는 45° 대각선 방향으로 몸체를 밉니다. <b>FL·RR</b> 은 헤딩에서 오른쪽 45°(θ − 45°), <b>FR·RL</b> 은 왼쪽 45°(θ + 45°). 크기 a√2 = <span class="num">5.21 m/s²</span> per N·m.</li>
+          <li>요: 오른쪽 바퀴(FR·RR) 는 +, 왼쪽(FL·RL) 은 −.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <div class="math"><span class="tag">six scalar equations</span><div class="eq" data-eq="scalar"></div><button class="copy" data-copy="scalar" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>τ̃<sub>i</sub> = τ<sub>i</sub> − τ<sub>b,i</sub>: 모터 토크에서 구동계 마찰을 뺀, 바퀴가 실제로 쓰는 토크.</li>
+          <li>κ = μ/(m+μ) = <span class="num">0.328</span>: 바퀴 관성 회전 결합. 선회(θ̇) 중 속도에 수직한 가속.</li>
+          <li>Q<sub>y</sub>, Q<sub>z</sub>: 롤러 구름 저항(몸체 옆 힘·요 모멘트). 몸체 좌표라 ẍ·ÿ 에는 R(θ) 로 돌아 들어갑니다.</li>
+          <li>d̂ = [d<sub>x</sub>, d<sub>y</sub>, d<sub>θ</sub>]: 외란 추정(가속도 단위).</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <div class="math"><span class="tag">friction · roller terms</span><div class="eq" data-eq="terms"></div><button class="copy" data-copy="terms" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>값</h3>
+        <ul>
+          <li>쿨롱 c<sub>i</sub> = <span class="num">[0.0174 0.0206 0.0155 0.0157] N·m</span>, 점성 b<sub>i</sub> = <span class="num">[1.07 1.16 1.11 1.18]·10⁻³ N·m·s/rad</span>, ω<sub>s</sub> = 0.5 rad/s (벤치 측정).</li>
+          <li>F<sub>rr</sub> = 0.88 N, l<sub>x</sub> = 0.0862 m: 순수 옆걸음 Q<sub>y</sub> = −4√2F<sub>rr</sub> = <span class="num">−4.98 N</span>, 순수 회전 Q<sub>z</sub> = −4√2 l<sub>x</sub>F<sub>rr</sub> = <span class="num">−0.43 N·m</span> (실측 4.99 N · 0.37~0.44 N·m).</li>
+          <li>직진(v<sub>y</sub> = ω<sub>z</sub> = 0)이면 s<sub>f</sub> = s<sub>r</sub> = 0 이라 롤러 항이 0 입니다. sgn 은 코드에서 매끄럽게(|s| ≈ √(s² + s₀²)).</li>
+          <li>MPC 안에서는 이 항들을 기준 궤적의 속도로 미리 계산해 상수 c<sub>k</sub> 로 넣습니다(QP 는 선형 그대로).</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <div class="math"><span class="tag">discrete, T_s = 0.01 s</span><div class="eq" data-eq="Afull"></div><button class="copy" data-copy="Afull" type="button">LaTeX 복사</button></div>
+      <div class="mean">
+        <h3>뜻</h3>
+        <ul>
+          <li>위치는 한 스텝에 T<sub>s</sub>·속도 + T<sub>s</sub>²/2·가속도, 속도는 T<sub>s</sub>·가속도만큼 바뀝니다. 가속도는 위 ẍ, ÿ, θ̈ (θ 자리에 기준 θ<sub>r,k</sub>).</li>
+          <li>A 의 0 이 아닌 원소는 대각 1 과 위 오른쪽 블록의 0.01 뿐입니다.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>값과 출처</h2></div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>기호</th><th>뜻</th><th class="num">값</th><th>출처</th></tr></thead>
+        <tbody>
+          <tr><td>m</td><td>몸체 질량 (배터리 포함)</td><td class="num">4.56 kg</td><td>저울 실측 11-15</td></tr>
+          <tr><td>J<sub>w</sub></td><td>바퀴 회전 관성 (출력축 기준)</td><td class="num">8.9·10⁻⁴ kg·m²</td><td>벤치 4 개 평균 11-12</td></tr>
+          <tr><td>I<sub>z</sub></td><td>몸체 요 관성 (MPC)</td><td class="num">0.03 kg·m²</td><td>제자리 회전 식별 11-25</td></tr>
+          <tr><td>r, k</td><td>바퀴 반지름, l<sub>x</sub> + l<sub>y</sub></td><td class="num">0.04, 0.1932 m</td><td>torque_plant.yaml</td></tr>
+          <tr><td>N<sub>i</sub> 몫</td><td>바퀴 하중 몫 FL FR RL RR</td><td class="num">0.239 0.239 0.261 0.261</td><td>정지 저울 11-18</td></tr>
+          <tr><td>μ̂, c<sub>s</sub></td><td>MPC 마찰 상한 계수, 안전 계수</td><td class="num">0.60, 0.8</td><td>세 경로 실차 비교 11-28</td></tr>
+          <tr><td>F<sub>rr</sub></td><td>롤러 구름 저항</td><td class="num">0.88 N</td><td>옆·회전 단계 토크 11-25</td></tr>
+          <tr><td>δ</td><td>구동 방향 보정</td><td class="num">3.1°</td><td>꺾은선 12 판 맞춤 11-26</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <span>표준 개념: mecanum inverse kinematics (Muir &amp; Neuman 1987), Jacobian-transpose duality (Siciliano 외 2009 Robotics 3·7 장), ZOH 이산화, LTV MPC, offset-free MPC (Rawlings · Mayne · Diehl 2017 1 장), rolling resistance (Gillespie 1992).</span>
+    <span>코드: <code>mpc_cpp/include/amr_mpc_cpp/torque_mpc.hpp</code> 머리주석, <code>mpc/amr_mpc/torque/model.py</code>. "바퀴 관성 회전 결합" 은 설명용 이름입니다 (정식 용어 아님, 코드 이름 w 항).</span>
+  </footer>
+</div>
+
+<script>
+const EQ = {
+  newton: String.raw`\underbrace{\begin{bmatrix} m+\mu & 0 & 0\\ 0 & m+\mu & 0\\ 0 & 0 & I_z+\mu k^2\end{bmatrix}}_{M}\ddot{\mathbf q} \;=\; R(\theta)\,F\,\boldsymbol\tau \;+\; \mathbf h(\dot{\mathbf q}),\qquad \mathbf q=\begin{bmatrix}x\\y\\\theta\end{bmatrix}`,
+  ss: String.raw`\frac{d}{dt}\underbrace{\begin{bmatrix}\mathbf q\\ \dot{\mathbf q}\end{bmatrix}}_{\mathbf x\in\mathbb R^6} = \underbrace{\begin{bmatrix} 0_{3} & I_{3}\\ 0_{3} & 0_{3}\end{bmatrix}}_{A_c}\begin{bmatrix}\mathbf q\\ \dot{\mathbf q}\end{bmatrix} + \underbrace{\begin{bmatrix} 0_{3\times4}\\ M^{-1}R(\theta)F\end{bmatrix}}_{B_c(\theta)}\boldsymbol\tau + \begin{bmatrix}0\\ M^{-1}\mathbf h(\dot{\mathbf q})\end{bmatrix}`,
+  F: String.raw`F=\frac1r\begin{bmatrix} 1 & 1 & 1 & 1\\ -1 & 1 & 1 & -1\\ -k & k & -k & k\end{bmatrix} = \begin{bmatrix} 25 & 25 & 25 & 25\\ -25 & 25 & 25 & -25\\ -4.83 & 4.83 & -4.83 & 4.83\end{bmatrix}\;\begin{matrix}\leftarrow F_x\\ \leftarrow F_y\\ \leftarrow M_z\end{matrix},\qquad \boldsymbol\tau=\begin{bmatrix}\tau_{FL}\\\tau_{FR}\\\tau_{RL}\\\tau_{RR}\end{bmatrix}`,
+  R: String.raw`R(\theta)=\begin{bmatrix}\cos\theta & -\sin\theta & 0\\ \sin\theta & \cos\theta & 0\\ 0 & 0 & 1\end{bmatrix}`,
+  M: String.raw`M=\mathrm{diag}\!\left(m+\mu,\; m+\mu,\; I_z+\mu k^2\right)=\mathrm{diag}(6.785,\;6.785,\;0.113),\qquad \mu=\frac{4J_w}{r^2}=2.225\ \mathrm{kg}`,
+  G: String.raw`G(0)=M^{-1}F=\begin{bmatrix} 3.68 & 3.68 & 3.68 & 3.68\\ -3.68 & 3.68 & 3.68 & -3.68\\ -42.7 & 42.7 & -42.7 & 42.7\end{bmatrix}\;\begin{matrix}\mathrm{m/s^2}\ \text{per N·m}\\ \mathrm{m/s^2}\ \text{per N·m}\\ \mathrm{rad/s^2}\ \text{per N·m}\end{matrix}`,
+  disc: String.raw`\mathbf x_{k+1} = \underbrace{\begin{bmatrix} I_3 & T_sI_3\\ 0 & I_3\end{bmatrix}}_{A}\mathbf x_k + \underbrace{\begin{bmatrix}\tfrac{T_s^2}{2}\,G(\theta_{r,k})\\ T_s\,G(\theta_{r,k})\end{bmatrix}}_{B_k}\boldsymbol\tau_k + \mathbf c_k,\qquad G(\theta)=M^{-1}R(\theta)F,\quad T_s=0.01\ \mathrm s`,
+  dual: String.raw`\boldsymbol\omega_{\mathrm{nom}} = F^{\top}\mathbf u,\qquad \mathbf u = R(\theta)^{\top}\dot{\mathbf q}=\begin{bmatrix}v_x\\v_y\\\omega_z\end{bmatrix},\qquad \boldsymbol\tau^{\top}\boldsymbol\omega = (F\boldsymbol\tau)^{\top}\mathbf u`,
+  h: String.raw`\mathbf h(\dot{\mathbf q}) = \underbrace{\begin{bmatrix}\mu\,\dot\theta\,S\,\dot{\mathbf p}\\ 0\end{bmatrix}}_{\text{wheel inertia}} \;-\; R(\theta)F\,\underbrace{\boldsymbol\tau_b(\boldsymbol\omega)}_{\text{drivetrain friction}} \;+\; R(\theta)\underbrace{Q_{rr}(\mathbf u)}_{\text{roller rolling}} \;+\; M\hat{\mathbf d},\qquad S=\begin{bmatrix}0&-1\\1&0\end{bmatrix},\ \dot{\mathbf p}=\begin{bmatrix}\dot x\\\dot y\end{bmatrix}`,
+  con: String.raw`|\tau_{i}| \le 1.2,\qquad \bigl|\bigl(P(\boldsymbol\tau-\mathbf f)\bigr)_i\bigr| \le \bar\tau_i=\frac{r}{\sqrt2}\,\hat\mu\,N_i\,c_s,\qquad |\Delta\tau_i|\le \tfrac13\bar\tau_i,\qquad P = I_4 - J_w F^{\top}M^{-1}F`,
+  cost: String.raw`J=\sum_{j=1}^{N_p}\bigl\|\mathbf x_j-\mathbf x_{r,j}\bigr\|_W^2+r_\Delta\sum_{j=0}^{N_c-1}\bigl\|\boldsymbol\tau_j-\boldsymbol\tau_{j-1}\bigr\|^2+r_U\sum_{j=0}^{N_c-1}\bigl\|\boldsymbol\tau_j-\mathbf U_{s,j}\bigr\|^2,\qquad W=\mathrm{diag}(80,80,10,2,2,1)`,
+  Bfull: String.raw`A_c=\begin{bmatrix} 0&0&0&1&0&0\\ 0&0&0&0&1&0\\ 0&0&0&0&0&1\\ 0&0&0&0&0&0\\ 0&0&0&0&0&0\\ 0&0&0&0&0&0\end{bmatrix},\qquad B_c(\theta)=\begin{bmatrix} 0&0&0&0\\ 0&0&0&0\\ 0&0&0&0\\ a(c_\theta+s_\theta) & a(c_\theta-s_\theta) & a(c_\theta-s_\theta) & a(c_\theta+s_\theta)\\ a(s_\theta-c_\theta) & a(s_\theta+c_\theta) & a(s_\theta+c_\theta) & a(s_\theta-c_\theta)\\ -b & b & -b & b\end{bmatrix}\begin{matrix}\\\\\\ \leftarrow \ddot x\\ \leftarrow \ddot y\\ \leftarrow \ddot\theta\end{matrix}`,
+  scalar: String.raw`\begin{aligned} \tfrac{d}{dt}x &= \dot x,\qquad \tfrac{d}{dt}y = \dot y,\qquad \tfrac{d}{dt}\theta = \dot\theta\\[4pt] \ddot x &= a\bigl[(c_\theta+s_\theta)(\tilde\tau_{FL}+\tilde\tau_{RR}) + (c_\theta-s_\theta)(\tilde\tau_{FR}+\tilde\tau_{RL})\bigr] - \kappa\,\dot\theta\,\dot y - \frac{s_\theta}{m+\mu}Q_y + d_x\\ \ddot y &= a\bigl[(s_\theta-c_\theta)(\tilde\tau_{FL}+\tilde\tau_{RR}) + (s_\theta+c_\theta)(\tilde\tau_{FR}+\tilde\tau_{RL})\bigr] + \kappa\,\dot\theta\,\dot x + \frac{c_\theta}{m+\mu}Q_y + d_y\\ \ddot\theta &= b\bigl[(\tilde\tau_{FR}+\tilde\tau_{RR}) - (\tilde\tau_{FL}+\tilde\tau_{RL})\bigr] + \frac{Q_z}{I_z+\mu k^2} + d_\theta \end{aligned}`,
+  terms: String.raw`\begin{aligned} \tilde\tau_i &= \tau_i - \tau_{b,i},\qquad \tau_{b,i} = c_i\tanh(\omega_i/\omega_s) + b_i\,\omega_i\\ \begin{bmatrix}\omega_{FL}\\\omega_{FR}\\\omega_{RL}\\\omega_{RR}\end{bmatrix} &= \frac1r\begin{bmatrix} 1&-1&-k\\ 1&1&k\\ 1&1&-k\\ 1&-1&k\end{bmatrix}\begin{bmatrix}v_x\\v_y\\\omega_z\end{bmatrix},\qquad \begin{aligned} v_x &= c_\theta\dot x + s_\theta\dot y\\ v_y &= -s_\theta\dot x + c_\theta\dot y\\ \omega_z &= \dot\theta\end{aligned}\\ Q_y &= -2\sqrt2\,F_{rr}\bigl[\mathrm{sgn}(s_f)+\mathrm{sgn}(s_r)\bigr],\qquad Q_z = -2\sqrt2\,F_{rr}\,l_x\bigl[\mathrm{sgn}(s_f)-\mathrm{sgn}(s_r)\bigr]\\ s_f &= \sqrt2\,(v_y + l_x\omega_z),\qquad s_r = \sqrt2\,(v_y - l_x\omega_z) \end{aligned}`,
+  Afull: String.raw`\begin{bmatrix} x\\ y\\ \theta\\ \dot x\\ \dot y\\ \dot\theta\end{bmatrix}_{k+1} = \begin{bmatrix} 1&0&0&0.01&0&0\\ 0&1&0&0&0.01&0\\ 0&0&1&0&0&0.01\\ 0&0&0&1&0&0\\ 0&0&0&0&1&0\\ 0&0&0&0&0&1\end{bmatrix}\begin{bmatrix} x\\ y\\ \theta\\ \dot x\\ \dot y\\ \dot\theta\end{bmatrix}_{k} + \begin{bmatrix} 5\cdot10^{-5}\,\ddot x_k\\ 5\cdot10^{-5}\,\ddot y_k\\ 5\cdot10^{-5}\,\ddot\theta_k\\ 0.01\,\ddot x_k\\ 0.01\,\ddot y_k\\ 0.01\,\ddot\theta_k\end{bmatrix}`,
+  sfb: String.raw`\boldsymbol\tau_{\mathrm{cmd}} = \boldsymbol\tau_{\mathrm{MPC}} - K_\omega\bigl(\boldsymbol\omega - F^{\top}\hat{\mathbf u}\bigr),\qquad K_\omega = 1.2\times 0.0162\,I_4 = 0.0194\,I_4\ \ \mathrm{N\,m/(rad/s)}`
+};
+function fill() {
+  document.querySelectorAll("[data-eq]").forEach(el => { el.textContent = "\\[" + EQ[el.dataset.eq] + "\\]"; });
+}
+document.addEventListener("click", ev => {
+  const b = ev.target.closest(".copy"); if (!b) return;
+  const tex = EQ[b.dataset.copy];
+  const done = () => { const t = b.textContent; b.textContent = "복사됨"; setTimeout(() => { b.textContent = t; }, 1400); };
+  const fallback = () => {
+    const ta = document.createElement("textarea"); ta.value = tex; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(); } catch (e) { b.textContent = "선택해서 복사하세요"; } ta.remove();
+  };
+  try { navigator.clipboard.writeText(tex).then(done, fallback); } catch (e) { fallback(); }
+});
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  startup: { typeset: false, ready() { MathJax.startup.defaultReady(); fill(); MathJax.typesetPromise(); } }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>

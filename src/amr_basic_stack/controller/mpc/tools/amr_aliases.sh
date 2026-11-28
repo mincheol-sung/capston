@@ -30,7 +30,7 @@
 #   amrpit                   rqt_reconfigure (랩 PC 등 화면 있는 곳). 기준 노드·MPC 노드 값을 GUI 로. RViz 에 다음 판 경로·상태 글자 (torque_real.rviz)
 #   amrruns bag... [--changes]  bag 하나에 든 여러 판을 나눠 판마다 조건·MPC 값·앞 판과 다른 값 (tools/bag_runs.py). amrcmp 에 --runs 면 판마다 한 줄
 #   amrall3 [인자...]        (2026-11-28) amrall + 세 제어기 다 (controller:=all, MPC friction, 녹화 켬) — 회차마다 controller_select 가 하나만 무장
-#   amrseq  [--n N ...]      (2026-11-28) amrall3 스택에서 mpc → pp → adpp 를 사람 없이 N 바퀴 (기본 5, zigzag 는 복귀 180° 회전). 순서: 배너 → pit s1|s2|s3 → amrseq. tools/seq.py -h
+#   amrseq  [--n N ...]      (2026-11-28) amrall3 스택에서 mpc → pp → adpp 를 사람 없이 N 바퀴 (기본 6, zigzag 는 복귀 180° 회전). 순서: 배너 → pit s1|s2|s3 → amrseq. tools/seq.py -h
 #   amrhelp                  이 표
 #   예) amrmpc shape:=line seg_distance:=0.4 seg_dir_deg:=45 speed:=0.10 limit_mode:=friction mu_hat:=0.55
 #       amrmove --dirs fwd,back --amps 0.1 --time 0.5

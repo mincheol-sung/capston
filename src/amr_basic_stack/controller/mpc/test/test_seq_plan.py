@@ -22,7 +22,7 @@ def test_plan_closed_paths_interleave():
     assert len(legs) == 18 and all(g["kind"] == "data" and g["dir"] is None for g in legs)
     assert [g["ctrl"] for g in legs[:6]] == ["mpc", "pp", "adpp", "mpc", "pp", "adpp"]
     assert [g["i"] for g in legs] == list(range(1, 19))
-    assert default_n("circles8") == default_n("polyline") == default_n("zigzag") == 5   # 2026-11-28 세 경로 모두 5
+    assert default_n("circles8") == default_n("polyline") == default_n("zigzag") == 6   # 2026-11-28 세 경로 모두 6
 
 
 def test_plan_zigzag_returns_and_direction_balance():
