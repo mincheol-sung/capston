@@ -30,7 +30,7 @@ s1:
               first_turn: left, yaw_mode: tangent, start_delay: 3.0, hold_s: 5.0}
   pp: {lookahead_time: 0.5, lookahead_min: 0.30, lookahead_max: 0.30, adpp_lookahead_time: 0.5, adpp_lookahead_min: 0.15, adpp_lookahead_max: 0.60}
   fault: {max_track_error: 0.5}
-  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.0}
+  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.2, mu_hat: 0.60}   # 2026-11-28 기본값 (μ̂ 0.60 · 배율 1.2)
 
 s2:
   description: S2 zigzag — 직선 5 개 × 2 m · 30° · square · 꼭짓점 통과 0.3 m/s · 최고 = 부하 예산 · accel 1.15 (11-26 기준 회차 200634 는 9 개 × 1 m)
@@ -42,7 +42,7 @@ s2:
   # 11-26 zigzag 는 PP·ADPP 모두 pp_lookahead_min:=0.1 pp_lookahead_max:=0.2 → lookahead_time 이 둘 다 0.5 라 두 제어기 룩어헤드가 같았다
   pp: {lookahead_time: 0.5, lookahead_min: 0.10, lookahead_max: 0.20, adpp_lookahead_time: 0.5, adpp_lookahead_min: 0.10, adpp_lookahead_max: 0.20}
   fault: {max_track_error: 0.5}
-  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.0}
+  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.2, mu_hat: 0.60}   # 2026-11-28 기본값 (μ̂ 0.60 · 배율 1.2)
 
 s3:
   description: 11-26 S3 polyline — R1,L1,L2,R1,R1,R2 · 최고 1.5 m/s · accel 1.5 · 꼭짓점 통과 (기준 회차 201944 · 202049 · 202150, = poly)
@@ -52,4 +52,4 @@ s3:
               start_delay: 3.0, hold_s: 5.0}
   pp: {lookahead_time: 0.5, lookahead_min: 0.30, lookahead_max: 0.30, adpp_lookahead_time: 0.5, adpp_lookahead_min: 0.15, adpp_lookahead_max: 0.60}
   fault: {max_track_error: 1.5}
-  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.0}
+  mpc: {W: [80.0, 80.0, 10.0, 2.0, 2.0, 1.0], slip_fb_enable: true, slip_fb_scale: 1.2, mu_hat: 0.60}   # 2026-11-28 기본값 (μ̂ 0.60 · 배율 1.2)

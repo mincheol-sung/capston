@@ -19,6 +19,12 @@ torque_limit:
                         #   2026-11-25 사용자 결정 "기본으로 넣어": 기본 ground (그 전 total). 이번 실행만: launch mpc_cap_on:=total
                         #   (P = I − J_w Fᵀ M_eff⁻¹ F, 바퀴 관성 몫 제외 — 앞 1.94 → 2.88 m/s², analysis/.../2026-11-21_line_accel/GROUND_CAP_REVIEW_KO.md).
                         #   launch 인자 mpc_cap_on:=ground
+  mu_hat: 0.60          # 2026-11-28 사용자 결정 "바꿔줘": MPC friction 상한에 쓰는 μ̂ (파라미터 단위, 상한 τ̄ = (r/√2)·μ̂·N_i·c_s, c_s 0.8 → 물리 μ 0.48).
+                        #   MPC 노드만 읽는다. 기준 노드 부하 예산 (fig8_limits·zigzag)·Python 모델·시뮬은 torque_plant.yaml surface.mu_hat 0.33 그대로
+                        #   (실차 비교는 pit set mu_hat 으로 MPC 값만 바꿔서 했다 — 같은 조건이 되게 따로 둔다). 키를 지우면 예전처럼 surface.mu_hat.
+                        #   근거: 원 · zigzag · polyline 세 경로 μ̂ 0.33~0.80 × 되먹임 배율 0.7~1.4 실차 (analysis/torque_mpc_real/2026-11-28_c_sfb_q4/RESULTS_KO.md 13 절):
+                        #   (0.60, 1.2) 가 세 경로 모두 위치에서 PP·ADPP 를 이기고 (비 0.31~0.79), 슬립은 polyline 에서 절반 · 원·zigzag 같은 수준 (지는 칸 유의 없음).
+                        #   예전 값으로: launch mu_hat:=0.33 (기준 부하 예산도 같이 바뀐다 — MPC 만이면 pit set mu_hat=0.33)
   # ── 마찰 상한 옮김 (2026-11-24, 11-23 교수님 회의 후속 지시서 T1 7단계 (B). 식은 torque_mpc.hpp 머리주석 "마찰 상한 옮김")
   #    torque_output 마찰 보상을 끈 판 (launch friction_comp:=false) 에서는 MPC 의 τ 가 모터 토크라, 구동계 마찰 f 만큼이 바닥에 안 간다.
   #    friction 상한 상자를 f 만큼 옮긴다:  −τ̄ + f ≤ τ ≤ τ̄ + f  (cap_on ground 면 바닥 토크 행을 P f 만큼).
@@ -131,7 +137,8 @@ slip_eta:
 slip_feedback:
   enable: true          # 2026-11-28 사용자 결정 "true 로 바꿔": 11-27 Q 튜닝 (tuning.W [80, 80, 10, 2, 2, 1]) 을 이 되먹임 (lqr, 배율 1.0) 을 켠 채로 했으므로
                         #   기본값도 그 조합으로. (이전: false — 2026-11-27 (2) 도입 때 "기본 끔")
-  gain_scale: 1.0       # K_ω 에 곱하는 배율 (0 ~ 5). lqr 대각 0.0162 N·m/(rad/s). 2026-11-27 실차 (friction · circles8 width 2.0 · blend 0):
+  gain_scale: 1.2       # 2026-11-28 사용자 결정 "바꿔줘": 1.0 → 1.2 (위 torque_limit.mu_hat 0.60 과 한 쌍, RESULTS_KO.md 13 절). 이번 실행만: slip_fb_scale:=1.0
+                        # K_ω 에 곱하는 배율 (0 ~ 5). lqr 대각 0.0162 N·m/(rad/s). 2026-11-27 실차 (friction · circles8 width 2.0 · blend 0):
                         #   ① 1.0 m/s · accel 1.0, 배율 1.0~1.5 19 판: > 50 % 슬립 시간은 배율과 무관 (p 0.32), 미끄럼 속도 r·e_ω RMS 13.1→11.2 cm/s,
                         #      위치 RMS 9.7→12.8 cm → 한때 1.4 로 (11-27 (4)).
                         #   ② 0.8 m/s · accel 1.0 (원이 마찰 상한 안, Q 튜닝 시나리오), 1.4 vs 1.0 각 3 판: 슬립 같거나 1.0 이 적음

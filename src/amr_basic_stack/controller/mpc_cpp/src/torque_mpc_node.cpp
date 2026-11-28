@@ -132,7 +132,9 @@ public:
     md.use_w = declare_parameter<bool>("use_w", ym["model_terms"] ? ym["model_terms"]["use_w"].as<bool>(false) : false);
     md.tau_rated = yp["motor"]["tau_rated_Nm"].as<double>();
     md.tau_fric_max = yp["friction"]["tau_fric_max_Nm"].as<double>();
-    md.mu_hat = declare_parameter<double>("mu_hat", yp["surface"]["mu_hat"].as<double>());
+    // 2026-11-28: MPC 전용 μ̂ (torque_mpc.yaml torque_limit.mu_hat) 가 있으면 그것, 없으면 torque_plant.yaml surface.mu_hat (기준 노드 부하 예산과 공유)
+    md.mu_hat = declare_parameter<double>("mu_hat", ym["torque_limit"]["mu_hat"] ?
+      ym["torque_limit"]["mu_hat"].as<double>() : yp["surface"]["mu_hat"].as<double>());
     // 바퀴별 수직력 몫 [FL, FR, RL, RR] (2026-11-19, torque_plant.yaml body.wheel_load_share — 정지 저울 측정).
     //   비우면 1/4 씩. 합이 1 ± 5 % 밖이거나 0.1~0.4 밖이면 기동 실패, 안이면 합 1 로 맞춘다
     const std::vector<double> share = declare_parameter<std::vector<double>>(

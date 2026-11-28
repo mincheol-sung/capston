@@ -61,6 +61,22 @@ mkdir -p ~/restore && tar -xzf ~/Documents/amr_ws/stack_baseline/2026-11-10_1924
 
 ## 변경 기록
 
+### 2026-11-28 (9) — MPC 기본값: μ̂ 0.33 → 0.60 (MPC 전용 키), 슬립 되먹임 배율 1.0 → 1.2
+- 왜: 사용자 (2026-11-28 밤) "바꿔줘". 원 · zigzag · polyline 세 경로에서 μ̂ × 되먹임 배율을 실차로 비교했다 (`analysis/torque_mpc_real/2026-11-28_c_sfb_q4/RESULTS_KO.md` 13 절).
+  (0.60, 1.2) 가 세 경로 모두 위치 RMS 에서 PP·ADPP 를 이기고 (원 3.4 · zigzag 2.2 · polyline 2.7 cm), PP·ADPP 에 p < 0.05 로 지는 지표가 없다.
+- 바꾼 파일:
+  - `mpc/config/torque_mpc.yaml`: 새 키 `torque_limit.mu_hat: 0.60` (MPC 전용). `slip_feedback.gain_scale` 1.0 → 1.2.
+  - `mpc_cpp/src/torque_mpc_node.cpp`: `mu_hat` 파라미터 기본값을 `torque_limit.mu_hat` 에서 먼저 읽고, 없으면 예전처럼 `torque_plant.yaml surface.mu_hat`.
+  - `mpc/config/pitwall_presets.yaml`: s1 · s2 · s3 의 mpc 묶음 `slip_fb_scale` 1.0 → 1.2, `mu_hat: 0.60` 추가. 그대로 두면 `pit sN` 이 배율을 1.0 으로 되돌린다.
+- 안 바꾼 것: `torque_plant.yaml surface.mu_hat` 0.33. 기준 노드 부하 예산 (`fig8_limits` · zigzag 최고 속도), Python 모델, 시뮬이 읽는 값이다.
+  실험 때도 `pit set mu_hat` 으로 MPC 만 바꿨으니 같은 조건이다. launch `mu_hat:=` 는 부하 예산까지 바꾸니 MPC 만 바꿀 때는 `pit set mu_hat=`.
+- 확인:
+  - `colcon build --packages-select amr_mpc_cpp` 성공.
+  - 격리 도메인 97 에서 노드 기동 로그: μ̂ 0.60, 바닥 상한 [0.1450 0.1453 0.1584 0.1586] N·m (= 0.33 값 × 0.60/0.33), K_ω 배율 1.20, W [80, 80, 10, 2, 2, 1].
+  - pytest test_seq_plan · test_launch_modes 224 통과.
+  - 실차로 새 기본값 그대로 띄운 판은 아직 없다 (실험 판은 pit 로 같은 값을 넣은 것).
+- 되돌리려면: `torque_limit.mu_hat` 줄을 지우고 (또는 0.33), gain_scale 1.0, 프리셋 slip_fb_scale 1.0 · mu_hat 줄 삭제. 노드는 키가 없으면 surface.mu_hat 을 쓴다.
+
 ### 2026-11-28 (8) — `amrseq`: zigzag_n 짝수 거부 (복귀 뒤 rev 회차가 다른 바닥)
 - 왜: 직선 길이 후보 계산 중 발견 — 180° 복귀 뒤 rev 회차가 fwd 와 같은 바닥 선을 지나는 것은 zigzag_n 홀수일 때만 (5 · 2.5 m: 0.00 cm, 4 · 2.5 m: 최대 2.18 m). 짝수도 출발점에는 돌아온다.
 - 바꾼 파일: `mpc/tools/seq.py` (짝수면 중단, `--allow-even`), `test_seq_plan.py` (n 3 · 4 · 5).
